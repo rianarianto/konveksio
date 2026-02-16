@@ -62,5 +62,10 @@
 - Form configured: Name, Address, Phone
 - Table configured: Name, Address, Phone, Created At
 - Multi-tenancy scope automatically applies to resource queries
+- **Fixes**:
+  - `User` model now implements `HasTenants` native interface
+  - `AdminPanelProvider` configured with `tenant(Shop::class)`
+  - `ShopResource` decoupled from tenant scope (`$isScopedToTenant = false`)
+  - **Tenant Registration**: Implemented `RegisterShop` page to handle new shop creation flow
 
 ---

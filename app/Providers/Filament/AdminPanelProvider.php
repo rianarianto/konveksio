@@ -27,6 +27,8 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->tenant(\App\Models\Shop::class)
+            ->tenantRegistration(\App\Filament\Pages\Tenancy\RegisterShop::class)
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
             ->colors([
                 'primary' => '#7F00FF',
