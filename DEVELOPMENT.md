@@ -34,6 +34,14 @@
 - Filament v3 installed with `filament/filament:^3.3` (requires PHP 8.2+)
 - Admin panel created (ID: admin) with default theme
 - First user 'Owner' created manually
+- **Theme Customization**:
+  - Font: **Rethink Sans**
+  - Primary Color: **#7F00FF** (Purple)
+  - Custom Login Page:
+    - Split-screen design (CSS Grid/Flexbox)
+    - Illustration placeholder on right
+    - Custom input styling (Soft Gray #F9F9F9)
+    - Custom "Sign In" header alignment
 
 #### ✅ Phase 2: Database & Models (COMPLETED)
 - `shops` table created (id, name, address, phone, timestamps)

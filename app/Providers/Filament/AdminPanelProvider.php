@@ -27,10 +27,11 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(\App\Filament\Pages\Auth\CustomLogin::class)
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => '#7F00FF',
             ])
+            ->font('Rethink Sans')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
@@ -54,6 +55,18 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+            ])
+            ->renderHook(
+                \Filament\View\PanelsRenderHook::SIMPLE_LAYOUT_END,
+                fn () => view('filament.login-illustration'),
+                scopes: \App\Filament\Pages\Auth\CustomLogin::class,
+            )
+            ->renderHook(
+                \Filament\View\PanelsRenderHook::STYLES_AFTER,
+                fn () => new \Illuminate\Support\HtmlString('
+                    <link rel="stylesheet" href="' . asset('css/custom-login.css') . '">
+                '),
+            )
+            ->brandName('Konveksio');
     }
 }

@@ -17,8 +17,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('role', ['owner', 'admin', 'designer']);
-            $table->foreignId('shop_id')->nullable();
+            $table->enum('role', ['owner', 'admin', 'designer'])->default('admin');
+            $table->foreignId('shop_id')->nullable()->constrained('shops')->onDelete('cascade');
             $table->rememberToken();
             $table->timestamps();
         });

@@ -1,0 +1,197 @@
+/* ===================================
+   Konveksio Custom Login - Split Screen
+   =================================== */
+
+/* Page background */
+/* Page background */
+body:has(.login-illustration-panel) {
+    background-color: #f0f0f0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+}
+
+/* Card container */
+.fi-simple-layout:has(.login-illustration-panel) {
+    display: flex !important;
+    flex-direction: row !important;
+    max-width: 960px !important;
+    min-height: 60vh !important;
+    width: 90% !important;
+    /* Responsive width */
+    background: #fff !important;
+    border-radius: 1.5rem !important;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.12) !important;
+    overflow: hidden !important;
+    position: relative !important;
+    /* Removed margin: 5vh auto to let body flex center it */
+    margin: 0 !important;
+}
+
+
+/* Left side - form area */
+.fi-simple-layout:has(.login-illustration-panel)>.fi-simple-main-ctn {
+    flex: 1 !important;
+    max-width: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 3rem !important;
+    background: #fff !important;
+    border: none !important;
+}
+
+.fi-simple-layout:has(.login-illustration-panel) .fi-simple-main {
+    width: 100% !important;
+    max-width: 380px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    /* Ensure transparent */
+    box-shadow: none !important;
+    /* Clear any default shadow */
+    border: none !important;
+    /* Clear any default border */
+}
+
+/* Clear styles for the inner card provided by Filament */
+.fi-simple-layout:has(.login-illustration-panel) .fi-simple-main>div,
+.fi-simple-layout:has(.login-illustration-panel) .fi-simple-main section {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+/* Hide brand logo on login */
+.fi-simple-layout:has(.login-illustration-panel) .fi-logo {
+    display: none !important;
+}
+
+/* Heading style */
+.fi-simple-layout:has(.login-illustration-panel) .fi-simple-page .fi-page-heading,
+.fi-simple-layout:has(.login-illustration-panel) h1 {
+    text-align: left !important;
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+    color: #111 !important;
+    width: 100% !important;
+    display: block !important;
+}
+
+.fi-simple-layout:has(.login-illustration-panel) .fi-simple-page .fi-page-sub-heading,
+.fi-simple-layout:has(.login-illustration-panel) p.text-sm {
+    text-align: left !important;
+    color: #666 !important;
+    font-size: 0.9rem !important;
+    width: 100% !important;
+    display: block !important;
+}
+
+/* Force left alignment on the header container */
+.fi-simple-layout:has(.login-illustration-panel) .fi-simple-page .fi-header {
+    align-items: flex-start !important;
+    text-align: left !important;
+}
+
+/* Right side - illustration panel */
+.login-illustration-panel {
+    flex: 1 !important;
+    display: flex !important;
+    background: #f5f5f5 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 100% !important;
+    margin-right: 3rem !important;
+}
+
+.login-illustration-content {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    padding: 2.5rem !important;
+    text-align: left !important;
+}
+
+/* Footer hide on login */
+.fi-simple-layout:has(.login-illustration-panel) .fi-simple-footer {
+    display: none !important;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .fi-simple-layout:has(.login-illustration-panel) {
+        flex-direction: column !important;
+        max-width: 95% !important;
+        min-height: auto !important;
+        margin: 2vh auto !important;
+    }
+
+    .fi-simple-layout:has(.login-illustration-panel)>.fi-simple-main-ctn {
+        max-width: 100% !important;
+    }
+
+    .login-illustration-panel {
+        display: none !important;
+    }
+
+    .fi-simple-layout:has(.login-illustration-panel)::before {
+        width: 80px !important;
+        height: 20px !important;
+    }
+}
+
+/* Custom Input Styling */
+.fi-simple-layout:has(.login-illustration-panel) input.custom-input {
+    background-color: #F9F9F9 !important;
+    border: 0.2px solid #E9E9E9 !important;
+    border-radius: 0.5rem !important;
+    /* Space for icon if any, though Filament handles icons via prefix */
+    color: #374151 !important;
+}
+
+.fi-simple-layout:has(.login-illustration-panel) input.custom-input::placeholder {
+    color: #9ca3af !important;
+}
+
+/* Fix for icons inside input */
+.fi-simple-layout:has(.login-illustration-panel) .fi-input-wrp {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    /* ring: none !important; REMOVED invalid property */
+}
+
+/* We need to target the wrapper provided by Filament for the input to style the background accurately if styling the input directly causes issues with icons */
+/* Actually, best to style the wrapper */
+.fi-simple-layout:has(.login-illustration-panel) .fi-input-wrp {
+    background-color: #f3f4f6 !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 0.5rem !important;
+    box-shadow: none !important;
+}
+
+.fi-simple-layout:has(.login-illustration-panel) .fi-input-wrp:focus-within {
+    border-color: #7F00FF !important;
+    box-shadow: 0 0 0 1px #7F00FF !important;
+    /* Replaced ring with box-shadow */
+}
+
+/* Button Styling */
+.fi-simple-layout:has(.login-illustration-panel) .fi-btn-primary {
+    background-color: #7F00FF !important;
+    border-radius: 0.5rem !important;
+    width: 100% !important;
+    font-weight: 600 !important;
+}
+
+.fi-simple-layout:has(.login-illustration-panel) .fi-btn-primary:hover {
+    background-color: #6d00db !important;
+}
+
+.fi-simple-header-subheading {
+    text-align: left !important;
+}
