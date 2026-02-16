@@ -15,11 +15,38 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
+        // Create Owner
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'Owner',
+            'email' => 'owner@konveksio.test',
+            'password' => bcrypt('password'),
+            'role' => 'owner',
+            'shop_id' => null,
+        ]);
+
+        // Create Shop
+        $shop = \App\Models\Shop::create([
+            'name' => 'Konveksi Cabang Jakarta',
+            'address' => 'Jl. Jendral Sudirman No. 1',
+            'phone' => '081234567890',
+        ]);
+
+        // Create Admin for Shop
+        User::factory()->create([
+            'name' => 'Admin Jakarta',
+            'email' => 'admin@jakarta.test',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+            'shop_id' => $shop->id,
+        ]);
+
+        // Create Designer for Shop
+        User::factory()->create([
+            'name' => 'Designer Jakarta',
+            'email' => 'designer@jakarta.test',
+            'password' => bcrypt('password'),
+            'role' => 'designer',
+            'shop_id' => $shop->id,
         ]);
     }
 }
