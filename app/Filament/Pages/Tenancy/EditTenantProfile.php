@@ -2,26 +2,15 @@
 
 namespace App\Filament\Pages\Tenancy;
 
-use App\Models\Shop;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
-use Filament\Pages\Tenancy\RegisterTenant;
+use Filament\Pages\Tenancy\EditTenantProfile as BaseEditTenantProfile;
 
-class RegisterShop extends RegisterTenant
+class EditTenantProfile extends BaseEditTenantProfile
 {
     public static function getLabel(): string
     {
-        return 'Register Shop';
-    }
-
-    public function mount(): void
-    {
-        $user = auth()->user();
-
-        if ($user->getTenants(filament()->getCurrentPanel())->count() > 0) {
-            $firstShop = $user->getTenants(filament()->getCurrentPanel())->first();
-            $this->redirect(\App\Filament\Resources\Shops\ShopResource::getUrl('create', ['tenant' => $firstShop]));
-        }
+        return 'Shop Settings';
     }
 
     public function form(Schema $schema): Schema
@@ -44,16 +33,5 @@ class RegisterShop extends RegisterTenant
                     ->required()
                     ->maxLength(20),
             ]);
-    }
-
-    protected function handleRegistration(array $data): Shop
-    {
-        $shop = Shop::create($data);
-
-        $user = auth()->user();
-        $user->shop()->associate($shop);
-        $user->save();
-
-        return $shop;
     }
 }

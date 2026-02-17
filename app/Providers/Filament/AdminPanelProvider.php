@@ -26,9 +26,10 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('admin')
-            ->path('admin')
+            ->path('app')
             ->tenant(\App\Models\Shop::class)
             ->tenantRegistration(\App\Filament\Pages\Tenancy\RegisterShop::class)
+            ->tenantProfile(\App\Filament\Pages\Tenancy\EditTenantProfile::class)
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
             ->colors([
                 'primary' => '#7F00FF',
@@ -37,7 +38,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
-                Dashboard::class,
+                \Filament\Pages\Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
@@ -69,6 +70,18 @@ class AdminPanelProvider extends PanelProvider
                     <link rel="stylesheet" href="' . asset('css/custom-login.css') . '">
                 '),
             )
+            ->userMenuItems([
+                'profile' => \Filament\Navigation\MenuItem::make()
+                    ->label('Edit Profile')
+                    ->url(fn (): string => filament()->getTenant() ? \App\Filament\Pages\EditProfile::getUrl() : '#')
+                    ->icon('heroicon-o-user-circle')
+                    ->visible(fn (): bool => filament()->getTenant() !== null),
+                'manage_shops' => \Filament\Navigation\MenuItem::make()
+                    ->label('Manage All Shops')
+                    ->url(fn (): string => filament()->getTenant() ? \App\Filament\Resources\Shops\ShopResource::getUrl('index') : '#')
+                    ->icon('heroicon-o-building-storefront')
+                    ->visible(fn (): bool => auth()->check() && auth()->user()->role === 'owner' && filament()->getTenant() !== null),
+            ])
             ->brandName('Konveksio');
     }
 }

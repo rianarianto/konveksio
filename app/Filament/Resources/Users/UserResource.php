@@ -1,44 +1,41 @@
 <?php
 
-namespace App\Filament\Resources\Shops;
+namespace App\Filament\Resources\Users;
 
-use App\Filament\Resources\Shops\Pages\CreateShop;
-use App\Filament\Resources\Shops\Pages\EditShop;
-use App\Filament\Resources\Shops\Pages\ListShops;
-use App\Filament\Resources\Shops\Pages\ViewShop;
-use App\Filament\Resources\Shops\Schemas\ShopForm;
-use App\Filament\Resources\Shops\Schemas\ShopInfolist;
-use App\Filament\Resources\Shops\Tables\ShopsTable;
-use App\Models\Shop;
+use App\Filament\Resources\Users\Pages\CreateUser;
+use App\Filament\Resources\Users\Pages\EditUser;
+use App\Filament\Resources\Users\Pages\ListUsers;
+use App\Filament\Resources\Users\Pages\ViewUser;
+use App\Filament\Resources\Users\Schemas\UserForm;
+use App\Filament\Resources\Users\Schemas\UserInfolist;
+use App\Filament\Resources\Users\Tables\UsersTable;
+use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
-class ShopResource extends Resource
+class UserResource extends Resource
 {
-    protected static ?string $model = Shop::class;
+    protected static ?string $model = User::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static bool $isScopedToTenant = false;
-
     protected static ?string $recordTitleAttribute = 'name';
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
+    protected static bool $isScopedToTenant = true;
 
-    protected static ?string $navigationLabel = 'Shops';
+    protected static ?string $navigationLabel = 'Users';
 
-    protected static ?string $modelLabel = 'Shop';
+    protected static ?string $modelLabel = 'User';
 
-    protected static ?string $pluralModelLabel = 'Shops';
+    protected static ?string $pluralModelLabel = 'Users';
+
+    protected static ?int $navigationSort = 2;
 
     /**
-     * Authorization: Only Owner can view shops.
+     * Authorization: Only Owner can view the resource.
      */
     public static function canViewAny(): bool
     {
@@ -46,7 +43,7 @@ class ShopResource extends Resource
     }
 
     /**
-     * Authorization: Only Owner can create shops.
+     * Authorization: Only Owner can create users.
      */
     public static function canCreate(): bool
     {
@@ -54,7 +51,7 @@ class ShopResource extends Resource
     }
 
     /**
-     * Authorization: Only Owner can edit shops.
+     * Authorization: Only Owner can edit users.
      */
     public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
     {
@@ -62,7 +59,7 @@ class ShopResource extends Resource
     }
 
     /**
-     * Authorization: Only Owner can delete shops.
+     * Authorization: Only Owner can delete users.
      */
     public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
     {
@@ -71,17 +68,17 @@ class ShopResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return ShopForm::configure($schema);
+        return UserForm::configure($schema);
     }
 
     public static function infolist(Schema $schema): Schema
     {
-        return ShopInfolist::configure($schema);
+        return UserInfolist::configure($schema);
     }
 
     public static function table(Table $table): Table
     {
-        return ShopsTable::configure($table);
+        return UsersTable::configure($table);
     }
 
     public static function getRelations(): array
@@ -94,10 +91,10 @@ class ShopResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListShops::route('/'),
-            'create' => CreateShop::route('/create'),
-            'view' => ViewShop::route('/{record}'),
-            'edit' => EditShop::route('/{record}/edit'),
+            'index' => ListUsers::route('/'),
+            'create' => CreateUser::route('/create'),
+            'view' => ViewUser::route('/{record}'),
+            'edit' => EditUser::route('/{record}/edit'),
         ];
     }
 }
