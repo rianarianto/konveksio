@@ -1,59 +1,84 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Konveksio
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**Konveksio** is a Multi-Outlet Convection Management System built with Laravel 12, Filament v3, and Livewire. It handles multi-tenancy for different shops/branches, role-based access control (Owner, Admin, Designer), and order management.
 
-## About Laravel
+## System Requirements
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- PHP 8.2+
+- Composer
+- Node.js & NPM
+- MySQL
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Installation & Setup
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Follow these steps to set up the project on a new machine:
 
-## Learning Laravel
+1.  **Clone the Repository**
+    ```bash
+    git clone https://github.com/rianarianto/konveksio.git
+    cd konveksio
+    ```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+2.  **Install PHP Dependencies**
+    ```bash
+    composer install
+    ```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+3.  **Install Frontend Dependencies**
+    ```bash
+    npm install
+    npm run build
+    ```
 
-## Laravel Sponsors
+4.  **Environment Setup**
+    - Copy the example environment file:
+      ```bash
+      cp .env.example .env
+      ```
+    - Open `.env` and configure your database settings:
+      ```env
+      DB_CONNECTION=mysql
+      DB_HOST=127.0.0.1
+      DB_PORT=3306
+      DB_DATABASE=konveksio
+      DB_USERNAME=root
+      DB_PASSWORD=
+      ```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+5.  **Generate App Key**
+    ```bash
+    php artisan key:generate
+    ```
 
-### Premium Partners
+6.  **Database Migration & Seeding**
+    - Run migrations and seed the database with default roles and users:
+      ```bash
+      php artisan migrate --seed
+      ```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+7.  **Link Storage**
+    ```bash
+    php artisan storage:link
+    ```
 
-## Contributing
+8.  **Run the Application**
+    ```bash
+    php artisan serve
+    ```
+    Access the app at `http://localhost:8000/app`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Default Access Credentials
 
-## Code of Conduct
+After seeding, you can log in with the following accounts:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+| Role | Email | Password | Scope |
+| :--- | :--- | :--- | :--- |
+| **Owner** | `owner@konveksio.test` | `password` | Global Access (All Shops) |
+| **Admin** | `admin@jakarta.test` | `password` | Shop Specific (Jakarta) |
+| **Designer** | `designer@jakarta.test` | `password` | Shop Specific (Jakarta) |
+| **Admin** | `admin@bandung.test` | `password` | Shop Specific (Bandung) |
 
-## Security Vulnerabilities
+## Development Notes
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- **Multi-Tenancy**: The system uses a single-database multi-tenancy approach. Data is scoped by `shop_id`.
+- **Filament Panel**: Located at `/app`. The default `/admin` path has been renamed.
