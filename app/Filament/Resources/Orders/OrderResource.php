@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\Orders;
 
-use App\Filament\Resources\Orders\Pages\ManageOrders;
+use App\Filament\Resources\Orders\Pages;
 use App\Models\Customer;
 use App\Models\Order;
 use BackedEnum;
@@ -11,20 +11,22 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Group;
+use Filament\Schemas\Components\Group;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Section;
+use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Get;
-use Filament\Forms\Set;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Forms\Components\FileUpload;
+use Illuminate\Support\HtmlString;
 
 class OrderResource extends Resource
 {
@@ -132,6 +134,23 @@ class OrderResource extends Resource
                                 ->dehydrated(false)
                                 ->rows(3)
                                 ->columnSpan('full'),
+
+                            Placeholder::make('maps_link')
+                                ->label(false)
+                                ->content(function (Get $get): HtmlString|string {
+                                    $address = $get('customer_address');
+                                    if (empty($address)) {
+                                        return '';
+                                    }
+                                    $url = 'https://www.google.com/maps/search/' . urlencode($address);
+                                    return new HtmlString(
+                                        '<a href="' . $url . '" target="_blank" rel="noopener" '
+                                        . 'style="display:inline-flex;align-items:center;gap:6px;color:#7c3aed;font-size:13px;font-weight:600;text-decoration:none;">'
+                                        . '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0z"/></svg>'
+                                        . 'Buka di Google Maps</a>'
+                                    );
+                                })
+                                ->columnSpan('full'),
                         ])
                         ->columns(2),
 
@@ -141,34 +160,46 @@ class OrderResource extends Resource
                             Repeater::make('orderItems')
                                 ->relationship()
                                 ->schema([
-                                    TextInput::make('product_name')
-                                        ->label('Produksi')
-                                        ->required()
-                                        ->maxLength(255)
-                                        ->columnSpan(2),
+                                    Group::make([
+                                        TextInput::make('product_name')
+                                            ->label('Produksi')
+                                            ->required()
+                                            ->maxLength(255)
+                                            ->columnSpan(4),
 
-                                    TextInput::make('quantity')
-                                        ->label('Jumlah')
-                                        ->required()
-                                        ->numeric()
-                                        ->default(1)
-                                        ->minValue(1)
-                                        ->live()
-                                        ->afterStateUpdated(fn(Set $set, Get $get) => static::updateSubtotal($set, $get))
-                                        ->columnSpan(1),
+                                        TextInput::make('quantity')
+                                            ->label('Qty')
+                                            ->required()
+                                            ->numeric()
+                                            ->default(1)
+                                            ->minValue(1)
+                                            ->live()
+                                            ->afterStateUpdated(fn(Set $set, Get $get) => static::updateSubtotal($set, $get))
+                                            ->columnSpan(1),
 
-                                    TextInput::make('price')
-                                        ->label('Harga')
-                                        ->required()
-                                        ->numeric()
-                                        ->prefix('Rp')
-                                        ->live()
-                                        ->afterStateUpdated(fn(Set $set, Get $get) => static::updateSubtotal($set, $get))
-                                        ->columnSpan(1),
+                                        TextInput::make('price')
+                                            ->label('Harga Satuan')
+                                            ->required()
+                                            ->numeric()
+                                            ->prefix('Rp')
+                                            ->live()
+                                            ->afterStateUpdated(fn(Set $set, Get $get) => static::updateSubtotal($set, $get))
+                                            ->columnSpan(2),
+
+                                        Placeholder::make('total_item')
+                                            ->label('Total')
+                                            ->content(function (Get $get): string {
+                                                $qty = (int) $get('quantity');
+                                                $price = (int) $get('price');
+                                                return 'Rp ' . number_format($qty * $price, 0, ',', '.');
+                                            })
+                                            ->columnSpan(2),
+                                    ])->columns(9)
                                 ])
-                                ->columns(4)
+                                ->columns(1)
                                 ->defaultItems(0)
                                 ->addActionLabel('+ Tambah Produk')
+                                ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color: #7F00FF; border-color: #7F00FF; background-color: #F3E8FF;'])) // Light purple bg, purple text
                                 ->live()
                                 ->afterStateUpdated(fn(Set $set, Get $get) => static::updateSubtotal($set, $get))
                                 ->deleteAction(
@@ -179,63 +210,92 @@ class OrderResource extends Resource
                     // Section 4: Pembayaran
                     Section::make('Pembayaran')
                         ->schema([
-                            TextInput::make('subtotal')
-                                ->label('Subtotal Biaya')
-                                ->numeric()
-                                ->prefix('Rp')
-                                ->disabled()
-                                ->dehydrated()
-                                ->default(0),
+                            Group::make([
+                                TextInput::make('subtotal')
+                                    ->label('Subtotal Biaya')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->disabled()
+                                    ->dehydrated()
+                                    ->default(0),
 
-                            TextInput::make('tax')
-                                ->label('PPN 11%')
-                                ->numeric()
-                                ->prefix('Rp')
-                                ->default(0)
-                                ->live()
-                                ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
+                                TextInput::make('tax')
+                                    ->label('PPN 11%')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->default(0)
+                                    ->live()
+                                    ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
+                            ])->columns(2),
 
-                            TextInput::make('shipping_cost')
-                                ->label('Ongkos Kirim')
-                                ->numeric()
-                                ->prefix('Rp')
-                                ->default(0)
-                                ->live()
-                                ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
+                            Group::make([
+                                TextInput::make('shipping_cost')
+                                    ->label('Ongkos Kirim')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->default(0)
+                                    ->live()
+                                    ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
 
-                            TextInput::make('discount')
-                                ->label('Discount')
-                                ->numeric()
-                                ->prefix('Rp')
-                                ->default(0)
-                                ->live()
-                                ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
+                                TextInput::make('discount')
+                                    ->label('Discount')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->default(0)
+                                    ->live()
+                                    ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
+                            ])->columns(2),
 
-                            TextInput::make('total_price')
-                                ->label('Total')
-                                ->numeric()
-                                ->prefix('Rp')
-                                ->disabled()
-                                ->dehydrated()
-                                ->default(0),
+                            Group::make([
+                                TextInput::make('total_price')
+                                    ->label('Total')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->disabled()
+                                    ->extraInputAttributes(['style' => 'font-size: 1.25rem; font-weight: bold; color: #7e22ce;']) // Purple bold
+                                    ->dehydrated()
+                                    ->default(0)
+                                    ->columnSpanFull(),
+                            ]),
 
-                            TextInput::make('down_payment')
-                                ->label('DP')
-                                ->numeric()
-                                ->prefix('Rp')
-                                ->default(0)
-                                ->live(),
+                            Group::make([
+                                TextInput::make('down_payment')
+                                    ->label('DP')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->default(0)
+                                    ->live(),
 
-                            Placeholder::make('remaining_payment')
-                                ->label('Sisa Tagihan')
-                                ->content(function (Get $get): string {
-                                    $total = $get('total_price') ?? 0;
-                                    $dp = $get('down_payment') ?? 0;
-                                    $remaining = $total - $dp;
-                                    return 'Rp ' . number_format($remaining, 0, ',', '.');
-                                }),
-                        ])
-                        ->columns(3),
+                                Placeholder::make('remaining_payment')
+                                    ->label('Sisa Tagihan')
+                                    ->content(function (Get $get): HtmlString {
+                                        $total = (int) $get('total_price') ?? 0;
+                                        $dp = (int) $get('down_payment') ?? 0;
+                                        $remaining = $total - $dp;
+
+                                        $color = $remaining > 0 ? 'text-danger-600' : 'text-success-600';
+
+                                        return new HtmlString(
+                                            '<span class="font-xl font-bold ' . $color . '" style="font-size:20px;">' .
+                                            'Rp ' . number_format($remaining, 0, ',', '.') .
+                                            '</span>'
+                                        );
+                                    }),
+                            ])->columns(2),
+
+                            FileUpload::make('dp_proof')
+                                ->label('Bukti Pembayaran DP')
+                                ->image()
+                                ->imageEditor()
+                                ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                                ->maxSize(5120)
+                                ->directory('dp-proofs')
+                                ->visibility('private')
+                                ->downloadable()
+                                ->openable()
+                                ->columnSpanFull()
+                                ->helperText('Upload foto/scan bukti transfer DP (maks. 5MB)'),
+                        ]),
                 ])
                     ->columnSpan(2),
 
@@ -243,77 +303,72 @@ class OrderResource extends Resource
                 Group::make([
                     Section::make('Ringkasan Pesanan')
                         ->schema([
-                            Placeholder::make('summary_items')
-                                ->label('Produk')
-                                ->content(function (Get $get): string {
+                            Placeholder::make('summary_full')
+                                ->label(false)
+                                ->content(function (Get $get): HtmlString {
                                     $items = $get('orderItems') ?? [];
-                                    if (empty($items)) {
-                                        return 'Belum ada produk';
-                                    }
-                                    
-                                    $html = '<div class="space-y-2">';
+                                    $subtotal = (int) ($get('subtotal') ?? 0);
+                                    $shipping = (int) ($get('shipping_cost') ?? 0);
+                                    $tax = (int) ($get('tax') ?? 0);
+                                    $discount = (int) ($get('discount') ?? 0);
+                                    $total = (int) ($get('total_price') ?? 0);
+                                    $dp = (int) ($get('down_payment') ?? 0);
+                                    $remaining = $total - $dp;
+
+                                    $fmt = fn(int $v) => 'Rp ' . number_format($v, 0, ',', '.');
+
+                                    // Product cards
+                                    $itemsHtml = '';
+                                    $hasItems = false;
                                     foreach ($items as $item) {
                                         if (!empty($item['product_name'])) {
+                                            $hasItems = true;
                                             $qty = $item['quantity'] ?? 0;
-                                            $html .= '<div class="flex items-center gap-2">';
-                                            $html .= '<span class="inline-block bg-purple-600 text-white text-xs px-2 py-1 rounded">Produksi</span>';
-                                            $html .= '<span class="text-sm">' . $qty . 'x ' . htmlspecialchars($item['product_name']) . '</span>';
-                                            $html .= '</div>';
+                                            $name = htmlspecialchars($item['product_name']);
+                                            $itemsHtml .= '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e9d5ff;border-radius:10px;background:#faf5ff;margin-bottom:8px;">';
+                                            $itemsHtml .= '<span style="background:#f3e8ff;color:#7c3aed;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;">Produksi</span>';
+                                            $itemsHtml .= '<span style="font-size:14px;font-weight:500;color:#1f2937;">' . $qty . 'x ' . $name . '</span>';
+                                            $itemsHtml .= '</div>';
                                         }
                                     }
-                                    $html .= '</div>';
-                                    return $html;
-                                })
-                                ->columnSpan('full'),
-
-                            Placeholder::make('summary_subtotal')
-                                ->label('Subtotal')
-                                ->content(fn(Get $get): string => 'Rp ' . number_format($get('subtotal') ?? 0, 0, ',', '.')),
-
-                            Placeholder::make('summary_shipping')
-                                ->label('Ongkos Kirim')
-                                ->content(fn(Get $get): string => 'Rp ' . number_format($get('shipping_cost') ?? 0, 0, ',', '.')),
-
-                            Placeholder::make('summary_tax')
-                                ->label('PPN 11%')
-                                ->content(fn(Get $get): string => 'Rp ' . number_format($get('tax') ?? 0, 0, ',', '.')),
-
-                            Placeholder::make('summary_discount')
-                                ->label('Diskon')
-                                ->content(fn(Get $get): string => 'Rp ' . number_format($get('discount') ?? 0, 0, ',', '.')),
-
-                            Placeholder::make('summary_total')
-                                ->label('Total')
-                                ->content(fn(Get $get): string => 'Rp ' . number_format($get('total_price') ?? 0, 0, ',', '.')),
-
-                            Placeholder::make('summary_dp')
-                                ->label('DP')
-                                ->content(fn(Get $get): string => 'Rp ' . number_format($get('down_payment') ?? 0, 0, ',', '.')),
-
-                            Placeholder::make('summary_total_paid')
-                                ->label('Total Pelunasan')
-                                ->content(function (Get $get): string {
-                                    $total = $get('total_price') ?? 0;
-                                    $dp = $get('down_payment') ?? 0;
-                                    $paid = $total - $dp;
-                                    return 'Rp ' . number_format($paid, 0, ',', '.');
-                                }),
-
-                            Placeholder::make('summary_remaining')
-                                ->label('Sisa')
-                                ->content(function (Get $get): string {
-                                    $total = $get('total_price') ?? 0;
-                                    $dp = $get('down_payment') ?? 0;
-                                    $remaining = $total - $dp;
-                                    
-                                    if ($remaining <= 0) {
-                                        return '<span class="inline-block bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full font-semibold">Lunas</span>';
+                                    if (!$hasItems) {
+                                        $itemsHtml = '<p style="color:#9ca3af;font-size:13px;">Belum ada produk ditambahkan</p>';
                                     }
-                                    
-                                    return 'Rp ' . number_format($remaining, 0, ',', '.');
-                                }),
+
+                                    $row = fn(string $label, string $value, bool $purple = false, bool $bold = false) =>
+                                        '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">'
+                                        . '<span style="color:#6b7280;font-size:14px;">' . $label . '</span>'
+                                        . '<span style="font-size:14px;' . ($purple ? 'color:#7c3aed;' : 'color:#374151;') . ($bold ? 'font-weight:700;' : '') . '">' . $value . '</span>'
+                                        . '</div>';
+
+                                    $divider = '<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">';
+
+                                    $remainingHtml = $remaining <= 0
+                                        ? '<span style="background:#22c55e;color:white;font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;">Lunas</span>'
+                                        : '<span style="color:#7c3aed;font-weight:700;font-size:14px;">' . $fmt($remaining) . '</span>';
+
+                                    $html = '<div style="font-family:inherit;">';
+                                    $html .= $itemsHtml;
+                                    $html .= '<div style="margin-top:12px;">';
+                                    $html .= $row('Subtotal', $fmt($subtotal), true, true);
+                                    $html .= $row('Ongkos Kirim', $fmt($shipping));
+                                    $html .= $row('PPn 11%', $fmt($tax));
+                                    $html .= $row('Diskon', $fmt($discount));
+                                    $html .= $divider;
+                                    $html .= $row('Total', $fmt($total), true, true);
+                                    $html .= $row('DP', $fmt($dp));
+                                    $html .= $divider;
+                                    $html .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">';
+                                    $html .= '<span style="color:#6b7280;font-size:14px;">Sisa</span>';
+                                    $html .= $remainingHtml;
+                                    $html .= '</div>';
+                                    $html .= '</div></div>';
+
+                                    return new HtmlString($html);
+                                })
+                                ->columnSpanFull(),
                         ])
-                        ->columns(2),
+                        ->columns(1),
                 ])
                     ->columnSpan(1),
             ])
@@ -406,7 +461,9 @@ class OrderResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ManageOrders::route('/'),
+            'index' => Pages\ListOrders::route('/'),
+            'create' => Pages\CreateOrder::route('/create'),
+            'edit' => Pages\EditOrder::route('/{record}/edit'),
         ];
     }
 }

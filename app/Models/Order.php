@@ -22,6 +22,8 @@ class Order extends Model
         'discount',
         'total_price',
         'down_payment',
+        'dp_proof',
+        'notes',
     ];
 
     protected $casts = [

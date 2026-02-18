@@ -240,3 +240,50 @@
 - **Authorization**: Designers cannot access OrderResource
 - **Table View**: Shows order_number, customer name, dates, status badges, total with search/sort capabilities
 
+---
+
+## 2026-02-18: Order Form Refinements
+
+### Phase 10: Button Styling & Bug Fixes (COMPLETED)
+- **Objective**: Apply custom color styles to key action buttons in the order form.
+- **Changes**:
+  - **"Simpan Pesanan" button**: Overrode `getCreateFormAction()` in `CreateOrder.php` → background `#7F00FF`, white text
+  - **"+ Tambah Produk" button**: Styled via `addAction` on `Repeater` → purple outline, light purple background (`#F3E8FF`)
+- **Bug Fix**:
+  - `TypeError` on `addAction` closure: Filament passes `Filament\Actions\Action` but type hint expected `Filament\Forms\Components\Actions\Action`
+  - Fix: Removed strict type hint → `fn($action)` instead of `fn(Action $action)`
+
+### Phase 11: New Features — Maps, DP Upload, Ringkasan Redesign (COMPLETED)
+- **Objective**: Enhance order form with 3 new features.
+
+#### Google Maps Link
+- Added `Placeholder` below "Alamat" field in Data Pelanggan section
+- Renders a clickable "Buka di Google Maps" link (purple, with SVG pin icon)
+- Opens Google Maps Search in new tab based on customer address text
+- Only visible when address is filled
+- Note: `suffixAction` not supported in this Filament version → used Placeholder HTML approach
+
+#### Upload Bukti Pembayaran DP
+- **Migration**: `2026_02_18_082359_add_dp_proof_to_orders_table` — added `dp_proof` (string, nullable) and `notes` (text, nullable) to `orders` table
+- **Model**: Added `dp_proof` and `notes` to `Order::$fillable`
+- **Form**: `FileUpload::make('dp_proof')` in Pembayaran section
+  - Supports image + PDF, mobile-friendly (camera), preview, download
+  - Max 5MB, stored in `storage/dp-proofs/`
+
+#### Ringkasan Pesanan Redesign
+- Replaced multiple `Placeholder` components with single HTML-rendered `Placeholder`
+- Layout matches hi-fi design:
+  - Product cards: border ungu, background `#faf5ff`, badge "Produksi"
+  - Rows: Subtotal (purple bold), Ongkos Kirim, PPn 11%, Diskon
+  - `<hr>` divider → Total (purple bold), DP
+  - `<hr>` divider → Sisa: "Lunas" badge (green) or purple amount
+- All values reactive via `Get $get`
+
+### Phase 12: Manual UI Refinements (COMPLETED)
+- **Objective**: Fine-tune specific UI elements based on user feedback.
+- **Changes**:
+  - **"Sisa Tagihan" (Main Form)**: Replaced default text with a custom `HtmlString` span.
+    - Large size (`text-xl`) initially, then adjusted to `text-sm` per user preference.
+    - Bold weight (`font-bold`).
+    - Dynamic color: Red (`text-danger-600`) if balance remaining, Green (`text-success-600`) if paid/surplus.
+- **Environment Note**: Resolved "Read Error" on local server caused by active VPN interference with local domain resolution.
