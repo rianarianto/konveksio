@@ -410,6 +410,33 @@ Payroll-ready: Phase 14B cukup cek `category === 'custom'` → upah ×2 otomatis
 | `app/Models/CustomerMeasurement.php` | NEW |
 | `database/migrations/2026_02_19_084935_create_customer_measurements_table.php` | NEW |
 
+---
+
+### Phase 14A-Rev2: Order Form UI/UX Optimization (2026-02-19)
+
+#### ✅ Request Tambahan: Layout & Logic Refinement
+- **New 2-Row Layout**: Reorganized "Request Tambahan" fields into 2 rows (Baris 1: Jenis/Ukuran, Baris 2: Qty/Harga) to avoid cramped UI.
+- **"Semua Ukuran" Option**: Added a special option `✦ Semua Ukuran` in the "Request Tambahan" dropdown.
+  - Automatically calculates and fills the total quantity of all variants when selected.
+  - Validates against the total pooled quantity of all size variants.
+- **Strict Validation**: Replaced hidden error fields with dynamic `helperText` and server-side `rules()`. Prevents quantity input from exceeding available variant stock with real-time feedback.
+
+#### ✅ Repeater UI Improvements
+- **Live Item Labeling**: Fixed the `itemLabel` calculation. Collapsed cards now accurately show `[Category] Qty x Product Name — Total Price` in real-time.
+- **Bottom Navigation**: Added a **"Sembunyikan Detail"** button at the bottom of each order item for easier navigation without scrolling to the top.
+- **Collapsible Custom Details**: "Detail Ukuran Badan (per Orang)" in Custom Category is now collapsible and **collapsed by default**, making long lists manageable.
+
+#### ✅ System Stability
+- **Deadlock Resolution**: Fixed `Serialization failure: 1213 Deadlock found` on session table by switching to `SESSION_DRIVER=file` in `.env`.
+- **Navigation**: Enabled `sidebarCollapsibleOnDesktop()` in `AdminPanelProvider` for a more flexible workspace.
+
+#### ✅ Files Modified
+| File | Status |
+|---|---|
+| `app/Filament/Resources/Orders/OrderResource.php` | MODIFIED (UI & Logic update) |
+| `app/Providers/Filament/AdminPanelProvider.php` | MODIFIED (Collapsible sidebar) |
+| `.env` | MODIFIED (Session driver) |
+
 
 
 

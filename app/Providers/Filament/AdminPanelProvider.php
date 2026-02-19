@@ -82,6 +82,7 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-building-storefront')
                     ->visible(fn (): bool => auth()->check() && auth()->user()->role === 'owner' && filament()->getTenant() !== null),
             ])
+            ->sidebarCollapsibleOnDesktop()
             ->brandName('Konveksio');
     }
 }
