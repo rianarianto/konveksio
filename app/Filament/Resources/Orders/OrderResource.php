@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders;
 
 use App\Filament\Resources\Orders\Pages;
 use App\Models\Customer;
+use App\Models\CustomerMeasurement;
 use App\Models\Order;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
@@ -46,6 +47,46 @@ class OrderResource extends Resource
     }
 
     protected static bool $isScopedToTenant = true;
+
+    // ─── Bahan baju dengan warna swatch (sementara hardcode, nanti dari data master) ───
+    protected static function getBahanOptions(): array
+    {
+        $bahanList = [
+            'JN | Parasut | Hitam' => ['hex' => '#1a1a1a', 'text' => '#ffffff'],
+            'JN | Parasut | Putih' => ['hex' => '#f0f0f0', 'text' => '#333333'],
+            'JN | Parasut | Hijau' => ['hex' => '#166534', 'text' => '#ffffff'],
+            'JN | Parasut | Navy' => ['hex' => '#1e3a5f', 'text' => '#ffffff'],
+            'JN | Parasut | Merah' => ['hex' => '#991b1b', 'text' => '#ffffff'],
+            'JN | Parasut | Abu' => ['hex' => '#6b7280', 'text' => '#ffffff'],
+            'JN | Drill | Hitam' => ['hex' => '#2d2d2d', 'text' => '#ffffff'],
+            'JN | Drill | Coklat' => ['hex' => '#8b5e3c', 'text' => '#ffffff'],
+            'JN | Drill | Cream' => ['hex' => '#f5e6c8', 'text' => '#333333'],
+            'JN | Polo | Putih' => ['hex' => '#ffffff', 'text' => '#333333'],
+            'JN | Polo | Hitam' => ['hex' => '#111111', 'text' => '#ffffff'],
+            'JN | Polo | Merah' => ['hex' => '#b91c1c', 'text' => '#ffffff'],
+            'Lainnya' => ['hex' => '#e5e7eb', 'text' => '#374151'],
+        ];
+
+        $options = [];
+        foreach ($bahanList as $label => $color) {
+            $options[$label] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
+                . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $color['hex'] . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
+                . '<span>' . htmlspecialchars($label) . '</span>'
+                . '</span>';
+        }
+        return $options;
+    }
+
+    // ─── Request tambahan ────────────────────────────────────────────────────
+    protected static array $requestTambahanOptions = [
+        'Saku Semi Klewang' => 'Saku Semi Klewang',
+        'Saku Biasa' => 'Saku Biasa',
+        'Kancing Ekstra' => 'Kancing Ekstra',
+        'Bordir Nama' => 'Bordir Nama',
+        'Label Jahit' => 'Label Jahit',
+        'Resleting' => 'Resleting',
+        'Lainnya' => 'Lainnya',
+    ];
 
     public static function form(Schema $schema): Schema
     {
@@ -139,9 +180,8 @@ class OrderResource extends Resource
                                 ->label(false)
                                 ->content(function (Get $get): HtmlString|string {
                                     $address = $get('customer_address');
-                                    if (empty($address)) {
+                                    if (empty($address))
                                         return '';
-                                    }
                                     $url = 'https://www.google.com/maps/search/' . urlencode($address);
                                     return new HtmlString(
                                         '<a href="' . $url . '" target="_blank" rel="noopener" '
@@ -154,57 +194,444 @@ class OrderResource extends Resource
                         ])
                         ->columns(2),
 
-                    // Section 3: Data Produk Pesanan
+                    // Section 3: Data Produk Pesanan — Repeater dengan card view
                     Section::make('Data Produk Pesanan')
                         ->schema([
                             Repeater::make('orderItems')
                                 ->relationship()
                                 ->schema([
+                                    // ── LAYER 1: Nama Produk + Kategori ───────────────
                                     Group::make([
                                         TextInput::make('product_name')
-                                            ->label('Produksi')
+                                            ->label('Nama Produk Pesanan')
                                             ->required()
                                             ->maxLength(255)
-                                            ->columnSpan(4),
+                                            ->columnSpan(3),
 
-                                        TextInput::make('quantity')
-                                            ->label('Qty')
+                                        Select::make('production_category')
+                                            ->label('Kategori Pesanan')
+                                            ->options([
+                                                'produksi' => 'Produksi (Size Toko)',
+                                                'custom' => 'Produksi Custom (Ukur Badan)',
+                                            ])
+                                            ->default('produksi')
                                             ->required()
-                                            ->numeric()
-                                            ->default(1)
-                                            ->minValue(1)
                                             ->live()
-                                            ->afterStateUpdated(fn(Set $set, Get $get) => static::updateSubtotal($set, $get))
-                                            ->columnSpan(1),
-
-                                        TextInput::make('price')
-                                            ->label('Harga Satuan')
-                                            ->required()
-                                            ->numeric()
-                                            ->prefix('Rp')
-                                            ->live()
-                                            ->afterStateUpdated(fn(Set $set, Get $get) => static::updateSubtotal($set, $get))
+                                            ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
                                             ->columnSpan(2),
+                                    ])->columns(5),
 
-                                        Placeholder::make('total_item')
-                                            ->label('Total')
-                                            ->content(function (Get $get): string {
-                                                $qty = (int) $get('quantity');
-                                                $price = (int) $get('price');
-                                                return 'Rp ' . number_format($qty * $price, 0, ',', '.');
-                                            })
-                                            ->columnSpan(2),
-                                    ])->columns(9)
+                                    // ── LAYER 2: Pilih Bahan (dengan color swatch) ─────
+                                    Select::make('bahan_baju')
+                                        ->label('Bahan Baju')
+                                        ->options(static::getBahanOptions())
+                                        ->allowHtml()
+                                        ->searchable()
+                                        ->columnSpanFull(),
+
+                                    // ═══════════════════════════════════════════════════
+                                    // ── ALUR A: PRODUKSI (SIZE TOKO) ──────────────────
+                                    // ═══════════════════════════════════════════════════
+
+                                    // A1: Sablon/Bordir — hanya Jenis + Lokasi (tanpa ukuran)
+                                    Section::make('Sablon / Bordir')
+                                        ->schema([
+                                            Repeater::make('sablon_bordir')
+                                                ->label(false)
+                                                ->schema([
+                                                    Select::make('jenis')
+                                                        ->label('Sablon/Bordir')
+                                                        ->options([
+                                                            'Sablon' => 'Sablon',
+                                                            'Bordir' => 'Bordir',
+                                                            'DTF' => 'DTF',
+                                                            'Lainnya' => 'Lainnya',
+                                                        ])
+                                                        ->required()
+                                                        ->columnSpan(1),
+
+                                                    Select::make('lokasi')
+                                                        ->label('Lokasi/Tipe Ukuran')
+                                                        ->options([
+                                                            'Dada Kanan' => 'Dada Kanan',
+                                                            'Dada Kiri' => 'Dada Kiri',
+                                                            'Dada Kanan Nama' => 'Dada Kanan Nama',
+                                                            'Dada Kiri Logo' => 'Dada Kiri Logo',
+                                                            'Punggung' => 'Punggung',
+                                                            'Lengan Kiri' => 'Lengan Kiri',
+                                                            'Lengan Kanan' => 'Lengan Kanan',
+                                                        ])
+                                                        ->searchable()
+                                                        ->columnSpan(2),
+                                                    // ✅ REVISI: Ukuran dihapus untuk size toko
+                                                ])
+                                                ->columns(3)
+                                                ->defaultItems(0)
+                                                ->addActionLabel('+ Tambah Varian')
+                                                ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;'])),
+                                        ])
+                                        ->visible(fn(Get $get) => $get('production_category') !== 'custom')
+                                        ->compact(),
+
+                                    // A2: Varian Ukuran
+                                    Section::make('Varian Ukuran')
+                                        ->schema([
+                                            Repeater::make('varian_ukuran')
+                                                ->label(false)
+                                                ->schema([
+                                                    Select::make('ukuran')
+                                                        ->label('Ukuran')
+                                                        ->options([
+                                                            'XS' => 'XS',
+                                                            'S' => 'S',
+                                                            'M' => 'M',
+                                                            'L' => 'L',
+                                                            'XL' => 'XL',
+                                                            'XXL' => 'XXL',
+                                                            'XXXL' => 'XXXL',
+                                                        ])
+                                                        ->required()
+                                                        ->columnSpan(1),
+
+                                                    TextInput::make('harga_satuan')
+                                                        ->label('Harga Satuan')
+                                                        ->numeric()
+                                                        ->prefix('Rp')
+                                                        ->required()
+                                                        ->live(debounce: 500)
+                                                        ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                        ->columnSpan(2),
+
+                                                    TextInput::make('qty')
+                                                        ->label('Kuantitas')
+                                                        ->numeric()
+                                                        ->required()
+                                                        ->default(1)
+                                                        ->minValue(1)
+                                                        ->live(debounce: 500)
+                                                        ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                        ->columnSpan(1),
+
+                                                    Placeholder::make('subtotal_varian')
+                                                        ->label('Subtotal')
+                                                        ->content(function (Get $get): string {
+                                                            $h = (int) ($get('harga_satuan') ?? 0);
+                                                            $q = (int) ($get('qty') ?? 0);
+                                                            return 'Rp ' . number_format($h * $q, 0, ',', '.');
+                                                        })
+                                                        ->columnSpan(2),
+                                                ])
+                                                ->columns(6)
+                                                ->defaultItems(0)
+                                                ->addActionLabel('+ Tambah Varian')
+                                                ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;']))
+                                                ->live()
+                                                ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                ->deleteAction(fn($action) => $action->after(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))),
+
+                                            // Baris total varian
+                                            Placeholder::make('total_varian_summary')
+                                                ->label(false)
+                                                ->content(function (Get $get): HtmlString {
+                                                    $varian = $get('varian_ukuran') ?? [];
+                                                    $totalQty = 0;
+                                                    $totalHarga = 0;
+                                                    foreach ($varian as $v) {
+                                                        $q = (int) ($v['qty'] ?? 0);
+                                                        $h = (int) ($v['harga_satuan'] ?? 0);
+                                                        $totalQty += $q;
+                                                        $totalHarga += $q * $h;
+                                                    }
+                                                    return new HtmlString(
+                                                        '<div style="display:flex;justify-content:space-between;padding:8px 4px;border-top:1px solid #e9d5ff;margin-top:4px;">'
+                                                        . '<span style="font-weight:700;color:#374151;">Total</span>'
+                                                        . '<span style="color:#6b7280;">' . $totalQty . ' pcs</span>'
+                                                        . '<span style="font-weight:700;color:#7c3aed;">Rp ' . number_format($totalHarga, 0, ',', '.') . '</span>'
+                                                        . '</div>'
+                                                    );
+                                                }),
+                                        ])
+                                        ->visible(fn(Get $get) => $get('production_category') !== 'custom')
+                                        ->compact(),
+
+                                    // A3: Request Tambahan
+                                    Section::make('Request Tambahan')
+                                        ->description('Berdasarkan jumlah varian ukuran')
+                                        ->schema([
+                                            Repeater::make('request_tambahan')
+                                                ->label(false)
+                                                ->schema([
+                                                    Select::make('jenis')
+                                                        ->label('Jenis Tambahan')
+                                                        ->options(static::$requestTambahanOptions)
+                                                        ->searchable()
+                                                        ->columnSpan(2),
+
+                                                    TextInput::make('harga_extra_satuan')
+                                                        ->label('Harga Tambahan/unit')
+                                                        ->numeric()
+                                                        ->prefix('Rp')
+                                                        ->live(debounce: 500)
+                                                        ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                        ->columnSpan(2),
+                                                ])
+                                                ->columns(4)
+                                                ->defaultItems(0)
+                                                ->addActionLabel('+ Tambah Request')
+                                                ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;']))
+                                                ->live()
+                                                ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                ->deleteAction(fn($action) => $action->after(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))),
+                                        ])
+                                        ->visible(fn(Get $get) => $get('production_category') !== 'custom')
+                                        ->compact(),
+
+                                    // ═══════════════════════════════════════════════════
+                                    // ── ALUR B: PRODUKSI CUSTOM (UKUR BADAN) ──────────
+                                    // ═══════════════════════════════════════════════════
+
+                                    // B0: Load dari ukuran tersimpan (tombol helper)
+                                    Placeholder::make('load_measurements_hint')
+                                        ->label(false)
+                                        ->content(function (Get $get): HtmlString {
+                                            $customerId = $get('../../customer_id');
+                                            if (!$customerId) {
+                                                return new HtmlString(
+                                                    '<p style="font-size:13px;color:#9ca3af;">Pilih pelanggan dulu untuk bisa load ukuran tim tersimpan.</p>'
+                                                );
+                                            }
+                                            $count = CustomerMeasurement::where('customer_id', $customerId)->count();
+                                            if ($count === 0) {
+                                                return new HtmlString(
+                                                    '<p style="font-size:13px;color:#9ca3af;">Belum ada ukuran tim tersimpan untuk pelanggan ini.</p>'
+                                                );
+                                            }
+                                            return new HtmlString(
+                                                '<p style="font-size:13px;color:#6d28d9;font-weight:600;">💾 ' . $count . ' ukuran tim tersimpan. Isi detail di bawah, ukuran akan disimpan otomatis saat pesanan disimpan.</p>'
+                                            );
+                                        })
+                                        ->visible(fn(Get $get) => $get('production_category') === 'custom'),
+
+                                    // B1: Detail Ukuran Custom per Orang
+                                    Section::make('Detail Ukuran Badan (per Orang)')
+                                        ->schema([
+                                            Repeater::make('detail_custom')
+                                                ->label(false)
+                                                ->schema([
+                                                    TextInput::make('nama')
+                                                        ->label('Nama')
+                                                        ->required()
+                                                        ->columnSpan(3),
+
+                                                    TextInput::make('LD')
+                                                        ->label('LD — Lebar Dada (cm)')
+                                                        ->numeric()
+                                                        ->suffix('cm')
+                                                        ->columnSpan(1),
+
+                                                    TextInput::make('PL')
+                                                        ->label('PL — Panjang Lengan (cm)')
+                                                        ->numeric()
+                                                        ->suffix('cm')
+                                                        ->columnSpan(1),
+
+                                                    TextInput::make('LP')
+                                                        ->label('LP — Lingkar Pinggang (cm)')
+                                                        ->numeric()
+                                                        ->suffix('cm')
+                                                        ->columnSpan(1),
+
+                                                    TextInput::make('LB')
+                                                        ->label('LB — Lebar Bahu (cm)')
+                                                        ->numeric()
+                                                        ->suffix('cm')
+                                                        ->columnSpan(1),
+
+                                                    TextInput::make('LPi')
+                                                        ->label('LPi — Lingkar Pinggul (cm)')
+                                                        ->numeric()
+                                                        ->suffix('cm')
+                                                        ->columnSpan(1),
+
+                                                    TextInput::make('PB')
+                                                        ->label('PB — Panjang Baju (cm)')
+                                                        ->numeric()
+                                                        ->suffix('cm')
+                                                        ->columnSpan(1),
+                                                ])
+                                                ->columns(3)
+                                                ->defaultItems(1)
+                                                ->addActionLabel('+ Tambah Orang')
+                                                ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;']))
+                                                ->live()
+                                                ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                ->deleteAction(fn($action) => $action->after(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))),
+                                        ])
+                                        ->visible(fn(Get $get) => $get('production_category') === 'custom')
+                                        ->compact(),
+
+                                    // B2: Sablon/Bordir (Custom) — ukuran jadi text cmxcm
+                                    Section::make('Sablon / Bordir')
+                                        ->schema([
+                                            Repeater::make('sablon_bordir_custom')
+                                                ->label(false)
+                                                ->schema([
+                                                    Select::make('jenis')
+                                                        ->label('Sablon/Bordir')
+                                                        ->options([
+                                                            'Sablon' => 'Sablon',
+                                                            'Bordir' => 'Bordir',
+                                                            'DTF' => 'DTF',
+                                                            'Lainnya' => 'Lainnya',
+                                                        ])
+                                                        ->required()
+                                                        ->columnSpan(1),
+
+                                                    Select::make('lokasi')
+                                                        ->label('Lokasi Titik')
+                                                        ->options([
+                                                            'Dada Kanan' => 'Dada Kanan',
+                                                            'Dada Kiri' => 'Dada Kiri',
+                                                            'Dada Kanan Nama' => 'Dada Kanan Nama',
+                                                            'Dada Kiri Logo' => 'Dada Kiri Logo',
+                                                            'Punggung' => 'Punggung',
+                                                            'Lengan Kiri' => 'Lengan Kiri',
+                                                            'Lengan Kanan' => 'Lengan Kanan',
+                                                        ])
+                                                        ->searchable()
+                                                        ->columnSpan(1),
+
+                                                    // ✅ REVISI: TextInput bebas (misal: 5x5 cm, A4)
+                                                    TextInput::make('ukuran_cmxcm')
+                                                        ->label('Ukuran (cmxcm)')
+                                                        ->placeholder('cth: 5x5 cm, A4, 30x10 cm')
+                                                        ->columnSpan(2),
+                                                ])
+                                                ->columns(4)
+                                                ->defaultItems(0)
+                                                ->addActionLabel('+ Tambah Varian')
+                                                ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;'])),
+                                        ])
+                                        ->visible(fn(Get $get) => $get('production_category') === 'custom')
+                                        ->compact(),
+
+                                    // B3: Jumlah & Harga (Custom)
+                                    Section::make('Jumlah & Harga')
+                                        ->schema([
+                                            Group::make([
+                                                Placeholder::make('qty_custom_display')
+                                                    ->label('Jumlah Baju')
+                                                    ->content(function (Get $get): string {
+                                                        return count($get('detail_custom') ?? []) . ' orang';
+                                                    }),
+
+                                                TextInput::make('harga_custom_satuan')
+                                                    ->label('Harga Satuan per Orang')
+                                                    ->numeric()
+                                                    ->prefix('Rp')
+                                                    ->live(debounce: 500)
+                                                    ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get)),
+                                            ])->columns(2),
+                                        ])
+                                        ->visible(fn(Get $get) => $get('production_category') === 'custom')
+                                        ->compact(),
+
+                                    // B4: Request Tambahan (Custom)
+                                    Section::make('Request Tambahan')
+                                        ->description('Berdasarkan jumlah baju yang dipesan')
+                                        ->schema([
+                                            Repeater::make('request_tambahan_custom')
+                                                ->label(false)
+                                                ->schema([
+                                                    Select::make('jenis')
+                                                        ->label('Jenis Tambahan')
+                                                        ->options(static::$requestTambahanOptions)
+                                                        ->searchable()
+                                                        ->columnSpan(2),
+
+                                                    TextInput::make('harga_extra_satuan')
+                                                        ->label('Harga Tambahan/unit')
+                                                        ->numeric()
+                                                        ->prefix('Rp')
+                                                        ->live(debounce: 500)
+                                                        ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                        ->columnSpan(2),
+                                                ])
+                                                ->columns(4)
+                                                ->defaultItems(0)
+                                                ->addActionLabel('+ Tambah Request')
+                                                ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;']))
+                                                ->live()
+                                                ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                ->deleteAction(fn($action) => $action->after(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))),
+                                        ])
+                                        ->visible(fn(Get $get) => $get('production_category') === 'custom')
+                                        ->compact(),
+
+                                    // ── LAYER AKHIR: Total (Selalu Tampil) ────────────
+                                    Section::make('Total yang harus dibayar')
+                                        ->schema([
+                                            Group::make([
+                                                Placeholder::make('total_qty_display')
+                                                    ->label('Jumlah Baju')
+                                                    ->content(function (Get $get): string {
+                                                        $cat = $get('production_category');
+                                                        if ($cat === 'custom') {
+                                                            return count($get('detail_custom') ?? []) . ' pcs';
+                                                        }
+                                                        $totalQty = 0;
+                                                        foreach ($get('varian_ukuran') ?? [] as $v) {
+                                                            $totalQty += (int) ($v['qty'] ?? 0);
+                                                        }
+                                                        return $totalQty . ' pcs';
+                                                    }),
+
+                                                Placeholder::make('total_item_display')
+                                                    ->label('Total')
+                                                    ->content(function (Get $get): HtmlString {
+                                                        $total = static::calcItemTotal($get);
+                                                        return new HtmlString(
+                                                            '<span style="font-weight:700;color:#7c3aed;font-size:16px;">Rp '
+                                                            . number_format($total, 0, ',', '.') . '</span>'
+                                                        );
+                                                    }),
+                                            ])->columns(2),
+                                        ])
+                                        ->compact(),
                                 ])
                                 ->columns(1)
                                 ->defaultItems(0)
                                 ->addActionLabel('+ Tambah Produk')
-                                ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color: #7F00FF; border-color: #7F00FF; background-color: #F3E8FF;'])) // Light purple bg, purple text
+                                ->addAction(fn($action) => $action
+                                    ->color('primary')
+                                    ->extraAttributes(['style' => 'width:100%;justify-content:center;color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;font-weight:600;']))
+                                // ✅ REVISI 4: Card view — collapsed setelah item diisi
+                                ->collapsible()
+                                ->collapsed()
+                                ->itemLabel(function (array $state): ?string {
+                                    $cat = $state['production_category'] ?? 'produksi';
+                                    $name = $state['product_name'] ?? 'Produk Baru';
+
+                                    if ($cat === 'custom') {
+                                        $qty = count($state['detail_custom'] ?? []);
+                                        $total = static::calcItemTotalFromArray($state);
+                                        return "[Custom] {$qty}x {$name} — Rp " . number_format($total, 0, ',', '.');
+                                    }
+
+                                    $totalQty = 0;
+                                    foreach ($state['varian_ukuran'] ?? [] as $v) {
+                                        $totalQty += (int) ($v['qty'] ?? 0);
+                                    }
+                                    $total = static::calcItemTotalFromArray($state);
+                                    return "[Produksi] {$totalQty}x {$name} — Rp " . number_format($total, 0, ',', '.');
+                                })
                                 ->live()
                                 ->afterStateUpdated(fn(Set $set, Get $get) => static::updateSubtotal($set, $get))
                                 ->deleteAction(
                                     fn($action) => $action->after(fn(Set $set, Get $get) => static::updateSubtotal($set, $get))
-                                ),
+                                )
+                                ->mutateRelationshipDataBeforeCreateUsing(fn(array $data) => static::mutateItemData($data))
+                                ->mutateRelationshipDataBeforeSaveUsing(fn(array $data) => static::mutateItemData($data)),
                         ]),
 
                     // Section 4: Pembayaran
@@ -246,17 +673,15 @@ class OrderResource extends Resource
                                     ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
                             ])->columns(2),
 
-                            Group::make([
-                                TextInput::make('total_price')
-                                    ->label('Total')
-                                    ->numeric()
-                                    ->prefix('Rp')
-                                    ->disabled()
-                                    ->extraInputAttributes(['style' => 'font-size: 1.25rem; font-weight: bold; color: #7e22ce;']) // Purple bold
-                                    ->dehydrated()
-                                    ->default(0)
-                                    ->columnSpanFull(),
-                            ]),
+                            TextInput::make('total_price')
+                                ->label('Total')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->disabled()
+                                ->extraInputAttributes(['style' => 'font-size: 1.25rem; font-weight: bold; color: #7e22ce;'])
+                                ->dehydrated()
+                                ->default(0)
+                                ->columnSpanFull(),
 
                             Group::make([
                                 TextInput::make('down_payment')
@@ -272,13 +697,11 @@ class OrderResource extends Resource
                                         $total = (int) $get('total_price') ?? 0;
                                         $dp = (int) $get('down_payment') ?? 0;
                                         $remaining = $total - $dp;
-
                                         $color = $remaining > 0 ? 'text-danger-600' : 'text-success-600';
-
                                         return new HtmlString(
-                                            '<span class="font-xl font-bold ' . $color . '" style="font-size:20px;">' .
-                                            'Rp ' . number_format($remaining, 0, ',', '.') .
-                                            '</span>'
+                                            '<span class="font-bold ' . $color . '" style="font-size:20px;">'
+                                            . 'Rp ' . number_format($remaining, 0, ',', '.')
+                                            . '</span>'
                                         );
                                     }),
                             ])->columns(2),
@@ -299,7 +722,7 @@ class OrderResource extends Resource
                 ])
                     ->columnSpan(2),
 
-                // RIGHT SIDE (Ringkasan Pesanan Sidebar) - 1 column
+                // RIGHT SIDE — Ringkasan Pesanan (Sticky Sidebar) ✅ REVISI 3
                 Group::make([
                     Section::make('Ringkasan Pesanan')
                         ->schema([
@@ -317,18 +740,32 @@ class OrderResource extends Resource
 
                                     $fmt = fn(int $v) => 'Rp ' . number_format($v, 0, ',', '.');
 
-                                    // Product cards
                                     $itemsHtml = '';
                                     $hasItems = false;
                                     foreach ($items as $item) {
                                         if (!empty($item['product_name'])) {
                                             $hasItems = true;
-                                            $qty = $item['quantity'] ?? 0;
+                                            $cat = $item['production_category'] ?? 'produksi';
                                             $name = htmlspecialchars($item['product_name']);
+                                            $itemTotal = static::calcItemTotalFromArray($item);
+
+                                            if ($cat === 'custom') {
+                                                $itemQty = count($item['detail_custom'] ?? []);
+                                                $badge = '<span style="background:#ede9fe;color:#6d28d9;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;">Custom</span>';
+                                            } else {
+                                                $itemQty = 0;
+                                                foreach ($item['varian_ukuran'] ?? [] as $v) {
+                                                    $itemQty += (int) ($v['qty'] ?? 0);
+                                                }
+                                                $badge = '<span style="background:#f3e8ff;color:#7c3aed;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;">Produksi</span>';
+                                            }
+
                                             $itemsHtml .= '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e9d5ff;border-radius:10px;background:#faf5ff;margin-bottom:8px;">';
-                                            $itemsHtml .= '<span style="background:#f3e8ff;color:#7c3aed;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;">Produksi</span>';
-                                            $itemsHtml .= '<span style="font-size:14px;font-weight:500;color:#1f2937;">' . $qty . 'x ' . $name . '</span>';
-                                            $itemsHtml .= '</div>';
+                                            $itemsHtml .= $badge;
+                                            $itemsHtml .= '<div style="flex:1;min-width:0;">';
+                                            $itemsHtml .= '<div style="font-size:13px;font-weight:500;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' . $itemQty . 'x ' . $name . '</div>';
+                                            $itemsHtml .= '<div style="font-size:12px;color:#7c3aed;">' . $fmt($itemTotal) . '</div>';
+                                            $itemsHtml .= '</div></div>';
                                         }
                                     }
                                     if (!$hasItems) {
@@ -347,8 +784,7 @@ class OrderResource extends Resource
                                         ? '<span style="background:#22c55e;color:white;font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;">Lunas</span>'
                                         : '<span style="color:#7c3aed;font-weight:700;font-size:14px;">' . $fmt($remaining) . '</span>';
 
-                                    $html = '<div style="font-family:inherit;">';
-                                    $html .= $itemsHtml;
+                                    $html = '<div style="font-family:inherit;">' . $itemsHtml;
                                     $html .= '<div style="margin-top:12px;">';
                                     $html .= $row('Subtotal', $fmt($subtotal), true, true);
                                     $html .= $row('Ongkos Kirim', $fmt($shipping));
@@ -361,31 +797,172 @@ class OrderResource extends Resource
                                     $html .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">';
                                     $html .= '<span style="color:#6b7280;font-size:14px;">Sisa</span>';
                                     $html .= $remainingHtml;
-                                    $html .= '</div>';
-                                    $html .= '</div></div>';
+                                    $html .= '</div></div></div>';
 
                                     return new HtmlString($html);
                                 })
                                 ->columnSpanFull(),
                         ])
-                        ->columns(1),
+                        ->columns(1)
+                        // ✅ REVISI 3: Sticky sidebar saat scroll
+                        ->extraAttributes(['style' => 'position:sticky;top:1rem;']),
                 ])
                     ->columnSpan(1),
             ])
             ->columns(3);
     }
 
+    // ─── Hitung total satu item dari Get $get (saat live form) ───────────────
+    protected static function calcItemTotal(Get $get): int
+    {
+        $cat = $get('production_category') ?? 'produksi';
+
+        if ($cat === 'custom') {
+            $qty = count($get('detail_custom') ?? []);
+            $harga = (int) ($get('harga_custom_satuan') ?? 0);
+            $extras = $get('request_tambahan_custom') ?? [];
+            $extraSum = array_sum(array_column($extras, 'harga_extra_satuan'));
+            return $qty * ($harga + (int) $extraSum);
+        }
+
+        $totalQty = 0;
+        $totalHarga = 0;
+        foreach ($get('varian_ukuran') ?? [] as $v) {
+            $q = (int) ($v['qty'] ?? 0);
+            $h = (int) ($v['harga_satuan'] ?? 0);
+            $totalQty += $q;
+            $totalHarga += $q * $h;
+        }
+        $extras = $get('request_tambahan') ?? [];
+        $extraSum = array_sum(array_column($extras, 'harga_extra_satuan'));
+        return $totalHarga + ($totalQty * (int) $extraSum);
+    }
+
+    // ─── Hitung total satu item dari array $state (card label & sidebar) ─────
+    protected static function calcItemTotalFromArray(array $state): int
+    {
+        $cat = $state['production_category'] ?? 'produksi';
+
+        if ($cat === 'custom') {
+            $qty = count($state['detail_custom'] ?? []);
+            $harga = (int) ($state['harga_custom_satuan'] ?? 0);
+            $extras = $state['request_tambahan_custom'] ?? [];
+            $extraSum = array_sum(array_column($extras, 'harga_extra_satuan'));
+            return $qty * ($harga + (int) $extraSum);
+        }
+
+        $totalQty = 0;
+        $totalHarga = 0;
+        foreach ($state['varian_ukuran'] ?? [] as $v) {
+            $q = (int) ($v['qty'] ?? 0);
+            $h = (int) ($v['harga_satuan'] ?? 0);
+            $totalQty += $q;
+            $totalHarga += $q * $h;
+        }
+        $extras = $state['request_tambahan'] ?? [];
+        $extraSum = array_sum(array_column($extras, 'harga_extra_satuan'));
+        return $totalHarga + ($totalQty * (int) $extraSum);
+    }
+
+    // ─── Live recalc price + quantity satu item ───────────────────────────────
+    protected static function recalcItemTotal(Set $set, Get $get): void
+    {
+        $cat = $get('production_category') ?? 'produksi';
+
+        if ($cat === 'custom') {
+            $qty = count($get('detail_custom') ?? []);
+        } else {
+            $qty = 0;
+            foreach ($get('varian_ukuran') ?? [] as $v) {
+                $qty += (int) ($v['qty'] ?? 0);
+            }
+        }
+
+        $total = static::calcItemTotal($get);
+        $set('quantity', max(1, $qty));
+        $set('price', $total > 0 && $qty > 0 ? intdiv($total, $qty) : 0);
+
+        static::updateSubtotal($set, $get);
+    }
+
+    // ─── Mutate sebelum simpan ke DB: pack JSON + simpan measurements ─────────
+    protected static function mutateItemData(array $data): array
+    {
+        $cat = $data['production_category'] ?? 'produksi';
+        $customerId = null; // akan diisi dari konteks order di sisi controller
+
+        if ($cat === 'custom') {
+            $detailCustom = $data['detail_custom'] ?? [];
+            $qty = count($detailCustom);
+            $harga = (int) ($data['harga_custom_satuan'] ?? 0);
+            $extras = $data['request_tambahan_custom'] ?? [];
+            $extraSum = array_sum(array_column($extras, 'harga_extra_satuan'));
+            $total = $qty * ($harga + $extraSum);
+
+            $data['size_and_request_details'] = [
+                'category' => 'custom',
+                'bahan' => $data['bahan_baju'] ?? null,
+                'detail_custom' => $detailCustom,
+                'sablon_bordir' => $data['sablon_bordir_custom'] ?? [],
+                'request_tambahan' => $extras,
+                'harga_satuan' => $harga,
+            ];
+            $data['quantity'] = max(1, $qty);
+            $data['price'] = $qty > 0 ? intdiv($total, $qty) : 0;
+        } else {
+            $totalQty = 0;
+            $totalHarga = 0;
+            foreach ($data['varian_ukuran'] ?? [] as $v) {
+                $q = (int) ($v['qty'] ?? 0);
+                $h = (int) ($v['harga_satuan'] ?? 0);
+                $totalQty += $q;
+                $totalHarga += $q * $h;
+            }
+            $extras = $data['request_tambahan'] ?? [];
+            $extraSum = array_sum(array_column($extras, 'harga_extra_satuan'));
+            $total = $totalHarga + ($totalQty * $extraSum);
+
+            $data['size_and_request_details'] = [
+                'category' => 'produksi',
+                'bahan' => $data['bahan_baju'] ?? null,
+                'sablon_bordir' => $data['sablon_bordir'] ?? [],
+                'varian_ukuran' => $data['varian_ukuran'] ?? [],
+                'request_tambahan' => $extras,
+            ];
+            $data['quantity'] = max(1, $totalQty);
+            $data['price'] = $totalQty > 0 ? intdiv($total, $totalQty) : 0;
+        }
+
+        // Bersihkan field sementara
+        unset(
+            $data['bahan_baju'],
+            $data['sablon_bordir'],
+            $data['sablon_bordir_custom'],
+            $data['varian_ukuran'],
+            $data['request_tambahan'],
+            $data['request_tambahan_custom'],
+            $data['detail_custom'],
+            $data['harga_custom_satuan'],
+            $data['total_item_display'],
+            $data['total_qty_display'],
+            $data['total_varian_summary'],
+            $data['qty_custom_display'],
+            $data['load_measurements_hint'],
+        );
+
+        return $data;
+    }
+
+    // ─── Update subtotal pesanan (sum semua items) ────────────────────────────
     protected static function updateSubtotal(Set $set, Get $get): void
     {
         $items = $get('orderItems') ?? [];
         $subtotal = 0;
-
         foreach ($items as $item) {
-            $quantity = (int) ($item['quantity'] ?? 0);
+            $qty = (int) ($item['quantity'] ?? 0);
             $price = (int) ($item['price'] ?? 0);
-            $subtotal += $quantity * $price;
+            $subtotal += $qty * $price;
         }
-
         $set('subtotal', $subtotal);
         static::updateTotalPrice($set, $get);
     }
@@ -396,9 +973,7 @@ class OrderResource extends Resource
         $tax = (int) ($get('tax') ?? 0);
         $shipping = (int) ($get('shipping_cost') ?? 0);
         $discount = (int) ($get('discount') ?? 0);
-
-        $total = $subtotal + $tax + $shipping - $discount;
-        $set('total_price', max(0, $total));
+        $set('total_price', max(0, $subtotal + $tax + $shipping - $discount));
     }
 
     public static function table(Table $table): Table
@@ -443,9 +1018,7 @@ class OrderResource extends Resource
                     ->money('IDR')
                     ->sortable(),
             ])
-            ->filters([
-                //
-            ])
+            ->filters([])
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make(),

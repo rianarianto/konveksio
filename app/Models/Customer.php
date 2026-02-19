@@ -30,4 +30,13 @@ class Customer extends Model
     {
         return $this->hasMany(Order::class);
     }
+
+    /**
+     * Ukuran badan anggota tim pelanggan ini.
+     * Bisa di-load ulang saat order baru.
+     */
+    public function measurements(): HasMany
+    {
+        return $this->hasMany(CustomerMeasurement::class);
+    }
 }

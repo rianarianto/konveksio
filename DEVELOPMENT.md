@@ -287,3 +287,131 @@
     - Bold weight (`font-bold`).
     - Dynamic color: Red (`text-danger-600`) if balance remaining, Green (`text-success-600`) if paid/surplus.
 - **Environment Note**: Resolved "Read Error" on local server caused by active VPN interference with local domain resolution.
+
+---
+
+## 2026-02-19: Production Workflow Foundation
+
+### Phase 13: Database Schema Enhancement (COMPLETED)
+
+#### Objective
+Memperkuat fondasi database untuk mendukung: logika pengupahan berjenjang, audit trail penugasan, dan status desain order.
+
+#### ✅ Migration 1: `order_items` Table
+- Tambah `production_category` (enum: produksi, custom, non_produksi, jasa) — menentukan alur tahapan kerja otomatis.
+- Tambah `size_and_request_details` (JSON, nullable) — menyimpan detail granular (ukuran, extras).
+
+#### ✅ Migration 2: `orders` Table
+- Tambah `design_status` (enum: pending, uploaded, approved, default: pending) — workflow mockup Designer.
+- Tambah `design_image` (string, nullable) — path file mockup yang diupload Designer.
+
+#### ✅ Migration 3: Tabel Baru `production_tasks`
+Tabel ini adalah inti dari sistem penugasan dan pengupahan:
+- `order_item_id` + `shop_id`: relasi ke item dan multi-tenancy.
+- `stage_name`: nama tahapan (Potong, Jahit, Kancing, QC, dll).
+- `assigned_to` (nullable FK → users): karyawan yang mengerjakan.
+- `assigned_by` (FK → users): Admin/Designer yang membuat penugasan (**Audit Trail**).
+- `wage_amount` (bigint): upah per unit saat penugasan dibuat (snapshot).
+- `quantity`: jumlah unit di tahap ini.
+- `status` (enum: pending, in_progress, done).
+- `description` (text, nullable): catatan khusus pengerjaan.
+
+#### ✅ Model Updates
+- **`OrderItem`**: fillable + casts updated, relasi `hasMany(ProductionTask)` ditambahkan.
+- **`Order`**: `design_status` + `design_image` ditambahkan ke fillable + casts.
+- **`ProductionTask`** (NEW): ShopScope global scope, relasi `assignedTo()`, `assignedBy()`, `orderItem()`, `shop()`.
+
+#### Notes
+- Semua kolom baru bersifat nullable atau punya default value → data lama aman.
+- **Logika upah berjenjang (WageCalculatorService)** dan **UI Penugasan** → Phase 14B/14C.
+
+### Phase 14A: Modal "Tambah Produk" — Dynamic Form (COMPLETED)
+**Tanggal**: 2026-02-19
+
+#### Objective
+Mengganti repeater `orderItems` sederhana dengan form dinamis yang reaktif berdasarkan kategori produksi.
+
+#### ✅ Dua Alur UI Reaktif (live di `production_category`)
+**Produksi (Size Toko)**:
+- Section Sablon/Bordir: Repeater (Jenis, Lokasi) — ketentuan ukuran dari toko
+- Section Varian Ukuran: Repeater (Ukuran XS–XXXL, Harga Satuan, Qty) + baris Total otomatis
+- Section Request Tambahan: Repeater (Jenis, Harga Extra/unit) — hanya tambah harga, tidak tambah qty baju
+
+**Produksi Custom (Ukur Badan)**:
+- Section Detail Ukuran Badan: Repeater per orang (Nama, LD, PL, LP, LB, LPi, PB)
+- Section Sablon/Bordir: Repeater (Jenis, Lokasi, Ukuran cmxcm — TextInput bebas: `5x5 cm`, `A4`)
+- Section Jumlah & Harga: Qty auto dari count orang + Harga Satuan per orang
+- Section Request Tambahan custom
+
+#### ✅ Logika Kalkulasi
+- `calcItemTotal(Get $get)`: Hitung total satu item dari live form state
+- `calcItemTotalFromArray(array)`: Versi array untuk card label & sidebar preview
+- `recalcItemTotal(Set, Get)`: Update `price` & `quantity` item secara live (debounce 500ms)
+- `updateSubtotal(Set, Get)`: Bubble-up ke subtotal pesanan + sidebar Ringkasan
+- `mutateItemData(array)`: Sebelum simpan ke DB → pack ke JSON `size_and_request_details`, unset field sementara
+
+#### ✅ Struktur JSON `size_and_request_details`
+```json
+// Produksi
+{ "category": "produksi", "bahan": "...", "sablon_bordir": [...], "varian_ukuran": [...], "request_tambahan": [...] }
+
+// Custom
+{ "category": "custom", "bahan": "...", "detail_custom": [...], "sablon_bordir": [...], "request_tambahan": [...], "harga_satuan": 0 }
+```
+Payroll-ready: Phase 14B cukup cek `category === 'custom'` → upah ×2 otomatis.
+
+#### ✅ File Modified
+- `app/Filament/Resources/Orders/OrderResource.php`: Full rewrite (syntax OK, cache cleared)
+
+---
+
+### Phase 14A-Rev1: UI Revisions & Customer Measurements (COMPLETED)
+**Tanggal**: 2026-02-19
+
+#### Revisi 1 — Bahan Baju: Color Swatch Dropdown
+- Setiap opsi bahan kini menampilkan **lingkaran warna** via `allowHtml()` + inline HTML
+- ~13 pilihan hardcode sementara (Parasut, Drill, Polo) dengan warna mendekati aslinya
+- Nanti diatur dari **data master** (kode hex per bahan)
+
+#### Revisi 2 — Sablon/Bordir (Produksi): Sederhanakan Field
+- **Dihapus**: input ukuran (cm) — karena size toko pakai ketentuan toko sendiri
+- **Tersisa**: Jenis (Sablon/Bordir/DTF) + Lokasi titik sablon
+
+#### Revisi 3 — Sablon/Bordir (Custom): Ukuran jadi Text Bebas
+- Field ukuran berubah dari `numeric+suffix cm` → `TextInput` biasa
+- Label: **"Ukuran (cmxcm)"** — user ketik bebas: `5x5 cm`, `A4`, `30x10 cm`
+
+#### Revisi 4 — Ukuran Badan: Disimpan per Pelanggan (`customer_measurements`)
+- **Tabel baru**: `customer_measurements` (migration berhasil)
+  - Kolom: `customer_id` (FK), `nama`, `LD`, `PL`, `LP`, `LB`, `LPi`, `PB`, `catatan`
+  - Semua ukuran nullable (decimal 5,1), bisa diisi sebagian
+- **Model baru**: `CustomerMeasurement` dengan `belongsTo(Customer)` dan cast otomatis ke float
+- **Customer model**: ditambah relasi `measurements()` → `hasMany(CustomerMeasurement)`
+- **Alur simpan**: Data ukuran masuk ke `size_and_request_details` JSON tiap order. Di form, sistem menampilkan hitungan anggota tim tersimpan untuk pelanggan yang dipilih
+- **Roadmap**: Load ulang ukuran tersimpan saat order baru → Phase selanjutnya
+
+#### Revisi 5 — Card View setelah Tambah Produk
+- Repeater berubah jadi `collapsible()->collapsed()`
+- Setiap item collapse jadi card dengan label dinamis:
+  `[Produksi] 20x Baju Putih SMKN — Rp 500.000`
+  `[Custom] 3x Kemeja Tim — Rp 600.000`
+- Klik item untuk expand & edit — **data tidak hilang** saat close
+
+#### Revisi 6 — Ringkasan Pesanan: Sticky Sidebar
+- Group sidebar kanan mendapat `style="position:sticky;top:1rem;"`
+- Laptop/desktop: sidebar mengikuti scroll
+- Tablet/mobile: otomatis collapse ke bawah form (Filament responsive grid)
+
+#### ✅ Files Modified / Created
+| File | Status |
+|---|---|
+| `app/Filament/Resources/Orders/OrderResource.php` | MODIFIED (full rewrite v2) |
+| `app/Models/Customer.php` | MODIFIED (+ `measurements()` relation) |
+| `app/Models/CustomerMeasurement.php` | NEW |
+| `database/migrations/2026_02_19_084935_create_customer_measurements_table.php` | NEW |
+
+
+
+
+
+
