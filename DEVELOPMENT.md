@@ -437,8 +437,82 @@ Payroll-ready: Phase 14B cukup cek `category === 'custom'` → upah ×2 otomatis
 | `app/Providers/Filament/AdminPanelProvider.php` | MODIFIED (Collapsible sidebar) |
 | `.env` | MODIFIED (Session driver) |
 
+---
 
+## 2026-02-20: Order Form UI Refinements & Bug Fixes (IN PROGRESS)
 
+#### ✅ UI/UX Improvements
+- **"Sembunyikan Detail" Button Rework**: 
+  - After multiple attempts with Alpine.js state and DOM traversal, simplified the button to **"Kembali ke Atas"**.
+  - Action: Smooth scroll to the top of the item header so the user can easily click the product title to collapse.
+  - Reason: Most robust solution across different Filament versions and layout states.
+- **Scroll Button in Detail Ukuran**: Added a matching "Kembali ke Atas" button inside the "Detail Ukuran Badan" section for long lists of people.
+- **Total Display Enhancement**: 
+  - Added **"Total Biaya Tambahan"** row in the order item summary section.
+  - Mode Produksi: `qty_tambahan * harga_extra_satuan`.
+  - Mode Custom: `jumlah_orang * harga_extra_satuan`.
+  - Color-coded: Green for > 0, Gray for 0.
 
+#### ✅ Critical Bug Fixes
+- **Error `array_sum` on String**: fixed `ErrorException` when user enters non-numeric characters in price fields. Switched to `foreach` loops with explicit `(int)` casting.
+- **Subtotal Calculation Precision**:
+  - Found bug where subtotal showed weird values (e.g., 776.246 instead of 560.000).
+  - Cause: Calculation relied on `qty * price` (where price was an integer-divided average).
+  - Solution: Rewrote `updateSubtotal` to sum items using `calcItemTotalFromArray()` directly for 100% accuracy.
+
+#### 🔄 Current Task: Debugging Saving Issue (Empty JSON in DB) — ✅ RESOLVED
+
+### Phase 15: Fix — Virtual Fields Not Saving to JSON (COMPLETED)
+**Tanggal**: 2026-02-20
+
+#### Root Cause
+`mutateRelationshipDataBeforeCreateUsing` dan `mutateRelationshipDataBeforeSaveUsing` sudah terhubung dengan benar ke `mutateItemData()`, **tapi** Filament secara default strips/exclude fields yang tidak ada di kolom database sebelum memanggil hook tersebut — kecuali field diberi tanda `->dehydrated(true)`.
+
+#### ✅ Fix 1: Tambah `->dehydrated(true)` ke Virtual Fields yang Hilang
+4 virtual field/repeater di dalam `orderItems` Repeater yang belum punya flag ini:
+| Field | Keterangan |
+|---|---|
+| `Repeater::make('detail_custom')` | Data ukuran badan per orang (kategori Custom) |
+| `Repeater::make('sablon_bordir_custom')` | Data sablon/bordir (kategori Custom) |
+| `TextInput::make('harga_custom_satuan')` | Harga satuan per orang (kategori Custom) |
+| `Repeater::make('request_tambahan_custom')` | Request tambahan (kategori Custom) |
+
+#### ✅ Fix 2: Tambah `->mutateRelationshipDataBeforeFillUsing()` ke Repeater
+- Menambahkan hook di Repeater `orderItems` untuk **saat Edit** — memanggil `unmutateItemData()` yang sudah ada
+- Ini unpack JSON `size_and_request_details` kembali ke virtual fields saat form Edit dibuka
+- Sebelumnya: hanya ada hook untuk Create/Save, Edit dilewati → form kosong saat Edit
+
+#### ✅ Fix 3: Update `EditOrder.php`
+- Ditambahkan `mutateFormDataBeforeFill()` untuk inject `shop_id` dari tenant
+- **Auto-Fill Customer Data**: Menambahkan logika untuk mengisi virtual fields `customer_phone` dan `customer_address` dari model `Customer` saat halaman Edit dibuka.
+- File dibersihkan dari semua stub/approach yang tidak tepat
+
+### Phase 16: Implementasi Kategori Non-Produksi & Jasa (COMPLETED)
+**Tanggal**: 2026-02-20
+
+#### 1. Kategori "Non-Produksi" (Barang Jadi Supplier)
+- **UI**: Menampilkan field `supplier_product`, sablon/bordir statis, varian ukuran grid, dan request tambahan.
+- **Logika Harga**: Total = (Qty Ukuran * Harga Barang Jadi) + Biaya Tambahan.
+- **JSON**: Detail disimpan dalam key `supplier_product` di `size_and_request_details`.
+
+#### 2. Kategori "Jasa" (Murni Jasa)
+- **UI**: Menyembunyikan varian ukuran & bahan. Menonjolkan `nama_jasa`, `jumlah_jasa`, dan `harga_satuan_jasa`.
+- **Logika Harga**: Total = Jumlah * Harga Satuan.
+- **JSON**: Data pengerjaan (sablon) tetap disimpan sebagai informasi detail.
+
+#### 3. Core Logic Updates
+- **Calc Functions**: `calcItemTotal` & `calcItemTotalFromArray` mendukung 4 kategori (Produksi, Custom, Non-Produksi, Jasa).
+- **Mutate/Unmutate**: Menangani packing/unpacking JSON untuk semua kategori baru, memastikan data tampil kembali saat Edit.
+- **UI Refinement**: `itemLabel` otomatis menyesuaikan label (cth: "[Jasa] 10x Sablon Logo — Rp 100.000").
+
+#### ✅ Files Modified
+| File | Status |
+|---|---|
+#### Refinement (2026-02-20, Rev 1)
+- **Fix Double Input**: Memperbaiki logika `visible()` pada section "Produksi" agar tidak muncul di kategori lain.
+- **Non-Produksi**: Menghapus section "Request Tambahan" dan memindahkan "Jenis Produk Supplier" ke baris bahan agar lebih intuitif.
+- **Jasa**: Menyembunyikan field "Nama Produk Pesanan" di level atas dan mensinkronisasinya dengan field "Nama Jasa" agar tidak double input.
+
+#### Refinement (2026-02-20, Rev 2)
 
 
