@@ -24,14 +24,11 @@ class Order extends Model
         'down_payment',
         'dp_proof',
         'notes',
-        'design_status',
-        'design_image',
     ];
 
     protected $casts = [
         'order_date' => 'date',
         'deadline' => 'date',
-        'design_status' => 'string',
     ];
 
     protected static function booted(): void

@@ -15,12 +15,15 @@ class OrderItem extends Model
         'price',
         'production_category',
         'size_and_request_details',
+        'design_status',
+        'design_image',
     ];
 
     protected $casts = [
         'size_and_request_details' => 'array',
         'quantity' => 'integer',
         'price' => 'integer',
+        'design_status' => 'string',
     ];
 
     protected $appends = [
@@ -92,5 +95,10 @@ class OrderItem extends Model
     public function productionTasks(): HasMany
     {
         return $this->hasMany(ProductionTask::class);
+    }
+
+    public function shop()
+    {
+        return $this->hasOneThrough(Shop::class, Order::class, 'id', 'id', 'order_id', 'shop_id');
     }
 }

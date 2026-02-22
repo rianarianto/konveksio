@@ -508,11 +508,71 @@ Payroll-ready: Phase 14B cukup cek `category === 'custom'` → upah ×2 otomatis
 #### ✅ Files Modified
 | File | Status |
 |---|---|
+| `app/Filament/Resources/Orders/OrderResource.php` | MODIFIED (Kategori Jasa & Non-Produksi) |
+
 #### Refinement (2026-02-20, Rev 1)
 - **Fix Double Input**: Memperbaiki logika `visible()` pada section "Produksi" agar tidak muncul di kategori lain.
 - **Non-Produksi**: Menghapus section "Request Tambahan" dan memindahkan "Jenis Produk Supplier" ke baris bahan agar lebih intuitif.
 - **Jasa**: Menyembunyikan field "Nama Produk Pesanan" di level atas dan mensinkronisasinya dengan field "Nama Jasa" agar tidak double input.
 
 #### Refinement (2026-02-20, Rev 2)
+- **Styling**: Unified sidebar summary badges and quantity display for Non-Produksi & Jasa.
 
+---
 
+## 2026-02-22: Designer Workflow & Critical Fixes
+
+### Phase 13: Order Item Deletion Fix (COMPLETED)
+- **Problem**: Deleting an order item from the repeater in Edit mode removed it from the UI but the item persisted in the database after saving.
+- **Root Cause**: The unique `id` of the order item was being lost or unset during the `mutate/unmutate` cycle, preventing Filament from identifying which records to delete.
+- **Fix**: 
+  - Updated `OrderResource::unmutateItemData` to strictly preserve or restore the item `id`.
+  - Refined `unset` logic in `mutateItemData` to ensure internal metadata used by Filament for relationship tracking is not accidentally destroyed.
+- **Result**: Items are now correctly deleted from the database when removed from the form and saved.
+
+### Phase 14B: Design Task Management (COMPLETED)
+- **Objective**: Create a dedicated workspace for Designers to process visual requirements without accessing full order management.
+- **New Resource: `DesignTaskResource`**:
+  - **Access Control**: Restricted strictly to the **Designer** role. Hidden from Owner/Admin.
+  - **Query Filter**: Table only shows orders with `design_status` in `['pending', 'uploaded']`.
+  - **Task Table**: Displays Order No, Customer, Summary of Products, Deadline, and Design Badge.
+- **Designer Workspace (Form)**:
+  - **2-Column Layout**:
+    - **Left**: "Rincian Teknis" — A read-only HTML block that dynamically parses JSON `size_and_request_details` from all order items. Shows Materials, Print locations, and Custom Measurements (LD/LP).
+    - **Right**: File upload for `design_image` (stored in `public/designs`).
+- **Automation Logic**:
+  - Overrode the `EditAction::using` logic.
+  - Upon saving a design:
+    - `design_status` is automatically set to `approved`.
+    - Order `status` is automatically updated to `antrian` (if it was 'diterima').
+- **Fixed Technical Issues**:
+  - Corrected `EditAction` namespace from `Tables` to `Actions`.
+  - Fixed `Group` and `Section` namespace conflicts between `Forms` and `Schemas`.
+
+#### ✅ Files Modified / Created
+| File | Status |
+|---|---|
+| `app/Filament/Resources/Orders/OrderResource.php` | MODIFIED (Deletion Fix) |
+| `app/Filament/Resources/DesignTasks/DesignTaskResource.php` | NEW (Designer Workspace) |
+### Phase 14C: Granular Design Tasks (Per-Item) [COMPLETED]
+- **Objective**: Improve the design workflow by allowing each product item within an order to have its own design status and file, rather than blocking the entire order.
+- **Database Schema**:
+  - Dropped `design_status` and `design_image` from the `orders` table.
+  - Added `design_status` and `design_image` to the `order_items` table.
+- **Models Update**: 
+  - Adjusted `$fillable` definitions in both `Order` and `OrderItem` models.
+  - Added a `shop()` relationship via `hasOneThrough` to `OrderItem` to support Filament's multi-tenancy scoping.
+- **Resource Refactoring (`DesignTaskResource`)**:
+  - Changed base model from `Order` to `OrderItem`.
+  - Updated table columns to display granular data: No. Pesanan, Nama Produk, Qty, Kategori, Deadline, and Status Desain.
+  - Simplified the `Edit` modal to only parse and render the JSON `size_and_request_details` for that specific item.
+  - **Automation**: Saving an item's design automatically sets its status to `approved`. A check is then performed: if all items in the parent order are `approved`, the parent order's status is automatically bumped from `diterima` to `antrian`.
+  - **UI Refinement**: Added Table Grouping to group the granular order items by their parent `Order Number` and `Customer Name` for better readability.
+
+#### ✅ Files Modified / Created
+| File | Status |
+|---|---|
+| `database/migrations/*_move_design_fields...` | NEW (Migration) |
+| `app/Models/Order.php` | MODIFIED (Remove design fields) |
+| `app/Models/OrderItem.php` | MODIFIED (Add design fields & relations) |
+| `app/Filament/Resources/DesignTasks/DesignTaskResource.php` | MODIFIED (Refactored to OrderItem, Fixed Ambiguous ID, Added Table Grouping) |

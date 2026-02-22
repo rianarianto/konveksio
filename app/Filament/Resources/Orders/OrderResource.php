@@ -1427,6 +1427,7 @@ class OrderResource extends Resource
         }
 
         // Bersihkan semua virtual fields sebelum simpan
+        // CATATAN: Filament butuh `$data['id']` dsb untuk menghapus (kalau ada)
         unset(
             $data['bahan_baju'],
             $data['sablon_jenis'],       $data['sablon_lokasi'],
@@ -1469,6 +1470,11 @@ class OrderResource extends Resource
 
         $cat = $details['category'] ?? ($data['production_category'] ?? 'produksi');
         $data['production_category'] = $cat;
+
+        // PASTIKAN ID TIDAK HILANG AGAR BISA DI-DELETE/UPDATE
+        if (!isset($data['id']) && isset($data['record_id'])) {
+             $data['id'] = $data['record_id'];
+        }
 
         if ($cat === 'custom') {
             $data['bahan_baju']              = $details['bahan'] ?? null;
