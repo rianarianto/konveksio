@@ -63,22 +63,22 @@ class DesignTaskResource extends Resource
                                 ->content(function ($record): HtmlString {
                                     if (!$record) return new HtmlString('');
 
-                                    $html = '<div style="font-family: inherit; font-size: 14px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">';
+                                    $html = '<div class="text-sm p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">';
                                     
                                     $name = htmlspecialchars($record->product_name ?? 'Produk Tak Bernama');
                                     $cat = $record->production_category ?? 'produksi';
                                     $details = $record->size_and_request_details ?? [];
                                     
-                                    $html .= '<h4 style="margin: 0 0 8px 0; font-weight: 600; color: #111827; font-size: 16px;">' . $name . '</h4>';
+                                    $html .= '<h4 class="mb-2 font-semibold text-base">' . $name . '</h4>';
 
                                     if ($cat === 'custom') {
                                         $bahan = htmlspecialchars($details['bahan'] ?? '-');
-                                        $html .= '<p style="margin: 0 0 4px 0;"><strong>Bahan:</strong> ' . $bahan . '</p>';
+                                        $html .= '<p class="mb-1"><strong>Bahan:</strong> ' . $bahan . '</p>';
                                         
                                         $sablon = $details['sablon_bordir'] ?? [];
                                         if (count($sablon) > 0) {
-                                            $html .= '<p style="margin: 8px 0 4px 0; font-weight: 600;">Sablon / Bordir:</p>';
-                                            $html .= '<ul style="margin: 0 0 8px 0; padding-left: 20px;">';
+                                            $html .= '<p class="mt-2 mb-1 font-semibold">Sablon / Bordir:</p>';
+                                            $html .= '<ul class="mb-2 pl-5 list-disc">';
                                             foreach ($sablon as $s) {
                                                 $j = htmlspecialchars($s['jenis'] ?? '');
                                                 $l = htmlspecialchars($s['lokasi'] ?? '');
@@ -90,13 +90,13 @@ class DesignTaskResource extends Resource
 
                                         $ukurans = $details['detail_custom'] ?? [];
                                         if (count($ukurans) > 0) {
-                                            $html .= '<p style="margin: 8px 0 4px 0; font-weight: 600;">Referensi Ukuran Custom:</p>';
-                                            $html .= '<div style="max-height: 200px; overflow-y: auto; padding-right: 8px;">';
+                                            $html .= '<p class="mt-2 mb-1 font-semibold">Referensi Ukuran Custom:</p>';
+                                            $html .= '<div class="max-h-[200px] overflow-y-auto pr-2">';
                                             foreach ($ukurans as $u) {
                                                 $person = htmlspecialchars($u['nama'] ?? 'Tanpa Nama');
                                                 $ld = htmlspecialchars($u['LD'] ?? '-');
                                                 $lp = htmlspecialchars($u['LP'] ?? '-');
-                                                $html .= '<div style="font-size: 13px; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px dotted #e5e7eb;">';
+                                                $html .= '<div class="text-sm mb-1 pb-1 border-b border-dotted border-gray-200 dark:border-gray-700">';
                                                 $html .= '<strong>' . $person . '</strong> — LD: ' . $ld . ', LP: ' . $lp;
                                                 $html .= '</div>';
                                             }
@@ -106,19 +106,19 @@ class DesignTaskResource extends Resource
                                     } elseif ($cat === 'non_produksi') {
                                         $j = htmlspecialchars($details['sablon_jenis'] ?? '-');
                                         $l = htmlspecialchars($details['sablon_lokasi'] ?? '-');
-                                        $html .= '<p style="margin: 0 0 4px 0;"><strong>Teknik Sablon/Bordir:</strong> ' . $j . '</p>';
-                                        $html .= '<p style="margin: 0 0 4px 0;"><strong>Lokasi:</strong> ' . $l . '</p>';
+                                        $html .= '<p class="mb-1"><strong>Teknik Sablon/Bordir:</strong> ' . $j . '</p>';
+                                        $html .= '<p class="mb-1"><strong>Lokasi:</strong> ' . $l . '</p>';
                                     } elseif ($cat === 'jasa') {
-                                        $html .= '<p style="margin: 0 0 4px 0;"><strong>Catatan Jasa:</strong> Item ini merupakan pengerjaan jasa murni.</p>';
+                                        $html .= '<p class="mb-1"><strong>Catatan Jasa:</strong> Item ini merupakan pengerjaan jasa murni.</p>';
                                     } else {
                                         // produksi biasa
                                         $bahan = htmlspecialchars($details['bahan'] ?? '-');
                                         $j = htmlspecialchars($details['sablon_jenis'] ?? '-');
                                         $l = htmlspecialchars($details['sablon_lokasi'] ?? '-');
                                         
-                                        $html .= '<p style="margin: 0 0 4px 0;"><strong>Bahan:</strong> ' . $bahan . '</p>';
-                                        $html .= '<p style="margin: 0 0 4px 0;"><strong>Teknik Sablon/Bordir:</strong> ' . $j . '</p>';
-                                        $html .= '<p style="margin: 0 0 4px 0;"><strong>Lokasi:</strong> ' . $l . '</p>';
+                                        $html .= '<p class="mb-1"><strong>Bahan:</strong> ' . $bahan . '</p>';
+                                        $html .= '<p class="mb-1"><strong>Teknik Sablon/Bordir:</strong> ' . $j . '</p>';
+                                        $html .= '<p class="mb-1"><strong>Lokasi:</strong> ' . $l . '</p>';
                                     }
 
                                     $html .= '</div>';

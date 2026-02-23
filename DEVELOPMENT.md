@@ -576,3 +576,38 @@ Payroll-ready: Phase 14B cukup cek `category === 'custom'` → upah ×2 otomatis
 | `app/Models/Order.php` | MODIFIED (Remove design fields) |
 | `app/Models/OrderItem.php` | MODIFIED (Add design fields & relations) |
 | `app/Filament/Resources/DesignTasks/DesignTaskResource.php` | MODIFIED (Refactored to OrderItem, Fixed Ambiguous ID, Added Table Grouping) |
+### Phase 15: Control Produksi Resource - Hybrid Layout (COMPLETED)
+**Tanggal**: 2026-02-23 & 2026-02-24
+
+#### Objective
+Membangun pusat komando untuk mendelegasikan dan melacak proses produksi per item pesanan setelah desainnya disetujui. Membutuhkan UI hybrid dengan card layout dan sidebar workload karyawan.
+
+####  1. Database & Master Data Tahapan
+- **Master Data**: Tabel production_stages untuk fleksibilitas tahapan pengerjaan (nama, urutan estafet).
+- **Migration**: Menambahkan size_quantities (JSON) ke tabel production_tasks untuk pencatatan jumlah per size.
+- **Resource**: Membuat ProductionStageResource untuk manajemen master data tahapan.
+
+####  2. Control Produksi Resource (Hybrid Layout)
+- **Base Model**: Diubah menjadi Order::class (bukan OrderItem) agar Card berbasis 1 Pesanan penuh.
+- **Scope Query**: Hanya menampilkan Order yang memiliki orderItems dengan design_status = 'approved'.
+- **Custom Table View**:
+  - Menggunakan contentGrid(['md' => 1]).
+  - Override view dengan order-card.blade.php rendering Card Pesanan berisi daftar OrderItem dan Status Tracker Stages (P, J, dll).
+- **Tab Filters**: Mengimplementasikan filter cepat: Semua, Siap Potong, Sedang Jahit, Siap QC.
+
+####  3. Custom Page Layout & Sidebar
+- **ManageControlProduksis Page**: Di-override menggunakan custom blade view untuk membentuk **Split Layout**.
+- **Sidebar**: Komponen Livewire EmployeeWorkloadSidebar di sisi kanan layar untuk memantau realtime beban kerja aktif tiap karyawan (pending/in progress).
+- **User Relations**: Menambahkan relasi ssignedProductionTasks dan createdProductionTasks di model User untuk komputasi workload.
+
+####  4. Top Widgets (ProduksiStats)
+- Membuat Custom Filament Widget ProduksiStats.php dan produksi-stats.blade.php.
+- **UI Mockup Compliance**:
+  - Hero Card (Kiri): Menampilkan Total Beban Produksi (Pcs) beserta persentase trend vs hari kemarin.
+  - Stage Mini-Cards Grid (Kanan): Otomatis melooping dari production_stages.
+  - Status Indicators Dinamis: Lancar (< 50 pcs), Menumpuk (>= 50 pcs), atau Kosong (0 pcs).
+
+####  5. Modal Penugasan (Atur Tugas)
+- Action: Diubah menjadi **Page Action** sehingga bisa dipicu dari dalam item card melalui argumen item_id.
+- Modal Schema: Render spesifikasi teknis dinamis dari size_and_request_details.
+- Validasi Relay/Estafet: Mencegah alokasi jumlah pcs melebihi tahapan sebelumnya.

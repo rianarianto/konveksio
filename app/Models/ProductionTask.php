@@ -16,6 +16,7 @@ class ProductionTask extends Model
         'assigned_by',
         'wage_amount',
         'quantity',
+        'size_quantities',
         'status',
         'description',
     ];
@@ -23,6 +24,7 @@ class ProductionTask extends Model
     protected $casts = [
         'wage_amount' => 'integer',
         'quantity' => 'integer',
+        'size_quantities' => 'array',
         'status' => 'string',
     ];
 
