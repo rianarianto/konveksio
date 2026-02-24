@@ -97,8 +97,8 @@ class OrderItem extends Model
         return $this->hasMany(ProductionTask::class);
     }
 
-    public function shop()
+    public function orderShop()
     {
-        return $this->hasOneThrough(Shop::class, Order::class, 'id', 'id', 'order_id', 'shop_id');
+        return $this->hasOneThrough(Shop::class, Order::class, 'shop_id', 'id', 'order_id', 'shop_id');
     }
 }

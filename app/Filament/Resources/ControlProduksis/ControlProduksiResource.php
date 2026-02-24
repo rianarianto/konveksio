@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Tables\Grouping\Group as TableGroup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\ProductionStage;
@@ -26,7 +27,7 @@ use Filament\Forms\Components\Textarea;
 
 class ControlProduksiResource extends Resource
 {
-    protected static ?string $model = \App\Models\Order::class;
+    protected static ?string $model = \App\Models\OrderItem::class;
 
     protected static ?string $slug = 'control-produksi';
 
@@ -49,19 +50,22 @@ class ControlProduksiResource extends Resource
 
     public static function scopeEloquentQueryToTenant(Builder $query, ?Model $tenant): Builder
     {
-        return $query->where('shop_id', $tenant?->getKey());
+        return $query->whereHas('order', function (Builder $q) use ($tenant) {
+            $q->where('shop_id', $tenant?->getKey());
+        });
+    }
+
+    public static function observeTenancyModelCreation(\Filament\Panel $panel): void
+    {
+        // Override and do nothing.
     }
 
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->whereHas('orderItems', function (Builder $query) {
-                $query->where('design_status', 'approved');
-            })
-            ->with(['orderItems' => function ($query) {
-                $query->where('design_status', 'approved')->with('productionTasks');
-            }, 'customer'])
-            ->latest();
+            ->where('design_status', 'approved')
+            ->with(['order.customer', 'productionTasks'])
+            ->latest('id');
     }
 
 
@@ -76,18 +80,70 @@ class ControlProduksiResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->contentGrid([
-                'md' => 1,
-            ])
             ->columns([
-                ViewColumn::make('card')
-                    ->view('filament.resources.control-produksi.order-card')
+                TextColumn::make('order.order_number')
+                    ->label('No. Pesanan')
+                    ->searchable()
+                    ->sortable()
+                    ->weight('bold'),
+
+                TextColumn::make('product_name')
+                    ->label('Nama Produk')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('quantity')
+                    ->label('Qty')
+                    ->numeric()
+                    ->sortable(),
+
+                TextColumn::make('production_category')
+                    ->label('Kategori')
+                    ->badge()
+                    ->color(fn(string $state): string => match ($state) {
+                        'produksi' => 'primary',
+                        'custom' => 'warning',
+                        'non_produksi' => 'gray',
+                        'jasa' => 'info',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn(string $state): string => ucfirst(str_replace('_', ' ', $state))),
+
+                TextColumn::make('order.deadline')
+                    ->label('Deadline')
+                    ->date('d M Y')
+                    ->sortable()
+                    ->color('danger'),
+
+                TextColumn::make('progress_status')
+                    ->label('Status Produksi')
+                    ->badge()
+                    ->state(function (OrderItem $record) {
+                        $tasks = $record->productionTasks;
+                        if ($tasks->count() === 0)
+                            return 'Belum Diproses';
+                        if ($tasks->where('status', '!=', 'done')->count() === 0)
+                            return 'Selesai';
+                        return 'Sedang Berjalan';
+                    })
+                    ->color(fn(string $state): string => match ($state) {
+                        'Belum Diproses' => 'gray',
+                        'Sedang Berjalan' => 'primary',
+                        'Selesai' => 'success',
+                        default => 'gray',
+                    }),
             ])
+            ->defaultGroup(
+                TableGroup::make('order.order_number')
+                    ->label('Pesanan')
+                    ->getTitleFromRecordUsing(fn(Model $record): string => $record->order->order_number . ' - ' . ($record->order->customer->name ?? 'Tanpa Nama'))
+                    ->collapsible()
+            )
             ->filters([
                 // Filters handled by Tabs in Manage page
             ])
             ->actions([
-                // Handled via Page Actions
+                //
             ])
             ->bulkActions([
                 //
@@ -100,7 +156,7 @@ class ControlProduksiResource extends Resource
             'index' => ManageControlProduksis::route('/'),
         ];
     }
-    
+
     public static function canCreate(): bool
     {
         return false;

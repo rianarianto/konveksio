@@ -31,6 +31,7 @@ class DesignTaskResource extends Resource
     protected static ?string $slug = 'design-tasks';
 
     protected static bool $isScopedToTenant = true;
+    protected static ?string $tenantOwnershipRelationshipName = 'orderShop';
 
     public static function canAccess(): bool
     {
@@ -43,6 +44,14 @@ class DesignTaskResource extends Resource
         return $query->whereHas('order', function (Builder $q) use ($tenant) {
             $q->where('shop_id', $tenant?->getKey());
         });
+    }
+
+    public static function observeTenancyModelCreation(\Filament\Panel $panel): void
+    {
+        // Override and do nothing.
+        // This prevents Filament from attempting to auto-save the `orderShop`
+        // HasOneThrough relation whenever an OrderItem is created globally,
+        // which would cause a "Call to undefined method HasOneThrough::save()" error.
     }
 
     public static function getEloquentQuery(): Builder
@@ -61,20 +70,21 @@ class DesignTaskResource extends Resource
                             Placeholder::make('technical_specs')
                                 ->label(false)
                                 ->content(function ($record): HtmlString {
-                                    if (!$record) return new HtmlString('');
+                                    if (!$record)
+                                        return new HtmlString('');
 
                                     $html = '<div class="text-sm p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">';
-                                    
+
                                     $name = htmlspecialchars($record->product_name ?? 'Produk Tak Bernama');
                                     $cat = $record->production_category ?? 'produksi';
                                     $details = $record->size_and_request_details ?? [];
-                                    
+
                                     $html .= '<h4 class="mb-2 font-semibold text-base">' . $name . '</h4>';
 
                                     if ($cat === 'custom') {
                                         $bahan = htmlspecialchars($details['bahan'] ?? '-');
                                         $html .= '<p class="mb-1"><strong>Bahan:</strong> ' . $bahan . '</p>';
-                                        
+
                                         $sablon = $details['sablon_bordir'] ?? [];
                                         if (count($sablon) > 0) {
                                             $html .= '<p class="mt-2 mb-1 font-semibold">Sablon / Bordir:</p>';
@@ -102,7 +112,7 @@ class DesignTaskResource extends Resource
                                             }
                                             $html .= '</div>';
                                         }
-                                        
+
                                     } elseif ($cat === 'non_produksi') {
                                         $j = htmlspecialchars($details['sablon_jenis'] ?? '-');
                                         $l = htmlspecialchars($details['sablon_lokasi'] ?? '-');
@@ -115,7 +125,7 @@ class DesignTaskResource extends Resource
                                         $bahan = htmlspecialchars($details['bahan'] ?? '-');
                                         $j = htmlspecialchars($details['sablon_jenis'] ?? '-');
                                         $l = htmlspecialchars($details['sablon_lokasi'] ?? '-');
-                                        
+
                                         $html .= '<p class="mb-1"><strong>Bahan:</strong> ' . $bahan . '</p>';
                                         $html .= '<p class="mb-1"><strong>Teknik Sablon/Bordir:</strong> ' . $j . '</p>';
                                         $html .= '<p class="mb-1"><strong>Lokasi:</strong> ' . $l . '</p>';
@@ -157,7 +167,7 @@ class DesignTaskResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
-                
+
                 TextColumn::make('product_name')
                     ->label('Nama Produk')
                     ->searchable()
@@ -171,14 +181,14 @@ class DesignTaskResource extends Resource
                 TextColumn::make('production_category')
                     ->label('Kategori')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'produksi' => 'primary',
                         'custom' => 'warning',
                         'non_produksi' => 'gray',
                         'jasa' => 'info',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state): string => ucfirst(str_replace('_', ' ', $state))),
+                    ->formatStateUsing(fn(string $state): string => ucfirst(str_replace('_', ' ', $state))),
 
                 TextColumn::make('order.deadline')
                     ->label('Deadline')
@@ -189,11 +199,11 @@ class DesignTaskResource extends Resource
                 TextColumn::make('design_status')
                     ->label('Status Desain')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'pending'  => 'warning',
+                    ->color(fn(string $state): string => match ($state) {
+                        'pending' => 'warning',
                         'uploaded' => 'info',
                         'approved' => 'success',
-                        default    => 'gray',
+                        default => 'gray',
                     }),
             ])
             ->filters([
@@ -228,7 +238,7 @@ class DesignTaskResource extends Resource
             ->defaultGroup(
                 TableGroup::make('order.order_number')
                     ->label('Pesanan')
-                    ->getTitleFromRecordUsing(fn (Model $record): string => $record->order->order_number . ' - ' . ($record->order->customer->name ?? 'Tanpa Nama'))
+                    ->getTitleFromRecordUsing(fn(Model $record): string => $record->order->order_number . ' - ' . ($record->order->customer->name ?? 'Tanpa Nama'))
                     ->collapsible()
             )
             ->heading('Antrian Tugas Desain');

@@ -611,3 +611,44 @@ Membangun pusat komando untuk mendelegasikan dan melacak proses produksi per ite
 - Action: Diubah menjadi **Page Action** sehingga bisa dipicu dari dalam item card melalui argumen item_id.
 - Modal Schema: Render spesifikasi teknis dinamis dari size_and_request_details.
 - Validasi Relay/Estafet: Mencegah alokasi jumlah pcs melebihi tahapan sebelumnya.
+
+### Phase 16: Control Produksi - Refactor ke Standard Filament Table dengan Grouping (COMPLETED)
+**Tanggal**: 2026-02-24
+
+#### Objective
+Merombak UI Control Produksi dari Card Grid kustom ke tabel standar Filament dengan pengelompokan per nomor pesanan (mirip halaman Meja Design), untuk meningkatkan keterbacaan dan manageability data.
+
+#### Perubahan Teknis
+
+1. **Model Refactor (`ControlProduksiResource`)**:
+   - Base model diubah dari `Order::class` menjadi `OrderItem::class`.
+   - `scopeEloquentQueryToTenant()` diperbarui untuk melakukan scope via relasi `order.shop_id`.
+   - `getEloquentQuery()` diperbarui: hanya menampilkan item dengan `design_status = 'approved'`, dengan eager loading `order.customer` dan `productionTasks`.
+
+2. **Table Columns Baru**:
+   - `order.order_number` — Nomor pesanan, sortable, searchable
+   - `product_name` — Nama produk item, sortable
+   - `quantity` — Jumlah pcs
+   - `production_category` — Badge berwarna (Produksi/Custom/Non-Produksi/Jasa)
+   - `order.deadline` — Badge merah deadline
+   - `progress_status` — Computed badge: Belum Diproses / Sedang Berjalan / Selesai
+
+3. **Grouping oleh Order Number**:
+   - Menggunakan `->defaultGroup(TableGroup::make('order.order_number'))`.
+   - Judul grup menampilkan `No. Pesanan - Nama Pelanggan`.
+   - Grup bisa di-collapse untuk menyembunyikan item di dalamnya.
+
+4. **CSS Hacks Dihapus**:
+   - Semua CSS override di `manage-control-produksis.blade.php` yang memaksa tampilan grid kustom dihapus.
+   - Tabel sekarang menggunakan Filament native styling.
+
+5. **Blade Views Lama Dihapus**:
+   - `order-card.blade.php` dan `table-items-cell.blade.php` dihapus karena tidak lagi digunakan.
+
+#### Files Modified
+| File | Status |
+|---|---|
+| `app/Filament/Resources/ControlProduksis/ControlProduksiResource.php` | MODIFIED (Model → OrderItem, Columns, Grouping) |
+| `resources/views/filament/resources/control-produksi/pages/manage-control-produksis.blade.php` | MODIFIED (Hapus CSS overrides) |
+| `resources/views/filament/resources/control-produksi/order-card.blade.php` | DELETED |
+| `resources/views/filament/resources/control-produksi/table-items-cell.blade.php` | DELETED |

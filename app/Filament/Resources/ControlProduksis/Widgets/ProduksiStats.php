@@ -11,7 +11,7 @@ class ProduksiStats extends Widget
 {
     protected string $view = 'filament.resources.control-produksi.widgets.produksi-stats';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected ?string $pollingInterval = '30s';
 
@@ -47,32 +47,39 @@ class ProduksiStats extends Widget
             ->doesntHave('productionTasks')
             ->sum('quantity');
 
-        // Setiap stage: hitung qty pending/in_progress
-        $allStages = ProductionStage::orderBy('order_sequence')->get();
-
         $stages = [
             [
                 'name' => 'Antrian',
-                'qty'  => (int) $antrian,
+                'qty' => (int) $antrian,
             ],
         ];
 
-        foreach ($allStages as $stage) {
+        // Specific requested categories mapped to possible stage names
+        $categoriesMap = [
+            'Potong' => ['Potong'],
+            'Jahit' => ['Jahit'],
+            'Kancing' => ['Kancing'],
+            'Bordir/Sablon' => ['Bordir', 'Sablon', 'Bordir/Sablon'],
+            'Finishing' => ['Finishing'],
+            'QC' => ['QC', 'Quality Control']
+        ];
+
+        foreach ($categoriesMap as $categoryLabel => $stageNames) {
             $qty = ProductionTask::where('shop_id', $shopId)
-                ->where('stage_name', $stage->name)
+                ->whereIn('stage_name', $stageNames)
                 ->whereIn('status', ['pending', 'in_progress'])
                 ->sum('quantity');
 
             $stages[] = [
-                'name' => $stage->name,
-                'qty'  => (int) $qty,
+                'name' => $categoryLabel,
+                'qty' => (int) $qty,
             ];
         }
 
         return [
             'totalBeban' => (int) $totalBeban,
-            'stages'     => $stages,
-            'trend'      => $trend,
+            'stages' => $stages,
+            'trend' => $trend,
         ];
     }
 }

@@ -61,26 +61,27 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 \Filament\View\PanelsRenderHook::SIMPLE_LAYOUT_END,
-                fn () => view('filament.login-illustration'),
+                fn() => view('filament.login-illustration'),
                 scopes: \App\Filament\Pages\Auth\CustomLogin::class,
             )
             ->renderHook(
                 \Filament\View\PanelsRenderHook::STYLES_AFTER,
-                fn () => new \Illuminate\Support\HtmlString('
+                fn() => new \Illuminate\Support\HtmlString('
                     <link rel="stylesheet" href="' . asset('css/custom-login.css') . '">
+                    ' . \Illuminate\Support\Facades\Blade::render('@vite("resources/css/app.css")') . '
                 '),
             )
             ->userMenuItems([
                 'profile' => \Filament\Navigation\MenuItem::make()
                     ->label('Edit Profile')
-                    ->url(fn (): string => filament()->getTenant() ? \App\Filament\Pages\EditProfile::getUrl() : '#')
+                    ->url(fn(): string => filament()->getTenant() ? \App\Filament\Pages\EditProfile::getUrl() : '#')
                     ->icon('heroicon-o-user-circle')
-                    ->visible(fn (): bool => filament()->getTenant() !== null),
+                    ->visible(fn(): bool => filament()->getTenant() !== null),
                 'manage_shops' => \Filament\Navigation\MenuItem::make()
                     ->label('Manage All Shops')
-                    ->url(fn (): string => filament()->getTenant() ? \App\Filament\Resources\Shops\ShopResource::getUrl('index') : '#')
+                    ->url(fn(): string => filament()->getTenant() ? \App\Filament\Resources\Shops\ShopResource::getUrl('index') : '#')
                     ->icon('heroicon-o-building-storefront')
-                    ->visible(fn (): bool => auth()->check() && auth()->user()->role === 'owner' && filament()->getTenant() !== null),
+                    ->visible(fn(): bool => auth()->check() && auth()->user()->role === 'owner' && filament()->getTenant() !== null),
             ])
             ->sidebarCollapsibleOnDesktop()
             ->brandName('Konveksio');

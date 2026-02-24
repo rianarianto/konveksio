@@ -1,4 +1,5 @@
 <x-filament-panels::page>
+
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
         <div class="lg:col-span-3 space-y-4">
             {{ $this->table }}
