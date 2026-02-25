@@ -472,6 +472,12 @@ class ControlProduksiResource extends Resource
                                         }
                                     }
 
+                                    // Validasi qty khusus untuk Custom (menghitung jumlah orang)
+                                    $displayQty = $qty;
+                                    if ($cat === 'custom' && !empty($details['detail_custom'])) {
+                                        $displayQty = count($details['detail_custom']);
+                                    }
+
                                     $html = '
                                     <div class="p-5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 shadow-sm mb-4">
                                         
@@ -489,7 +495,7 @@ class ControlProduksiResource extends Resource
                                         <!-- Row 2: Qty, Name & Sizes -->
                                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                                             <h3 class="text-base font-bold text-gray-800 dark:text-gray-100">
-                                                <span class="text-gray-500 font-semibold">' . $qty . 'x</span> ' . $name . '
+                                                <span class="text-gray-500 font-semibold">' . $displayQty . 'x</span> ' . $name . '
                                             </h3>
                                             ' . ($sizeString ? '<div class="text-[13px] font-medium text-gray-600 dark:text-gray-400">' . $sizeString . '</div>' : '') . '
                                         </div>

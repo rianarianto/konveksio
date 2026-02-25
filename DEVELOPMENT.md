@@ -673,3 +673,27 @@ Menyempurnakan antarmuka modal "Atur" tugas produksi, menghilangkan parsing arra
 | File | Status |
 |---|---|
 | `app/Filament/Resources/ControlProduksis/ControlProduksiResource.php` | MODIFIED (HTML Builder layout, regex extraction arrays logic, Header actions) |
+
+### Phase 18: Dashboard Widget & Control Produksi Fixes (COMPLETED)
+**Tanggal**: 2026-02-26
+
+#### 1. Produksi Stats Widget (UI/UX)
+- **Dark Mode CSS Conflict**: Resolved a conflict between Filament v3 class-based dark mode (`.dark`) and Tailwind v4's default media query strategy by injecting `@custom-variant dark (&:where(.dark, .dark *));` into `resources/css/app.css`. The widget now seamlessly syncs with the Filament panel's light/dark mode.
+- **Responsive Layout Improvements**: 
+  - Converted the "Antrian" badge into a clean subtitle below the title to prevent text wrapping on small screens.
+  - Adjusted text scaling (`text-5xl sm:text-6xl lg:text-7xl`) for the main metric numbers.
+  - Set the active production stage cards to `flex-1 min-w-[120px]` to automatically stretch and fill the available container width, maintaining a horizontal scroll fallback for mobile devices.
+
+#### 2. Order Item Formatting & Seeding
+- **Custom Item Quantity Fix**: Updated `ControlProduksiResource`'s Placeholder. When the category is `custom`, the displayed quantity next to the product name is automatically calculated by counting the number of individuals in the `detail_custom` array rather than relying on the generic quantity input.
+- **Production Stage Seeder**:
+  - Implemented `ProductionStageSeeder` to automatically populate the `production_stages` table for all registered shops (`shop_id`).
+  - Standardized the estafet stages sequence: **Potong → Jahit → Kancing → Bordir/Sablon → Finishing → QC**.
+
+#### Files Modified
+| File | Status |
+|---|---|
+| `resources/css/app.css` | MODIFIED (Added custom dark variant) |
+| `resources/views/filament/resources/control-produksi/widgets/produksi-stats.blade.php` | MODIFIED (Responsive + Flex fixes) |
+| `app/Filament/Resources/ControlProduksis/ControlProduksiResource.php` | MODIFIED (Fix Custom Qty Calculation) |
+| `database/seeders/ProductionStageSeeder.php` | NEW (Tenant-scoped seeder) |

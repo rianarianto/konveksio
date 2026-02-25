@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* Sinkronkan dark mode Tailwind v4 dengan strategi Filament (class-based, bukan media query) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
