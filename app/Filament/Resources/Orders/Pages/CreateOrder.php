@@ -15,6 +15,7 @@ class CreateOrder extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['shop_id'] = Filament::getTenant()->id;
+        $data['status'] = 'diterima'; // Default: belum diproses
 
         return $data;
     }

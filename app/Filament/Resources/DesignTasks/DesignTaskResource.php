@@ -181,14 +181,15 @@ class DesignTaskResource extends Resource
                 TextColumn::make('production_category')
                     ->label('Kategori')
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
-                        'produksi' => 'primary',
-                        'custom' => 'warning',
-                        'non_produksi' => 'gray',
-                        'jasa' => 'info',
-                        default => 'gray',
-                    })
-                    ->formatStateUsing(fn(string $state): string => ucfirst(str_replace('_', ' ', $state))),
+                    ->color(fn(string $state) => [
+                        50 => '#F2E6FF',
+                        500 => '#8000FF',
+                        600 => '#8000FF',
+                    ])
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                        'non_produksi' => 'Non Produksi',
+                        default => ucfirst($state),
+                    }),
 
                 TextColumn::make('order.deadline')
                     ->label('Deadline')
@@ -218,20 +219,9 @@ class DesignTaskResource extends Resource
                         $data['design_status'] = 'approved';
                         $record->update($data);
 
-                        // Cek apakah semua item di parent order sudah approved
-                        $parentOrder = Order::find($record->order_id);
-                        if ($parentOrder) {
-                            $totalItems = $parentOrder->orderItems()->count();
-                            $approvedItems = $parentOrder->orderItems()->where('design_status', 'approved')->count();
-
-                            // Jika semua item sudah di-approve, ubah status Order
-                            if ($totalItems > 0 && $totalItems === $approvedItems) {
-                                if ($parentOrder->status === 'diterima') {
-                                    $parentOrder->update(['status' => 'antrian']);
-                                }
-                            }
-                        }
-
+                        // Hanya perbarui status item ini saja, tidak menyentuh status Order global.
+                        // Order baru akan berubah jadi 'Antrian' saat Admin membagi tugas di sini.
+            
                         return $record;
                     }),
             ])

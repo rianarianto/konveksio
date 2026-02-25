@@ -50,15 +50,14 @@ Sistem memiliki urutan *state machine* (*status tracker*) antara model *Order* d
 1. **Pembuatan Pesanan**: Admin input di form `OrderResource`. Status Pesanan: `diterima`. Status Desain (*Item-Level*): `pending`.
 2. **Approval Desain**: Designer masuk ke `DesignTaskResource`, mengunduh *brief*, dan menggunggah gambar final. Setelah disimpan, *Item-Level design_status* otomatis berubah jadi `approved`.
    *(Jika seluruh item dalam order telah 'approved', Status Induk Order akan otomatis naik kelas dari `diterima` menjadi `antrian`).*
-3. **Kontrol Produksi (Grouped Table UI)**: Pemantauan kerja dipusatkan di halaman `ManageControlProduksis`. Base model diubah ke `OrderItem::class` agar data dapat dikelompokkan secara native oleh Filament menggunakan `->defaultGroup(TableGroup::make('order.order_number'))`. Tabel menampilkan kolom per produk (Nama, Qty, Kategori, Deadline, Status Produksi) dengan setiap grup bisa di-*collapse*. Widget ProduksiStats tetap di atas sebagai ringkasan. Penugasan tugas dilakukan via *Page Action* slideOver.
-4. **Tahapan Produksi (Relay/Estafet)**: Admin mendelegasikan pengerjaan melalui tabel berelasi `production_tasks`. Master data *stage* (Potong->Jahit->Kancing->QC) ditentukan oleh tabel `production_stages`. Admin tidak bisa menugaskan *quantity* pada *Stage B* melebihi jumlah celcius *Stage A* yang sudah dikerjakan (*Validasi Estafet*).
-5. **Penyelesaian**: Status naik bertahap menjadi `diproses` -> `selesai` -> `siap_diambil`.
+3. **Kontrol Produksi (Grouped Table UI)**: Pemantauan kerja dipusatkan di halaman `ManageControlProduksis`. Base model diubah ke `OrderItem::class` agar data dapat dikelompokkan secara native oleh Filament menggunakan `->defaultGroup(TableGroup::make('order.order_number'))`. Tabel menampilkan kolom per produk (Nama, Qty, Kategori, Deadline, Status Produksi) dengan setiap grup bisa di-*collapse*. Widget ProduksiStats tetap di atas sebagai ringkasan.
+   - **Modal Atur Tugas / Detail**: Saat baris pesanan diklik, sebuah slide-over terbuka memuat "Spesifikasi Produksi" lengkap. Field JSON (`size_and_request_details`) diurai/diparsing untuk merender data kompleks (Ukuran custom pelanggan dilipat/collapsible, material bahan dari `supplier_product` jika pesanan non-produksi, serta *Tambahan Request* diformat bebas dari JSON key). Terdapat status-bar *progress* persentase berjenjang.
+4. **Tahapan Produksi (Relay/Estafet)**: Admin mendelegasikan pengerjaan melalui tabel berelasi `production_tasks`. Master data *stage* (Potong->Jahit->Kancing->QC) ditentukan oleh tabel `production_stages`. Tombol Aksi di header akan menyesuaikan persentase dan warna progres (Kerjakan, Selesai, Batal). Admin tidak bisa menugaskan *quantity* pada *Stage B* melebihi jumlah celcius *Stage A* yang sudah dikerjakan (*Validasi Estafet*).
+5. **Penyelesaian**: Status pesanan dan status produksi naik bertahap menjadi `diproses` -> `selesai` -> `siap_diambil`.
 
 ---
 
 ## 5. Struktur Database Utama
-
-- **`shops`**: Data profil identitas Toko Induk.
 - **`users`**: Karyawan sistem yang memiliki Hak Akses. (Relasi *BelongsTo* -> `shops`)
 - **`customers`**: Database Pelanggan.
 - **`customer_measurements`**: Penyimpanan spesifikasi detail ukuran badan tiap anggota.

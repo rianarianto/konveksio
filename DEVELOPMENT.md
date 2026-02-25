@@ -652,3 +652,24 @@ Merombak UI Control Produksi dari Card Grid kustom ke tabel standar Filament den
 | `resources/views/filament/resources/control-produksi/pages/manage-control-produksis.blade.php` | MODIFIED (Hapus CSS overrides) |
 | `resources/views/filament/resources/control-produksi/order-card.blade.php` | DELETED |
 | `resources/views/filament/resources/control-produksi/table-items-cell.blade.php` | DELETED |
+
+### Phase 17: UI Refinements & Detail View for Control Produksi (COMPLETED)
+**Tanggal**: 2026-02-25
+
+#### Objective
+Menyempurnakan antarmuka modal "Atur" tugas produksi, menghilangkan parsing array mentah (seperti ID bawaan Filament cache), serta memastikan indikator *status* tahapan estafet (Selesai/Dibatalkan/Pending) terpusat dan mudah diakses dari header modal.
+
+#### Perubahan Teknis
+1. **Modal Atur Tugas (Spesifikasi Produksi)**:
+   - **Request Tambahan**: Memisahkan rendering dari logika standar `implode` Filament yang sering menyertakan key index array/ UUID aneh (`1 62 15000` dsb), dan mem-parsingnya ke ekstrak khusus hanya `jenis`, `ukuran`, `qty_tambahan`, dan custom text. Tampilannya kini rapi sebagai list berformat text murni (e.g. *Kancing Ekstra Semua Ukuran (1 pcs)*).
+   - **Badge Material**: Mengubah logika badge untuk kasus produk **Non-Produksi**, di mana detail bahan kini otomatis menarik dari teks *Product dari Supplier*. Menambahkan separator `&nbsp;&nbsp;|&nbsp;&nbsp;` agar UI tidak saling bertumpukan.
+   - **Collapsible Layout**: Membungkus rincian list ukuran tubuh pelanggan Custom (lebih dari 2 orang) ke dalam elemen HTML `<details>` untuk menghemat tinggi layar modal.
+
+2. **Aksi Tombol Update Progress (`ControlProduksiResource`)**:
+   - Memindahkan *Update Progress Action* yang sebelumnya di level _column_ (tombol dalam tabel) langsung ke _header Action_ di dalam UI modal Atur Tugas beserta Action Group-nya jika perlu.
+   - Memastikan hierarki skema status update terkini. Tombol status dibedakan jelas dengan warna (Emerald untuk *Tandai Selesai*, Danger untuk *Batal*, Primary untuk *Kerjakan*).
+
+#### Files Modified
+| File | Status |
+|---|---|
+| `app/Filament/Resources/ControlProduksis/ControlProduksiResource.php` | MODIFIED (HTML Builder layout, regex extraction arrays logic, Header actions) |

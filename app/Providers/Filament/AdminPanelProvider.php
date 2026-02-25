@@ -32,7 +32,19 @@ class AdminPanelProvider extends PanelProvider
             ->tenantProfile(\App\Filament\Pages\Tenancy\EditTenantProfile::class)
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
             ->colors([
-                'primary' => '#7F00FF',
+                'primary' => [
+                    50 => '#F2E6FF',
+                    100 => '#E6CCFF',
+                    200 => '#CC99FF',
+                    300 => '#B366FF',
+                    400 => '#9933FF',
+                    500 => '#8000FF',
+                    600 => '#8000FF', // Exact vibrant CTA color
+                    700 => '#6600CC',
+                    800 => '#4D0099',
+                    900 => '#330066',
+                    950 => '#1A0033',
+                ],
             ])
             ->font('Rethink Sans')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')

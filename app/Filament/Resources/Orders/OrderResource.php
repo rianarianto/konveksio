@@ -1530,7 +1530,7 @@ class OrderResource extends Resource
 
         // PASTIKAN ID TIDAK HILANG AGAR BISA DI-DELETE/UPDATE
         if (!isset($data['id']) && isset($data['record_id'])) {
-             $data['id'] = $data['record_id'];
+            $data['id'] = $data['record_id'];
         }
 
         if ($cat === 'custom') {
@@ -1596,6 +1596,9 @@ class OrderResource extends Resource
     {
         return $table
             ->recordTitleAttribute('order_number')
+            ->query(
+                \App\Models\Order::query()->with(['customer', 'orderItems.productionTasks'])
+            )
             ->columns([
                 TextColumn::make('order_number')
                     ->label('No. Pesanan')
@@ -1620,6 +1623,46 @@ class OrderResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                        'diterima' => 'Diterima',
+                        'antrian' => 'Antrian',
+                        'diproses' => 'Diproses',
+                        'selesai' => 'Selesai',
+                        'siap_diambil' => 'Siap Diambil',
+                        default => ucfirst($state),
+                    })
+                    ->description(function (\App\Models\Order $record): ?string {
+                        $status = $record->status;
+
+                        if (!in_array($status, ['antrian', 'diproses'])) {
+                            return null;
+                        }
+
+                        $allTasks = $record->orderItems
+                            ->flatMap(fn($item) => $item->productionTasks);
+
+                        if ($allTasks->isEmpty()) {
+                            return null;
+                        }
+
+                        if ($status === 'diproses') {
+                            $active = $allTasks->firstWhere('status', 'in_progress');
+                            if ($active) {
+                                return 'Sedang: ' . $active->stage_name;
+                            }
+                        }
+
+                        // Antrian atau fallback: tampilkan stage pending pertama
+                        $nextPending = $allTasks->where('status', 'pending')
+                            ->sortBy('id')
+                            ->first();
+
+                        if ($nextPending) {
+                            return 'Tahap: ' . $nextPending->stage_name;
+                        }
+
+                        return null;
+                    })
                     ->color(fn(string $state): string => match ($state) {
                         'diterima' => 'gray',
                         'antrian' => 'warning',
