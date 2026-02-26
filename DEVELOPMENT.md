@@ -697,3 +697,41 @@ Menyempurnakan antarmuka modal "Atur" tugas produksi, menghilangkan parsing arra
 | `resources/views/filament/resources/control-produksi/widgets/produksi-stats.blade.php` | MODIFIED (Responsive + Flex fixes) |
 | `app/Filament/Resources/ControlProduksis/ControlProduksiResource.php` | MODIFIED (Fix Custom Qty Calculation) |
 | `database/seeders/ProductionStageSeeder.php` | NEW (Tenant-scoped seeder) |
+
+### Phase 19: Worker Master Data & Wage Balancing (COMPLETED)
+**Tanggal**: 2026-02-26
+
+#### Objective
+Membuat Master Data untuk Karyawan Produksi (Tukang) yang bebas dari tabel Users (tanpa login), menerapkan sistem kalkulasi Upah Borongan berjenjang sesuai tahapan, dan memberikan fitur sinkronisasi Load Balancing di dropdown penugasan.
+
+#### Perubahan Teknis
+1. **Model & Migration `Worker`**:
+   - Menambahkan tabel `workers` dengan `shop_id` (Tenant Scope), `name`, `category`, `phone`, `is_active`.
+   - Mengubah relasi `ProductionTask::assignedTo()` agar menunjuk ke `Worker::class`, bukan lagi ke `User::class`.
+
+2. **Load Balancing via Accessor**:
+   - Menambahkan attr custom `$appends = ['active_queue_count']` pada model `Worker`. 
+   - Ini menghitung `sum('quantity')` dari task-task yang berstatus `pending` atau `in_progress`.
+   - Admin Panel -> Dropdown `Tugaskan Ke` akan merender jumlah beban aktif Karyawan secara live (Misal: *Budi - Antrian: 15 pcs*).
+
+3. **Filament Worker Resource**:
+   - `WorkerResource` diciptakan agar Pemilik/Admin bisa mengelola data tim produksi per-tenant (Tambah/Edit Pekerja).
+   - Tabel Karyawan mendukung pencarian dan memformat nilai `active_queue_count` menjadi badge warna dinamis (Hijau = < 20, Kuning = < 50, Merah = >= 50).
+
+4. **Sistem Kalkulasi Upah Borongan (`ControlProduksiResource`)**:
+   - Menambahkan text input numerik `wage_per_pcs` di area Repeater Modal "Atur Tugas".
+   - `ProductionTask` save action dikonfigurasi agar secara otomatis mengambil kuantitas yang baru disimpan dan mengalikannya dengan *Base Rate* = `wage_amount`. 
+   - Modal edit juga di-_reinject_ logic untuk mendeteksi *Base Rate* aslinya dengan mengekstrak kembali nilai `wage_amount / quantity`.
+
+5. **UI Request Tambahan (`ControlProduksiResource`)**:
+   - Menyingkirkan entitas `Placeholder` `_req_info` yang sebelumnya disematkan ke dalam ukuran-ukuran dinamis yang bermasalah.
+   - Peringatan Request Tambahan/ Ekstra secara keseluruhan sudah tersedia dan _dipatenkan_ ke dalam `fieldset` header card informasi pesanan, sehingga UI kolom penugasan terlihat jauh lebih bersih dan bebas dari error path resolusi.
+
+#### Files Modified / Created
+| File | Status |
+|---|---|
+| `database/migrations/2026_02_26_142318_create_workers_table.php` | NEW |
+| `app/Models/Worker.php` | NEW |
+| `app/Models/ProductionTask.php` | MODIFIED (assigned_to -> Worker) |
+| `app/Filament/Resources/Workers/WorkerResource.php` | NEW |
+| `app/Filament/Resources/ControlProduksis/ControlProduksiResource.php` | MODIFIED (Worker Assign, Wage calculation, Dropdown Queue) |

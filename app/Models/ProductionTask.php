@@ -42,11 +42,11 @@ class ProductionTask extends Model
     }
 
     /**
-     * Karyawan yang mengerjakan tahap ini.
+     * Karyawan (Tukang) yang mengerjakan tahap ini.
      */
     public function assignedTo(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'assigned_to');
+        return $this->belongsTo(Worker::class, 'assigned_to');
     }
 
     /**

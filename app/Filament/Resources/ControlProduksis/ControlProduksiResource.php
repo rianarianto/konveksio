@@ -19,7 +19,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\ProductionStage;
 use App\Models\User;
-use Filament\Forms\Get;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\HtmlString;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -262,11 +263,13 @@ class ControlProduksiResource extends Resource
                         $item = $record->load('productionTasks');
                         $tasksForRepeater = [];
                         foreach ($item->productionTasks as $task) {
+                            $wagePerPcs = $task->quantity > 0 ? (int) ($task->wage_amount / $task->quantity) : 0;
                             $tasksForRepeater[(string) \Illuminate\Support\Str::uuid()] = [
                                 'id' => $task->id,
                                 'stage_name' => $task->stage_name,
                                 'assigned_to' => $task->assigned_to,
                                 'quantity' => $task->quantity,
+                                'wage_per_pcs' => $wagePerPcs,
                                 'size_quantities' => $task->size_quantities,
                                 'description' => $task->description,
                             ];
@@ -543,132 +546,197 @@ class ControlProduksiResource extends Resource
                                             return $query->pluck('name', 'name');
                                         })
                                         ->required()
+                                        ->live()
                                         ->disableOptionsWhenSelectedInSiblingRepeaterItems(),
 
                                     \Filament\Forms\Components\Select::make('assigned_to')
-                                        ->label('Tugaskan Ke')
-                                        ->options(User::where('shop_id', \Filament\Facades\Filament::getTenant()->id)->pluck('name', 'id'))
+                                        ->label('Tugaskan Ke (Karyawan)')
+                                        ->options(function () {
+                                            $workers = \App\Models\Worker::where('shop_id', \Filament\Facades\Filament::getTenant()->id)
+                                                ->where('is_active', true)
+                                                ->get();
+                                            
+                                            $opts = [];
+                                            foreach($workers as $w) {
+                                                $q = $w->active_queue_count;
+                                                $opts[$w->id] = "{$w->name}" . ($q > 0 ? " — (Antrian: {$q} pcs)" : "");
+                                            }
+                                            return $opts;
+                                        })
                                         ->searchable()
                                         ->preload()
                                         ->required(),
 
-                                    TextInput::make('quantity')
-                                        ->label('Total Qty')
+                                    TextInput::make('wage_per_pcs')
+                                        ->label('Upah Satuan Dasar (Rp)')
                                         ->numeric()
-                                        ->required()
-                                        ->default(function () use ($item) {
-                                            return $item ? $item->quantity : 0;
-                                        })
-                                        ->rules([
-                                            fn(Get $get) => function (string $attribute, $value, \Closure $fail) use ($get, $item) {
-                                                if (!$item)
-                                                    return;
+                                        ->default(0)
+                                        ->prefix('Rp')
+                                        ->helperText('Harga upah per pcs untuk tahapan ini'),
 
-                                                $stageName = $get('stage_name');
-                                                if (!$stageName)
-                                                    return;
+                                    TextInput::make('quantity')
+                                        ->label('Total Qty (otomatis)')
+                                        ->numeric()
+                                        ->readOnly()
+                                        ->dehydrated()
+                                        ->default(0)
+                                        ->extraInputAttributes(['style' => 'font-weight:700;color:#7c3aed;cursor:not-allowed;'])
+                                        ->helperText('Otomatis menghitung total baju yg dikerjakan'),
 
-                                                $stage = ProductionStage::where('name', $stageName)->first();
-                                                if (!$stage)
-                                                    return;
-
-                                                $sequence = $stage->order_sequence;
-                                                if ($sequence <= 1) {
-                                                    $maxQty = $item->quantity;
-                                                    if ($value > $maxQty) {
-                                                        $fail("Kuantitas untuk tahapan awal tidak boleh melebihi total pesanan ({$maxQty}).");
-                                                    }
-                                                    return;
-                                                }
-
-                                                $previousStage = ProductionStage::where('order_sequence', '<', $sequence)
-                                                    ->orderByDesc('order_sequence')
-                                                    ->first();
-
-                                                if (!$previousStage)
-                                                    return;
-
-                                                $completedQty = $item->productionTasks()
-                                                    ->where('stage_name', $previousStage->name)
-                                                    ->where('status', 'done')
-                                                    ->sum('quantity');
-
-                                                if ($value > $completedQty) {
-                                                    $fail("Kuantitas {$stageName} tidak boleh melebihi {$completedQty} (jumlah selesai dari {$previousStage->name}).");
-                                                }
-                                            }
-                                        ]),
-
-                                    \Filament\Forms\Components\Fieldset::make('size_quantities')
-                                        ->schema(function (\App\Models\OrderItem $record) {
+                                    \Filament\Schemas\Components\Fieldset::make('size_quantities')
+                                        ->label('Detail Qty per Ukuran')
+                                        ->schema(function (\App\Models\OrderItem $record) use ($item) {
                                             $fields = [];
                                             $cat = $record->production_category ?? 'produksi';
                                             $details = $record->size_and_request_details ?? [];
 
-                                            if ($cat === 'produksi' || $cat === 'produksi_size_toko') {
-                                                // Extract sizes from varian_ukuran
+                                            // Recalculate Total Qty from all size inputs
+                                            $recalcQty = function (Get $get, Set $set) {
+                                                $sizeQty = $get('size_quantities') ?? [];
+                                                $total = 0;
+                                                if (is_array($sizeQty)) {
+                                                    foreach ($sizeQty as $v) {
+                                                        $total += (int) $v;
+                                                    }
+                                                }
+                                                $set('quantity', $total > 0 ? $total : 0);
+                                            };
+
+                                            // Ekstrak ukuran + stok dari detail order
+                                            $extractSizes = function () use ($details): array {
                                                 $sizes = [];
                                                 if (isset($details['sizes']) && is_array($details['sizes'])) {
-                                                    $sizes = array_keys(array_filter($details['sizes'], fn($v) => $v > 0));
+                                                    foreach ($details['sizes'] as $sz => $qty) {
+                                                        if ((int) $qty > 0) $sizes[strtoupper($sz)] = (int) $qty;
+                                                    }
                                                 } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
                                                     foreach ($details['varian_ukuran'] as $v) {
                                                         $sz = strtoupper($v['ukuran'] ?? '');
                                                         if ($sz && (int) ($v['qty'] ?? 0) > 0) {
-                                                            $sizes[] = $sz;
+                                                            $sizes[$sz] = (int) $v['qty'];
+                                                        }
+                                                    }
+                                                }
+                                                return $sizes;
+                                            };
+
+                                            if ($cat === 'custom') {
+                                                $people = [];
+                                                if (!empty($details['detail_custom']) && is_array($details['detail_custom'])) {
+                                                    foreach ($details['detail_custom'] as $index => $u) {
+                                                        $person = htmlspecialchars($u['nama'] ?? 'Person ' . ($index + 1));
+                                                        $sz = strtoupper($u['ukuran'] ?? 'CUSTOM');
+                                                        $people[] = ['key' => $person, 'sz' => $sz];
+                                                    }
+                                                }
+
+                                                // Toggle Kerjakan Semua (custom)
+                                                $fields[] = \Filament\Forms\Components\Toggle::make('_fill_all')
+                                                    ->label('✓ Kerjakan semua (' . count($people) . ' orang)')
+                                                    ->dehydrated(false)
+                                                    ->live()
+                                                    ->afterStateUpdated(function (bool $state, Set $set) use ($people) {
+                                                        foreach ($people as $p) {
+                                                            $set($p['key'], $state ? 1 : 0);
+                                                        }
+                                                        $set('quantity', $state ? count($people) : 0);
+                                                    })
+                                                    ->columnSpanFull();
+
+                                                foreach ($people as $p) {
+                                                    $fields[] = \Filament\Forms\Components\TextInput::make($p['key'])
+                                                        ->label($p['key'])
+                                                        ->placeholder($p['sz'])
+                                                        ->numeric()
+                                                        ->minValue(0)
+                                                        ->maxValue(1)
+                                                        ->default(0)
+                                                        ->readOnly(fn(Get $get) => (bool) $get('_fill_all'))
+                                                        ->extraInputAttributes(fn(Get $get) => array_merge(
+                                                            ['style' => 'text-align:center;padding-left:0.5rem;padding-right:0.5rem;'],
+                                                            $get('_fill_all') ? ['style' => 'background-color:rgba(175,175,175,0.08);cursor:not-allowed;text-align:center;padding-left:0.5rem;padding-right:0.5rem;'] : []
+                                                        ))
+                                                        ->live(debounce: 300)
+                                                        ->afterStateUpdated($recalcQty);
+                                                }
+                                            } else {
+                                                $sizes = $extractSizes();
+
+                                                // Map request tambahan per ukuran
+                                                $requestPerSize = [];
+                                                $reqData = $details['request_tambahan'] ?? [];
+                                                if (is_array($reqData)) {
+                                                    foreach ($reqData as $req) {
+                                                        $jenis  = $req['jenis'] ?? null;
+                                                        $ukuran = strtoupper($req['ukuran'] ?? '');
+                                                        $qty    = (int) ($req['qty_tambahan'] ?? 0);
+                                                        if (!$jenis || $qty <= 0) continue;
+                                                        if ($ukuran === '__SEMUA__' || $ukuran === '') {
+                                                            foreach (array_keys($sizes) as $sz) {
+                                                                $requestPerSize[$sz][] = "{$jenis} ({$qty})";
+                                                            }
+                                                        } else {
+                                                            $requestPerSize[$ukuran][] = "{$jenis} ({$qty})";
                                                         }
                                                     }
                                                 }
 
-                                                foreach (array_unique($sizes) as $size) {
-                                                    $fields[] = \Filament\Forms\Components\TextInput::make(strtoupper($size))
-                                                        ->label("Size " . strtoupper($size))
-                                                        ->numeric()
-                                                        ->minValue(0)
-                                                        ->default(0);
-                                                }
-                                            } elseif ($cat === 'custom') {
-                                                if (!empty($details['detail_custom']) && is_array($details['detail_custom'])) {
-                                                    foreach ($details['detail_custom'] as $index => $u) {
-                                                        $person = htmlspecialchars($u['nama'] ?? "Person " . ($index + 1));
-                                                        $sz = strtoupper($u['ukuran'] ?? 'CUSTOM');
-                                                        $fields[] = \Filament\Forms\Components\TextInput::make($person)
-                                                            ->label($person . " ({$sz})")
+                                                if (!empty($sizes)) {
+                                                    $totalStok = array_sum($sizes);
+
+                                                    // Toggle Kerjakan Semua
+                                                    $fields[] = \Filament\Forms\Components\Toggle::make('_fill_all')
+                                                        ->label('✓ Kerjakan semua ukuran (total: ' . $totalStok . ' pcs)')
+                                                        ->dehydrated(false)
+                                                        ->live()
+                                                        ->afterStateUpdated(function (bool $state, Set $set) use ($sizes) {
+                                                            foreach ($sizes as $sizeName => $maxQty) {
+                                                                $set($sizeName, $state ? $maxQty : 0);
+                                                            }
+                                                            $set('quantity', $state ? array_sum($sizes) : 0);
+                                                        })
+                                                        ->columnSpanFull();
+
+                                                    foreach ($sizes as $sizeName => $maxQty) {
+                                                        $fields[] = \Filament\Forms\Components\TextInput::make($sizeName)
+                                                            ->label($sizeName)
+                                                            ->placeholder("0 \u2013 {$maxQty}")
                                                             ->numeric()
                                                             ->minValue(0)
-                                                            ->maxValue(1)
-                                                            ->default(0);
+                                                            ->maxValue($maxQty)
+                                                            ->default(0)
+                                                            ->readOnly(fn(Get $get) => (bool) $get('_fill_all'))
+                                                            ->extraInputAttributes(fn(Get $get) => array_merge(
+                                                                ['style' => 'text-align:center;padding-left:0.5rem;padding-right:0.5rem;'],
+                                                                $get('_fill_all') ? ['style' => 'background-color:rgba(175,175,175,0.08);cursor:not-allowed;text-align:center;padding-left:0.5rem;padding-right:0.5rem;'] : []
+                                                            ))
+                                                            ->live(debounce: 300)
+                                                            ->afterStateUpdated($recalcQty);
                                                     }
+
+                                                    // Info request tambahan — hanya muncul jika ada & stage_name mengandung 'jahit'
+                                                    if (!empty($requestPerSize)) {
+                                                        $summaryParts = [];
+                                                        foreach ($requestPerSize as $sz => $reqs) {
+                                                            $summaryParts[] = strtoupper($sz) . ' \u2192 ' . implode(', ', $reqs);
+                                                        }
+                                                        $summaryText = '\u2746 Request Tambahan:  ' . implode('   |   ', $summaryParts);
+                                                    }
+                                                } else {
+                                                    // Fallback: tidak ada data ukuran
+                                                    $fields[] = \Filament\Forms\Components\TextInput::make('qty')
+                                                        ->label('Target Qty')
+                                                        ->numeric()
+                                                        ->minValue(0)
+                                                        ->default(0)
+                                                        ->live(debounce: 300)
+                                                        ->afterStateUpdated($recalcQty);
                                                 }
-                                            } elseif ($cat === 'non_produksi' || $cat === 'jasa') {
-                                                $fields[] = \Filament\Forms\Components\TextInput::make('qty')
-                                                    ->label("Target Qty")
-                                                    ->numeric()
-                                                    ->minValue(0)
-                                                    ->default(0);
                                             }
 
                                             return $fields;
                                         })
-                                        ->columns(4)
-                                        ->rules([
-                                            fn(\App\Models\OrderItem $record) => function (string $attribute, $value, \Closure $fail) use ($record) {
-                                                if (!is_array($value))
-                                                    return;
-
-                                                // Convert values to integers and sum them up
-                                                $totalInput = array_sum(array_map('intval', array_values($value)));
-
-                                                $maxQty = $record->quantity;
-                                                // For 'produksi_custom', check the count of people in detail_custom
-                                                if ($record->production_category === 'custom') {
-                                                    $maxQty = is_array($record->detail_custom) ? count($record->detail_custom) : $record->quantity;
-                                                }
-
-                                                if ($totalInput > $maxQty) {
-                                                    $fail("Total detail qty ({$totalInput}) tidak boleh melebihi jumlah pesanan ({$maxQty}).");
-                                                }
-                                            }
-                                        ])
+                                        ->columns(6)
                                         ->columnSpanFull(),
 
                                     \Filament\Forms\Components\Textarea::make('description')
@@ -699,10 +767,14 @@ class ControlProduksiResource extends Resource
                                 }
                             }
 
+                            $quantity = (int) ($taskItem['quantity'] ?? 0);
+                            $wagePerPcs = (float) ($taskItem['wage_per_pcs'] ?? 0);
+                            
                             $taskData = [
                                 'stage_name' => $taskItem['stage_name'],
                                 'assigned_to' => $taskItem['assigned_to'],
-                                'quantity' => $taskItem['quantity'],
+                                'quantity' => $quantity,
+                                'wage_amount' => $quantity * $wagePerPcs,
                                 'size_quantities' => empty($sizeQuantities) ? null : $sizeQuantities,
                                 'description' => $taskItem['description'] ?? null,
                                 'shop_id' => \Filament\Facades\Filament::getTenant()->id,
