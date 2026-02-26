@@ -546,7 +546,7 @@ class ControlProduksiResource extends Resource
                                         ->disableOptionsWhenSelectedInSiblingRepeaterItems(),
 
                                     \Filament\Forms\Components\Select::make('assigned_to')
-                                        ->label('Tugaskan Ke (Pegawai)')
+                                        ->label('Tugaskan Ke')
                                         ->options(User::where('shop_id', \Filament\Facades\Filament::getTenant()->id)->pluck('name', 'id'))
                                         ->searchable()
                                         ->preload()
@@ -599,10 +599,76 @@ class ControlProduksiResource extends Resource
                                             }
                                         ]),
 
-                                    \Filament\Forms\Components\KeyValue::make('size_quantities')
-                                        ->label('Detail Qty per Ukuran (Opsional)')
-                                        ->keyLabel('Ukuran (S, M, dll)')
-                                        ->valueLabel('Jumlah')
+                                    \Filament\Forms\Components\Fieldset::make('size_quantities')
+                                        ->schema(function (\App\Models\OrderItem $record) {
+                                            $fields = [];
+                                            $cat = $record->production_category ?? 'produksi';
+                                            $details = $record->size_and_request_details ?? [];
+
+                                            if ($cat === 'produksi' || $cat === 'produksi_size_toko') {
+                                                // Extract sizes from varian_ukuran
+                                                $sizes = [];
+                                                if (isset($details['sizes']) && is_array($details['sizes'])) {
+                                                    $sizes = array_keys(array_filter($details['sizes'], fn($v) => $v > 0));
+                                                } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
+                                                    foreach ($details['varian_ukuran'] as $v) {
+                                                        $sz = strtoupper($v['ukuran'] ?? '');
+                                                        if ($sz && (int) ($v['qty'] ?? 0) > 0) {
+                                                            $sizes[] = $sz;
+                                                        }
+                                                    }
+                                                }
+
+                                                foreach (array_unique($sizes) as $size) {
+                                                    $fields[] = \Filament\Forms\Components\TextInput::make(strtoupper($size))
+                                                        ->label("Size " . strtoupper($size))
+                                                        ->numeric()
+                                                        ->minValue(0)
+                                                        ->default(0);
+                                                }
+                                            } elseif ($cat === 'custom') {
+                                                if (!empty($details['detail_custom']) && is_array($details['detail_custom'])) {
+                                                    foreach ($details['detail_custom'] as $index => $u) {
+                                                        $person = htmlspecialchars($u['nama'] ?? "Person " . ($index + 1));
+                                                        $sz = strtoupper($u['ukuran'] ?? 'CUSTOM');
+                                                        $fields[] = \Filament\Forms\Components\TextInput::make($person)
+                                                            ->label($person . " ({$sz})")
+                                                            ->numeric()
+                                                            ->minValue(0)
+                                                            ->maxValue(1)
+                                                            ->default(0);
+                                                    }
+                                                }
+                                            } elseif ($cat === 'non_produksi' || $cat === 'jasa') {
+                                                $fields[] = \Filament\Forms\Components\TextInput::make('qty')
+                                                    ->label("Target Qty")
+                                                    ->numeric()
+                                                    ->minValue(0)
+                                                    ->default(0);
+                                            }
+
+                                            return $fields;
+                                        })
+                                        ->columns(4)
+                                        ->rules([
+                                            fn(\App\Models\OrderItem $record) => function (string $attribute, $value, \Closure $fail) use ($record) {
+                                                if (!is_array($value))
+                                                    return;
+
+                                                // Convert values to integers and sum them up
+                                                $totalInput = array_sum(array_map('intval', array_values($value)));
+
+                                                $maxQty = $record->quantity;
+                                                // For 'produksi_custom', check the count of people in detail_custom
+                                                if ($record->production_category === 'custom') {
+                                                    $maxQty = is_array($record->detail_custom) ? count($record->detail_custom) : $record->quantity;
+                                                }
+
+                                                if ($totalInput > $maxQty) {
+                                                    $fail("Total detail qty ({$totalInput}) tidak boleh melebihi jumlah pesanan ({$maxQty}).");
+                                                }
+                                            }
+                                        ])
                                         ->columnSpanFull(),
 
                                     \Filament\Forms\Components\Textarea::make('description')
@@ -623,11 +689,21 @@ class ControlProduksiResource extends Resource
                         $tasksData = $data['productionTasks'] ?? [];
 
                         foreach ($tasksData as $taskItem) {
+                            // Extract size_quantities which is now an array of dynamically generated inputs
+                            $sizeQuantities = [];
+                            if (isset($taskItem['size_quantities']) && is_array($taskItem['size_quantities'])) {
+                                foreach ($taskItem['size_quantities'] as $key => $val) {
+                                    if ($val > 0) { // Only save sizes that have a quantity assigned
+                                        $sizeQuantities[$key] = $val;
+                                    }
+                                }
+                            }
+
                             $taskData = [
                                 'stage_name' => $taskItem['stage_name'],
                                 'assigned_to' => $taskItem['assigned_to'],
                                 'quantity' => $taskItem['quantity'],
-                                'size_quantities' => $taskItem['size_quantities'] ?? null,
+                                'size_quantities' => empty($sizeQuantities) ? null : $sizeQuantities,
                                 'description' => $taskItem['description'] ?? null,
                                 'shop_id' => \Filament\Facades\Filament::getTenant()->id,
                             ];

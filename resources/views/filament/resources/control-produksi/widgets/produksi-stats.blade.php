@@ -31,7 +31,7 @@
 
                 {{-- Angka Besar --}}
                 <div class="mt-3 mb-3">
-                    <span class="text-5xl sm:text-6xl lg:text-7xl font-light text-gray-700 dark:text-white">{{ number_format($totalBeban) }}</span>
+                    <span class="text-5xl sm:text-4xl lg:text-4xl font-light text-gray-700 dark:text-white">{{ number_format($totalBeban) }}</span>
                     <span class="text-2xl sm:text-3xl lg:text-4xl font-light text-gray-400 dark:text-gray-500 ml-1">Pcs</span>
                 </div>
 
@@ -59,7 +59,7 @@
 
                 {{-- Angka Besar --}}
                 <div class="mt-3 mb-3">
-                    <span class="text-5xl sm:text-6xl lg:text-7xl font-light text-gray-700 dark:text-white">{{ number_format($antrianQty) }}</span>
+                    <span class="text-4xl sm:text-4xl lg:text-4xl font-light text-gray-700 dark:text-white">{{ number_format($antrianQty) }}</span>
                     <span class="text-2xl sm:text-3xl lg:text-4xl font-light text-gray-400 dark:text-gray-500 ml-1">Pcs</span>
                 </div>
 
