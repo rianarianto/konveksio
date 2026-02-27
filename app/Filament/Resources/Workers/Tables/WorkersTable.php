@@ -20,24 +20,18 @@ class WorkersTable
                     ->label('Nama Karyawan')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('category')
-                    ->label('Kategori')
-                    ->searchable()
-                    ->sortable()
-                    ->badge()
-                    ->color('primary'),
                 TextColumn::make('phone')
                     ->label('No. HP')
                     ->searchable(),
                 TextColumn::make('active_queue_count')
                     ->label('Antrian Pekerjaan')
                     ->badge()
-                    ->color(fn ($state): string => match (true) {
+                    ->color(fn($state): string => match (true) {
                         $state >= 50 => 'danger',
                         $state >= 20 => 'warning',
                         default => 'success',
                     })
-                    ->formatStateUsing(fn ($state) => $state . ' pcs')
+                    ->formatStateUsing(fn($state) => $state . ' pcs')
                     ->sortable(),
                 IconColumn::make('is_active')
                     ->label('Aktif')

@@ -18,6 +18,7 @@ class ProductionStageSeeder extends Seeder
         $stages = [
             [
                 'name' => 'Potong',
+                'base_wage' => 1000,
                 'order_sequence' => 1,
                 'for_produksi_custom' => true,
                 'for_non_produksi' => false,
@@ -25,6 +26,7 @@ class ProductionStageSeeder extends Seeder
             ],
             [
                 'name' => 'Jahit',
+                'base_wage' => 3000,
                 'order_sequence' => 2,
                 'for_produksi_custom' => true,
                 'for_non_produksi' => false,
@@ -32,6 +34,7 @@ class ProductionStageSeeder extends Seeder
             ],
             [
                 'name' => 'Kancing',
+                'base_wage' => 500,
                 'order_sequence' => 3,
                 'for_produksi_custom' => true,
                 'for_non_produksi' => false,
@@ -39,6 +42,7 @@ class ProductionStageSeeder extends Seeder
             ],
             [
                 'name' => 'Bordir/Sablon',
+                'base_wage' => 2000,
                 'order_sequence' => 4,
                 'for_produksi_custom' => true,
                 'for_non_produksi' => true,
@@ -46,6 +50,7 @@ class ProductionStageSeeder extends Seeder
             ],
             [
                 'name' => 'Finishing',
+                'base_wage' => 500,
                 'order_sequence' => 5,
                 'for_produksi_custom' => true,
                 'for_non_produksi' => true,
@@ -53,6 +58,7 @@ class ProductionStageSeeder extends Seeder
             ],
             [
                 'name' => 'QC',
+                'base_wage' => 500,
                 'order_sequence' => 6,
                 'for_produksi_custom' => true,
                 'for_non_produksi' => true,
@@ -71,7 +77,7 @@ class ProductionStageSeeder extends Seeder
             DB::transaction(function () use ($stages, $shop) {
                 // Clear existing stages for this shop to avoid mixing old and new stages
                 ProductionStage::where('shop_id', $shop->id)->delete();
-                
+
                 foreach ($stages as $stage) {
                     // Assign to specific shop
                     ProductionStage::create(

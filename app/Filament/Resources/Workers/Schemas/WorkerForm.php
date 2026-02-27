@@ -14,24 +14,11 @@ class WorkerForm
         return $schema
             ->components([
                 \Filament\Forms\Components\Hidden::make('shop_id')
-                    ->default(fn () => \Filament\Facades\Filament::getTenant()->id),
+                    ->default(fn() => \Filament\Facades\Filament::getTenant()->id),
                 TextInput::make('name')
                     ->label('Nama Karyawan/Tukang')
                     ->required()
                     ->maxLength(255),
-                Select::make('category')
-                    ->label('Kategori / Posisi')
-                    ->options([
-                        'Jahit' => 'Jahit',
-                        'Sablon' => 'Sablon',
-                        'Bordir' => 'Bordir',
-                        'Potong' => 'Potong',
-                        'Obras' => 'Obras',
-                        'Finishing' => 'Finishing',
-                        'Packing' => 'Packing',
-                    ])
-                    ->searchable()
-                    ->required(),
                 TextInput::make('phone')
                     ->label('Nomor HP')
                     ->tel()

@@ -16,7 +16,6 @@ class Worker extends Model implements HasTenants
         'shop_id',
         'name',
         'phone',
-        'category',
         'is_active',
     ];
 

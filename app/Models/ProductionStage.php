@@ -11,6 +11,7 @@ class ProductionStage extends Model
     protected $fillable = [
         'shop_id',
         'name',
+        'base_wage',
         'order_sequence',
         'for_produksi_custom',
         'for_non_produksi',

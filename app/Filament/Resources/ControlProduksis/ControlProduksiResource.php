@@ -21,11 +21,12 @@ use App\Models\ProductionStage;
 use App\Models\User;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
-use Illuminate\Support\HtmlString;
+use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Illuminate\Support\HtmlString;
 
 class ControlProduksiResource extends Resource
 {
@@ -527,61 +528,72 @@ class ControlProduksiResource extends Resource
                                 ->label('Daftar Tugas Produksi')
                                 ->schema([
                                     Hidden::make('id'),
-                                    \Filament\Forms\Components\Select::make('stage_name')
-                                        ->label('Tahap Pekerjaan')
-                                        ->options(function () use ($item) {
-                                            $category = $item->production_category ?? 'produksi';
+                                    \Filament\Schemas\Components\Grid::make(2)
+                                        ->schema([
+                                            \Filament\Forms\Components\Select::make('stage_name')
+                                                ->label('Tahap Pekerjaan')
+                                                ->options(function () use ($item) {
+                                                    $category = $item->production_category ?? 'produksi';
 
-                                            $query = ProductionStage::query()->orderBy('order_sequence');
-                                            if ($category === 'produksi') {
-                                                $query->where('for_produksi_custom', true);
-                                            } elseif ($category === 'custom') {
-                                                $query->where('for_produksi_custom', true);
-                                            } elseif ($category === 'non_produksi') {
-                                                $query->where('for_non_produksi', true);
-                                            } elseif ($category === 'jasa') {
-                                                $query->where('for_jasa', true);
-                                            }
+                                                    $query = ProductionStage::query()->orderBy('order_sequence');
+                                                    if ($category === 'produksi') {
+                                                        $query->where('for_produksi_custom', true);
+                                                    } elseif ($category === 'custom') {
+                                                        $query->where('for_produksi_custom', true);
+                                                    } elseif ($category === 'non_produksi') {
+                                                        $query->where('for_non_produksi', true);
+                                                    } elseif ($category === 'jasa') {
+                                                        $query->where('for_jasa', true);
+                                                    }
 
-                                            return $query->pluck('name', 'name');
-                                        })
-                                        ->required()
-                                        ->live()
-                                        ->disableOptionsWhenSelectedInSiblingRepeaterItems(),
+                                                    return $query->pluck('name', 'name');
+                                                })
+                                                ->required()
+                                                ->live()
+                                                ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                                ->afterStateUpdated(function ($state, Set $set) {
+                                                    if ($state) {
+                                                        $stage = \App\Models\ProductionStage::where('name', $state)->first();
+                                                        if ($stage) {
+                                                            $set('wage_per_pcs', $stage->base_wage);
+                                                        }
+                                                    }
+                                                }),
 
-                                    \Filament\Forms\Components\Select::make('assigned_to')
-                                        ->label('Tugaskan Ke (Karyawan)')
-                                        ->options(function () {
-                                            $workers = \App\Models\Worker::where('shop_id', \Filament\Facades\Filament::getTenant()->id)
-                                                ->where('is_active', true)
-                                                ->get();
-                                            
-                                            $opts = [];
-                                            foreach($workers as $w) {
-                                                $q = $w->active_queue_count;
-                                                $opts[$w->id] = "{$w->name}" . ($q > 0 ? " — (Antrian: {$q} pcs)" : "");
-                                            }
-                                            return $opts;
-                                        })
-                                        ->searchable()
-                                        ->preload()
-                                        ->required(),
+                                            \Filament\Forms\Components\Select::make('assigned_to')
+                                                ->label('Tugaskan Ke (Karyawan)')
+                                                ->options(function () {
+                                                    $workers = \App\Models\Worker::where('shop_id', \Filament\Facades\Filament::getTenant()->id)
+                                                        ->where('is_active', true)
+                                                        ->get();
 
-                                    TextInput::make('wage_per_pcs')
-                                        ->label('Upah Satuan Dasar (Rp)')
-                                        ->numeric()
-                                        ->default(0)
-                                        ->prefix('Rp')
-                                        ->helperText('Harga upah per pcs untuk tahapan ini'),
+                                                    $opts = [];
+                                                    foreach ($workers as $w) {
+                                                        $q = $w->active_queue_count;
+                                                        $opts[$w->id] = "{$w->name}" . ($q > 0 ? " — (Antrian: {$q} pcs)" : "");
+                                                    }
+                                                    return $opts;
+                                                })
+                                                ->searchable()
+                                                ->preload()
+                                                ->required(),
 
-                                    TextInput::make('quantity')
-                                        ->label('Total Qty (otomatis)')
-                                        ->numeric()
-                                        ->readOnly()
-                                        ->dehydrated()
-                                        ->default(0)
-                                        ->extraInputAttributes(['style' => 'font-weight:700;color:#7c3aed;cursor:not-allowed;'])
-                                        ->helperText('Otomatis menghitung total baju yg dikerjakan'),
+                                            TextInput::make('wage_per_pcs')
+                                                ->label('Upah Satuan Dasar (Rp)')
+                                                ->numeric()
+                                                ->default(0)
+                                                ->prefix('Rp')
+                                                ->helperText('Otomatis/Bisa diubah'),
+
+                                            TextInput::make('quantity')
+                                                ->label('Total Qty (otomatis)')
+                                                ->numeric()
+                                                ->readOnly()
+                                                ->dehydrated()
+                                                ->default(0)
+                                                ->extraInputAttributes(['style' => 'font-weight:700;color:#7c3aed;cursor:not-allowed;'])
+                                                ->helperText('Dihitung otomatis'),
+                                        ]),
 
                                     \Filament\Schemas\Components\Fieldset::make('size_quantities')
                                         ->label('Detail Qty per Ukuran')
@@ -607,7 +619,8 @@ class ControlProduksiResource extends Resource
                                                 $sizes = [];
                                                 if (isset($details['sizes']) && is_array($details['sizes'])) {
                                                     foreach ($details['sizes'] as $sz => $qty) {
-                                                        if ((int) $qty > 0) $sizes[strtoupper($sz)] = (int) $qty;
+                                                        if ((int) $qty > 0)
+                                                            $sizes[strtoupper($sz)] = (int) $qty;
                                                     }
                                                 } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
                                                     foreach ($details['varian_ukuran'] as $v) {
@@ -636,11 +649,11 @@ class ControlProduksiResource extends Resource
                                                     ->dehydrated(false)
                                                     ->live()
                                                     ->afterStateUpdated(function (bool $state, Set $set) use ($people) {
-                                                        foreach ($people as $p) {
-                                                            $set($p['key'], $state ? 1 : 0);
-                                                        }
-                                                        $set('quantity', $state ? count($people) : 0);
-                                                    })
+                                                    foreach ($people as $p) {
+                                                        $set($p['key'], $state ? 1 : 0);
+                                                    }
+                                                    $set('quantity', $state ? count($people) : 0);
+                                                })
                                                     ->columnSpanFull();
 
                                                 foreach ($people as $p) {
@@ -653,11 +666,19 @@ class ControlProduksiResource extends Resource
                                                         ->default(0)
                                                         ->readOnly(fn(Get $get) => (bool) $get('_fill_all'))
                                                         ->extraInputAttributes(fn(Get $get) => array_merge(
-                                                            ['style' => 'text-align:center;padding-left:0.5rem;padding-right:0.5rem;'],
+                                                            [
+                                                                'style' => 'text-align:center;padding-left:0.5rem;padding-right:0.5rem;',
+                                                                'oninput' => "if(this.value > 1) this.value = 1;"
+                                                            ],
                                                             $get('_fill_all') ? ['style' => 'background-color:rgba(175,175,175,0.08);cursor:not-allowed;text-align:center;padding-left:0.5rem;padding-right:0.5rem;'] : []
                                                         ))
                                                         ->live(debounce: 300)
-                                                        ->afterStateUpdated($recalcQty);
+                                                        ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcQty, $p) {
+                                                            if ((int) $state > 1) {
+                                                                $set($p['key'], 1);
+                                                            }
+                                                            $recalcQty($get, $set);
+                                                        });
                                                 }
                                             } else {
                                                 $sizes = $extractSizes();
@@ -667,10 +688,11 @@ class ControlProduksiResource extends Resource
                                                 $reqData = $details['request_tambahan'] ?? [];
                                                 if (is_array($reqData)) {
                                                     foreach ($reqData as $req) {
-                                                        $jenis  = $req['jenis'] ?? null;
+                                                        $jenis = $req['jenis'] ?? null;
                                                         $ukuran = strtoupper($req['ukuran'] ?? '');
-                                                        $qty    = (int) ($req['qty_tambahan'] ?? 0);
-                                                        if (!$jenis || $qty <= 0) continue;
+                                                        $qty = (int) ($req['qty_tambahan'] ?? 0);
+                                                        if (!$jenis || $qty <= 0)
+                                                            continue;
                                                         if ($ukuran === '__SEMUA__' || $ukuran === '') {
                                                             foreach (array_keys($sizes) as $sz) {
                                                                 $requestPerSize[$sz][] = "{$jenis} ({$qty})";
@@ -690,37 +712,45 @@ class ControlProduksiResource extends Resource
                                                         ->dehydrated(false)
                                                         ->live()
                                                         ->afterStateUpdated(function (bool $state, Set $set) use ($sizes) {
-                                                            foreach ($sizes as $sizeName => $maxQty) {
-                                                                $set($sizeName, $state ? $maxQty : 0);
-                                                            }
-                                                            $set('quantity', $state ? array_sum($sizes) : 0);
-                                                        })
+                                                        foreach ($sizes as $sizeName => $maxQty) {
+                                                            $set($sizeName, $state ? $maxQty : 0);
+                                                        }
+                                                        $set('quantity', $state ? array_sum($sizes) : 0);
+                                                    })
                                                         ->columnSpanFull();
 
                                                     foreach ($sizes as $sizeName => $maxQty) {
                                                         $fields[] = \Filament\Forms\Components\TextInput::make($sizeName)
                                                             ->label($sizeName)
-                                                            ->placeholder("0 \u2013 {$maxQty}")
+                                                            ->placeholder("0 - {$maxQty}")
                                                             ->numeric()
                                                             ->minValue(0)
                                                             ->maxValue($maxQty)
                                                             ->default(0)
                                                             ->readOnly(fn(Get $get) => (bool) $get('_fill_all'))
                                                             ->extraInputAttributes(fn(Get $get) => array_merge(
-                                                                ['style' => 'text-align:center;padding-left:0.5rem;padding-right:0.5rem;'],
+                                                                [
+                                                                    'style' => 'text-align:center;padding-left:0.5rem;padding-right:0.5rem;',
+                                                                    'oninput' => "if(this.value > {$maxQty}) this.value = {$maxQty};"
+                                                                ],
                                                                 $get('_fill_all') ? ['style' => 'background-color:rgba(175,175,175,0.08);cursor:not-allowed;text-align:center;padding-left:0.5rem;padding-right:0.5rem;'] : []
                                                             ))
                                                             ->live(debounce: 300)
-                                                            ->afterStateUpdated($recalcQty);
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcQty, $maxQty, $sizeName) {
+                                                                if ((int) $state > $maxQty) {
+                                                                    $set($sizeName, $maxQty);
+                                                                }
+                                                                $recalcQty($get, $set);
+                                                            });
                                                     }
 
                                                     // Info request tambahan — hanya muncul jika ada & stage_name mengandung 'jahit'
                                                     if (!empty($requestPerSize)) {
                                                         $summaryParts = [];
                                                         foreach ($requestPerSize as $sz => $reqs) {
-                                                            $summaryParts[] = strtoupper($sz) . ' \u2192 ' . implode(', ', $reqs);
+                                                            $summaryParts[] = strtoupper($sz) . ' -> ' . implode(', ', $reqs);
                                                         }
-                                                        $summaryText = '\u2746 Request Tambahan:  ' . implode('   |   ', $summaryParts);
+                                                        $summaryText = '* Request Tambahan:  ' . implode('   |   ', $summaryParts);
                                                     }
                                                 } else {
                                                     // Fallback: tidak ada data ukuran
@@ -744,7 +774,6 @@ class ControlProduksiResource extends Resource
                                         ->rows(2)
                                         ->columnSpanFull(),
                                 ])
-                                ->columns(3)
                                 ->columnSpanFull()
                                 ->itemLabel(fn(array $state): ?string => $state['stage_name'] ?? null)
                                 ->addActionLabel('Tambah Tugas Baru'),
@@ -769,7 +798,7 @@ class ControlProduksiResource extends Resource
 
                             $quantity = (int) ($taskItem['quantity'] ?? 0);
                             $wagePerPcs = (float) ($taskItem['wage_per_pcs'] ?? 0);
-                            
+
                             $taskData = [
                                 'stage_name' => $taskItem['stage_name'],
                                 'assigned_to' => $taskItem['assigned_to'],

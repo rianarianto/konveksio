@@ -56,6 +56,11 @@ class ProductionStageResource extends Resource
                     ->label('Nama Tahapan')
                     ->required()
                     ->maxLength(255),
+                TextInput::make('base_wage')
+                    ->label('Upah Satuan Dasar (Rp)')
+                    ->numeric()
+                    ->default(0)
+                    ->prefix('Rp'),
                 Toggle::make('for_produksi_custom')
                     ->label('Kategori Produksi & Custom')
                     ->default(true)
@@ -79,6 +84,11 @@ class ProductionStageResource extends Resource
                     ->label('Nama Tahapan')
                     ->searchable()
                     ->weight('bold'),
+                TextColumn::make('base_wage')
+                    ->label('Upah Dasar (Rp)')
+                    ->numeric()
+                    ->money('IDR', locale: 'id')
+                    ->sortable(),
                 IconColumn::make('for_produksi_custom')
                     ->label('Produksi / Custom')
                     ->boolean(),

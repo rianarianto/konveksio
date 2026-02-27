@@ -17,8 +17,6 @@ class WorkerInfolist
                 TextEntry::make('name'),
                 TextEntry::make('phone')
                     ->placeholder('-'),
-                TextEntry::make('category')
-                    ->placeholder('-'),
                 IconEntry::make('is_active')
                     ->boolean(),
                 TextEntry::make('created_at')
