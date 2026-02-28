@@ -54,32 +54,34 @@ class ProduksiStats extends Widget
             ],
         ];
 
-        // Specific requested categories mapped to possible stage names
+        // Specific categories mapped to possible stage names
         $categoriesMap = [
-            'Potong' => ['Potong'],
-            'Jahit' => ['Jahit'],
-            'Kancing' => ['Kancing'],
-            'Bordir/Sablon' => ['Bordir', 'Sablon', 'Bordir/Sablon'],
-            'Finishing' => ['Finishing'],
-            'QC' => ['QC', 'Quality Control']
+            'Potong'       => ['Potong'],
+            'Jahit'        => ['Jahit'],
+            'Kancing'      => ['Kancing'],
+            'Bordir/Sablon'=> ['Bordir', 'Sablon', 'Bordir/Sablon'],
+            'Finishing'    => ['Finishing'],
+            'QC'           => ['QC', 'Quality Control'],
         ];
 
         foreach ($categoriesMap as $categoryLabel => $stageNames) {
+            // Hanya hitung task yang sedang AKTIF dikerjakan di tahap ini (in_progress)
+            // Task berstatus 'pending' di tahap ini berarti belum sampai di sini
             $qty = ProductionTask::where('shop_id', $shopId)
                 ->whereIn('stage_name', $stageNames)
-                ->whereIn('status', ['pending', 'in_progress'])
+                ->where('status', 'in_progress')
                 ->sum('quantity');
 
             $stages[] = [
                 'name' => $categoryLabel,
-                'qty' => (int) $qty,
+                'qty'  => (int) $qty,
             ];
         }
 
         return [
             'totalBeban' => (int) $totalBeban,
-            'stages' => $stages,
-            'trend' => $trend,
+            'stages'     => $stages,
+            'trend'      => $trend,
         ];
     }
 }

@@ -79,4 +79,29 @@ class Worker extends Model implements HasTenants
     {
         return $this->productionTasks()->where('status', 'done')->sum('quantity');
     }
+
+    /**
+     * Total upah yang sudah diperoleh (semua waktu, hanya task done).
+     * Formula: SUM(wage_amount × quantity) untuk status = done
+     */
+    public function getTotalEarnedAttribute(): int
+    {
+        return (int) $this->productionTasks()
+            ->where('status', 'done')
+            ->selectRaw('SUM(wage_amount * quantity) as total')
+            ->value('total') ?? 0;
+    }
+
+    /**
+     * Total upah bulan berjalan (berdasarkan completed_at).
+     */
+    public function getMonthlyEarnedAttribute(): int
+    {
+        return (int) $this->productionTasks()
+            ->where('status', 'done')
+            ->whereYear('completed_at', now()->year)
+            ->whereMonth('completed_at', now()->month)
+            ->selectRaw('SUM(wage_amount * quantity) as total')
+            ->value('total') ?? 0;
+    }
 }

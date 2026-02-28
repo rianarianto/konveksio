@@ -800,3 +800,65 @@ Perubahan dilakukan via **dedicated route** (`GET /task-action/{task}/{action}/{
 | `routes/web.php` | MODIFIED (route task-action) |
 | `database/migrations/2026_02_28_112451_update_assigned_to_foreign_key_on_production_tasks_table.php` | NEW |
 
+---
+
+### 2026-03-01: Status Produksi, Fix Redirect & Stage Stats, Sistem Upah Karyawan
+
+#### ✅ Status Produksi — 4 State yang Jelas (`ControlProduksiResource`)
+
+Kolom **"Status Produksi"** direvisi dari 3 status ambigu menjadi **4 status presisi**:
+
+| Status | Kondisi | Warna |
+|---|---|---|
+| `Belum Diatur` | Task belum di-assign setelah desain approved | Abu |
+| `Antrian` | Task ada, semua masih `pending` | Kuning |
+| `Diproses` | Minimal 1 task `in_progress` | Biru |
+| `Selesai` | Semua task `done` | Hijau |
+
+Deskripsi kolom diperbarui menjadi lebih detail: `🔨 Potong — Pak Joko` (in_progress) atau `⏳ Menunggu: Potong` (antrian).
+
+#### ✅ Fix Redirect 404 Setelah Klik Mulai/Selesai (`TaskActionController`)
+
+- Typo slug redirect: `/control-produksis` (dengan `s`) → diperbaiki ke `/control-produksi` (tanpa `s`)
+
+#### ✅ Fix Stage Card Widget — Hanya Hitung Item Aktif (`ProduksiStats`)
+
+Widget "Detail Produksi Berjalan" sebelumnya menghitung semua task `pending OR in_progress` per tahap, sehingga Finishing & QC yang belum dimulai ikut terhitung. Fix: tiap card kini hanya menghitung task `in_progress`.
+
+#### ✅ Fix Tabel Tanpa Horizontal Scroll (`ControlProduksiResource`)
+
+Hapus kolom "No. Pesanan" (sudah ada di group header) dan "Kategori". Info kategori kini ditampilkan sebagai description emoji di kolom Produk (🏭/🧵/📦/🔧). Tabel jadi 4 kolom.
+
+#### ✅ Fix WorkerInfolist — Namespace Filament v3
+
+`Filament\Infolists\Components\Section` tidak ada di v3, diganti ke `Filament\Schemas\Components\Section`.
+
+#### ✅ Sistem Upah Karyawan — Tracking & Audit Trail
+
+**Tujuan**: Upah dihitung dari `wage_amount × quantity` per task selesai, harus bisa direkap & difilter per periode & karyawan.
+
+**Perubahan:**
+
+1. **Migration** `add_completed_at_to_production_tasks_table`: tambah kolom `completed_at` (timestamp nullable) — diisi `now()` otomatis saat "Tandai Selesai" diklik.
+2. **`TaskActionController`**: action `done` kini set `completed_at = now()`.
+3. **`Worker` model**: tambah accessor `total_earned` (all time) dan `monthly_earned` (bulan berjalan) berdasarkan `SUM(wage_amount × quantity)` task done.
+4. **`WorkerPayrollResource`** (BARU) — halaman `/app/{tenant}/worker-payroll`:
+   - Tabel rekap pekerjaan selesai: Karyawan, Tahap, Produk, No. Pesanan, Qty, Upah/pcs, Total Upah, Selesai Pada
+   - Filter Periode (dari–sampai `completed_at`) dan filter Karyawan
+   - Default pagination 25 per halaman
+5. **`WorkerInfolist`**: tambah section "💰 Ringkasan Upah" (Upah Bulan Ini / All Time / Total Pcs) dan perluas section riwayat selesai dengan kolom upah & tanggal selesai.
+
+#### Files Modified / Created
+
+| File | Status |
+|---|---|
+| `app/Filament/Resources/ControlProduksis/ControlProduksiResource.php` | MODIFIED |
+| `app/Filament/Resources/ControlProduksis/Widgets/ProduksiStats.php` | MODIFIED |
+| `app/Filament/Resources/Workers/Schemas/WorkerInfolist.php` | MODIFIED |
+| `app/Http/Controllers/TaskActionController.php` | MODIFIED |
+| `app/Models/Worker.php` | MODIFIED |
+| `app/Filament/Resources/WorkerPayrolls/WorkerPayrollResource.php` | NEW |
+| `app/Filament/Resources/WorkerPayrolls/Pages/ManageWorkerPayrolls.php` | NEW |
+| `database/migrations/2026_02_28_190706_add_completed_at_to_production_tasks_table.php` | NEW |
+
+

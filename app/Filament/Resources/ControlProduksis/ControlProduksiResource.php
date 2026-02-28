@@ -84,31 +84,22 @@ class ControlProduksiResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('order.order_number')
-                    ->label('No. Pesanan')
+                TextColumn::make('product_name')
+                    ->label('Produk')
                     ->searchable()
                     ->sortable()
-                    ->weight('bold'),
-
-                TextColumn::make('product_name')
-                    ->label('Nama Produk')
-                    ->searchable()
-                    ->sortable(),
+                    ->weight('bold')
+                    ->description(fn(OrderItem $record): string => match($record->production_category) {
+                        'custom'       => '🧵 Custom (Ukur Badan)',
+                        'non_produksi' => '📦 Non-Produksi',
+                        'jasa'         => '🔧 Jasa',
+                        default        => '🏭 Produksi',
+                    }),
 
                 TextColumn::make('quantity')
                     ->label('Qty')
                     ->numeric()
                     ->sortable(),
-
-                TextColumn::make('production_category')
-                    ->label('Kategori')
-                    ->badge()
-                    ->color(fn(string $state) => [
-                        50 => '#F2E6FF',
-                        500 => '#8000FF',
-                        600 => '#8000FF',
-                    ])
-                    ->formatStateUsing(fn(string $state): string => ucfirst(str_replace('_', ' ', $state))),
 
                 TextColumn::make('order.deadline')
                     ->label('Deadline')
@@ -122,38 +113,42 @@ class ControlProduksiResource extends Resource
                     ->state(function (OrderItem $record) {
                         $tasks = $record->productionTasks;
                         if ($tasks->count() === 0)
-                            return 'Belum Diproses';
+                            return 'Belum Diatur';
                         if ($tasks->where('status', '!=', 'done')->count() === 0)
                             return 'Selesai';
-                        return 'Sedang Berjalan';
+                        if ($tasks->where('status', 'in_progress')->count() > 0)
+                            return 'Diproses';
+                        return 'Antrian'; // Semua masih pending, belum ada yang start
                     })
                     ->color(fn(string $state): string => match ($state) {
-                        'Belum Diproses' => 'gray',
-                        'Sedang Berjalan' => 'primary',
-                        'Selesai' => 'success',
-                        default => 'gray',
+                        'Belum Diatur' => 'gray',
+                        'Antrian'      => 'warning',
+                        'Diproses'     => 'info',
+                        'Selesai'      => 'success',
+                        default        => 'gray',
                     })
                     ->description(function (OrderItem $record) {
                         $tasks = $record->productionTasks;
                         if ($tasks->isEmpty())
                             return null;
 
-                        // Cari yang 'in_progress' dulu
+                        // Tampilkan tahap yang sedang berjalan
                         $activeTask = $tasks->firstWhere('status', 'in_progress');
                         if ($activeTask) {
-                            return 'Sedang: ' . $activeTask->stage_name;
+                            return '🔨 ' . $activeTask->stage_name . ' — ' . ($activeTask->assignedTo?->name ?? '-');
                         }
 
-                        // Kalau ga ada yang in_progress, cari yang masih 'pending'
-                        $pendingTask = $tasks->firstWhere('status', 'pending');
+                        // Atau tahap pending pertama (antrian)
+                        $pendingTask = $tasks->where('status', 'pending')->sortBy('id')->first();
                         if ($pendingTask) {
-                            return 'Tahap: ' . $pendingTask->stage_name;
+                            return '⏳ Menunggu: ' . $pendingTask->stage_name;
                         }
 
-                        return null; // Kalau semuanya 'done'
+                        return null;
                     }),
 
             ])
+
             ->defaultGroup(
                 TableGroup::make('order.order_number')
                     ->label('Pesanan')
@@ -857,6 +852,33 @@ class ControlProduksiResource extends Resource
                             }
                         }
                         $stagedTasks = collect($tasksData)->groupBy('stage_name');
+                        
+                        // Siapkan stok per ukuran dari item (max yang tersedia untuk setiap ukuran)
+                        $stockPerSize = [];
+                        if ($item->production_category === 'custom') {
+                            $details = $item->size_and_request_details ?? [];
+                            if (!empty($details['detail_custom'])) {
+                                foreach ($details['detail_custom'] as $u) {
+                                    $sz = $u['nama'] ?? null;
+                                    if ($sz) $stockPerSize[$sz] = ($stockPerSize[$sz] ?? 0) + 1;
+                                }
+                            }
+                        } else {
+                            $details = $item->size_and_request_details ?? [];
+                            if (isset($details['sizes']) && is_array($details['sizes'])) {
+                                foreach ($details['sizes'] as $sz => $qty) {
+                                    if ((int)$qty > 0) $stockPerSize[strtoupper($sz)] = (int)$qty;
+                                }
+                            } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
+                                foreach ($details['varian_ukuran'] as $v) {
+                                    $sz = strtoupper($v['ukuran'] ?? '');
+                                    if ($sz && (int)($v['qty'] ?? 0) > 0) {
+                                        $stockPerSize[$sz] = (int)$v['qty'];
+                                    }
+                                }
+                            }
+                        }
+                        
                         foreach ($stagedTasks as $stageName => $tasksGroup) {
                             $totalAssignedQty = $tasksGroup->sum(function($t) use ($sizesToLookFor) {
                                 // Default quantity field is disabled/readOnly so it might be missing or 0
@@ -877,6 +899,16 @@ class ControlProduksiResource extends Resource
                                 return $sizeQty;
                             });
                             
+                            // Validasi per ukuran: pastikan tidak ada ukuran yang over-quota di dalam 1 tahapan
+                            if (!empty($stockPerSize)) {
+                                foreach ($stockPerSize as $sizeKey => $maxQty) {
+                                    $allocatedForSize = $tasksGroup->sum(fn($t) => (int)($t[$sizeKey] ?? 0));
+                                    if ($allocatedForSize > $maxQty) {
+                                        $errors[] = "Tahap '<b>{$stageName}</b>': ukuran <b>{$sizeKey}</b> dialokasikan {$allocatedForSize} pcs melebihi stok ({$maxQty} pcs).";
+                                    }
+                                }
+                            }
+                            
                             // Bandingkan dengan qty yang seharusnya (kalau custom hitung orang)
                             $expectedQty = (int)$item->quantity;
                             if ($item->production_category === 'custom') {
@@ -887,9 +919,10 @@ class ControlProduksiResource extends Resource
                             }
                             
                             if ($totalAssignedQty !== $expectedQty) {
-                                $errors[] = "Total kuantitas untuk tahap '{$stageName}' ({$totalAssignedQty} pcs) tidak sesuai dengan total produk ({$expectedQty} pcs).";
+                                $errors[] = "Total kuantitas untuk tahap '<b>{$stageName}</b>' ({$totalAssignedQty} pcs) tidak sesuai dengan total produk ({$expectedQty} pcs).";
                             }
                         }
+
                         
                         if (count($errors) > 0) {
                             \Filament\Notifications\Notification::make()

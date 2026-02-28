@@ -20,7 +20,7 @@ class TaskActionController extends Controller
 
         match ($action) {
             'start' => $task->update(['status' => 'in_progress']),
-            'done' => $task->update(['status' => 'done']),
+            'done'  => $task->update(['status' => 'done', 'completed_at' => now()]),
             default => abort(400, 'Aksi tidak dikenal.'),
         };
 
@@ -50,9 +50,9 @@ class TaskActionController extends Controller
 
         // Redirect kembali ke halaman Control Produksi (tenant-aware)
         $shop = $order?->shop;
-        $tenantSlug = $shop?->id ?? 1;
+        $tenantId = $shop?->id ?? 1;
         return redirect()
-            ->to("/admin/{$tenantSlug}/control-produksis")
+            ->to("/app/{$tenantId}/control-produksi")
             ->with('status', 'Status tugas berhasil diperbarui.');
     }
 }
