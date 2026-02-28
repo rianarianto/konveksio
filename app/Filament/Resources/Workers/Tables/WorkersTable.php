@@ -23,16 +23,32 @@ class WorkersTable
                 TextColumn::make('phone')
                     ->label('No. HP')
                     ->searchable(),
-                TextColumn::make('active_queue_count')
-                    ->label('Antrian Pekerjaan')
+
+                // --- Kolom Antrian Rincian ---
+                TextColumn::make('pending_count')
+                    ->label('⏳ Antrian')
                     ->badge()
-                    ->color(fn($state): string => match (true) {
-                        $state >= 50 => 'danger',
-                        $state >= 20 => 'warning',
-                        default => 'success',
-                    })
+                    ->color(fn($state): string => $state > 0 ? 'warning' : 'gray')
                     ->formatStateUsing(fn($state) => $state . ' pcs')
-                    ->sortable(),
+                    ->sortable()
+                    ->tooltip('Tugas yang belum dimulai'),
+
+                TextColumn::make('in_progress_count')
+                    ->label('🔨 Dikerjakan')
+                    ->badge()
+                    ->color(fn($state): string => $state > 0 ? 'info' : 'gray')
+                    ->formatStateUsing(fn($state) => $state . ' pcs')
+                    ->sortable()
+                    ->tooltip('Tugas yang sedang dikerjakan'),
+
+                TextColumn::make('done_count')
+                    ->label('✅ Selesai')
+                    ->badge()
+                    ->color(fn($state): string => $state > 0 ? 'success' : 'gray')
+                    ->formatStateUsing(fn($state) => $state . ' pcs')
+                    ->sortable()
+                    ->tooltip('Total pcs yang sudah diselesaikan'),
+
                 IconColumn::make('is_active')
                     ->label('Aktif')
                     ->boolean()

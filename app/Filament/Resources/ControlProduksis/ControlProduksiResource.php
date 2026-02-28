@@ -169,88 +169,117 @@ class ControlProduksiResource extends Resource
                     ->label('Update Progress')
                     ->icon('heroicon-o-arrow-path')
                     ->color('info')
-                    ->modalWidth('md')
+                    ->modalWidth('2xl')
+                    ->modalHeading(fn(OrderItem $record) => 'Kelola Tugas: ' . ($record->product_name ?? 'Item'))
+                    ->modalDescription('Klik tombol pada setiap baris untuk memperbarui status tugas masing-masing karyawan.')
                     ->fillForm(function (OrderItem $record) {
+                        return ['item_id' => $record->id];
+                    })
+                    ->form(function (OrderItem $record) {
+                        // Load tugas dan group berdasarkan urutan stage
+                        $tasks = $record->productionTasks()
+                            ->with(['assignedTo'])
+                            ->get();
+
+                        // Ambil semua stage yang ada beserta order_sequence-nya
+                        $stageOrder = \App\Models\ProductionStage::pluck('order_sequence', 'name');
+
+                        // Sort tugas berdasarkan order_sequence tahap, kemudian by id
+                        $sortedTasks = $tasks->sortBy(function($task) use ($stageOrder) {
+                            return [$stageOrder[$task->stage_name] ?? 999, $task->id];
+                        });
+
+                        // Tentukan stage yang sedang "aktif" (bisa dimulai):
+                        // Tahap pertama selalu bisa, tahap berikutnya hanya jika SEMUA tasks di tahap sebelumnya = done
+                        $groupedByStage = $sortedTasks->groupBy('stage_name');
+                        $stagesInOrder = $groupedByStage->keys()->sortBy(fn($s) => $stageOrder[$s] ?? 999);
+
+                        $unlockedStages = [];
+                        foreach ($stagesInOrder as $i => $stageName) {
+                            if ($i === 0) {
+                                $unlockedStages[] = $stageName;
+                                continue;
+                            }
+                            // Stage ini bisa dibuka jika semua task di stage sebelumnya = done
+                            $prevStage = $stagesInOrder[$i - 1];
+                            $prevDone = $groupedByStage[$prevStage]->every(fn($t) => $t->status === 'done');
+                            if ($prevDone) {
+                                $unlockedStages[] = $stageName;
+                            } else {
+                                break; // Tahap berikutnya tetap terkunci
+                            }
+                        }
+
+                        // Render HTML tabel tugas
+                        $rows = '';
+                        $prevStageName = null;
+                        foreach ($sortedTasks as $task) {
+                            $isUnlocked = in_array($task->stage_name, $unlockedStages);
+                            $workerName = $task->assignedTo?->name ?? 'Tidak Diketahui';
+                            $stageName = htmlspecialchars($task->stage_name);
+                            $qty = $task->quantity . ' pcs';
+                            $showStageLabel = $task->stage_name !== $prevStageName;
+                            $prevStageName = $task->stage_name;
+
+                            $statusBadge = match($task->status) {
+                                'pending' => '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">⏳ Antrian</span>',
+                                'in_progress' => '<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">🔨 Dikerjakan</span>',
+                                'done' => '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">✅ Selesai</span>',
+                                default => '',
+                            };
+
+                            if (!$isUnlocked) {
+                                $actionBtn = '<span style="color:#9ca3af;font-size:12px">🔒 Menunggu tahap sebelumnya</span>';
+                            } elseif ($task->status === 'pending') {
+                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'start', 'item' => $record->id]) . '" style="background:#2563eb;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">▶ Mulai</a>';
+                            } elseif ($task->status === 'in_progress') {
+                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'done', 'item' => $record->id]) . '" style="background:#059669;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✓ Tandai Selesai</a>';
+                            } else {
+                                $actionBtn = '<span style="color:#6b7280;font-size:12px">Selesai</span>';
+                            }
+
+                            $stageCell = $showStageLabel
+                                ? '<td style="padding:10px 14px;font-weight:700;color:#374151;font-size:13px;border-bottom:1px solid #e5e7eb;">' . $stageName . '</td>'
+                                : '<td style="padding:10px 14px;color:#9ca3af;font-size:13px;border-bottom:1px solid #e5e7eb;">↳</td>';
+
+                            $rows .= '
+                                <tr>
+                                    ' . $stageCell . '
+                                    <td style="padding:10px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb;">' . htmlspecialchars($workerName) . '</td>
+                                    <td style="padding:10px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb;">' . $qty . '</td>
+                                    <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;">' . $statusBadge . '</td>
+                                    <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:right;">' . $actionBtn . '</td>
+                                </tr>';
+                        }
+
+                        $html = '
+                            <div style="border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
+                                <table style="width:100%;border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:#f9fafb;">
+                                            <th style="padding:10px 14px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;">TAHAP</th>
+                                            <th style="padding:10px 14px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;">KARYAWAN</th>
+                                            <th style="padding:10px 14px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;">QTY</th>
+                                            <th style="padding:10px 14px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;">STATUS</th>
+                                            <th style="padding:10px 14px;text-align:right;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;">AKSI</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>' . $rows . '</tbody>
+                                </table>
+                            </div>';
+
                         return [
-                            'tasks' => $record->productionTasks->map(fn($task) => [
-                                'id' => $task->id,
-                                'stage_name' => $task->stage_name,
-                                'status' => $task->status,
-                            ])->toArray(),
+                            Placeholder::make('task_table')
+                                ->hiddenLabel()
+                                ->content(new \Illuminate\Support\HtmlString($html)),
                         ];
                     })
-                    ->form([
-                        Repeater::make('tasks')
-                            ->label('Tahapan Produksi')
-                            ->schema([
-                                Hidden::make('id'),
-                                TextInput::make('stage_name')
-                                    ->label('Tahap')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->columnSpan(2),
-                                Select::make('status')
-                                    ->label('Status')
-                                    ->options([
-                                        'pending' => 'Antrian (Belum Mulai)',
-                                        'in_progress' => 'Sedang Dikerjakan',
-                                        'done' => 'Selesai',
-                                    ])
-                                    ->required()
-                                    ->columnSpan(2),
-                            ])
-                            ->columns(4)
-                            ->addable(false)
-                            ->deletable(false)
-                            ->reorderable(false),
-                    ])
                     ->action(function (array $data, OrderItem $record) {
-                        // 1. Update status masing-masing task
-                        foreach ($data['tasks'] ?? [] as $taskData) {
-                            if (!empty($taskData['id'])) {
-                                \App\Models\ProductionTask::where('id', $taskData['id'])
-                                    ->update(['status' => $taskData['status']]);
-                            }
-                        }
-
-                        // 2. Evaluasi status Order global
-                        $order = $record->order;
-                        if ($order) {
-                            $allTasks = $order->orderItems()->with('productionTasks')->get()
-                                ->flatMap(fn($item) => $item->productionTasks);
-
-                            if ($allTasks->isEmpty()) {
-                                // Jika tidak ada tugas, order bisa jadi masih di Meja Desain (diterima)
-                                // atau baru keluar dari Meja Desain dan menunggu di-assign tugas (antrian).
-                                // Jangan turunkan status yang sudah antrian/diproses/selesai kembali ke diterima
-                                $newStatus = in_array($order->status, ['diterima', 'antrian']) ? $order->status : 'antrian';
-                            } else {
-                                $completedCount = $allTasks->where('status', 'done')->count();
-                                $inProgressCount = $allTasks->where('status', 'in_progress')->count();
-                                $totalTasks = $allTasks->count();
-
-                                if ($completedCount === $totalTasks) {
-                                    $newStatus = 'selesai';
-                                } elseif ($inProgressCount > 0) {
-                                    $newStatus = 'diproses';
-                                } else {
-                                    // Semua task pending OR ada selesai tapi ada pending (tapi ga ada yg in_progress)
-                                    // Berarti lagi nunggu / antri di sela-sela tahapan
-                                    $newStatus = 'diproses'; // Kalau sudah pernah mulai (ada yg done), tetap diproses.
-            
-                                    // Kalau bener-bener belum pernah ada yang selesai dan ngga ada progress = antrian murni
-                                    if ($completedCount === 0) {
-                                        $newStatus = 'antrian';
-                                    }
-                                }
-                            }
-
-                            // Update order kalau berubah aja (hindari query tak perlu)
-                            if ($order->status !== $newStatus) {
-                                $order->update(['status' => $newStatus]);
-                            }
-                        }
+                        // Action utama form ini hanya sebagai re-render / reload
+                        // Update status dilakukan via dedicated route (link tombol per baris)
                     }),
+
+
 
                 Action::make('atur_tugas')
                     ->label('Atur Tugas')
@@ -550,7 +579,6 @@ class ControlProduksiResource extends Resource
                                                 })
                                                 ->required()
                                                 ->live()
-                                                ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                                 ->afterStateUpdated(function ($state, Set $set) {
                                                     if ($state) {
                                                         $stage = \App\Models\ProductionStage::where('name', $state)->first();
@@ -779,24 +807,143 @@ class ControlProduksiResource extends Resource
                                 ->addActionLabel('Tambah Tugas Baru'),
                         ];
                     })
-                    ->action(function (array $data, OrderItem $record) {
+                    ->action(function (array $data, OrderItem $record, \Filament\Actions\Action $action) {
                         $item = $record;
+                        $tasksData = $data['productionTasks'] ?? [];
+                        
+                        // 1. Validasi Total Qty Per Tahapan & Kelengkapan Tahapan
+                        $errors = [];
+                        
+                        // A. Cek Kelengkapan Tahapan Wajib
+                        $category = $item->production_category ?? 'produksi';
+                        $stageQuery = \App\Models\ProductionStage::query()->orderBy('order_sequence');
+                        if ($category === 'produksi' || $category === 'custom') {
+                            $stageQuery->where('for_produksi_custom', true);
+                        } elseif ($category === 'non_produksi') {
+                            $stageQuery->where('for_non_produksi', true);
+                        } elseif ($category === 'jasa') {
+                            $stageQuery->where('for_jasa', true);
+                        }
+                        
+                        $requiredStages = $stageQuery->pluck('name')->toArray();
+                        $stagedTasks = collect($tasksData)->groupBy('stage_name');
+                        
+                        $missingStages = array_diff($requiredStages, $stagedTasks->keys()->toArray());
+                        if (!empty($missingStages)) {
+                            $errors[] = "Tahapan berikut wajib dikerjakan dan belum ditugaskan: <b>" . implode(', ', $missingStages) . "</b>";
+                        }
+                        
+                        // Menyiapkan daftar kunci (key) ukuran/person apa saja yang perlu diekstrak dari data repeater (karena Fieldset mem-flatten inputannya)
+                        $sizesToLookFor = [];
+                        if ($item->production_category === 'custom') {
+                            $details = $item->size_and_request_details ?? [];
+                            if (!empty($details['detail_custom']) && is_array($details['detail_custom'])) {
+                                foreach ($details['detail_custom'] as $index => $u) {
+                                    $person = $u['nama'] ?? 'Person ' . ($index + 1);
+                                    $sizesToLookFor[] = $person;
+                                }
+                            }
+                        } else {
+                            $details = $item->size_and_request_details ?? [];
+                            if (isset($details['sizes']) && is_array($details['sizes'])) {
+                                foreach ($details['sizes'] as $sz => $qty) {
+                                    if ((int)$qty > 0) $sizesToLookFor[] = strtoupper($sz);
+                                }
+                            } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
+                                foreach ($details['varian_ukuran'] as $v) {
+                                    $sz = strtoupper($v['ukuran'] ?? '');
+                                    if ($sz && (int)($v['qty'] ?? 0) > 0) $sizesToLookFor[] = $sz;
+                                }
+                            }
+                        }
+                        $stagedTasks = collect($tasksData)->groupBy('stage_name');
+                        foreach ($stagedTasks as $stageName => $tasksGroup) {
+                            $totalAssignedQty = $tasksGroup->sum(function($t) use ($sizesToLookFor) {
+                                // Default quantity field is disabled/readOnly so it might be missing or 0
+                                // Calculate from size_quantities fields instead (which are flattened to root $t)
+                                $sizeQty = 0;
+                                foreach ($sizesToLookFor as $key) {
+                                    // if a specific size is assigned to this part of the stage
+                                    if (isset($t[$key]) && (int)$t[$key] > 0) {
+                                        $sizeQty += (int)$t[$key];
+                                    }
+                                }
+                                
+                                // Fallback for simple qty item if it doesn't have sizes
+                                if ($sizeQty === 0 && isset($t['qty']) && (int)$t['qty'] > 0) {
+                                    $sizeQty += (int)$t['qty'];
+                                }
+                                
+                                return $sizeQty;
+                            });
+                            
+                            // Bandingkan dengan qty yang seharusnya (kalau custom hitung orang)
+                            $expectedQty = (int)$item->quantity;
+                            if ($item->production_category === 'custom') {
+                                $details = $item->size_and_request_details ?? [];
+                                if (!empty($details['detail_custom'])) {
+                                    $expectedQty = count($details['detail_custom']);
+                                }
+                            }
+                            
+                            if ($totalAssignedQty !== $expectedQty) {
+                                $errors[] = "Total kuantitas untuk tahap '{$stageName}' ({$totalAssignedQty} pcs) tidak sesuai dengan total produk ({$expectedQty} pcs).";
+                            }
+                        }
+                        
+                        if (count($errors) > 0) {
+                            \Filament\Notifications\Notification::make()
+                                ->danger()
+                                ->title('Gagal Menyimpan Tugas')
+                                ->body(implode('<br>', $errors))
+                                ->send();
+                            
+                            $action->halt();
+                        }
 
                         $existingTaskIds = [];
-                        $tasksData = $data['productionTasks'] ?? [];
 
                         foreach ($tasksData as $taskItem) {
-                            // Extract size_quantities which is now an array of dynamically generated inputs
+                            // Extract size_quantities which are dynamically generated inputs flattened by Fieldset
                             $sizeQuantities = [];
-                            if (isset($taskItem['size_quantities']) && is_array($taskItem['size_quantities'])) {
-                                foreach ($taskItem['size_quantities'] as $key => $val) {
-                                    if ($val > 0) { // Only save sizes that have a quantity assigned
-                                        $sizeQuantities[$key] = $val;
+                            
+                            // The keys we want to grab depend on the item category
+                            $sizesToLookFor = [];
+                            if ($item->production_category === 'custom') {
+                                $details = $item->size_and_request_details ?? [];
+                                if (!empty($details['detail_custom']) && is_array($details['detail_custom'])) {
+                                    foreach ($details['detail_custom'] as $index => $u) {
+                                        $person = $u['nama'] ?? 'Person ' . ($index + 1);
+                                        $sizesToLookFor[] = $person;
+                                    }
+                                }
+                            } else {
+                                $details = $item->size_and_request_details ?? [];
+                                if (isset($details['sizes']) && is_array($details['sizes'])) {
+                                    foreach ($details['sizes'] as $sz => $qty) {
+                                        if ((int)$qty > 0) $sizesToLookFor[] = strtoupper($sz);
+                                    }
+                                } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
+                                    foreach ($details['varian_ukuran'] as $v) {
+                                        $sz = strtoupper($v['ukuran'] ?? '');
+                                        if ($sz && (int)($v['qty'] ?? 0) > 0) $sizesToLookFor[] = $sz;
                                     }
                                 }
                             }
 
-                            $quantity = (int) ($taskItem['quantity'] ?? 0);
+                            // Extract these specific keys from $taskItem if they exist and are greater than 0
+                            foreach ($sizesToLookFor as $key) {
+                                if (isset($taskItem[$key]) && (int)$taskItem[$key] > 0) {
+                                    $sizeQuantities[$key] = (int)$taskItem[$key];
+                                }
+                            }
+
+                            // Hitung quantity dari sizeQuantities yang sudah diekstrak (quantity field readOnly jadi tidak reliable)
+                            $quantity = array_sum($sizeQuantities);
+                            // Fallback ke field qty biasa (untuk item tanpa ukuran)
+                            if ($quantity === 0 && isset($taskItem['qty']) && (int)$taskItem['qty'] > 0) {
+                                $quantity = (int)$taskItem['qty'];
+                            }
                             $wagePerPcs = (float) ($taskItem['wage_per_pcs'] ?? 0);
 
                             $taskData = [

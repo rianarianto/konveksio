@@ -23,7 +23,7 @@ class Worker extends Model implements HasTenants
         'is_active' => 'boolean',
     ];
 
-    protected $appends = ['active_queue_count'];
+    protected $appends = ['active_queue_count', 'pending_count', 'in_progress_count', 'done_count'];
 
     protected static function booted(): void
     {
@@ -63,5 +63,20 @@ class Worker extends Model implements HasTenants
         return $this->productionTasks()
             ->whereIn('status', ['pending', 'in_progress'])
             ->sum('quantity');
+    }
+
+    public function getPendingCountAttribute(): int
+    {
+        return $this->productionTasks()->where('status', 'pending')->sum('quantity');
+    }
+
+    public function getInProgressCountAttribute(): int
+    {
+        return $this->productionTasks()->where('status', 'in_progress')->sum('quantity');
+    }
+
+    public function getDoneCountAttribute(): int
+    {
+        return $this->productionTasks()->where('status', 'done')->sum('quantity');
     }
 }

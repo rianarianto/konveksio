@@ -59,6 +59,7 @@ class ProductionStageResource extends Resource
                 TextInput::make('base_wage')
                     ->label('Upah Satuan Dasar (Rp)')
                     ->numeric()
+                    ->required()
                     ->default(0)
                     ->prefix('Rp'),
                 Toggle::make('for_produksi_custom')

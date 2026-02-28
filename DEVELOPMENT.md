@@ -735,3 +735,68 @@ Membuat Master Data untuk Karyawan Produksi (Tukang) yang bebas dari tabel Users
 | `app/Models/ProductionTask.php` | MODIFIED (assigned_to -> Worker) |
 | `app/Filament/Resources/Workers/WorkerResource.php` | NEW |
 | `app/Filament/Resources/ControlProduksis/ControlProduksiResource.php` | MODIFIED (Worker Assign, Wage calculation, Dropdown Queue) |
+
+---
+
+### 2026-02-28: Production Task Validation, Worker Queue Detail & Per-Task Progress Modal
+
+#### ✅ Bug Fixes & Validation – `ControlProduksiResource`
+
+1. **Validasi Submit "Atur Tugas"**:
+   - Menambahkan validasi **kelengkapan tahapan wajib**: sistem mengambil semua tahapan dari DB sesuai kategori produk (`for_produksi_custom`, `for_non_produksi`, dll.), lalu memastikan semua tahapan tersebut sudah ditugaskan sebelum bisa disimpan.
+   - Menambahkan validasi **akumulasi kuantitas per tahap**: untuk setiap `stage_name` (termasuk yang dipecah ke 2+ tukang), total qty dari semua baris harus sama persis dengan total qty item pesanan.
+   - Satu tahapan **boleh muncul lebih dari sekali** (misal Jahit dibagi ke 2 tukang) — opsi `->disableOptionsWhenSelectedInSiblingRepeaterItems()` dihapus dari dropdown tahap.
+
+2. **Bug Fix `quantity = 0` saat Save**:
+   - Field "Total Qty" di repeater adalah *read-only/disabled* sehingga tidak dikirim ke server saat form submit. Quantity kini dihitung ulang dari penjumlahan field ukuran (`sizeQuantities`) di dalam action save.
+   - Akibatnya, `wage_amount = quantity × wage_per_pcs` juga ikut benar.
+
+3. **Bug Fix `base_wage` null constraint** (`ProductionStageResource`):
+   - Menambahkan `->required()` pada input `base_wage` agar nilai `0` tidak diperlakukan sebagai `null`.
+
+#### ✅ Foreign Key Migration – `production_tasks.assigned_to`
+
+- `assigned_to` di tabel `production_tasks` sebelumnya masih menunjuk ke `users(id)`, padahal karyawan sudah dipindahkan ke tabel `workers`.
+- Menambahkan migration baru: `2026_02_28_112451_update_assigned_to_foreign_key_on_production_tasks_table.php` yang menghapus FK lama dan membuat FK baru ke `workers(id) ON DELETE SET NULL`.
+
+#### ✅ Worker Queue Detail – `Worker` model & `WorkersTable`
+
+1. **Model `Worker`**:
+   - Menambahkan 3 accessor baru: `pending_count`, `in_progress_count`, `done_count` — masing-masing menjumlahkan `quantity` dari task per status.
+   - `$appends` diperbarui agar ketiganya otomatis tersedia.
+
+2. **WorkersTable** — kolom antrian diperinci menjadi 3 badge terpisah:
+   - ⏳ **Antrian** (kuning): task `pending`
+   - 🔨 **Dikerjakan** (biru): task `in_progress`
+   - ✅ **Selesai** (hijau): task `done`
+
+3. **WorkerInfolist** (halaman View Detail Karyawan) — kini menampilkan:
+   - Informasi dasar karyawan (relayout dengan `Section`)
+   - Section ⏳ Antrian Tugas: daftar task `pending` dengan nama produk & tanggal penugasan
+   - Section 🔨 Sedang Dikerjakan: daftar task `in_progress`
+   - Section ✅ Riwayat Selesai: daftar task `done` (collapsed by default)
+
+#### ✅ Per-Task Progress Modal – `ControlProduksiResource`
+
+Tombol **"Update Progress"** diganti dari modal sederhana (dropdown per-task) menjadi **modal tabel per-baris** dengan aturan:
+- Setiap baris = 1 tugas (1 karyawan, 1 porsi qty)
+- Tombol **▶ Mulai** → ubah status `pending` → `in_progress`
+- Tombol **✓ Tandai Selesai** → ubah status `in_progress` → `done`
+- **Stage berikutnya terkunci** (🔒) sampai semua task di stage sebelumnya berstatus `done`
+- Split stage (Jahit 2x) → keduanya dibuka **independen** berdasarkan stage sebelumnya
+- Setelah aksi → status Order disinkronkan otomatis (`antrian` / `diproses` / `selesai`)
+
+Perubahan dilakukan via **dedicated route** (`GET /task-action/{task}/{action}/{item}`) dan controller baru `TaskActionController`.
+
+#### Files Modified / Created
+| File | Status |
+|---|---|
+| `app/Filament/Resources/ControlProduksis/ControlProduksiResource.php` | MODIFIED (validasi, qty fix, progress modal baru) |
+| `app/Filament/Resources/ProductionStages/ProductionStageResource.php` | MODIFIED (required base_wage) |
+| `app/Filament/Resources/Workers/Tables/WorkersTable.php` | MODIFIED (3 kolom badge antrian) |
+| `app/Filament/Resources/Workers/Schemas/WorkerInfolist.php` | MODIFIED (task breakdown per status) |
+| `app/Models/Worker.php` | MODIFIED (accessor pending/in_progress/done count) |
+| `app/Http/Controllers/TaskActionController.php` | NEW |
+| `routes/web.php` | MODIFIED (route task-action) |
+| `database/migrations/2026_02_28_112451_update_assigned_to_foreign_key_on_production_tasks_table.php` | NEW |
+
