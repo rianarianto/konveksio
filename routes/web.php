@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TaskActionController;
+use App\Http\Controllers\MonitorController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -11,3 +12,8 @@ Route::get('/', function () {
 Route::get('/task-action/{task}/{action}/{item}', [TaskActionController::class, 'handle'])
     ->middleware(['web', 'auth'])
     ->name('filament.admin.resources.control-produksis.task-action');
+
+// ─── Monitor Produksi (tanpa auth — untuk TV/monitor di ruang produksi) ───────
+Route::get('/monitor/{shop}', [MonitorController::class, 'produksi'])
+    ->name('monitor.produksi');
+

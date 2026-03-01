@@ -16,19 +16,21 @@ class Order extends Model
         'order_date',
         'deadline',
         'status',
+        'is_express',
+        'express_fee',
         'subtotal',
         'tax',
         'shipping_cost',
         'discount',
         'total_price',
-        'down_payment',
-        'dp_proof',
         'notes',
     ];
 
     protected $casts = [
-        'order_date' => 'date',
-        'deadline' => 'date',
+        'order_date'  => 'date',
+        'deadline'    => 'date',
+        'is_express'  => 'boolean',
+        'express_fee' => 'integer',
     ];
 
     protected static function booted(): void
@@ -79,5 +81,22 @@ class Order extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(\App\Models\Payment::class)->orderBy('payment_date');
+    }
+
+    // ── Accessor: total yang sudah dibayar ───────────────────────────────────
+    public function getTotalPaidAttribute(): int
+    {
+        return (int) $this->payments->sum('amount');
+    }
+
+    // ── Accessor: sisa tagihan ───────────────────────────────────────────────
+    public function getRemainingBalanceAttribute(): int
+    {
+        return max(0, (int) $this->total_price - $this->total_paid);
     }
 }

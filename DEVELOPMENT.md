@@ -861,4 +861,101 @@ Hapus kolom "No. Pesanan" (sudah ada di group header) dan "Kategori". Info kateg
 | `app/Filament/Resources/WorkerPayrolls/Pages/ManageWorkerPayrolls.php` | NEW |
 | `database/migrations/2026_02_28_190706_add_completed_at_to_production_tasks_table.php` | NEW |
 
+---
+
+### 2026-03-01 (Sesi Lanjutan): Express Order, Monitor Produksi, Redesign Tabel, Sistem Pembayaran Cicilan
+
+#### ✅ Fitur Express Order
+
+Pesanan prioritas dengan biaya tambahan (diinput manual admin).
+
+- **Migration**: tambah `is_express` (bool) + `express_fee` (int) ke tabel `orders`
+- **Order Model**: keduanya masuk `$fillable` + `$casts`
+- **OrderResource Form**: Toggle `is_express` dengan `live()` → tampilkan `express_fee` secara kondisional
+- **OrderResource Table**: badge ⚡ EXPRESS merah inline di kolom No. Pesanan; sort Express-first lalu deadline
+- **ControlProduksiResource**: badge EXPRESS di group header; `modifyQueryUsing` sort `is_express DESC` → `deadline ASC`
+
+---
+
+#### ✅ Monitor Produksi Full-Screen
+
+Halaman tanpa navigasi admin untuk TV/monitor di ruang produksi.
+
+- **URL**: `/monitor/{shop_id}` — public, tanpa auth
+- **Auto-refresh**: 30 detik via `<meta http-equiv="refresh">`
+- **Live clock**: JavaScript update tiap detik
+- **Sidebar**: antrian item pending (Express-first, max 10)
+- **Main cards**: item in-progress dengan deadline badge H-X, progress bar tahapan, task list color-coded, nama karyawan, badge ⚡ pulse merah untuk Express
+
+| File | Status |
+|---|---|
+| `app/Http/Controllers/MonitorController.php` | NEW |
+| `resources/views/monitor/produksi.blade.php` | NEW |
+| `routes/web.php` | MODIFIED |
+
+---
+
+#### ✅ Redesign Tabel Daftar Pesanan — 4 Kolom Padat HTML
+
+Dari 7 kolom terpisah → 4 kolom HTML kaya informasi dengan `->html()->state()`.
+
+| Kolom | Konten |
+|---|---|
+| **Pesanan & Pelanggan** | No. pesanan bold + badge ⚡EXPRESS + nama (badge ungu) + WA icon + nomor |
+| **Timeline** | Tanggal masuk + Deadline + badge Sisa X hari (merah/kuning/hijau) |
+| **Finance** | Sisa tagihan (dari `SUM(payments)`) + Total + Dibayar Nx |
+| **Produk & Status** | List item: Qty × Nama + badge kategori + status + progress bar ungu `#7F00FF` |
+
+- Quick Filters: Belum Lunas, Deadline ≤3 Hari, Tipe Produk
+- Tombol **Detail** kuning (eye icon) + dropdown Edit/Hapus
+- CSS `vertical-align:top` untuk semua sel via `AdminPanelProvider` renderHook
+
+---
+
+#### ✅ Sistem Pembayaran Cicilan (Multi-Payment)
+
+Menggantikan field `down_payment` tunggal agar DP bisa berkali-kali dengan tracking lengkap.
+
+**Database:**
+- Tabel `payments`: `order_id`, `amount`, `payment_date`, `payment_method` (cash/transfer/qris), `note`, `proof_image`, `recorded_by`
+- Drop kolom `down_payment` + `dp_proof` dari `orders`
+
+**Model & Logika:**
+- `Payment` model: relasi ke Order + User; method `methodLabel()`
+- `Order` model: relasi `hasMany Payment`; accessor `total_paid` (SUM) + `remaining_balance` (total_price - total_paid)
+
+**UI:**
+- `PaymentsRelationManager` → tab "Riwayat Pembayaran" di halaman Edit Pesanan
+- Form: Jumlah, Tanggal, Metode, Catatan, **Upload foto bukti** (disk: public, dir: `payments/proofs`)
+- Auto-fill `recorded_by = auth()->id()`
+- Tabel: Tanggal | Nominal | Metode badge | Catatan | Preview foto | Dicatat Oleh
+
+| File | Status |
+|---|---|
+| `app/Models/Payment.php` | NEW |
+| `app/Models/Order.php` | MODIFIED |
+| `app/Filament/Resources/Orders/RelationManagers/PaymentsRelationManager.php` | NEW |
+| `app/Filament/Resources/Orders/OrderResource.php` | MODIFIED |
+| `database/migrations/2026_03_01_*_create_payments_table.php` | NEW |
+| `database/migrations/2026_03_01_*_remove_down_payment_from_orders_table.php` | NEW |
+| `app/Providers/Filament/AdminPanelProvider.php` | MODIFIED (CSS vertical-align) |
+
+---
+
+#### 🔜 Rencana: Halaman Keuangan (Belum Diimplementasi)
+
+Desain 3-tab sudah dikonfirmasi dari mockup.
+
+**Header stat cards**: Total Piutang (Siap Diambil) | Uang Masuk Hari Ini | Saldo Kas Kecil (otomatis: `SUM(payments) - SUM(expenses)`)
+
+**Tab 1 — Daftar Piutang & Penagihan**: order belum lunas, tombol Bayar/Pelunasan, tombol WhatsApp dengan pesan otomatis sisa tagihan
+
+**Tab 2 — Riwayat Kas Masuk**: semua record `payments`, preview foto bukti, filter tanggal & status
+
+**Tab 3 — Pengeluaran Operasional**: tabel `expenses` baru (keperluan bebas, nominal, penanggung jawab, foto struk)
+
+**Perlu dibuat:**
+- Migration + Model `Expense` (`shop_id`, `description`, `amount`, `expense_date`, `proof_image`, `recorded_by`)
+- `KeuanganResource` Filament dengan 3 tab
+- 3 stat widgets
 

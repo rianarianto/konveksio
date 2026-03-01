@@ -81,6 +81,14 @@ class AdminPanelProvider extends PanelProvider
                 fn() => new \Illuminate\Support\HtmlString('
                     <link rel="stylesheet" href="' . asset('css/custom-login.css') . '">
                     ' . \Illuminate\Support\Facades\Blade::render('@vite("resources/css/app.css")') . '
+                    <style>
+                        /* Tombol actions tabel rata atas */
+                        .fi-ta-record-actions { vertical-align: top !important; }
+                        table td:last-child { vertical-align: top !important; }
+                        /* Checkbox bulk select rata atas */
+                        .fi-ta-checkbox-column { vertical-align: top !important; }
+                        table td:first-child { vertical-align: top !important; }
+                    </style>
                 '),
             )
             ->userMenuItems([

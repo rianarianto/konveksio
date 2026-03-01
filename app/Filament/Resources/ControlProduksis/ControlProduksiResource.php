@@ -152,8 +152,20 @@ class ControlProduksiResource extends Resource
             ->defaultGroup(
                 TableGroup::make('order.order_number')
                     ->label('Pesanan')
-                    ->getTitleFromRecordUsing(fn(Model $record): string => $record->order->order_number . ' - ' . ($record->order->customer->name ?? 'Tanpa Nama'))
+                    ->getTitleFromRecordUsing(function (Model $record): string {
+                        $order = $record->order;
+                        $prefix = $order->is_express
+                            ? '<span style="background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;margin-right:6px;">⚡ EXPRESS</span>'
+                            : '';
+                        return $prefix . $order->order_number . ' — ' . ($order->customer->name ?? 'Tanpa Nama');
+                    })
                     ->collapsible()
+            )
+            ->modifyQueryUsing(fn($query) => $query
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->orderByRaw('orders.is_express DESC')
+                ->orderBy('orders.deadline', 'asc')
+                ->select('order_items.*')
             )
             ->filters([
                 // Filters handled by Tabs in Manage page
@@ -247,7 +259,31 @@ class ControlProduksiResource extends Resource
                                 </tr>';
                         }
 
-                        $html = '
+                        // ─── Banner desain ───────────────────────────────────────
+                        $designHtml = '';
+                        if ($record->design_image) {
+                            $designUrl = asset('storage/' . $record->design_image);
+                            $designHtml = '
+                                <div style="margin-bottom:16px;border:1.5px solid #c4b5fd;border-radius:12px;overflow:hidden;background:#faf5ff;">
+                                    <div style="padding:8px 14px;background:#ede9fe;display:flex;align-items:center;gap:8px;">
+                                        <span style="font-size:16px;">🎨</span>
+                                        <span style="font-size:13px;font-weight:600;color:#5b21b6;">Referensi Desain</span>
+                                        <a href="' . $designUrl . '" target="_blank" style="margin-left:auto;font-size:11px;color:#7c3aed;text-decoration:underline;">Buka full ↗</a>
+                                    </div>
+                                    <div style="padding:12px;text-align:center;">
+                                        <a href="' . $designUrl . '" target="_blank">
+                                            <img src="' . $designUrl . '" style="max-height:200px;max-width:100%;object-fit:contain;border-radius:8px;cursor:zoom-in;" alt="Desain">
+                                        </a>
+                                    </div>
+                                </div>';
+                        } else {
+                            $designHtml = '
+                                <div style="margin-bottom:16px;border:1.5px dashed #d1d5db;border-radius:12px;padding:16px;text-align:center;background:#f9fafb;">
+                                    <span style="font-size:13px;color:#9ca3af;">🖼️ Belum ada file desain yang diupload untuk item ini</span>
+                                </div>';
+                        }
+
+                        $html = $designHtml . '
                             <div style="border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
                                 <table style="width:100%;border-collapse:collapse;">
                                     <thead>

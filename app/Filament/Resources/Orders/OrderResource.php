@@ -13,6 +13,7 @@ use Filament\Forms\Components\Hidden;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Schemas\Components\Group;
 use Filament\Forms\Components\Placeholder;
@@ -27,8 +28,12 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Toggle;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -168,6 +173,24 @@ class OrderResource extends Resource
                                 ->required()
                                 ->native(false)
                                 ->minDate(now()),
+
+                            // ── Express ─────────────────────────────────────────────
+                            Toggle::make('is_express')
+                                ->label('⚡ Pesanan Express')
+                                ->helperText('Pesanan ini akan diprioritaskan di antrian produksi')
+                                ->default(false)
+                                ->live()
+                                ->onColor('danger')
+                                ->columnSpan(2),
+
+                            TextInput::make('express_fee')
+                                ->label('Biaya Express (Rp)')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->default(0)
+                                ->visible(fn(Get $get): bool => (bool) $get('is_express'))
+                                ->helperText('Biaya tambahan untuk layanan express')
+                                ->columnSpan(1),
                         ])
                         ->columns(3),
 
@@ -254,6 +277,40 @@ class OrderResource extends Resource
                             Repeater::make('orderItems')
                                 ->relationship()
                                 ->schema([
+                                    // ── DESIGN PREVIEW (read-only, hanya saat Edit) ────────
+                                    Placeholder::make('design_preview')
+                                        ->label(false)
+                                        ->content(function (Get $get, $record) {
+                                            // $record di sini adalah OrderItem (saat Edit)
+                                            if (!$record || !($record->design_image ?? null)) {
+                                                return null; // Sembunyikan kalau belum ada desain
+                                            }
+                                            $url = asset('storage/' . $record->design_image);
+                                            $statusBadge = match($record->design_status ?? 'pending') {
+                                                'pending'  => '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;">⏳ Menunggu</span>',
+                                                'uploaded' => '<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;">📤 Diupload</span>',
+                                                'approved' => '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;">✅ Disetujui</span>',
+                                                default    => '',
+                                            };
+                                            return new \Illuminate\Support\HtmlString('
+                                                <div style="border:1.5px solid #c4b5fd;border-radius:12px;overflow:hidden;background:#faf5ff;margin-bottom:4px;">
+                                                    <div style="padding:8px 14px;background:#ede9fe;display:flex;align-items:center;gap:8px;">
+                                                        <span style="font-size:15px;">🎨</span>
+                                                        <span style="font-size:12px;font-weight:600;color:#5b21b6;">File Desain</span>
+                                                        ' . $statusBadge . '
+                                                        <a href="' . $url . '" target="_blank" style="margin-left:auto;font-size:11px;color:#7c3aed;text-decoration:underline;">Buka full ↗</a>
+                                                    </div>
+                                                    <div style="padding:10px;text-align:center;">
+                                                        <a href="' . $url . '" target="_blank">
+                                                            <img src="' . $url . '" style="max-height:160px;max-width:100%;object-fit:contain;border-radius:8px;cursor:zoom-in;" alt="Desain">
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            ');
+                                        })
+                                        ->columnSpanFull()
+                                        ->visible(fn($record) => $record && $record->design_image),
+
                                     // ── LAYER 1: Nama Produk + Kategori ───────────────
                                     Group::make([
                                         TextInput::make('product_name')
@@ -276,6 +333,7 @@ class OrderResource extends Resource
                                             ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
                                             ->columnSpan(2),
                                     ])->columns(5),
+
 
                                     // ── LAYER 2: Pilih Bahan (hanya Produksi & Custom) ─────
                                     Select::make('bahan_baju')
@@ -1597,97 +1655,226 @@ class OrderResource extends Resource
         return $table
             ->recordTitleAttribute('order_number')
             ->query(
-                \App\Models\Order::query()->with(['customer', 'orderItems.productionTasks'])
+                \App\Models\Order::query()
+                    ->with(['customer', 'orderItems.productionTasks', 'payments'])
             )
             ->columns([
+
+                // ═══ KOLOM 1: Pesanan & Pelanggan ════════════════════════════
                 TextColumn::make('order_number')
-                    ->label('No. Pesanan')
+                    ->label('Pesanan & Pelanggan')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->html()
+                    ->extraCellAttributes(['style' => 'vertical-align:top;'])
+                    ->state(function (\App\Models\Order $record): string {
+                        $expressHtml = $record->is_express
+                            ? '<span style="display:inline-flex;align-items:center;gap:3px;background:#ef4444;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;margin-bottom:5px;vertical-align:middle;">⚡ EXPRESS</span> '
+                            : '';
 
-                TextColumn::make('customer.name')
-                    ->label('Pelanggan')
-                    ->searchable()
-                    ->sortable(),
+                        $orderNum = '<div style="font-size:14px;font-weight:700;color:var(--text-color,#111);">'
+                            . $expressHtml
+                            . htmlspecialchars($record->order_number)
+                            . '</div>';
 
-                TextColumn::make('order_date')
-                    ->label('Tanggal')
-                    ->date('d M Y')
-                    ->sortable(),
+                        $customer = $record->customer;
+                        $name = $customer?->name ?? '—';
+                        $phone = $customer?->phone ?? null;
 
-                TextColumn::make('deadline')
-                    ->label('Deadline')
-                    ->date('d M Y')
-                    ->sortable(),
+                        $nameBadge = '<span style="display:inline-block;background:rgba(124,58,237,0.1);color:#7c3aed;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;margin-top:5px;">'
+                            . htmlspecialchars($name)
+                            . '</span>';
 
-                TextColumn::make('status')
-                    ->label('Status')
-                    ->badge()
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'diterima' => 'Diterima',
-                        'antrian' => 'Antrian',
-                        'diproses' => 'Diproses',
-                        'selesai' => 'Selesai',
-                        'siap_diambil' => 'Siap Diambil',
-                        default => ucfirst($state),
-                    })
-                    ->description(function (\App\Models\Order $record): ?string {
-                        $status = $record->status;
+                        $phoneLine = $phone
+                            ? '<div style="margin-top:5px;display:flex;align-items:center;gap:4px;font-size:12px;color:#6b7280;">'
+                              . '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="#25D366" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.297-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.998 0C5.372 0 0 5.373 0 12.001c0 2.117.554 4.1 1.523 5.823L0 24l6.335-1.508A11.944 11.944 0 0 0 11.998 24C18.626 24 24 18.627 24 12.001 24 5.373 18.626 0 11.998 0zm0 21.818a9.81 9.81 0 0 1-5.006-1.367l-.359-.214-3.721.976.994-3.634-.235-.374a9.819 9.819 0 0 1-1.504-5.204c0-5.42 4.409-9.83 9.83-9.83 5.42 0 9.83 4.41 9.83 9.83 0 5.422-4.41 9.817-9.83 9.817z"/></svg>'
+                              . htmlspecialchars($phone)
+                              . '</div>'
+                            : '';
 
-                        if (!in_array($status, ['antrian', 'diproses'])) {
-                            return null;
-                        }
-
-                        $allTasks = $record->orderItems
-                            ->flatMap(fn($item) => $item->productionTasks);
-
-                        if ($allTasks->isEmpty()) {
-                            return null;
-                        }
-
-                        if ($status === 'diproses') {
-                            $active = $allTasks->firstWhere('status', 'in_progress');
-                            if ($active) {
-                                return 'Sedang: ' . $active->stage_name;
-                            }
-                        }
-
-                        // Antrian atau fallback: tampilkan stage pending pertama
-                        $nextPending = $allTasks->where('status', 'pending')
-                            ->sortBy('id')
-                            ->first();
-
-                        if ($nextPending) {
-                            return 'Tahap: ' . $nextPending->stage_name;
-                        }
-
-                        return null;
-                    })
-                    ->color(fn(string $state): string => match ($state) {
-                        'diterima' => 'gray',
-                        'antrian' => 'warning',
-                        'diproses' => 'info',
-                        'selesai' => 'success',
-                        'siap_diambil' => 'success',
-                        default => 'gray',
+                        return $orderNum . '<div>' . $nameBadge . '</div>' . $phoneLine;
                     }),
 
+                // ═══ KOLOM 2: Timeline ════════════════════════════════════════
+                TextColumn::make('order_date')
+                    ->label('Timeline')
+                    ->searchable(false)
+                    ->sortable()
+                    ->html()
+                    ->extraCellAttributes(['style' => 'vertical-align:top;'])
+                    ->state(function (\App\Models\Order $record): string {
+                        $masuk = $record->order_date?->format('d M Y') ?? '—';
+                        $deadline = $record->deadline?->format('d M Y') ?? '—';
+
+                        $days = $record->deadline
+                            ? now()->startOfDay()->diffInDays($record->deadline, false)
+                            : null;
+
+                        if ($days === null) {
+                            $badgeHtml = '';
+                        } elseif ($days < 0) {
+                            $badgeHtml = '<span style="background:#fef2f2;color:#dc2626;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;border:1px solid #fecaca;">Terlambat ' . abs($days) . ' hari</span>';
+                        } elseif ($days === 0) {
+                            $badgeHtml = '<span style="background:#fef2f2;color:#dc2626;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;border:1px solid #fecaca;">⏰ Hari ini!</span>';
+                        } elseif ($days <= 2) {
+                            $badgeHtml = '<span style="background:#fffbeb;color:#d97706;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid #fde68a;">🔥 Sisa ' . $days . ' hari</span>';
+                        } else {
+                            $badgeHtml = '<span style="background:#f0fdf4;color:#16a34a;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid #bbf7d0;">Sisa ' . $days . ' hari</span>';
+                        }
+
+                        return '<div style="font-size:13px;line-height:1.8;">'
+                            . '<div style="color:#6b7280;font-size:12px;">Masuk</div>'
+                            . '<div style="font-weight:600;font-size:13px;">' . $masuk . '</div>'
+                            . '<div style="color:#6b7280;font-size:12px;margin-top:5px;">Deadline</div>'
+                            . '<div style="font-weight:600;font-size:13px;">' . $deadline . '</div>'
+                            . '<div style="margin-top:7px;">' . $badgeHtml . '</div>'
+                            . '</div>';
+                    }),
+
+                // ═══ KOLOM 3: Finance ════════════════════════════════════════
                 TextColumn::make('total_price')
-                    ->label('Total')
-                    ->money('IDR')
-                    ->sortable(),
+                    ->label('Finance')
+                    ->sortable()
+                    ->html()
+                    ->extraCellAttributes(['style' => 'vertical-align:top;'])
+                    ->state(function (\App\Models\Order $record): string {
+                        $total  = (int) $record->total_price;
+                        $paid   = (int) $record->payments->sum('amount');
+                        $sisa   = max(0, $total - $paid);
+                        $lunas  = $sisa === 0;
+
+                        $sisaColor = $lunas ? '#16a34a' : '#7c3aed';
+
+                        $sisaHtml = '<div style="font-size:15px;font-weight:800;color:' . $sisaColor . ';">'
+                            . ($lunas ? '✅ Lunas' : 'Rp ' . number_format($sisa, 0, ',', '.'))
+                            . '</div>';
+
+                        $totalHtml = '<div style="font-size:12px;color:#9ca3af;margin-top:3px;">Total: Rp '
+                            . number_format($total, 0, ',', '.')
+                            . '</div>';
+
+                        $cicilan = $record->payments->count();
+                        $paidHtml = $paid > 0
+                            ? '<div style="font-size:12px;color:#9ca3af;">Dibayar: Rp ' . number_format($paid, 0, ',', '.') . ' (' . $cicilan . 'x)</div>'
+                            : '<div style="font-size:12px;color:#f59e0b;">Belum ada pembayaran</div>';
+
+                        return $sisaHtml . $totalHtml . $paidHtml;
+                    }),
+
+                // ═══ KOLOM 4: Produk & Status Produksi ═══════════════════════
+                TextColumn::make('status')
+                    ->label('Produk & Status')
+                    ->searchable(false)
+                    ->html()
+                    ->extraCellAttributes(['style' => 'vertical-align:top;'])
+                    ->state(function (\App\Models\Order $record): string {
+                        $items = $record->orderItems;
+
+                        if ($items->isEmpty()) {
+                            return '<span style="color:#9ca3af;font-size:13px;">—</span>';
+                        }
+
+                        $html = '';
+                        foreach ($items as $item) {
+                            $cat = match($item->production_category) {
+                                'custom'       => ['🧵 Custom',       'rgba(99,102,241,0.12)',  '#6366f1'],
+                                'non_produksi' => ['📦 Non-Produksi', 'rgba(245,158,11,0.12)', '#d97706'],
+                                'jasa'         => ['🔧 Jasa',          'rgba(16,185,129,0.12)', '#059669'],
+                                default        => ['🏭 Produksi',      'rgba(124,58,237,0.10)', '#7c3aed'],
+                            };
+
+                            $catBadge = '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:' . $cat[1] . ';color:' . $cat[2] . ';">'. $cat[0] . '</span>';
+
+                            // Progress bar
+                            $tasks = $item->productionTasks;
+                            $total = $tasks->count();
+                            $done  = $tasks->where('status', 'done')->count();
+                            $pct   = $total > 0 ? round(($done / $total) * 100) : 0;
+
+                            if ($total === 0) {
+                                $statusText = '<span style="font-size:11px;color:#9ca3af;">Belum Diproses</span>';
+                                $progressHtml = '';
+                            } elseif ($pct === 100) {
+                                $statusText = '<span style="font-size:11px;font-weight:600;color:#10b981;">✓ Selesai</span>';
+                                $progressHtml = '<div style="height:5px;background:#d1fae5;border-radius:9999px;overflow:hidden;margin-top:5px;"><div style="width:100%;height:100%;background:#10b981;border-radius:9999px;"></div></div>';
+                            } else {
+                                $inProgress = $tasks->where('status', 'in_progress')->count() > 0;
+                                $statusText = $inProgress
+                                    ? '<span style="font-size:11px;font-weight:600;color:#7c3aed;">● Diproses</span>'
+                                    : '<span style="font-size:11px;color:#f59e0b;">⏳ Antrian</span>';
+                                $progressHtml = '<div style="height:5px;background:rgba(127,0,255,0.15);border-radius:9999px;overflow:hidden;margin-top:5px;"><div style="width:' . $pct . '%;height:100%;background:#7F00FF;border-radius:9999px;"></div></div>';
+                            }
+
+                            $qty = $item->quantity;
+                            if ($item->production_category === 'custom' && !empty($item->size_and_request_details['detail_custom'])) {
+                                $qty = count($item->size_and_request_details['detail_custom']);
+                            }
+
+                            $html .= '<div style="padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.05);">'
+                                . '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+                                . '<span style="font-size:13px;font-weight:700;">' . $qty . 'x ' . htmlspecialchars($item->product_name) . '</span>'
+                                . $catBadge
+                                . $statusText
+                                . '</div>'
+                                . $progressHtml
+                                . '</div>';
+                        }
+
+                        return $html;
+                    }),
             ])
-            ->filters([])
+
+            ->filters([
+                Filter::make('hutang')
+                    ->label('Belum Lunas (Piutang)')
+                    ->query(fn(Builder $query) => $query->whereColumn('down_payment', '<', 'total_price')),
+
+                Filter::make('deadline_dekat')
+                    ->label('Deadline ≤ 3 Hari')
+                    ->query(fn(Builder $query) => $query->where('deadline', '<=', now()->addDays(3))->where('deadline', '>=', now())),
+
+                SelectFilter::make('tipe_produk')
+                    ->label('Tipe Produk')
+                    ->options([
+                        'produksi'     => '🏭 Produksi',
+                        'custom'       => '🧵 Custom',
+                        'non_produksi' => '📦 Non-Produksi',
+                        'jasa'         => '🔧 Jasa',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (!$data['value']) return $query;
+                        return $query->whereHas('orderItems', fn($q) => $q->where('production_category', $data['value']));
+                    }),
+            ])
+
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
+                Action::make('detail')
+                    ->label('Detail')
+                    ->icon('heroicon-o-eye')
+                    ->color('warning')
+                    ->url(fn(\App\Models\Order $record) => static::getUrl('edit', ['record' => $record])),
+
+                \Filament\Actions\ActionGroup::make([
+                    EditAction::make(),
+                    DeleteAction::make(),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('order_date', 'desc');
+            ->defaultSort('is_express', 'desc')
+            ->modifyQueryUsing(fn($query) => $query->orderBy('is_express', 'desc')->orderBy('order_date', 'desc'));
+    }
+
+
+
+    public static function getRelations(): array
+    {
+        return [
+            \App\Filament\Resources\Orders\RelationManagers\PaymentsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
