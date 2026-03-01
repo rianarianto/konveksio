@@ -88,6 +88,29 @@ class AdminPanelProvider extends PanelProvider
                         /* Checkbox bulk select rata atas */
                         .fi-ta-checkbox-column { vertical-align: top !important; }
                         table td:first-child { vertical-align: top !important; }
+
+                        /* Custom Piutang Table UI Overrides */
+                        .custom-piutang-pill {
+                            display: inline-flex !important; align-items: center !important; gap: 6px !important;
+                            padding: 2px 10px !important; border-radius: 9999px !important; 
+                            border: 1px solid #e9d5ff !important; background-color: #faf5ff !important; 
+                            color: #7e22ce !important; font-size: 12px !important; font-weight: 500 !important; width: max-content !important;
+                        }
+                        .custom-piutang-badge {
+                            display: inline-flex !important; align-items: center !important; gap: 6px !important; 
+                            padding: 4px 10px 4px 6px !important; border-radius: 6px !important; 
+                            font-size: 12px !important; font-weight: 600 !important; width: max-content !important;
+                        }
+                        .custom-piutang-item-badge {
+                            display: inline-flex !important; align-items: stretch !important; background-color: #f9fafb !important; 
+                            border: 1px solid #e5e7eb !important; border-radius: 6px !important; overflow: hidden !important; 
+                            font-size: 12px !important; height: 26px !important;
+                        }
+                        .custom-payment-pill {
+                            display: inline-flex !important; align-items: center !important; gap: 4px !important; 
+                            padding: 2px 6px !important; background-color: #f3f4f6 !important; border: 1px solid #e5e7eb !important; 
+                            border-radius: 4px !important; font-size: 10px !important; color: #4b5563 !important;
+                        }
                     </style>
                 '),
             )
