@@ -840,135 +840,142 @@ class ControlProduksiResource extends Resource
                     })
                     ->action(function (array $data, OrderItem $record, \Filament\Actions\Action $action) {
                         $item = $record;
-                        $tasksData = $data['productionTasks'] ?? [];
-                        
-                        // 1. Validasi Total Qty Per Tahapan & Kelengkapan Tahapan
-                        $errors = [];
-                        
-                        // A. Cek Kelengkapan Tahapan Wajib
                         $category = $item->production_category ?? 'produksi';
-                        $stageQuery = \App\Models\ProductionStage::query()->orderBy('order_sequence');
-                        if ($category === 'produksi' || $category === 'custom') {
-                            $stageQuery->where('for_produksi_custom', true);
-                        } elseif ($category === 'non_produksi') {
-                            $stageQuery->where('for_non_produksi', true);
-                        } elseif ($category === 'jasa') {
-                            $stageQuery->where('for_jasa', true);
-                        }
-                        
-                        $requiredStages = $stageQuery->pluck('name')->toArray();
-                        $stagedTasks = collect($tasksData)->groupBy('stage_name');
-                        
-                        $missingStages = array_diff($requiredStages, $stagedTasks->keys()->toArray());
-                        if (!empty($missingStages)) {
-                            $errors[] = "Tahapan berikut wajib dikerjakan dan belum ditugaskan: <b>" . implode(', ', $missingStages) . "</b>";
-                        }
-                        
-                        // Menyiapkan daftar kunci (key) ukuran/person apa saja yang perlu diekstrak dari data repeater (karena Fieldset mem-flatten inputannya)
-                        $sizesToLookFor = [];
-                        if ($item->production_category === 'custom') {
-                            $details = $item->size_and_request_details ?? [];
-                            if (!empty($details['detail_custom']) && is_array($details['detail_custom'])) {
-                                foreach ($details['detail_custom'] as $index => $u) {
-                                    $person = $u['nama'] ?? 'Person ' . ($index + 1);
-                                    $sizesToLookFor[] = $person;
-                                }
+                        $details = $item->size_and_request_details ?? [];
+
+                        $tasksData = $data['productionTasks'] ?? [];
+
+                        // ══════════════════════════════════════════════════════════════
+                        // PERSIAPAN DATA KAPASITAS ASLI
+                        // ══════════════════════════════════════════════════════════════
+                        $originalSizes = []; // ['S' => 20, 'M' => 30, ...]
+                        if (isset($details['sizes']) && is_array($details['sizes'])) {
+                            foreach ($details['sizes'] as $sz => $qty) {
+                                if ((int) $qty > 0)
+                                    $originalSizes[strtoupper($sz)] = (int) $qty;
                             }
-                        } else {
-                            $details = $item->size_and_request_details ?? [];
-                            if (isset($details['sizes']) && is_array($details['sizes'])) {
-                                foreach ($details['sizes'] as $sz => $qty) {
-                                    if ((int)$qty > 0) $sizesToLookFor[] = strtoupper($sz);
-                                }
-                            } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
-                                foreach ($details['varian_ukuran'] as $v) {
-                                    $sz = strtoupper($v['ukuran'] ?? '');
-                                    if ($sz && (int)($v['qty'] ?? 0) > 0) $sizesToLookFor[] = $sz;
-                                }
+                        } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
+                            foreach ($details['varian_ukuran'] as $v) {
+                                $sz = strtoupper($v['ukuran'] ?? '');
+                                if ($sz && (int) ($v['qty'] ?? 0) > 0)
+                                    $originalSizes[$sz] = (int) $v['qty'];
                             }
+                        } elseif ($category === 'custom' && !empty($details['detail_custom'])) {
+                            // Kategori custom: qty = jumlah orang
+                            $originalSizes['CUSTOM'] = count($details['detail_custom']);
                         }
-                        $stagedTasks = collect($tasksData)->groupBy('stage_name');
-                        
-                        // Siapkan stok per ukuran dari item (max yang tersedia untuk setiap ukuran)
-                        $stockPerSize = [];
-                        if ($item->production_category === 'custom') {
-                            $details = $item->size_and_request_details ?? [];
-                            if (!empty($details['detail_custom'])) {
-                                foreach ($details['detail_custom'] as $u) {
-                                    $sz = $u['nama'] ?? null;
-                                    if ($sz) $stockPerSize[$sz] = ($stockPerSize[$sz] ?? 0) + 1;
-                                }
+                        $totalOrderQty = $item->quantity ?? 0;
+
+                        // ══════════════════════════════════════════════════════════════
+                        // AGREGASI: Qty & stage dari semua baris tugas
+                        // ══════════════════════════════════════════════════════════════
+                        $usedQtyPerStageSize = []; // ['Jahit']['M'] = 50
+                        $usedQtyPerStage = []; // ['Jahit'] = 100
+                        $assignedStages = []; // ['Jahit', 'Potong']
+            
+                        foreach ($tasksData as $idx => $taskItem) {
+                            $stage = $taskItem['stage_name'] ?? null;
+                            $qty = (int) ($taskItem['quantity'] ?? 0);
+
+                            // ─── Cek #1: Setiap baris wajib punya qty > 0 ─────────────
+                            if ($qty === 0) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Ada Tugas Tanpa Qty!')
+                                    ->body("Baris tugas <strong>{$stage}</strong> tidak memiliki qty yang diisi. Isi qty atau hapus baris tersebut.")
+                                    ->danger()->send();
+                                $action->halt();
+                                return;
                             }
-                        } else {
-                            $details = $item->size_and_request_details ?? [];
-                            if (isset($details['sizes']) && is_array($details['sizes'])) {
-                                foreach ($details['sizes'] as $sz => $qty) {
-                                    if ((int)$qty > 0) $stockPerSize[strtoupper($sz)] = (int)$qty;
-                                }
-                            } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
-                                foreach ($details['varian_ukuran'] as $v) {
-                                    $sz = strtoupper($v['ukuran'] ?? '');
-                                    if ($sz && (int)($v['qty'] ?? 0) > 0) {
-                                        $stockPerSize[$sz] = (int)$v['qty'];
+
+                            if ($stage) {
+                                $assignedStages[] = $stage;
+                                $usedQtyPerStage[$stage] = ($usedQtyPerStage[$stage] ?? 0) + $qty;
+
+                                $sqs = $taskItem['size_quantities'] ?? [];
+                                if (is_array($sqs)) {
+                                    foreach ($sqs as $key => $val) {
+                                        $upperKey = strtoupper($key);
+                                        $usedQtyPerStageSize[$stage][$upperKey] = ($usedQtyPerStageSize[$stage][$upperKey] ?? 0) + (int) $val;
                                     }
                                 }
                             }
+                            }
                         }
-                        
-                        foreach ($stagedTasks as $stageName => $tasksGroup) {
-                            $totalAssignedQty = $tasksGroup->sum(function($t) use ($sizesToLookFor) {
-                                // Default quantity field is disabled/readOnly so it might be missing or 0
-                                // Calculate from size_quantities fields instead (which are flattened to root $t)
-                                $sizeQty = 0;
-                                foreach ($sizesToLookFor as $key) {
-                                    // if a specific size is assigned to this part of the stage
-                                    if (isset($t[$key]) && (int)$t[$key] > 0) {
-                                        $sizeQty += (int)$t[$key];
-                                    }
-                                }
-                                
-                                // Fallback for simple qty item if it doesn't have sizes
-                                if ($sizeQty === 0 && isset($t['qty']) && (int)$t['qty'] > 0) {
-                                    $sizeQty += (int)$t['qty'];
-                                }
-                                
-                                return $sizeQty;
-                            });
-                            
-                            // Validasi per ukuran: pastikan tidak ada ukuran yang over-quota di dalam 1 tahapan
-                            if (!empty($stockPerSize)) {
-                                foreach ($stockPerSize as $sizeKey => $maxQty) {
-                                    $allocatedForSize = $tasksGroup->sum(fn($t) => (int)($t[$sizeKey] ?? 0));
-                                    if ($allocatedForSize > $maxQty) {
-                                        $errors[] = "Tahap '<b>{$stageName}</b>': ukuran <b>{$sizeKey}</b> dialokasikan {$allocatedForSize} pcs melebihi stok ({$maxQty} pcs).";
+                        if (!empty($originalSizes)) {
+                            $errors = [];
+                            foreach ($usedQtyPerStageSize as $stageName => $sizeUsage) {
+                                foreach ($sizeUsage as $sz => $usedQty) {
+                                    $maxQty = $originalSizes[$sz] ?? null;
+                                    if ($maxQty !== null && $usedQty > $maxQty) {
+                                        $errors[] = "Tahap <strong>{$stageName}</strong> — Ukuran <strong>{$sz}</strong>: ditugaskan {$usedQty} pcs, maks {$maxQty} pcs.";
                                     }
                                 }
                             }
-                            
-                            // Bandingkan dengan qty yang seharusnya (kalau custom hitung orang)
-                            $expectedQty = (int)$item->quantity;
-                            if ($item->production_category === 'custom') {
-                                $details = $item->size_and_request_details ?? [];
-                                if (!empty($details['detail_custom'])) {
-                                    $expectedQty = count($details['detail_custom']);
-                                }
-                            }
-                            
-                            if ($totalAssignedQty !== $expectedQty) {
-                                $errors[] = "Total kuantitas untuk tahap '<b>{$stageName}</b>' ({$totalAssignedQty} pcs) tidak sesuai dengan total produk ({$expectedQty} pcs).";
+                            if (!empty($errors)) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('❌ Qty Per Ukuran Melebihi Kapasitas!')
+                                    ->body(new \Illuminate\Support\HtmlString(implode('<br>', $errors)))
+                                    ->danger()->send();
+                                $action->halt();
+                                return;
                             }
                         }
 
-                        
-                        if (count($errors) > 0) {
-                            \Filament\Notifications\Notification::make()
-                                ->danger()
-                                ->title('Gagal Menyimpan Tugas')
-                                ->body(implode('<br>', $errors))
-                                ->send();
-                            
-                            $action->halt();
+                        // ─── Cek #3: Total qty per tahap tidak boleh melebihi total order ────────
+                        $stageOverErrors = [];
+                        foreach ($usedQtyPerStage as $stageName => $totalAssigned) {
+                            if ($totalAssigned > $totalOrderQty) {
+                                $stageOverErrors[] = "Tahap <strong>{$stageName}</strong>: total ditugaskan {$totalAssigned} pcs, maks {$totalOrderQty} pcs.";
+                            }
                         }
+                        if (!empty($stageOverErrors)) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('❌ Total Qty Melebihi Total Order!')
+                                ->body(new \Illuminate\Support\HtmlString(implode('<br>', $stageOverErrors)))
+                                ->danger()->send();
+                            $action->halt();
+                            return;
+                        }
+
+                        // ─── Cek #4 (Warning): Total qty per tahap kurang dari total order ────────
+                        $underAssignedWarnings = [];
+                        foreach ($usedQtyPerStage as $stageName => $totalAssigned) {
+                            if ($totalAssigned < $totalOrderQty) {
+                                $kekurangan = $totalOrderQty - $totalAssigned;
+                                $underAssignedWarnings[] = "Tahap <strong>{$stageName}</strong>: baru {$totalAssigned} dari {$totalOrderQty} pcs (kurang {$kekurangan} pcs).";
+                            }
+                        }
+                        if (!empty($underAssignedWarnings)) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('⚠️ Qty Belum Lengkap')
+                                ->body(new \Illuminate\Support\HtmlString(
+                                    'Data disimpan, namun qty beberapa tahap belum mencapai total order:<br>' . implode('<br>', $underAssignedWarnings)
+                                ))
+                                ->warning()->persistent()->send();
+                            // Tidak halt — hanya peringatan, data tetap disimpan
+                        }
+
+                        // ─── Cek #5 (Warning): Pastikan tahapan yang diperlukan sudah ada ─────────
+                        $requiredStages = ProductionStage::query()->orderBy('order_sequence');
+                        if ($category === 'produksi' || $category === 'custom') {
+                            $requiredStages->where('for_produksi_custom', true);
+                        } elseif ($category === 'non_produksi') {
+                            $requiredStages->where('for_non_produksi', true);
+                        } elseif ($category === 'jasa') {
+                            $requiredStages->where('for_jasa', true);
+                        }
+                        $requiredStageNames = $requiredStages->pluck('name')->toArray();
+                        $missingStages = array_diff($requiredStageNames, array_unique($assignedStages));
+                        if (!empty($missingStages)) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('⚠️ Tahapan Belum Lengkap')
+                                ->body(new \Illuminate\Support\HtmlString(
+                                    'Data disimpan, namun tahapan berikut belum di-assign:<br><strong>' . implode(', ', $missingStages) . '</strong>'
+                                ))
+                                ->warning()->persistent()->send();
+                            // Tidak halt — admin mungkin sengaja assign bertahap
+                        }
+                        // ══════════════════════════════════════════════════════════════
 
                         $existingTaskIds = [];
 
