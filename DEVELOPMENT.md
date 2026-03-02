@@ -798,6 +798,31 @@ Perubahan dilakukan via **dedicated route** (`GET /task-action/{task}/{action}/{
 | `app/Models/Worker.php` | MODIFIED (accessor pending/in_progress/done count) |
 | `app/Http/Controllers/TaskActionController.php` | NEW |
 | `routes/web.php` | MODIFIED (route task-action) |
+
+---
+
+## 2026-03-01: Finance Module & Wage System Optimization
+
+#### âœ… Keuangan & Piutang Module (COMPLETED)
+- **Objective**: Pusat manajemen cashflow, pelunasan order, dan monitoring piutang.
+- **New Resource: `KeuanganResource`**:
+  - Dashboard Keuangan: Ringkasan Pendapatan, Piutang (Sisa Tagihan), dan Pengeluaran.
+  - Tabel Piutang: Menggunakan custom Tailwind UI untuk menampilkan kartu piutang pelanggan yang belum lunas.
+  - Multi-Payment: Mendukung pencatatan pembayaran berkali-kali (DP -> Cicilan -> Pelunasan) via tabel `payments`.
+
+#### âœ… Sistem Upah & Monitor Produksi (COMPLETED)
+- **Feature**: Automasi rekap upah karyawan borongan berdasarkan `production_tasks` yang berstatus `done`.
+- **UI Update**: Redesign tabel Control Produksi menjadi 4 kolom utama untuk kepadatan informasi yang lebih baik.
+- **Express Order**: Penambahan flag `is_express` dan `express_fee` pada Order untuk prioritas pengerjaan.
+
+---
+
+## 2026-03-02: Final Validation & Stabilization
+
+#### âœ… Stability Fixes
+- **Merge Conflict Resolution**: Memperbaiki konflik pada `ControlProduksiResource` akibat perubahan simultan pada logika validasi dan UI.
+- **Validation Logic Enforcement**: Pengetatan validasi `quantity` agar tidak melebihi kapasitas `size` yang tersedia di setiap tahap produksi.
+
 | `database/migrations/2026_02_28_112451_update_assigned_to_foreign_key_on_production_tasks_table.php` | NEW |
 
 ---
@@ -959,3 +984,41 @@ Desain 3-tab sudah dikonfirmasi dari mockup.
 - `KeuanganResource` Filament dengan 3 tab
 - 3 stat widgets
 
+
+---
+
+### 2026-03-02: Dashboard Widget Row 1 & 2 + Bug Fixes
+
+#### Horizontal Payment Layout (PiutangTableWidget)
+- Kolom rincian pembayaran diubah ke horizontal dengan CSS flex-wrap agar tidak bergantung Tailwind arbitrary values.
+
+#### AktivitasUtamaWidget (Dashboard Baris 1)
+- Widget baru: 4 kartu statistik utama (Pesanan Masuk, Diproses, Siap Di-ambil, Deadline Hari Ini).
+- Data real dinamis per tenant. Trend % dibandingkan vs kemarin.
+- Desain menggunakan native CSS (bukan Tailwind) agar style selalu dirender benar.
+- Bug Fix: protected string view (non-static) untuk menghindari FatalError.
+
+#### DashboardRow2Widget (Dashboard Baris 2)
+- Widget baru layout 2-panel (2fr : 1fr).
+- **Panel Kiri**: Arus Kas (Cashflow) dengan Total Piutang, Pemasukan Hari Ini, dan SVG Donut Chart dinamis.
+  - Fix donut terpotong: viewBox "0 0 140 140", cx/cy=70 agar stroke tidak melampaui batas canvas.
+- **Panel Kanan**: Daftar Aktivitas Terbaru — 5 ProductionTask terbaru diubah, dengan badge per stage.
+
+#### AdminPanelProvider — Registrasi Widget Bersih
+- Menghapus AccountWidget, FilamentInfoWidget, dan discoverWidgets().
+- Daftar eksplisit: AktivitasUtamaWidget (sort=1), DashboardRow2Widget (sort=3).
+
+#### Bug Fix — Control Produksi Group Header HTML
+- getTitleFromRecordUsing() kini mengembalikan HtmlString (bukan string biasa) agar badge EXPRESS tidak di-escape.
+
+#### Files Modified / Created
+| File | Status |
+|---|---|
+| app/Filament/Widgets/AktivitasUtamaWidget.php | NEW |
+| app/Filament/Widgets/DashboardRow2Widget.php | NEW |
+| resources/views/filament/widgets/aktivitas-utama-widget.blade.php | NEW |
+| resources/views/filament/widgets/dashboard-row2-widget.blade.php | NEW |
+| app/Providers/Filament/AdminPanelProvider.php | MODIFIED |
+| app/Filament/Widgets/KeuanganStatsWidget.php | MODIFIED (sort=2) |
+| app/Filament/Resources/ControlProduksis/ControlProduksiResource.php | MODIFIED (HtmlString fix) |
+| app/Filament/Resources/Keuangans/Widgets/PiutangTableWidget.php | MODIFIED (horizontal layout) |

@@ -19,7 +19,7 @@ use Filament\Facades\Filament;
 class PengeluaranTableWidget extends BaseWidget
 {
     protected static ?string $heading = 'Daftar Pengeluaran Operasional';
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -47,7 +47,7 @@ class PengeluaranTableWidget extends BaseWidget
 
                 TextColumn::make('amount')
                     ->label('Nominal')
-                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format($state, 0, ',', '.'))
+                    ->formatStateUsing(fn($state) => 'Rp ' . number_format($state, 0, ',', '.'))
                     ->color('danger')
                     ->weight('bold'),
 
@@ -57,7 +57,8 @@ class PengeluaranTableWidget extends BaseWidget
 
                 ImageColumn::make('proof_image')
                     ->label('Bukti')
-                    ->disk('public')
+                    ->state(fn($record) => $record->proof_image ? asset('storage/' . $record->proof_image) : null)
+                    ->disk(null)
                     ->width(48)
                     ->height(48)
                     ->defaultImageUrl(null),
@@ -88,12 +89,12 @@ class PengeluaranTableWidget extends BaseWidget
                         Select::make('note')
                             ->label('Kategori')
                             ->options([
-                                'Bahan Baku'       => 'Bahan Baku',
-                                'Operasional'      => 'Operasional',
-                                'Gaji / Upah'      => 'Gaji / Upah',
-                                'Transport'        => 'Transport',
-                                'Alat & Mesin'     => 'Alat & Mesin',
-                                'Lainnya'          => 'Lainnya',
+                                'Bahan Baku' => 'Bahan Baku',
+                                'Operasional' => 'Operasional',
+                                'Gaji / Upah' => 'Gaji / Upah',
+                                'Transport' => 'Transport',
+                                'Alat & Mesin' => 'Alat & Mesin',
+                                'Lainnya' => 'Lainnya',
                             ])
                             ->placeholder('Pilih kategori...'),
 
@@ -106,7 +107,7 @@ class PengeluaranTableWidget extends BaseWidget
                             ->columnSpanFull(),
                     ])
                     ->mutateFormDataUsing(function (array $data): array {
-                        $data['shop_id']     = Filament::getTenant()?->id;
+                        $data['shop_id'] = Filament::getTenant()?->id;
                         $data['recorded_by'] = auth()->id();
                         return $data;
                     })
@@ -138,12 +139,12 @@ class PengeluaranTableWidget extends BaseWidget
                         Select::make('note')
                             ->label('Kategori')
                             ->options([
-                                'Bahan Baku'       => 'Bahan Baku',
-                                'Operasional'      => 'Operasional',
-                                'Gaji / Upah'      => 'Gaji / Upah',
-                                'Transport'        => 'Transport',
-                                'Alat & Mesin'     => 'Alat & Mesin',
-                                'Lainnya'          => 'Lainnya',
+                                'Bahan Baku' => 'Bahan Baku',
+                                'Operasional' => 'Operasional',
+                                'Gaji / Upah' => 'Gaji / Upah',
+                                'Transport' => 'Transport',
+                                'Alat & Mesin' => 'Alat & Mesin',
+                                'Lainnya' => 'Lainnya',
                             ]),
 
                         FileUpload::make('proof_image')

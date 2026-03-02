@@ -54,6 +54,8 @@ Sistem memiliki urutan *state machine* (*status tracker*) antara model *Order* d
    - **Modal Atur Tugas / Detail**: Saat baris pesanan diklik, sebuah slide-over terbuka memuat "Spesifikasi Produksi" lengkap. Field JSON (`size_and_request_details`) diurai/diparsing untuk merender data kompleks (Ukuran custom pelanggan dilipat/collapsible, material bahan dari `supplier_product` jika pesanan non-produksi, serta *Tambahan Request* diformat bebas dari JSON key). Terdapat status-bar *progress* persentase berjenjang.
 4. **Tahapan Produksi (Relay/Estafet)**: Admin mendelegasikan pengerjaan melalui tabel berelasi `production_tasks`. Master data *stage* (Potong->Jahit->Kancing->QC) ditentukan oleh tabel `production_stages`. Tombol Aksi di header akan menyesuaikan persentase dan warna progres (Kerjakan, Selesai, Batal). Admin tidak bisa menugaskan *quantity* pada *Stage B* melebihi jumlah celcius *Stage A* yang sudah dikerjakan (*Validasi Estafet*).
 5. **Penyelesaian**: Status pesanan dan status produksi naik bertahap menjadi `diproses` -> `selesai` -> `siap_diambil`.
+56: 6. **Keuangan & Pelunasan**: Pembayaran dikelola di `KeuanganResource`. Mendukung pembayaran bertahap (multi-payment). Order dengan sisa tagihan 0 akan otomatis berstatus lunas di Ringkasan.
+57: 
 
 ---
 
@@ -61,10 +63,33 @@ Sistem memiliki urutan *state machine* (*status tracker*) antara model *Order* d
 - **`users`**: Karyawan sistem yang memiliki Hak Akses. (Relasi *BelongsTo* -> `shops`)
 - **`customers`**: Database Pelanggan.
 - **`customer_measurements`**: Penyimpanan spesifikasi detail ukuran badan tiap anggota.
-- **`orders`**: Dokumen/faktur utama ("Keranjang"). Memuat ringkasan *total_price*, *down_payment*, dan status makro (`diterima`, `antrian`, dll). 
-- **`order_items`**: Rincian sub-pesanan di dalam sebuah faktur. Memuat *quantity*, informasi *JSON size_and_request_details*, kategori barang, aset gambar, dan riwayat desain.
-- **`production_stages`**: Urutan cetakan pabrik / rantai perizinan. Dikelompokkan apakah khusus untuk baju *Custom*, untuk *Non-Produksi*, dst.
-- **`production_tasks`**: Rincian riwayat operasi pabrik per produk yang didelegasikan oleh *Admin* kepada *User/Karyawan* bersangkutan. Bisa memuat deskripsi, kuantitas target, status kerja, rekap `size_quantities` untuk pelacakan spesifik ukuran yang diolah.
+- **`orders`**: Dokumen/faktur utama ("Keranjang"). Memuat ringkasan *total_price* dan status makro (`diterima`, `antrian`, dll).
+- **`order_items`**: Rincian sub-pesanan. Memuat *quantity*, JSON `size_and_request_details`, kategori, aset gambar, dan riwayat desain.
+- **`production_stages`**: Master urutan tahapan pabrik (Potong → Jahit → QC).
+- **`production_tasks`**: Rincian penugasan produksi per item, termasuk `stage_name`, `assigned_to` (→ `workers`), `wage_amount`, `quantity`, `status`, dan `completed_at`.
+- **`payments`**: Catatan transaksi pembayaran pelanggan multi-cicilan (DP, Cicilan, Pelunasan). Memuat `proof_image`, `payment_method`, `recorded_by`.
+- **`workers`**: Master data pekerja produksi (Tukang) untuk perhitungan upah borongan.
+- **`expenses`**: Pencatatan pengeluaran operasional toko.
+
+---
+
+## 6. Dashboard Widget Architecture
+
+Dashboard admin menggunakan **2 baris widget** dengan data real dinamis per tenant:
+
+### Baris 1 — `AktivitasUtamaWidget` (`$sort = 1`)
+- 4 kartu statistik: Pesanan Masuk, Diproses, Siap Di-ambil, Deadline Hari Ini.
+- Trend persentase dihitung live vs kemarin.
+- Desain menggunakan **native CSS** (bukan Tailwind arbitrary values) agar style di-render benar.
+
+### Baris 2 — `DashboardRow2Widget` (`$sort = 3`)
+- **Panel Kiri (Arus Kas)**: Total Piutang + Pemasukan Hari Ini + SVG Donut Chart dinamis.
+  - Donut chart: `viewBox "0 0 140 140"` dengan center `(70,70)` dan `r=54` sehingga stroke tidak terpotong.
+- **Panel Kanan (Aktivitas Terbaru)**: 5 `ProductionTask` terbaru diubah, badge stage bewarna per jenis.
+
+### Registrasi Widget (`AdminPanelProvider`)
+- Widget didaftarkan **secara eksplisit** (bukan `discoverWidgets()`).
+- Widget default Filament (`AccountWidget`, `FilamentInfoWidget`) **dihapus**.
 
 ---
 

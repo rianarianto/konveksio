@@ -14,7 +14,7 @@ use Filament\Facades\Filament;
 class KasMasukTableWidget extends BaseWidget
 {
     protected static ?string $heading = 'Riwayat Kas Masuk (Pembayaran)';
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -35,38 +35,45 @@ class KasMasukTableWidget extends BaseWidget
 
                 TextColumn::make('order.order_number')
                     ->label('Pesanan & Pelanggan')
-                    ->formatStateUsing(fn ($record) => new HtmlString(
+                    ->formatStateUsing(fn($record) => new HtmlString(
                         '<div style="font-weight:bold;">' . ($record->order->order_number ?? '-') . '</div>' .
                         '<div style="color:gray; font-size:0.875rem;">' . ($record->order->customer->name ?? '-') . '</div>'
                     ))
-                    ->searchable(),
+                    ->searchable()
+                    ->extraCellAttributes(['style' => 'vertical-align: top;']),
 
                 TextColumn::make('amount')
                     ->label('Nominal')
-                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format($state, 0, ',', '.'))
-                    ->color('success')
-                    ->weight('bold'),
+                    ->formatStateUsing(fn($state) => 'Rp ' . number_format($state, 0, ',', '.'))
+                    ->extraAttributes([
+                        'class' => 'text-purple-600', // Pakai standar Tailwind
+                    ])
+                    ->weight('bold')
+                    ->extraCellAttributes(['style' => 'vertical-align: top;']),
 
                 TextColumn::make('payment_method')
                     ->label('Metode')
                     ->badge()
-                    ->formatStateUsing(fn ($record) => $record->methodLabel())
-                    ->color(fn ($record) => match ($record->payment_method) {
+                    ->formatStateUsing(fn($record) => $record->methodLabel())
+                    ->color(fn($record) => match ($record->payment_method) {
                         'transfer' => 'primary',
-                        'qris'     => 'info',
-                        default    => 'gray',
-                    }),
+                        'qris' => 'info',
+                        default => 'gray',
+                    })
+                    ->extraCellAttributes(['style' => 'vertical-align: top;']),
 
                 TextColumn::make('recorder.name')
                     ->label('Penerima')
-                    ->default('-'),
+                    ->default('-')
+                    ->extraCellAttributes(['style' => 'vertical-align: top;']),
 
                 ImageColumn::make('proof_image')
                     ->label('Bukti')
-                    ->disk('public')
+                    ->state(fn($record) => $record->proof_image ? asset('storage/' . $record->proof_image) : null)
+                    ->disk(null)
                     ->width(48)
-                    ->height(48)
-                    ->defaultImageUrl(null),
+                    ->defaultImageUrl(null)
+                    ->extraCellAttributes(['style' => 'vertical-align: top;']),
             ])
             ->emptyStateHeading('Belum Ada Kas Masuk')
             ->emptyStateDescription('Catat pembayaran melalui detail pesanan atau tab Piutang.');

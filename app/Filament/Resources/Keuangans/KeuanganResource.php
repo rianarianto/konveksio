@@ -73,12 +73,12 @@ class KeuanganResource extends Resource
             Select::make('note')
                 ->label('Kategori')
                 ->options([
-                    'Bahan Baku'       => 'Bahan Baku',
-                    'Operasional'      => 'Operasional',
-                    'Gaji / Upah'      => 'Gaji / Upah',
-                    'Transport'        => 'Transport',
-                    'Alat & Mesin'     => 'Alat & Mesin',
-                    'Lainnya'          => 'Lainnya',
+                    'Bahan Baku' => 'Bahan Baku',
+                    'Operasional' => 'Operasional',
+                    'Gaji / Upah' => 'Gaji / Upah',
+                    'Transport' => 'Transport',
+                    'Alat & Mesin' => 'Alat & Mesin',
+                    'Lainnya' => 'Lainnya',
                 ])
                 ->placeholder('Pilih kategori...'),
 
@@ -119,7 +119,7 @@ class KeuanganResource extends Resource
 
                 TextColumn::make('amount')
                     ->label('Nominal')
-                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format($state, 0, ',', '.'))
+                    ->formatStateUsing(fn($state) => 'Rp ' . number_format($state, 0, ',', '.'))
                     ->color('danger')
                     ->weight('bold'),
 
@@ -129,7 +129,8 @@ class KeuanganResource extends Resource
 
                 ImageColumn::make('proof_image')
                     ->label('Bukti')
-                    ->disk('public')
+                    ->state(fn($record) => $record->proof_image ? asset('storage/' . $record->proof_image) : null)
+                    ->disk(null)
                     ->width(48)
                     ->height(48)
                     ->defaultImageUrl(null),
@@ -139,7 +140,7 @@ class KeuanganResource extends Resource
                     ->label('+ Tambah Pengeluaran')
                     ->modalHeading('Tambah Pengeluaran')
                     ->mutateFormDataUsing(function (array $data): array {
-                        $data['shop_id']     = Filament::getTenant()?->id;
+                        $data['shop_id'] = Filament::getTenant()?->id;
                         $data['recorded_by'] = auth()->id();
                         return $data;
                     }),

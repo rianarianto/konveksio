@@ -15,6 +15,10 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Intervention\Image\Laravel\Facades\Image;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class PaymentsRelationManager extends RelationManager
 {
@@ -43,9 +47,9 @@ class PaymentsRelationManager extends RelationManager
             Select::make('payment_method')
                 ->label('Metode Pembayaran')
                 ->options([
-                    'cash'     => '💵 Cash',
+                    'cash' => '💵 Cash',
                     'transfer' => '🏦 Transfer Bank',
-                    'qris'     => '📱 QRIS',
+                    'qris' => '📱 QRIS',
                 ])
                 ->required()
                 ->default('cash'),
@@ -63,7 +67,42 @@ class PaymentsRelationManager extends RelationManager
                 ->directory('payments/proofs')
                 ->maxSize(5120)
                 ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                ->helperText('Upload foto bukti transfer atau struk pembayaran (maks 5MB)'),
+                ->downloadable()
+                ->openable()
+                ->previewable()
+                ->helperText('Upload foto bukti transfer atau struk pembayaran (maks 5MB)')
+                ->getUploadedFileUsing(function (string $file): ?array {
+                    $disk = Storage::disk('public');
+                    if (!$disk->exists($file)) {
+                        return null;
+                    }
+                    return [
+                        'name' => basename($file),
+                        'size' => $disk->size($file),
+                        'type' => mime_content_type($disk->path($file)) ?: 'image/jpeg',
+                        'url' => asset('storage/' . $file),
+                    ];
+                })
+                ->saveUploadedFileUsing(function (TemporaryUploadedFile $file): string {
+                    $mimeType = $file->getMimeType();
+
+                    // Gambar — kompres dengan Intervention Image
+                    $img = Image::read($file->getRealPath());
+
+                    // Resize jika lebar > 1920px (pertahankan aspek rasio)
+                    if ($img->width() > 1920) {
+                        $img->scaleDown(width: 1920);
+                    }
+
+                    // Encode ke JPEG quality 75
+                    $encoded = $img->toJpeg(quality: 75);
+
+                    $filename = Str::uuid() . '.jpg';
+                    $path = 'payments/proofs/' . $filename;
+                    Storage::disk('public')->put($path, (string) $encoded);
+
+                    return $path;
+                }),
 
         ]);
     }
@@ -89,15 +128,15 @@ class PaymentsRelationManager extends RelationManager
                 TextColumn::make('payment_method')
                     ->label('Metode')
                     ->badge()
-                    ->formatStateUsing(fn($state) => match($state) {
+                    ->formatStateUsing(fn($state) => match ($state) {
                         'transfer' => '🏦 Transfer Bank',
-                        'qris'     => '📱 QRIS',
-                        default    => '💵 Cash',
+                        'qris' => '📱 QRIS',
+                        default => '💵 Cash',
                     })
-                    ->color(fn($state) => match($state) {
+                    ->color(fn($state) => match ($state) {
                         'transfer' => 'info',
-                        'qris'     => 'warning',
-                        default    => 'success',
+                        'qris' => 'warning',
+                        default => 'success',
                     }),
 
                 TextColumn::make('note')
@@ -106,7 +145,8 @@ class PaymentsRelationManager extends RelationManager
 
                 ImageColumn::make('proof_image')
                     ->label('Bukti')
-                    ->disk('public')
+                    ->state(fn($record) => $record->proof_image ? asset('storage/' . $record->proof_image) : null)
+                    ->disk(null)
                     ->square()
                     ->size(48)
                     ->defaultImageUrl(null),

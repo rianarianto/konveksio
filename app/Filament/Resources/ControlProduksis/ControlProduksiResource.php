@@ -89,11 +89,11 @@ class ControlProduksiResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->description(fn(OrderItem $record): string => match($record->production_category) {
-                        'custom'       => '🧵 Custom (Ukur Badan)',
+                    ->description(fn(OrderItem $record): string => match ($record->production_category) {
+                        'custom' => '🧵 Custom (Ukur Badan)',
                         'non_produksi' => '📦 Non-Produksi',
-                        'jasa'         => '🔧 Jasa',
-                        default        => '🏭 Produksi',
+                        'jasa' => '🔧 Jasa',
+                        default => '🏭 Produksi',
                     }),
 
                 TextColumn::make('quantity')
@@ -122,10 +122,10 @@ class ControlProduksiResource extends Resource
                     })
                     ->color(fn(string $state): string => match ($state) {
                         'Belum Diatur' => 'gray',
-                        'Antrian'      => 'warning',
-                        'Diproses'     => 'info',
-                        'Selesai'      => 'success',
-                        default        => 'gray',
+                        'Antrian' => 'warning',
+                        'Diproses' => 'info',
+                        'Selesai' => 'success',
+                        default => 'gray',
                     })
                     ->description(function (OrderItem $record) {
                         $tasks = $record->productionTasks;
@@ -152,20 +152,21 @@ class ControlProduksiResource extends Resource
             ->defaultGroup(
                 TableGroup::make('order.order_number')
                     ->label('Pesanan')
-                    ->getTitleFromRecordUsing(function (Model $record): string {
+                    ->getTitleFromRecordUsing(function (Model $record): HtmlString {
                         $order = $record->order;
                         $prefix = $order->is_express
                             ? '<span style="background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;margin-right:6px;">⚡ EXPRESS</span>'
                             : '';
-                        return $prefix . $order->order_number . ' — ' . ($order->customer->name ?? 'Tanpa Nama');
+                        return new HtmlString($prefix . $order->order_number . ' — ' . ($order->customer->name ?? 'Tanpa Nama'));
                     })
                     ->collapsible()
             )
-            ->modifyQueryUsing(fn($query) => $query
-                ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                ->orderByRaw('orders.is_express DESC')
-                ->orderBy('orders.deadline', 'asc')
-                ->select('order_items.*')
+            ->modifyQueryUsing(
+                fn($query) => $query
+                    ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                    ->orderByRaw('orders.is_express DESC')
+                    ->orderBy('orders.deadline', 'asc')
+                    ->select('order_items.*')
             )
             ->filters([
                 // Filters handled by Tabs in Manage page
@@ -192,7 +193,7 @@ class ControlProduksiResource extends Resource
                         $stageOrder = \App\Models\ProductionStage::pluck('order_sequence', 'name');
 
                         // Sort tugas berdasarkan order_sequence tahap, kemudian by id
-                        $sortedTasks = $tasks->sortBy(function($task) use ($stageOrder) {
+                        $sortedTasks = $tasks->sortBy(function ($task) use ($stageOrder) {
                             return [$stageOrder[$task->stage_name] ?? 999, $task->id];
                         });
 
@@ -228,7 +229,7 @@ class ControlProduksiResource extends Resource
                             $showStageLabel = $task->stage_name !== $prevStageName;
                             $prevStageName = $task->stage_name;
 
-                            $statusBadge = match($task->status) {
+                            $statusBadge = match ($task->status) {
                                 'pending' => '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">⏳ Antrian</span>',
                                 'in_progress' => '<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">🔨 Dikerjakan</span>',
                                 'done' => '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">✅ Selesai</span>',
@@ -899,8 +900,9 @@ class ControlProduksiResource extends Resource
                                     }
                                 }
                             }
-                            }
                         }
+
+                        // ─── Cek #2: Qty per ukuran per tahap tidak boleh melebihi kapasitas asli ──
                         if (!empty($originalSizes)) {
                             $errors = [];
                             foreach ($usedQtyPerStageSize as $stageName => $sizeUsage) {
@@ -976,13 +978,13 @@ class ControlProduksiResource extends Resource
                             // Tidak halt — admin mungkin sengaja assign bertahap
                         }
                         // ══════════════════════════════════════════════════════════════
-
+            
                         $existingTaskIds = [];
 
                         foreach ($tasksData as $taskItem) {
                             // Extract size_quantities which are dynamically generated inputs flattened by Fieldset
                             $sizeQuantities = [];
-                            
+
                             // The keys we want to grab depend on the item category
                             $sizesToLookFor = [];
                             if ($item->production_category === 'custom') {
@@ -997,28 +999,30 @@ class ControlProduksiResource extends Resource
                                 $details = $item->size_and_request_details ?? [];
                                 if (isset($details['sizes']) && is_array($details['sizes'])) {
                                     foreach ($details['sizes'] as $sz => $qty) {
-                                        if ((int)$qty > 0) $sizesToLookFor[] = strtoupper($sz);
+                                        if ((int) $qty > 0)
+                                            $sizesToLookFor[] = strtoupper($sz);
                                     }
                                 } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
                                     foreach ($details['varian_ukuran'] as $v) {
                                         $sz = strtoupper($v['ukuran'] ?? '');
-                                        if ($sz && (int)($v['qty'] ?? 0) > 0) $sizesToLookFor[] = $sz;
+                                        if ($sz && (int) ($v['qty'] ?? 0) > 0)
+                                            $sizesToLookFor[] = $sz;
                                     }
                                 }
                             }
 
                             // Extract these specific keys from $taskItem if they exist and are greater than 0
                             foreach ($sizesToLookFor as $key) {
-                                if (isset($taskItem[$key]) && (int)$taskItem[$key] > 0) {
-                                    $sizeQuantities[$key] = (int)$taskItem[$key];
+                                if (isset($taskItem[$key]) && (int) $taskItem[$key] > 0) {
+                                    $sizeQuantities[$key] = (int) $taskItem[$key];
                                 }
                             }
 
                             // Hitung quantity dari sizeQuantities yang sudah diekstrak (quantity field readOnly jadi tidak reliable)
                             $quantity = array_sum($sizeQuantities);
                             // Fallback ke field qty biasa (untuk item tanpa ukuran)
-                            if ($quantity === 0 && isset($taskItem['qty']) && (int)$taskItem['qty'] > 0) {
-                                $quantity = (int)$taskItem['qty'];
+                            if ($quantity === 0 && isset($taskItem['qty']) && (int) $taskItem['qty'] > 0) {
+                                $quantity = (int) $taskItem['qty'];
                             }
                             $wagePerPcs = (float) ($taskItem['wage_per_pcs'] ?? 0);
 

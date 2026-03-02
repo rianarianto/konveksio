@@ -37,6 +37,7 @@ use Filament\Forms\Components\Toggle;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 use Intervention\Image\Laravel\Facades\Image;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
@@ -286,13 +287,13 @@ class OrderResource extends Resource
                                                 return null; // Sembunyikan kalau belum ada desain
                                             }
                                             $url = asset('storage/' . $record->design_image);
-                                            $statusBadge = match($record->design_status ?? 'pending') {
-                                                'pending'  => '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;">⏳ Menunggu</span>',
+                                            $statusBadge = match ($record->design_status ?? 'pending') {
+                                                'pending' => '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;">⏳ Menunggu</span>',
                                                 'uploaded' => '<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;">📤 Diupload</span>',
                                                 'approved' => '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;">✅ Disetujui</span>',
-                                                default    => '',
+                                                default => '',
                                             };
-                                            return new \Illuminate\Support\HtmlString('
+                                            return new HtmlString('
                                                 <div style="border:1.5px solid #c4b5fd;border-radius:12px;overflow:hidden;background:#faf5ff;margin-bottom:4px;">
                                                     <div style="padding:8px 14px;background:#ede9fe;display:flex;align-items:center;gap:8px;">
                                                         <span style="font-size:15px;">🎨</span>
@@ -1160,82 +1161,82 @@ class OrderResource extends Resource
                                 ->default(0)
                                 ->columnSpanFull(),
 
-                            Group::make([
-                                TextInput::make('down_payment')
-                                    ->label('DP')
-                                    ->numeric()
-                                    ->prefix('Rp')
-                                    ->default(0)
-                                    ->live(),
+                            // Group::make([
+                            //     TextInput::make('down_payment')
+                            //         ->label('DP')
+                            //         ->numeric()
+                            //         ->prefix('Rp')
+                            //         ->default(0)
+                            //         ->live(),
 
-                                Placeholder::make('remaining_payment')
-                                    ->label('Sisa Tagihan')
-                                    ->content(function (Get $get): HtmlString {
-                                        $total = (int) $get('total_price') ?? 0;
-                                        $dp = (int) $get('down_payment') ?? 0;
-                                        $remaining = $total - $dp;
-                                        $color = $remaining > 0 ? 'text-danger-600' : 'text-success-600';
-                                        return new HtmlString(
-                                            '<span class="font-bold ' . $color . '" style="font-size:20px;">'
-                                            . 'Rp ' . number_format($remaining, 0, ',', '.')
-                                            . '</span>'
-                                        );
-                                    }),
-                            ])->columns(2),
+                            //     Placeholder::make('remaining_payment')
+                            //         ->label('Sisa Tagihan')
+                            //         ->content(function (Get $get): HtmlString {
+                            //             $total = (int) $get('total_price') ?? 0;
+                            //             $dp = (int) $get('down_payment') ?? 0;
+                            //             $remaining = $total - $dp;
+                            //             $color = $remaining > 0 ? 'text-danger-600' : 'text-success-600';
+                            //             return new HtmlString(
+                            //                 '<span class="font-bold ' . $color . '" style="font-size:20px;">'
+                            //                 . 'Rp ' . number_format($remaining, 0, ',', '.')
+                            //                 . '</span>'
+                            //             );
+                            //         }),
+                            // ])->columns(2),
 
-                            FileUpload::make('dp_proof')
-                                ->label('Bukti Pembayaran DP')
-                                ->image()
-                                ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
-                                ->maxSize(5120)
-                                ->disk('public')
-                                ->directory('dp-proofs')
-                                ->downloadable()
-                                ->openable()
-                                ->previewable()
-                                ->columnSpanFull()
-                                ->nullable()
-                                ->helperText('Upload foto/scan bukti transfer DP (maks. 5MB, otomatis dikompres ke max 1920px/75% quality)')
-                                ->getUploadedFileUsing(function (string $file): ?array {
-                                    $disk = Storage::disk('public');
-                                    if (!$disk->exists($file)) {
-                                        return null;
-                                    }
-                                    return [
-                                        'name' => basename($file),
-                                        'size' => $disk->size($file),
-                                        'type' => mime_content_type($disk->path($file)) ?: 'image/jpeg',
-                                        'url' => asset('storage/' . $file),
-                                    ];
-                                })
-                                ->saveUploadedFileUsing(function (TemporaryUploadedFile $file): string {
-                                    $mimeType = $file->getMimeType();
+                            // FileUpload::make('dp_proof')
+                            //     ->label('Bukti Pembayaran DP')
+                            //     ->image()
+                            //     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                            //     ->maxSize(5120)
+                            //     ->disk('public')
+                            //     ->directory('payments/proofs')
+                            //     ->downloadable()
+                            //     ->openable()
+                            //     ->previewable()
+                            //     ->columnSpanFull()
+                            //     ->nullable()
+                            //     ->helperText('Upload foto/scan bukti transfer DP (maks. 5MB, otomatis dikompres ke max 1920px/75% quality)')
+                            //     ->getUploadedFileUsing(function (string $file): ?array {
+                            //         $disk = Storage::disk('public');
+                            //         if (!$disk->exists($file)) {
+                            //             return null;
+                            //         }
+                            //         return [
+                            //             'name' => basename($file),
+                            //             'size' => $disk->size($file),
+                            //             'type' => mime_content_type($disk->path($file)) ?: 'image/jpeg',
+                            //             'url' => asset('storage/' . $file),
+                            //         ];
+                            //     })
+                            //     ->saveUploadedFileUsing(function (TemporaryUploadedFile $file): string {
+                            //         $mimeType = $file->getMimeType();
 
-                                    // PDF — simpan langsung tanpa kompres
-                                    if ($mimeType === 'application/pdf') {
-                                        $filename = Str::uuid() . '.pdf';
-                                        $path = 'dp-proofs/' . $filename;
-                                        Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
-                                        return $path;
-                                    }
+                            //         // PDF — simpan langsung tanpa kompres
+                            //         if ($mimeType === 'application/pdf') {
+                            //             $filename = Str::uuid() . '.pdf';
+                            //             $path = 'payments/proofs/' . $filename;
+                            //             Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
+                            //             return $path;
+                            //         }
 
-                                    // Gambar — kompres dengan Intervention Image
-                                    $img = Image::read($file->getRealPath());
+                            //         // Gambar — kompres dengan Intervention Image
+                            //         $img = Image::read($file->getRealPath());
 
-                                    // Resize jika lebar > 1920px (pertahankan aspek rasio)
-                                    if ($img->width() > 1920) {
-                                        $img->scaleDown(width: 1920);
-                                    }
+                            //         // Resize jika lebar > 1920px (pertahankan aspek rasio)
+                            //         if ($img->width() > 1920) {
+                            //             $img->scaleDown(width: 1920);
+                            //         }
 
-                                    // Encode ke JPEG quality 75
-                                    $encoded = $img->toJpeg(quality: 75);
+                            //         // Encode ke JPEG quality 75
+                            //         $encoded = $img->toJpeg(quality: 75);
 
-                                    $filename = Str::uuid() . '.jpg';
-                                    $path = 'dp-proofs/' . $filename;
-                                    Storage::disk('public')->put($path, (string) $encoded);
+                            //         $filename = Str::uuid() . '.jpg';
+                            //         $path = 'payments/proofs/' . $filename;
+                            //         Storage::disk('public')->put($path, (string) $encoded);
 
-                                    return $path;
-                                }),
+                            //         return $path;
+                            //     }),
                         ]),
                 ])
                     ->columnSpan(2),
@@ -1247,15 +1248,36 @@ class OrderResource extends Resource
                             Placeholder::make('summary_full')
                                 ->live()
                                 ->label(false)
-                                ->content(function (Get $get): HtmlString {
+                                ->content(function (Get $get, ?Order $record): HtmlString {
                                     $items = $get('orderItems') ?? [];
                                     $subtotal = (int) ($get('subtotal') ?? 0);
                                     $shipping = (int) ($get('shipping_cost') ?? 0);
                                     $tax = (int) ($get('tax') ?? 0);
                                     $discount = (int) ($get('discount') ?? 0);
                                     $total = (int) ($get('total_price') ?? 0);
-                                    $dp = (int) ($get('down_payment') ?? 0);
-                                    $remaining = $total - $dp;
+
+                                    // Hitung total bayar & sisa tagihan dari riwayat pembayaran
+                                    $totalPaid = 0;
+                                    $paymentsHtml = '';
+                                    if ($record) {
+                                        $payments = $record->payments()->orderBy('payment_date', 'asc')->get();
+                                        $totalPaid = $payments->sum('amount');
+
+                                        foreach ($payments as $index => $pay) {
+                                            $methodLabel = match ($pay->payment_method) {
+                                                'transfer' => '🏦',
+                                                'qris' => '📱',
+                                                default => '💵',
+                                            };
+                                            $label = "Bayar #" . ($index + 1) . " {$methodLabel}";
+                                            $paymentsHtml .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">'
+                                                . '<span style="color:#6b7280;font-size:13px;">' . $label . '</span>'
+                                                . '<span style="font-size:13px;color:#374151;">' . 'Rp ' . number_format($pay->amount, 0, ',', '.') . '</span>'
+                                                . '</div>';
+                                        }
+                                    }
+
+                                    $remaining = $total - $totalPaid;
 
                                     $fmt = fn(int $v) => 'Rp ' . number_format($v, 0, ',', '.');
 
@@ -1323,7 +1345,14 @@ class OrderResource extends Resource
                                     $html .= $row('Diskon', $fmt($discount));
                                     $html .= $divider;
                                     $html .= $row('Total', $fmt($total), true, true);
-                                    $html .= $row('DP', $fmt($dp));
+
+                                    // Tampilkan riwayat pembayaran jika ada
+                                    if ($paymentsHtml) {
+                                        $html .= $paymentsHtml;
+                                    } else {
+                                        $html .= $row('Total Bayar', 'Rp 0');
+                                    }
+
                                     $html .= $divider;
                                     $html .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">';
                                     $html .= '<span style="color:#6b7280;font-size:14px;">Sisa</span>';
@@ -1655,7 +1684,7 @@ class OrderResource extends Resource
         return $table
             ->recordTitleAttribute('order_number')
             ->query(
-                \App\Models\Order::query()
+                Order::query()
                     ->with(['customer', 'orderItems.productionTasks', 'payments'])
             )
             ->columns([
@@ -1667,7 +1696,7 @@ class OrderResource extends Resource
                     ->sortable()
                     ->html()
                     ->extraCellAttributes(['style' => 'vertical-align:top;'])
-                    ->state(function (\App\Models\Order $record): string {
+                    ->state(function (Order $record): string {
                         $expressHtml = $record->is_express
                             ? '<span style="display:inline-flex;align-items:center;gap:3px;background:#ef4444;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;margin-bottom:5px;vertical-align:middle;">⚡ EXPRESS</span> '
                             : '';
@@ -1687,9 +1716,9 @@ class OrderResource extends Resource
 
                         $phoneLine = $phone
                             ? '<div style="margin-top:5px;display:flex;align-items:center;gap:4px;font-size:12px;color:#6b7280;">'
-                              . '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="#25D366" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.297-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.998 0C5.372 0 0 5.373 0 12.001c0 2.117.554 4.1 1.523 5.823L0 24l6.335-1.508A11.944 11.944 0 0 0 11.998 24C18.626 24 24 18.627 24 12.001 24 5.373 18.626 0 11.998 0zm0 21.818a9.81 9.81 0 0 1-5.006-1.367l-.359-.214-3.721.976.994-3.634-.235-.374a9.819 9.819 0 0 1-1.504-5.204c0-5.42 4.409-9.83 9.83-9.83 5.42 0 9.83 4.41 9.83 9.83 0 5.422-4.41 9.817-9.83 9.817z"/></svg>'
-                              . htmlspecialchars($phone)
-                              . '</div>'
+                            . '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="#25D366" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.297-.497.1-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.998 0C5.372 0 0 5.373 0 12.001c0 2.117.554 4.1 1.523 5.823L0 24l6.335-1.508A11.944 11.944 0 0 0 11.998 24C18.626 24 24 18.627 24 12.001 24 5.373 18.626 0 11.998 0zm0 21.818a9.81 9.81 0 0 1-5.006-1.367l-.359-.214-3.721.976.994-3.634-.235-.374a9.819 9.819 0 0 1-1.504-5.204c0-5.42 4.409-9.83 9.83-9.83 5.42 0 9.83 4.41 9.83 9.83 0 5.422-4.41 9.817-9.83 9.817z"/></svg>'
+                            . htmlspecialchars($phone)
+                            . '</div>'
                             : '';
 
                         return $orderNum . '<div>' . $nameBadge . '</div>' . $phoneLine;
@@ -1702,9 +1731,9 @@ class OrderResource extends Resource
                     ->sortable()
                     ->html()
                     ->extraCellAttributes(['style' => 'vertical-align:top;'])
-                    ->state(function (\App\Models\Order $record): string {
-                        $masuk = $record->order_date?->format('d M Y') ?? '—';
-                        $deadline = $record->deadline?->format('d M Y') ?? '—';
+                    ->state(function (Order $record): string {
+                        $masuk = $record->order_date instanceof Carbon ? $record->order_date->format('d M Y') : ($record->order_date ? date('d M Y', strtotime($record->order_date)) : '—');
+                        $deadline = $record->deadline instanceof Carbon ? $record->deadline->format('d M Y') : ($record->deadline ? date('d M Y', strtotime($record->deadline)) : '—');
 
                         $days = $record->deadline
                             ? now()->startOfDay()->diffInDays($record->deadline, false)
@@ -1737,11 +1766,11 @@ class OrderResource extends Resource
                     ->sortable()
                     ->html()
                     ->extraCellAttributes(['style' => 'vertical-align:top;'])
-                    ->state(function (\App\Models\Order $record): string {
-                        $total  = (int) $record->total_price;
-                        $paid   = (int) $record->payments->sum('amount');
-                        $sisa   = max(0, $total - $paid);
-                        $lunas  = $sisa === 0;
+                    ->state(function (Order $record): string {
+                        $total = (int) $record->total_price;
+                        $paid = (int) $record->payments->sum('amount');
+                        $sisa = max(0, $total - $paid);
+                        $lunas = $sisa === 0;
 
                         $sisaColor = $lunas ? '#16a34a' : '#7c3aed';
 
@@ -1767,7 +1796,7 @@ class OrderResource extends Resource
                     ->searchable(false)
                     ->html()
                     ->extraCellAttributes(['style' => 'vertical-align:top;'])
-                    ->state(function (\App\Models\Order $record): string {
+                    ->state(function (Order $record): string {
                         $items = $record->orderItems;
 
                         if ($items->isEmpty()) {
@@ -1776,20 +1805,20 @@ class OrderResource extends Resource
 
                         $html = '';
                         foreach ($items as $item) {
-                            $cat = match($item->production_category) {
-                                'custom'       => ['🧵 Custom',       'rgba(99,102,241,0.12)',  '#6366f1'],
+                            $cat = match ($item->production_category) {
+                                'custom' => ['🧵 Custom', 'rgba(99,102,241,0.12)', '#6366f1'],
                                 'non_produksi' => ['📦 Non-Produksi', 'rgba(245,158,11,0.12)', '#d97706'],
-                                'jasa'         => ['🔧 Jasa',          'rgba(16,185,129,0.12)', '#059669'],
-                                default        => ['🏭 Produksi',      'rgba(124,58,237,0.10)', '#7c3aed'],
+                                'jasa' => ['🔧 Jasa', 'rgba(16,185,129,0.12)', '#059669'],
+                                default => ['🏭 Produksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
                             };
 
-                            $catBadge = '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:' . $cat[1] . ';color:' . $cat[2] . ';">'. $cat[0] . '</span>';
+                            $catBadge = '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:' . $cat[1] . ';color:' . $cat[2] . ';">' . $cat[0] . '</span>';
 
                             // Progress bar
                             $tasks = $item->productionTasks;
                             $total = $tasks->count();
-                            $done  = $tasks->where('status', 'done')->count();
-                            $pct   = $total > 0 ? round(($done / $total) * 100) : 0;
+                            $done = $tasks->where('status', 'done')->count();
+                            $pct = $total > 0 ? round(($done / $total) * 100) : 0;
 
                             if ($total === 0) {
                                 $statusText = '<span style="font-size:11px;color:#9ca3af;">Belum Diproses</span>';
@@ -1836,13 +1865,14 @@ class OrderResource extends Resource
                 SelectFilter::make('tipe_produk')
                     ->label('Tipe Produk')
                     ->options([
-                        'produksi'     => '🏭 Produksi',
-                        'custom'       => '🧵 Custom',
+                        'produksi' => '🏭 Produksi',
+                        'custom' => '🧵 Custom',
                         'non_produksi' => '📦 Non-Produksi',
-                        'jasa'         => '🔧 Jasa',
+                        'jasa' => '🔧 Jasa',
                     ])
                     ->query(function (Builder $query, array $data): Builder {
-                        if (!$data['value']) return $query;
+                        if (!$data['value'])
+                            return $query;
                         return $query->whereHas('orderItems', fn($q) => $q->where('production_category', $data['value']));
                     }),
             ])
@@ -1852,7 +1882,7 @@ class OrderResource extends Resource
                     ->label('Detail')
                     ->icon('heroicon-o-eye')
                     ->color('warning')
-                    ->url(fn(\App\Models\Order $record) => static::getUrl('edit', ['record' => $record])),
+                    ->url(fn(Order $record) => static::getUrl('edit', ['record' => $record])),
 
                 \Filament\Actions\ActionGroup::make([
                     EditAction::make(),

@@ -13,6 +13,7 @@ use Livewire\Attributes\On;
 
 class KeuanganStatsWidget extends BaseWidget
 {
+    protected static ?int $sort = 2;
     #[On('refreshStats')]
     public function refresh()
     {
@@ -31,20 +32,20 @@ class KeuanganStatsWidget extends BaseWidget
 
         // 2. Uang Masuk Hari Ini
         $uangMasukHariIni = Payment::whereHas('order', fn($q) => $q->where('shop_id', $tenantId))
-                                   ->whereDate('payment_date', Carbon::today())
-                                   ->sum('amount');
+            ->whereDate('payment_date', Carbon::today())
+            ->sum('amount');
 
         // 3. Saldo Kas Kecil Bulan Ini
         $paymentsBulanIni = Payment::whereHas('order', fn($q) => $q->where('shop_id', $tenantId))
-                                   ->whereMonth('payment_date', Carbon::now()->month)
-                                   ->whereYear('payment_date', Carbon::now()->year)
-                                   ->sum('amount');
-        
+            ->whereMonth('payment_date', Carbon::now()->month)
+            ->whereYear('payment_date', Carbon::now()->year)
+            ->sum('amount');
+
         $expensesBulanIni = Expense::where('shop_id', $tenantId)
-                                   ->whereMonth('expense_date', Carbon::now()->month)
-                                   ->whereYear('expense_date', Carbon::now()->year)
-                                   ->sum('amount');
-                                   
+            ->whereMonth('expense_date', Carbon::now()->month)
+            ->whereYear('expense_date', Carbon::now()->year)
+            ->sum('amount');
+
         $saldoKasKecil = $paymentsBulanIni - $expensesBulanIni;
 
         return [

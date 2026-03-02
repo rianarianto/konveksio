@@ -52,10 +52,9 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 \Filament\Pages\Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
-                AccountWidget::class,
-                FilamentInfoWidget::class,
+                \App\Filament\Widgets\AktivitasUtamaWidget::class,
+                \App\Filament\Widgets\DashboardRow2Widget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

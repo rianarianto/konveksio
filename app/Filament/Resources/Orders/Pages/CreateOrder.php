@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Orders\Pages;
 
 use App\Filament\Resources\Orders\OrderResource;
+use App\Models\Payment;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -15,10 +16,11 @@ class CreateOrder extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['shop_id'] = Filament::getTenant()->id;
-        $data['status'] = 'diterima'; // Default: belum diproses
+        $data['status'] = 'diterima';
 
         return $data;
     }
+
     protected function getCreateFormAction(): \Filament\Actions\Action
     {
         return parent::getCreateFormAction()
