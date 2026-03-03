@@ -664,11 +664,19 @@ class ControlProduksiResource extends Resource
 
                                             // Recalculate Total Qty from all size inputs
                                             $recalcQty = function (Get $get, Set $set) {
-                                                $sizeQty = $get('size_quantities') ?? [];
+                                                $excludeKeys = ['id', 'stage_name', 'assigned_to', 'wage_per_pcs', 'quantity', 'description', '_fill_all', 'qty'];
                                                 $total = 0;
-                                                if (is_array($sizeQty)) {
-                                                    foreach ($sizeQty as $v) {
-                                                        $total += (int) $v;
+                                                // Because Fieldset flattens the schema, $get('') from a sub-field or using a key gets the flattened array of the Repeater row
+                                                // So we must manually check all keys in the current repeater item's state
+                                                // Filament's $get('../') from within the fieldset usually just gives the repeater row if we use specific keys
+                                                // However, since we define fields dynamically, they are at the ROOT of the repeater item.
+                                                // We can grab the whole item state by getting relative path ''
+                                                $state = $get('');
+                                                if (is_array($state)) {
+                                                    foreach ($state as $k => $v) {
+                                                        if (!in_array($k, $excludeKeys) && is_numeric($v)) {
+                                                            $total += (int)$v;
+                                                        }
                                                     }
                                                 }
                                                 $set('quantity', $total > 0 ? $total : 0);
@@ -708,11 +716,11 @@ class ControlProduksiResource extends Resource
                                                     ->label('✓ Kerjakan semua (' . count($people) . ' orang)')
                                                     ->dehydrated(false)
                                                     ->live()
-                                                    ->afterStateUpdated(function (bool $state, Set $set) use ($people) {
+                                                    ->afterStateUpdated(function (bool $state, Set $set, Get $get) use ($people, $recalcQty) {
                                                     foreach ($people as $p) {
                                                         $set($p['key'], $state ? 1 : 0);
                                                     }
-                                                    $set('quantity', $state ? count($people) : 0);
+                                                    $recalcQty($get, $set);
                                                 })
                                                     ->columnSpanFull();
 
@@ -771,11 +779,11 @@ class ControlProduksiResource extends Resource
                                                         ->label('✓ Kerjakan semua ukuran (total: ' . $totalStok . ' pcs)')
                                                         ->dehydrated(false)
                                                         ->live()
-                                                        ->afterStateUpdated(function (bool $state, Set $set) use ($sizes) {
+                                                        ->afterStateUpdated(function (bool $state, Set $set, Get $get) use ($sizes, $recalcQty) {
                                                         foreach ($sizes as $sizeName => $maxQty) {
                                                             $set($sizeName, $state ? $maxQty : 0);
                                                         }
-                                                        $set('quantity', $state ? array_sum($sizes) : 0);
+                                                        $recalcQty($get, $set);
                                                     })
                                                         ->columnSpanFull();
 
@@ -820,7 +828,9 @@ class ControlProduksiResource extends Resource
                                                         ->minValue(0)
                                                         ->default(0)
                                                         ->live(debounce: 300)
-                                                        ->afterStateUpdated($recalcQty);
+                                                        ->afterStateUpdated(function($state, Set $set, Get $get) use ($recalcQty){
+                                                            $recalcQty($get, $set);
+                                                        });
                                                 }
                                             }
 
@@ -862,8 +872,11 @@ class ControlProduksiResource extends Resource
                                     $originalSizes[$sz] = (int) $v['qty'];
                             }
                         } elseif ($category === 'custom' && !empty($details['detail_custom'])) {
-                            // Kategori custom: qty = jumlah orang
-                            $originalSizes['CUSTOM'] = count($details['detail_custom']);
+                            // Kategori custom: qty = jumlah orang (nama)
+                            foreach ($details['detail_custom'] as $index => $u) {
+                                $person = strtoupper($u['nama'] ?? 'Person ' . ($index + 1));
+                                $originalSizes[$person] = 1;
+                            }
                         }
                         $totalOrderQty = $item->quantity ?? 0;
 
@@ -876,7 +889,24 @@ class ControlProduksiResource extends Resource
             
                         foreach ($tasksData as $idx => $taskItem) {
                             $stage = $taskItem['stage_name'] ?? null;
-                            $qty = (int) ($taskItem['quantity'] ?? 0);
+                            
+                            $calculatedQty = 0;
+                            $sqs = [];
+                            $excludeKeys = ['id', 'stage_name', 'assigned_to', 'wage_per_pcs', 'quantity', 'description', '_fill_all', 'qty'];
+                            foreach ($taskItem as $k => $v) {
+                                if (!in_array($k, $excludeKeys) && is_numeric($v) && (int)$v > 0) {
+                                    $calculatedQty += (int) $v;
+                                    $sqs[$k] = (int) $v;
+                                }
+                            }
+                            if ($calculatedQty === 0 && isset($taskItem['qty']) && (int)$taskItem['qty'] > 0) {
+                                $calculatedQty = (int)$taskItem['qty'];
+                            }
+                            if ($calculatedQty === 0 && isset($taskItem['quantity']) && (int)$taskItem['quantity'] > 0) {
+                                $calculatedQty = (int)$taskItem['quantity'];
+                            }
+                            
+                            $qty = $calculatedQty;
 
                             // ─── Cek #1: Setiap baris wajib punya qty > 0 ─────────────
                             if ($qty === 0) {
@@ -892,12 +922,9 @@ class ControlProduksiResource extends Resource
                                 $assignedStages[] = $stage;
                                 $usedQtyPerStage[$stage] = ($usedQtyPerStage[$stage] ?? 0) + $qty;
 
-                                $sqs = $taskItem['size_quantities'] ?? [];
-                                if (is_array($sqs)) {
-                                    foreach ($sqs as $key => $val) {
-                                        $upperKey = strtoupper($key);
-                                        $usedQtyPerStageSize[$stage][$upperKey] = ($usedQtyPerStageSize[$stage][$upperKey] ?? 0) + (int) $val;
-                                    }
+                                foreach ($sqs as $key => $val) {
+                                    $upperKey = strtoupper($key);
+                                    $usedQtyPerStageSize[$stage][$upperKey] = ($usedQtyPerStageSize[$stage][$upperKey] ?? 0) + (int) $val;
                                 }
                             }
                         }
@@ -949,12 +976,13 @@ class ControlProduksiResource extends Resource
                         }
                         if (!empty($underAssignedWarnings)) {
                             \Filament\Notifications\Notification::make()
-                                ->title('⚠️ Qty Belum Lengkap')
+                                ->title('❌ Qty Belum Lengkap')
                                 ->body(new \Illuminate\Support\HtmlString(
-                                    'Data disimpan, namun qty beberapa tahap belum mencapai total order:<br>' . implode('<br>', $underAssignedWarnings)
+                                    'Total penugasan belum mencapai total order:<br>' . implode('<br>', $underAssignedWarnings)
                                 ))
-                                ->warning()->persistent()->send();
-                            // Tidak halt — hanya peringatan, data tetap disimpan
+                                ->danger()->persistent()->send();
+                            $action->halt();
+                            return;
                         }
 
                         // ─── Cek #5 (Warning): Pastikan tahapan yang diperlukan sudah ada ─────────
@@ -970,12 +998,13 @@ class ControlProduksiResource extends Resource
                         $missingStages = array_diff($requiredStageNames, array_unique($assignedStages));
                         if (!empty($missingStages)) {
                             \Filament\Notifications\Notification::make()
-                                ->title('⚠️ Tahapan Belum Lengkap')
+                                ->title('❌ Tahapan Belum Lengkap')
                                 ->body(new \Illuminate\Support\HtmlString(
-                                    'Data disimpan, namun tahapan berikut belum di-assign:<br><strong>' . implode(', ', $missingStages) . '</strong>'
+                                    'Penyimpanan dibatalkan, tahapan berikut wajib di-assign:<br><strong>' . implode(', ', $missingStages) . '</strong>'
                                 ))
-                                ->warning()->persistent()->send();
-                            // Tidak halt — admin mungkin sengaja assign bertahap
+                                ->danger()->persistent()->send();
+                            $action->halt();
+                            return;
                         }
                         // ══════════════════════════════════════════════════════════════
             
@@ -1066,6 +1095,13 @@ class ControlProduksiResource extends Resource
                                 $order->update(['status' => 'antrian']);
                             }
                         }
+
+                        // Emit success notification!
+                        \Filament\Notifications\Notification::make()
+                            ->title('Berhasil Diatur')
+                            ->body('Tugas produksi berhasil diteapkan dan disimpan.')
+                            ->success()
+                            ->send();
                     })
             ])
             ->bulkActions([

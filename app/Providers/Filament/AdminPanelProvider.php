@@ -55,6 +55,7 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 \App\Filament\Widgets\AktivitasUtamaWidget::class,
                 \App\Filament\Widgets\DashboardRow2Widget::class,
+                \App\Filament\Widgets\DashboardRow3Widget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

@@ -34,7 +34,7 @@ class DashboardRow2Widget extends Widget
         ])
             ->whereHas('orderItem.order', fn($q) => $q->where('shop_id', $tenantId))
             ->latest('updated_at')
-            ->take(5)
+            ->take(4)
             ->get();
 
         $activities = $tasks->map(function ($task) {

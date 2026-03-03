@@ -73,6 +73,15 @@
             justify-content: center;
         }
 
+        @media (max-width: 640px) {
+            .r2-card-header .r2-icon-wrap {
+                display: none;
+            }
+            .r2-cashflow-title {
+                margin-top: 8px; /* Compensate for removed icon space */
+            }
+        }
+
         .r2-icon-wrap svg {
             width: 18px;
             height: 18px;
@@ -83,6 +92,14 @@
             display: flex;
             gap: 32px;
             align-items: center;
+        }
+
+        @media (max-width: 640px) {
+            .r2-cashflow-inner {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 24px;
+            }
         }
 
         .r2-cashflow-title {
@@ -100,12 +117,13 @@
         }
 
         .r2-metric-value {
-            font-size: 32px;
+            font-size: 42px;
             font-weight: 600;
             color: #171717;
             letter-spacing: -0.5px;
             margin-bottom: 20px;
             line-height: 1.1;
+            word-break: break-word; /* Prevent long numbers from overflowing */
         }
 
         /* ─── DONUT CHART ─── */
@@ -114,6 +132,18 @@
             position: relative;
             width: 200px;
             height: 200px;
+            margin: 0 auto; /* Center on mobile when column flex */
+        }
+
+        @media (max-width: 640px) {
+            .r2-donut-wrap {
+                width: 160px;
+                height: 160px;
+            }
+            .r2-donut-wrap svg {
+                width: 160px;
+                height: 160px;
+            }
         }
 
         .r2-donut-wrap svg {
@@ -126,6 +156,12 @@
             display: flex;
             flex-direction: column;
             gap: 6px;
+        }
+
+        @media (max-width: 640px) {
+            .r2-donut-legend {
+                align-items: center; /* Center legend text on mobile */
+            }
         }
 
         .r2-legend-item {
@@ -175,11 +211,27 @@
             justify-content: space-between;
             align-items: center;
             gap: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        @media (max-width: 640px) {
+            .r2-act-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+
+        .r2-act-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
         }
 
         .r2-act-info {
             flex: 1;
             min-width: 0;
+            width: 100%;
         }
 
         .r2-act-invoice {
@@ -195,6 +247,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            max-width: 100%;
         }
 
         .r2-badge {
@@ -219,44 +272,44 @@
     <div class="r2-grid">
         {{-- ═══ LEFT: Arus Kas (Cashflow) ═══ --}}
         <div class="r2-card">
-            <div class="r2-card-header">
-                <div class="r2-icon-wrap">
-                    <svg fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="m4.5 19.5 15-15m0 0H8.25m11.25 0v11.25" />
-                    </svg>
-                </div>
-            </div>
-
+            
             <div class="r2-cashflow-inner">
                 {{-- Metrics --}}
-                <div style="flex:1">
+                <div style="flex:1; width: 100%;">
+                    <div class="r2-card-header">
+                        <div class="r2-icon-wrap">
+                            <svg fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="m4.5 19.5 15-15m0 0H8.25m11.25 0v11.25" />
+                            </svg>
+                        </div>
+                    </div>
                     <div class="r2-cashflow-title">Arus Kas (Cashflow)</div>
                     <div class="r2-metric-label">Total Piutang</div>
                     <div class="r2-metric-value">IDR {{ number_format($piutang, 0, ',', '.') }}</div>
-                    <div class="r2-metric-label">Pemasukan Hari Ini</div>
+                    <div class="r2-metric-label">Pendapatan Hari Ini</div>
                     <div class="r2-metric-value">IDR
                         {{ number_format($pemasukan, 0, ',', '.') }}
                     </div>
                 </div>
 
                 {{-- Donut Chart --}}
-                <div>
-                    <div class="r2-donut-wrap">
+                <div style="flex:1; width: 100%; display: flex; flex-direction: column; align-items: center;">
+                    <div class="r2-donut-wrap" style="justify-self: center;">
                         {{-- viewBox 140x140, center (70,70), r=54 → outer edge=54+8=62 → 70-62=8px padding. All edges
                         safe! --}}
                         <svg viewBox="0 0 140 140" width="200" height="200">
                             {{-- Background track --}}
-                            <circle cx="70" cy="70" r="54" fill="none" stroke="#e9d5ff" stroke-width="16" />
+                            <circle cx="70" cy="70" r="54" fill="none" stroke="#e9d5ff" stroke-width="28" />
                             {{-- Pemasukan segment (purple) --}}
                             @if($pemasukanDash > 0)
-                                <circle cx="70" cy="70" r="54" fill="none" stroke="#7c3aed" stroke-width="16"
+                                <circle cx="70" cy="70" r="54" fill="none" stroke="#7c3aed" stroke-width="28"
                                     stroke-dasharray="{{ $pemasukanDash }} {{ $circumference - $pemasukanDash }}"
                                     stroke-dashoffset="0" stroke-linecap="round" />
                             @endif
                         </svg>
                     </div>
-                    <div class="r2-donut-legend">
+                    <div class="r2-donut-legend" style="justify-self: center;">
                         <div class="r2-legend-item">
                             <div class="r2-legend-dot" style="background:#7c3aed"></div>
                             <span>Pendapatan Hari Ini</span>
