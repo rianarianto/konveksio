@@ -10,6 +10,7 @@ class Shop extends Model
         'name',
         'address',
         'phone',
+        'max_capacity_pcs',
     ];
 
     public function users()

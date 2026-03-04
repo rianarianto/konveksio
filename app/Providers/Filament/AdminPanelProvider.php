@@ -29,7 +29,6 @@ class AdminPanelProvider extends PanelProvider
             ->path('app')
             ->tenant(\App\Models\Shop::class)
             ->tenantRegistration(\App\Filament\Pages\Tenancy\RegisterShop::class)
-            ->tenantProfile(\App\Filament\Pages\Tenancy\EditTenantProfile::class)
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
             ->colors([
                 'primary' => [
@@ -53,6 +52,7 @@ class AdminPanelProvider extends PanelProvider
                 \Filament\Pages\Dashboard::class,
             ])
             ->widgets([
+                \App\Filament\Widgets\OwnerFinanceStatsWidget::class,
                 \App\Filament\Widgets\AktivitasUtamaWidget::class,
                 \App\Filament\Widgets\DashboardRow2Widget::class,
                 \App\Filament\Widgets\DashboardRow3Widget::class,
@@ -82,12 +82,19 @@ class AdminPanelProvider extends PanelProvider
                     <link rel="stylesheet" href="' . asset('css/custom-login.css') . '">
                     ' . \Illuminate\Support\Facades\Blade::render('@vite("resources/css/app.css")') . '
                     <style>
+                        /* Disable click for admin & designer */
+                        ' . (auth()->check() && in_array(auth()->user()->role, ['admin', 'designer']) ? '
+                        .fi-tenant-menu {
+                            pointer-events: none !important;
+                            cursor: default !important;
+                        }
+                        ' : '') . '
+
+                        /* Global table vertical alignment */
+                        .fi-ta-table td { vertical-align: top !important; }
+
                         /* Tombol actions tabel rata atas */
                         .fi-ta-record-actions { vertical-align: top !important; }
-                        table td:last-child { vertical-align: top !important; }
-                        /* Checkbox bulk select rata atas */
-                        .fi-ta-checkbox-column { vertical-align: top !important; }
-                        table td:first-child { vertical-align: top !important; }
 
                         /* Custom Piutang Table UI Overrides */
                         .custom-piutang-pill {
@@ -116,9 +123,9 @@ class AdminPanelProvider extends PanelProvider
             )
             ->userMenuItems([
                 'profile' => \Filament\Navigation\MenuItem::make()
-                    ->label('Edit Profile')
-                    ->url(fn(): string => filament()->getTenant() ? \App\Filament\Pages\EditProfile::getUrl() : '#')
-                    ->icon('heroicon-o-user-circle')
+                    ->label('Shop Settings')
+                    ->url(fn(): string => filament()->getTenant() ? \App\Filament\Resources\Shops\ShopResource::getUrl('edit', ['record' => filament()->getTenant()]) : '#')
+                    ->icon('heroicon-o-cog-6-tooth')
                     ->visible(fn(): bool => filament()->getTenant() !== null),
                 'manage_shops' => \Filament\Navigation\MenuItem::make()
                     ->label('Manage All Shops')

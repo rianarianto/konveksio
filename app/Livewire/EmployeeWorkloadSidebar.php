@@ -3,10 +3,12 @@
 namespace App\Livewire;
 
 use Livewire\Component;
-use App\Models\User;
+use App\Models\Worker;
 
 class EmployeeWorkloadSidebar extends Component
 {
+    public $search = '';
+
     public function render()
     {
         $tenant = \Filament\Facades\Filament::getTenant();
@@ -14,13 +16,26 @@ class EmployeeWorkloadSidebar extends Component
             $employees = collect();
         } else {
             $shopId = $tenant->id;
-            
-            $employees = User::where('shop_id', $shopId)
-                ->withSum(['assignedProductionTasks as active_workload' => function($query) {
-                    $query->whereIn('status', ['pending', 'in_progress']);
-                }], 'quantity')
+
+            $employees = Worker::where('shop_id', $shopId)
+                ->where('is_active', true)
+                ->when($this->search, fn($q) => $q->where('name', 'like', '%' . $this->search . '%'))
+                ->withSum([
+                    'productionTasks as in_progress_qty' => function ($query) {
+                        $query->where('status', 'in_progress');
+                    }
+                ], 'quantity')
+                ->withSum([
+                    'productionTasks as pending_qty' => function ($query) {
+                        $query->where('status', 'pending');
+                    }
+                ], 'quantity')
                 ->get()
-                ->filter(fn ($u) => ($u->active_workload ?? 0) > 0)
+                ->map(function ($w) {
+                    $w->active_workload = ($w->in_progress_qty ?? 0) + ($w->pending_qty ?? 0);
+                    return $w;
+                })
+                ->filter(fn($w) => $w->active_workload > 0)
                 ->sortByDesc('active_workload');
         }
 

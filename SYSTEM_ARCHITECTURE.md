@@ -48,6 +48,27 @@ Saat Admin menginput sebuah item pesanan (`OrderItem`), sistem membaginya ke dal
 Sistem memiliki urutan *state machine* (*status tracker*) antara model *Order* dan *OrderItem*:
 
 1. **Pembuatan Pesanan**: Admin input di form `OrderResource`. Status Pesanan: `diterima`. Status Desain (*Item-Level*): `pending`.
+
+---
+
+## 5. Panduan Pengembangan Berbasis AI (AI Guidelines)
+
+Bagian ini ditujukan bagi asisten AI (dan *developer*) untuk memahami batasan lingkungan pengembangan saat ini guna menghindari kerusakan tampilan (*UI breakage*).
+
+### A. Kendala Build CSS (Vite/Tailwind)
+**PENTING**: Lingkungan pengembangan saat ini memiliki batasan keamanan (Execution Policy) yang mencegah eksekusi perintah `npm run build` atau `npm run dev`.
+- **Dampak**: Menambahkan *class* Tailwind baru yang belum pernah digunakan sebelumnya tidak akan muncul di browser karena file CSS final tidak bisa diperbarui secara otomatis.
+- **Instruksi untuk AI**: 
+  - Gunakan **Inline Styles** (Atribut `style="..."`) untuk dekorasi layout dan elemen kustom pada file `.blade.php`.
+  - Jangan mengandalkan *class* Tailwind baru untuk perubahan UI yang sifatnya mendesak atau krusial.
+
+### B. Styling & Konsistensi UI
+- **Warna Dasar**: Gunakan kode Hex atau warna standar Tailwind yang sudah ada (misal: `#7F00FF` untuk ungu, `#666666` untuk teks abu-abu gelap).
+- **Badge & Status**: Pastikan badge status (seperti Express, Aktif, Antrian) memiliki desain yang konsisten (teks tebal, warna latar kontras rendah, teks kontras tinggi).
+
+### C. Multi-Tenancy
+- Selalu gunakan `shop_id` untuk setiap query data utama demi keamanan data antar toko.
+- Gunakan `\Filament\Facades\Filament::getTenant()->id` untuk mengambil ID toko yang sedang aktif. 
 2. **Approval Desain**: Designer masuk ke `DesignTaskResource`, mengunduh *brief*, dan menggunggah gambar final. Setelah disimpan, *Item-Level design_status* otomatis berubah jadi `approved`.
    *(Jika seluruh item dalam order telah 'approved', Status Induk Order akan otomatis naik kelas dari `diterima` menjadi `antrian`).*
 3. **Kontrol Produksi (Grouped Table UI)**: Pemantauan kerja dipusatkan di halaman `ManageControlProduksis`. Base model diubah ke `OrderItem::class` agar data dapat dikelompokkan secara native oleh Filament menggunakan `->defaultGroup(TableGroup::make('order.order_number'))`. Tabel menampilkan kolom per produk (Nama, Qty, Kategori, Deadline, Status Produksi) dengan setiap grup bisa di-*collapse*. Widget ProduksiStats tetap di atas sebagai ringkasan.
@@ -94,3 +115,14 @@ Dashboard admin menggunakan **2 baris widget** dengan data real dinamis per tena
 ---
 
 *File ini adalah pusat sumber panduan awal (Cheat Sheet). Silakan perbarui file ini jika di kemudian hari dilakukan pemecahan monolitik menjadi microservices atau refaktor besar-besaran.*
+
+## Owner Finance Widgets & Shop Unification
+### Widget Architecture
+- **OwnerFinanceStatsWidget**: Menggunakan height: 100% dan lex-direction: column untuk layout yang seimbang.
+- **Piutang Macet Logic**: Menggunakan logika tren terbalik (Warna Danger jika nilai Piutang hari ini > dari bulan lalu).
+- **Workshop Load Logic**: Dihitung dari Total Pcs Aktif (sum of quantity order items dengan status dikerjakan) berbanding dengan max_capacity_pcs milik tenant (Shop).
+
+### Multi-tenancy & Shop Settings
+- **Shop Settings Centralization**: Fitur 	enantProfile bawaan Filament dimatikan untuk menghindari halaman ganda. Pengaturan toko kini dipusatkan di ShopResource.
+- **User Menu Extension**: Menambahkan menu "Shop Settings" secara dinamis di pojok kanan atas yang langsung mengarah ke halaman edit toko yang sedang aktif.
+

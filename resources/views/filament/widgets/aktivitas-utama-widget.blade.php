@@ -48,7 +48,7 @@
         .au-label {
             font-size: 14px;
             font-weight: 500;
-            color: #a3a3a3;
+            color: #666666;
             line-height: 1.4;
             max-width: 75%;
         }

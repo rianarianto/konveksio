@@ -20,8 +20,8 @@
             {{-- Beban Produksi --}}
             <div class="flex-1 flex flex-col justify-between rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 p-4 sm:p-6 shadow-sm min-w-0">
                 {{-- Judul & Ikon --}}
-                <div class="flex justify-between items-start gap-2">
-                    <p class="text-sm sm:text-base font-medium text-gray-400 dark:text-gray-500 truncate">Beban Produksi</p>
+                <div class="flex justify-between items-start">
+                    <p class="text-sm sm:text-base font-medium text-gray-800 dark:text-gray-500 truncate">Beban Produksi</p>
                     <div class="h-8 w-8 shrink-0 rounded-full border border-gray-200 dark:border-white/10 hidden sm:flex items-center justify-center text-primary-600 dark:text-primary-400">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 19.5 15-15m0 0H8.25m11.25 0v11.25" />
@@ -31,8 +31,8 @@
 
                 {{-- Angka Besar --}}
                 <div class="mt-3 mb-3">
-                    <span class="text-5xl sm:text-4xl lg:text-4xl font-light text-gray-700 dark:text-white">{{ number_format($totalBeban) }}</span>
-                    <span class="text-2xl sm:text-3xl lg:text-4xl font-light text-gray-400 dark:text-gray-500 ml-1">Pcs</span>
+                    <span class="text-5xl sm:text-4xl lg:text-4xl text-gray-800 dark:text-white">{{ number_format($totalBeban) }}</span>
+                    <span class="text-2xl sm:text-3xl lg:text-4xl text-gray-800 dark:text-gray-500 ml-1">Pcs</span>
                 </div>
 
                 {{-- Trend --}}
@@ -53,20 +53,20 @@
             <div class="flex-1 flex flex-col justify-between rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 border-l-4 border-l-warning-400 p-4 sm:p-6 shadow-sm min-w-0">
                 {{-- Judul --}}
                 <div>
-                    <p class="text-sm sm:text-base font-medium text-gray-400 dark:text-gray-500">Antrian</p>
+                    <p class="text-sm sm:text-base font-medium text-gray-800 dark:text-gray-500">Antrian</p>
                     <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">Order belum diplot</p>
                 </div>
 
                 {{-- Angka Besar --}}
                 <div class="mt-3 mb-3">
-                    <span class="text-4xl sm:text-4xl lg:text-4xl font-light text-gray-700 dark:text-white">{{ number_format($antrianQty) }}</span>
-                        <span class="text-2xl sm:text-3xl lg:text-4xl font-light text-gray-400 dark:text-gray-500 ml-1">Pcs</span>
+                    <span class="text-4xl sm:text-4xl lg:text-4xl text-gray-800 dark:text-white">{{ number_format($antrianQty) }}</span>
+                        <span class="text-2xl sm:text-3xl lg:text-4xl text-gray-800 dark:text-gray-500 ml-1">Pcs</span>
                     </div>
 
                     {{-- Status --}}
                 <div>
                     @if($antrianQty > 0)
-                        <span class="text-xs sm:text-sm font-medium text-warning-600 dark:text-warning-400">Pekerjaan harus segera diplot!</span>
+                        <span class="text-xs sm:text-sm font-medium text-danger-600 dark:text-warning-400">Pekerjaan harus segera diplot!</span>
                     @else
                         <span class="text-sm text-gray-400 dark:text-gray-500">Tidak ada antrian saat ini</span>
                     @endif
@@ -94,7 +94,7 @@
                         } else {
                             $statusText = 'Lancar';
                             $statusClass = 'text-success-600 dark:text-success-400 font-semibold';
-                            $cardClass = 'bg-success-50 dark:bg-success-900/10 border-success-200 dark:border-success-800 text-success-900 dark:text-success-100';
+                            $cardClass = 'bg-success-50 dark:bg-success-900/10 border-purple-200 dark:border-success-800 text-success-900 dark:text-success-100';
                         }
                     @endphp
                     <div class="flex-1 min-w-[120px] shrink-0 flex flex-col justify-between rounded-xl border {{ $cardClass }} p-4 shadow-sm">

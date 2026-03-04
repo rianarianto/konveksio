@@ -1699,31 +1699,34 @@ class OrderResource extends Resource
                     ->state(function (Order $record): string {
                         $expressHtml = '';
                         if ($record->is_express) {
-                            $expressHtml = '<span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:9999px; background:#fef2f2; border:1px solid #fecaca; color:#ef4444; font-size:10px; font-weight:800; letter-spacing:0.02em; margin-bottom:6px;">'
-                                . '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>'
+                            $expressHtml = '<span style="background:#dc2626; color:#fff; font-size:10px; font-weight:800; padding:2px 8px; border-radius:999px; letter-spacing:0.02em; display:inline-flex; align-items:center; gap:3px;">'
+                                . '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
                                 . 'EXPRESS</span>';
                         }
-    
-                        $orderNum = '<div style="font-weight:600; color:#9ca3af; font-size:13px; margin-bottom:8px; letter-spacing:0.04em; text-transform:uppercase;">' . $expressHtml . '<br>' . htmlspecialchars($record->order_number) . '</div>';
-    
+
+                        $orderNum = '<div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">'
+                            . $expressHtml
+                            . '<div style="font-weight:600; color:#9ca3af; font-size:13px; letter-spacing:0.04em; text-transform:uppercase;">' . htmlspecialchars($record->order_number) . '</div>'
+                            . '</div>';
+
                         $customer = $record->customer;
                         $name = $customer?->name ?? '—';
                         $phone = $customer?->phone ?? null;
-    
+
                         $pillClass = 'display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border:1px solid #f3e8ff; border-radius:9999px; background:white; color:#a855f7; font-size:12px; font-weight:500;';
-    
+
                         $nameBadge = '<div style="' . $pillClass . '">'
                             . '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
                             . htmlspecialchars($name)
                             . '</div>';
-    
+
                         $phoneLine = $phone
                             ? '<div style="' . $pillClass . '">'
                             . '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
                             . htmlspecialchars($phone)
                             . '</div>'
                             : '';
-    
+
                         return '<div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">' . $orderNum . $nameBadge . $phoneLine . '</div>';
                     }),
 
@@ -1737,15 +1740,15 @@ class OrderResource extends Resource
                     ->state(function (Order $record): string {
                         $masukStr = $record->order_date instanceof Carbon ? $record->order_date->format('d M Y') : ($record->order_date ? date('d M Y', strtotime($record->order_date)) : '—');
                         $deadlineStr = $record->deadline instanceof Carbon ? $record->deadline->format('d M Y') : ($record->deadline ? date('d M Y', strtotime($record->deadline)) : '—');
-    
+
                         $days = $record->deadline
                             ? now()->startOfDay()->diffInDays($record->deadline, false)
                             : null;
-    
+
                         $sisaBadgeStyle = '';
                         $sisaText = '';
                         $sisaIconColor = '';
-    
+
                         if ($days === null) {
                             $sisaText = 'Tidak ada';
                             $sisaBadgeStyle = 'color:#9ca3af; border:1px solid #e5e7eb; background:#f9fafb;';
@@ -1771,21 +1774,21 @@ class OrderResource extends Resource
                             $sisaBadgeStyle = 'color:#16a34a; border:1px solid #86efac; background:white;';
                             $sisaIconColor = '#16a34a';
                         }
-    
+
                         $masukHtml = '<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">'
                             . '<span style="font-size:13px; font-weight:500; color:#9ca3af;">' . $masukStr . '</span>'
                             . '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#9ca3af; font-size:10px; font-weight:600;">MASUK</span>'
                             . '</div>';
-    
+
                         $deadlineHtml = '<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">'
                             . '<span style="font-size:14px; font-weight:500; color:#4b5563;">' . $deadlineStr . '</span>'
                             . '</div>';
-    
+
                         $badgeHtml = '<div style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:9999px; font-size:11px; font-weight:500; ' . $sisaBadgeStyle . '">'
                             . '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="' . $sisaIconColor . '" stroke-width="2.5"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>'
                             . $sisaText
                             . '</div>';
-    
+
                         return '<div style="display:flex; flex-direction:column;">' . $masukHtml . $deadlineHtml . $badgeHtml . '</div>';
                     }),
 
@@ -1832,11 +1835,11 @@ class OrderResource extends Resource
                     ->extraCellAttributes(['style' => 'vertical-align:top;'])
                     ->state(function (Order $record): string {
                         $items = $record->orderItems;
-    
+
                         if ($items->isEmpty()) {
                             return '<span style="color:#9ca3af;font-size:13px;">—</span>';
                         }
-    
+
                         $html = '<div style="display:flex; flex-direction:column; gap:16px;">';
                         foreach ($items as $item) {
                             $cat = match ($item->production_category) {
@@ -1845,15 +1848,15 @@ class OrderResource extends Resource
                                 'jasa' => ['🔧 Jasa', 'rgba(16,185,129,0.12)', '#059669'],
                                 default => ['🏭 Produksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
                             };
-    
+
                             $catBadge = '<div style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; background:' . $cat[1] . '; color:' . $cat[2] . ';">' . $cat[0] . '</div>';
-    
+
                             // Calculate Base Qty
                             $qty = $item->quantity;
                             if ($item->production_category === 'custom' && !empty($item->size_and_request_details['detail_custom'])) {
                                 $qty = count($item->size_and_request_details['detail_custom']);
                             }
-    
+
                             // Construct Material & Sizing Details
                             $detailsHtml = '';
                             if ($item->production_category !== 'jasa' && $item->production_category !== 'non_produksi') {
@@ -1865,24 +1868,24 @@ class OrderResource extends Resource
                                 if (!empty($item->material_details['warna'])) {
                                     $matText .= $matText ? ' (' . $item->material_details['warna'] . ')' : $item->material_details['warna'];
                                 }
-                                
+
                                 if ($matText) {
                                     $detailsHtml .= '<div style="margin-top:4px; margin-bottom:4px; display:inline-flex; align-items:center; gap:4px; font-size:12px; color:#6b7280; font-weight:500; background:#f9fafb; border:1px solid #f3f4f6; padding:2px 8px; border-radius:6px;">'
                                         . '<span>' . htmlspecialchars($matText) . '</span>'
                                         . '</div>';
                                 }
-    
+
                                 // Size Breakdown
                                 if (!empty($item->sizes)) {
                                     $sizeStrings = [];
                                     $isMultipleSizes = count($item->sizes) > 1;
-                                    
+
                                     foreach ($item->sizes as $sizeObj) {
                                         if (is_array($sizeObj) && isset($sizeObj['size']) && isset($sizeObj['quantity'])) {
                                             $sizeStrings[] = htmlspecialchars($sizeObj['size']) . ': <span style="font-weight:700;">' . $sizeObj['quantity'] . '</span>';
                                         }
                                     }
-                                    
+
                                     if (count($sizeStrings) > 0) {
                                         $detailsHtml .= '<div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:4px;">';
                                         foreach ($sizeStrings as $szStr) {
@@ -1892,18 +1895,18 @@ class OrderResource extends Resource
                                     }
                                 }
                             }
-    
+
                             // Progress bar Logic
                             $tasks = $item->productionTasks;
                             $totalTasks = $tasks->count();
                             $doneTasks = $tasks->where('status', 'done')->count();
                             $inProgressTasks = $tasks->where('status', 'in_progress')->count();
-                            
+
                             $pct = $totalTasks > 0 ? round(($doneTasks / $totalTasks) * 100) : 0;
-                            
+
                             $statusText = '<span style="color:#9ca3af;">Belum Diproses</span>';
                             $progressBarHtml = '';
-    
+
                             if ($totalTasks > 0) {
                                 // Find Current Step Status Text
                                 if ($pct === 100) {
@@ -1924,22 +1927,22 @@ class OrderResource extends Resource
                                             }
                                         }
                                     }
-                                    
+
                                     if ($currentTask) {
-                                         $statusName = $currentTask->nama_tugas ?? 'Tugas';
-                                         
-                                         if ($currentTask->status === 'in_progress') {
-                                             $statusText = '<span style="color:#d97706; font-weight:600;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#d97706;margin-right:4px;animation:pulse 2s infinite;"></span>' . htmlspecialchars($statusName) . ' (' . $pct . '%)</span>';
-                                         } else {
-                                             $statusText = '<span style="color:#6b7280; font-weight:500;">Antrian ' . htmlspecialchars($statusName) . ' (' . $pct . '%)</span>';
-                                         }
+                                        $statusName = $currentTask->nama_tugas ?? 'Tugas';
+
+                                        if ($currentTask->status === 'in_progress') {
+                                            $statusText = '<span style="color:#d97706; font-weight:600;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#d97706;margin-right:4px;animation:pulse 2s infinite;"></span>' . htmlspecialchars($statusName) . ' (' . $pct . '%)</span>';
+                                        } else {
+                                            $statusText = '<span style="color:#6b7280; font-weight:500;">Antrian ' . htmlspecialchars($statusName) . ' (' . $pct . '%)</span>';
+                                        }
                                     }
                                 }
-    
+
                                 // Build Progress Bar UI
                                 $barColor = $pct === 100 ? '#10b981' : '#7c3aed';
                                 $barBgColor = $pct === 100 ? '#d1fae5' : '#ede9fe';
-                                
+
                                 $progressBarHtml = '<div style="margin-top:8px;">'
                                     . '<div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.02em;">'
                                     . '<span>Progress</span>'
@@ -1952,13 +1955,13 @@ class OrderResource extends Resource
                             } else {
                                 $progressBarHtml = '<div style="margin-top:8px; font-size:11px; color:#9ca3af; font-weight:500;">❌ Tidak ada jadwal produksi</div>';
                             }
-    
+
                             // Container per Item
                             $html .= '<div style="display:flex; flex-direction:column; background:white; border:1px solid #f3f4f6; border-radius:12px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,0.02);">'
                                 . '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; gap:8px;">'
-                                    . '<div style="font-size:14px; font-weight:700; color:#111827; line-height:1.4;">'
-                                        . '<span style="color:#6b7280; margin-right:4px;">' . $qty . 'x</span>' . htmlspecialchars($item->product_name)
-                                    . '</div>'
+                                . '<div style="font-size:14px; font-weight:700; color:#111827; line-height:1.4;">'
+                                . '<span style="color:#6b7280; margin-right:4px;">' . $qty . 'x</span>' . htmlspecialchars($item->product_name)
+                                . '</div>'
                                 . $catBadge
                                 . '</div>'
                                 . $detailsHtml
@@ -1966,7 +1969,7 @@ class OrderResource extends Resource
                                 . '</div>';
                         }
                         $html .= '</div>';
-    
+
                         return $html;
                     }),
             ])

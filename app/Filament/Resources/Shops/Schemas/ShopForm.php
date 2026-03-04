@@ -18,6 +18,11 @@ class ShopForm
                 TextInput::make('phone')
                     ->tel()
                     ->required(),
+                TextInput::make('max_capacity_pcs')
+                    ->label('Workshop Capacity (Pcs)')
+                    ->numeric()
+                    ->required()
+                    ->default(2000),
             ]);
     }
 }

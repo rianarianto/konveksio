@@ -11,7 +11,13 @@ class AktivitasUtamaWidget extends Widget
 {
     protected string $view = 'filament.widgets.aktivitas-utama-widget';
     protected int|string|array $columnSpan = 'full';
-    protected static ?int $sort = 1;
+    protected static ?int $sort = 2;
+
+    // Sembunyikan dari Owner — mereka dapat widget Finance Stats
+    public static function canView(): bool
+    {
+        return auth()->check() && auth()->user()->role !== 'owner';
+    }
 
     public function getData(): array
     {

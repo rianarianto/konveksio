@@ -1022,3 +1022,26 @@ Desain 3-tab sudah dikonfirmasi dari mockup.
 | app/Filament/Widgets/KeuanganStatsWidget.php | MODIFIED (sort=2) |
 | app/Filament/Resources/ControlProduksis/ControlProduksiResource.php | MODIFIED (HtmlString fix) |
 | app/Filament/Resources/Keuangans/Widgets/PiutangTableWidget.php | MODIFIED (horizontal layout) |
+
+#### Dashboard Owner Finance & Shop Refactor
+- **OwnerFinanceStatsWidget**: Baris pertama khusus Owner dengan 3 metrik kritikal:
+  - **Revenue & Profitability**: Total Omzet (bulan ini vs lalu) dengan indikator tren hijau/abu.
+  - **Piutang Macet (Red Alert)**: Total tagihan jatuh tempo. Logika warna dibalik: **Merah jika hutang naik**, Hijau jika turun.
+  - **Beban Workshop**: Persentase pengerjaan vs kapasitas maksimal toko (dengan progress bar).
+- **Penyatuan Pengaturan Toko**:
+  - Menambahkan kolom max_capacity_pcs di tabel shops.
+  - Menghapus EditTenantProfile (bawaan Filament) untuk menghindari redundansi.
+  - User Menu "Shop Settings" kini langsung mengarah ke halaman edit ShopResource milik toko aktif.
+- **UX Refinement**: Penyesuaian spacing kartu dashboard dan perbaikan badge tren agar tidak stretch (fit-content).
+
+#### Files Modified / Created
+| File | Status |
+|---|---|
+| app/Filament/Widgets/OwnerFinanceStatsWidget.php | NEW |
+| resources/views/filament/widgets/owner-finance-stats-widget.blade.php | NEW |
+| app/Models/Shop.php | MODIFIED |
+| app/Filament/Resources/Shops/Schemas/ShopForm.php | MODIFIED |
+| app/Providers/Filament/AdminPanelProvider.php | MODIFIED |
+| app/Filament/Widgets/AktivitasUtamaWidget.php | MODIFIED |
+| app/Filament/Pages/Tenancy/EditTenantProfile.php | DELETED |
+
