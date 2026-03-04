@@ -7,6 +7,7 @@ use Filament\Widgets\Widget;
 use Illuminate\Support\Carbon;
 use Filament\Facades\Filament;
 use Livewire\WithPagination;
+use Illuminate\Database\Eloquent\Builder;
 
 class DashboardRow3Widget extends Widget
 {
@@ -15,6 +16,12 @@ class DashboardRow3Widget extends Widget
     protected string $view = 'filament.widgets.dashboard-row3-widget';
     protected int|string|array $columnSpan = 'full';
     protected static ?int $sort = 4;
+
+    // Sembunyikan dari Owner — mereka punya widget sendiri
+    public static function canView(): bool
+    {
+        return auth()->check() && in_array(auth()->user()->role, ['admin', 'owner']);
+    }
 
     public $search = '';
     public $statusFilter = '';
@@ -44,6 +51,14 @@ class DashboardRow3Widget extends Widget
                          ->orWhere('phone', 'like', '%' . $this->search . '%');
                   });
             });
+        }
+
+        if (auth()->user()->role === 'owner') {
+            $query->whereNotIn('status', ['selesai', 'diambil', 'batal'])
+                  ->where(function (Builder $query) {
+                      $query->whereDate('deadline', '<=', now()->addDays(3))
+                            ->orWhereRaw('total_price > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)');
+                  });
         }
 
         if (!empty($this->statusFilter)) {

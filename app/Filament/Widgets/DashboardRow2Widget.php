@@ -15,6 +15,12 @@ class DashboardRow2Widget extends Widget
     protected int|string|array $columnSpan = 'full';
     protected static ?int $sort = 3;
 
+    // Sembunyikan dari Owner — mereka punya widget sendiri
+    public static function canView(): bool
+    {
+        return auth()->check() && auth()->user()->role !== 'owner';
+    }
+
     public function getData(): array
     {
         $tenantId = Filament::getTenant()?->id;

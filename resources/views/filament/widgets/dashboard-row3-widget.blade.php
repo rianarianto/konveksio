@@ -3,7 +3,9 @@
         style="background:white; border-radius:20px; box-shadow:0 1px 3px rgba(0,0,0,0.07); border:1px solid #e5e7eb; overflow:hidden; font-family:inherit;">
         {{-- HEADER SECTION --}}
         <div style="padding:24px 24px 16px;">
-            <h2 style="font-size:20px; font-weight:600; color:#1f2937; margin-bottom:20px;">Daftar Pesanan Cepat</h2>
+            <h2 style="font-size:20px; font-weight:600; color:#1f2937; margin-bottom:20px;">
+                {{ auth()->user()->role === 'owner' ? 'PANTAUAN PRIORITAS OWNER' : 'Daftar Pesanan Cepat' }}
+            </h2>
 
             <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px;">
                 {{-- Add Button --}}
@@ -272,33 +274,53 @@
                                                         $itemStatusLabel = 'Antrian';
                                                     }
                                                 }
-
-                                                // Different color mappings for finished vs in progress
-                                                $barColor = $itemProgress === 100 ? '#16a34a' : '#a855f7';
-                                                $bgColor = $itemProgress === 100 ? '#dcfce7' : '#f3e8ff';
-                                                $borderColor = $itemProgress === 100 ? '#bbf7d0' : '#e9d5ff';
-                                            @endphp
-                                            <div style="display:flex; flex-direction:column; gap:2px;">
-                                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                                    <span
-                                                        style="font-size:14px; font-weight:500; color:#6b7280;">{{ $item->quantity }}x
-                                                        {{ $item->product_name }}</span>
-                                                    <span
-                                                        style="padding:2px 8px; border-radius:4px; border:1px solid #f3e8ff; background:white; color:#a855f7; font-size:11px; font-weight:500;">{{ $catName }}</span>
-                                                </div>
-
-                                                {{-- Individual Progress Bar --}}
-                                                <div style="display:flex; align-items:center; gap:10px; margin-top:2px;">
-                                                    <div
-                                                        style="width:70px; height:6px; background:{{ $bgColor }}; border-radius:9999px; overflow:hidden; border:1px solid {{ $borderColor }};">
-                                                        <div
-                                                            style="height:100%; background:{{ $barColor }}; border-radius:9999px; width:{{ $itemProgress }}%;">
-                                                        </div>
+                                                @endphp
+                                                @php
+                                                    $statusKey = strtolower($itemStatusLabel);
+                                                    $colorMap = [
+                                                        'antrian' => '#818cf8',
+                                                        'potong' => '#f87171',
+                                                        'jahit' => '#22d3ee',
+                                                        'bordir' => '#fb923c',
+                                                        'kancing' => '#6366f1',
+                                                        'finishing' => '#4ade80',
+                                                        'qc' => '#a855f7',
+                                                        'selesai' => '#2dd4bf',
+                                                        'siap diambil' => '#22c55e',
+                                                        'batal' => '#ef4444',
+                                                        'diterima' => '#d946ef',
+                                                        'dikerjakan' => '#3b82f6',
+                                                    ];
+                                                    
+                                                    $baseColor = $colorMap[$statusKey] ?? ($itemProgress === 100 ? '#16a34a' : '#a855f7');
+                                                    
+                                                    // Generate lighter tints for background and border
+                                                    $barColor = $baseColor;
+                                                    $bgColor = $baseColor . '15'; // 15 is hex for ~8% opacity
+                                                    $borderColor = $baseColor . '30'; // 30 is hex for ~18% opacity
+                                                @endphp
+                                                
+                                                <div style="display:flex; flex-direction:column; gap:2px;">
+                                                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                                        <span
+                                                            style="font-size:14px; font-weight:500; color:#6b7280;">{{ $item->quantity }}x
+                                                            {{ $item->product_name }}</span>
+                                                        <span
+                                                            style="padding:2px 8px; border-radius:4px; border:1px solid {{ $borderColor }}; background:{{ $bgColor }}; color:{{ $barColor }}; font-size:11px; font-weight:500;">{{ $catName }}</span>
                                                     </div>
-                                                    <span
-                                                        style="font-size:10px; font-weight:600; color:{{ $barColor }};">{{ $itemStatusLabel }}</span>
+
+                                                    {{-- Individual Progress Bar --}}
+                                                    <div style="display:flex; align-items:center; gap:10px; margin-top:2px;">
+                                                        <div
+                                                            style="width:70px; height:6px; background:#f1f5f9; border-radius:9999px; overflow:hidden; border:1px solid #e2e8f0;">
+                                                            <div
+                                                                style="height:100%; background:{{ $barColor }}; border-radius:9999px; width:{{ $itemProgress }}%;">
+                                                            </div>
+                                                        </div>
+                                                        <span
+                                                            style="font-size:10px; font-weight:600; color:{{ $barColor }};">{{ $itemStatusLabel }}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
                                         @endforeach
                                     </div>
                                 </td>
@@ -317,16 +339,33 @@
                                             Detail
                                         </a>
 
-                                        <a href="{{ \App\Filament\Resources\ControlProduksis\ControlProduksiResource::getUrl('index') }}"
-                                            style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#7c3aed; color:white; font-size:12px; font-weight:600; border-radius:8px; text-decoration:none; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
-                                            <svg width="16" height="13" viewBox="0 0 24 24" fill="none"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v10" />
-                                                <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-                                                <path d="M10.4 12.6a2 2 0 1 1 3 3L8 21l-4 1 1-4Z" />
-                                            </svg>
-                                            Tugas
-                                        </a>
+                                        @if(auth()->user()->role === 'owner')
+                                            @php
+                                                $phone = $order->customer->phone ?? '';
+                                                if (str_starts_with($phone, '0')) {
+                                                    $phone = '62' . substr($phone, 1);
+                                                }
+                                                $waUrl = 'https://wa.me/' . preg_replace('/[^0-9]/', '', $phone);
+                                            @endphp
+                                            <a href="{{ $waUrl }}" target="_blank"
+                                                style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#22c55e; color:white; font-size:12px; font-weight:600; border-radius:8px; text-decoration:none; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                                                </svg>
+                                                WhatsApp
+                                            </a>
+                                        @else
+                                            <a href="{{ \App\Filament\Resources\ControlProduksis\ControlProduksiResource::getUrl('index') }}"
+                                                style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#7c3aed; color:white; font-size:12px; font-weight:600; border-radius:8px; text-decoration:none; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                                                <svg width="16" height="13" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="2">
+                                                    <path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v10" />
+                                                    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                                                    <path d="M10.4 12.6a2 2 0 1 1 3 3L8 21l-4 1 1-4Z" />
+                                                </svg>
+                                                Tugas
+                                            </a>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

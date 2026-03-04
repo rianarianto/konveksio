@@ -119,8 +119,8 @@
         }
 
         .ofs-amount {
-            font-size: 30px;
-            font-weight: 800;
+            font-size: 40px;
+            font-weight: 600;
             color: #111;
             line-height: 1.1;
             letter-spacing: -1px;
@@ -242,7 +242,7 @@
         }
 
         .ofs-big-detail {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 800;
             color: #111;
             margin-bottom: 2px;
