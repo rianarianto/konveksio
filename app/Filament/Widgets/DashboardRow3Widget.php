@@ -8,6 +8,7 @@ use Illuminate\Support\Carbon;
 use Filament\Facades\Filament;
 use Livewire\WithPagination;
 use Illuminate\Database\Eloquent\Builder;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class DashboardRow3Widget extends Widget
 {
@@ -46,19 +47,19 @@ class DashboardRow3Widget extends Widget
         if (!empty($this->search)) {
             $query->where(function ($q) {
                 $q->where('order_number', 'like', '%' . $this->search . '%')
-                  ->orWhereHas('customer', function ($cq) {
-                      $cq->where('name', 'like', '%' . $this->search . '%')
-                         ->orWhere('phone', 'like', '%' . $this->search . '%');
-                  });
+                    ->orWhereHas('customer', function ($cq) {
+                        $cq->where('name', 'like', '%' . $this->search . '%')
+                            ->orWhere('phone', 'like', '%' . $this->search . '%');
+                    });
             });
         }
 
         if (auth()->user()->role === 'owner') {
             $query->whereNotIn('status', ['selesai', 'diambil', 'batal'])
-                  ->where(function (Builder $query) {
-                      $query->whereDate('deadline', '<=', now()->addDays(3))
-                            ->orWhereRaw('total_price > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)');
-                  });
+                ->where(function (Builder $query) {
+                    $query->whereDate('deadline', '<=', now()->addDays(3))
+                        ->orWhereRaw('total_price > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)');
+                });
         }
 
         if (!empty($this->statusFilter)) {
@@ -71,6 +72,25 @@ class DashboardRow3Widget extends Widget
 
         // Default order by deadline so urgent ones are on top
         return $query->orderByRaw('is_express DESC')->orderBy('deadline', 'asc')->paginate($this->perPage);
+    }
+
+    public function downloadReceipt($orderId)
+    {
+        $order = Order::with(['customer', 'shop', 'orderItems', 'payments'])->findOrFail($orderId);
+
+        $filename = 'Kuitansi-' . str_replace('#', '', $order->order_number) . '.pdf';
+
+        return response()->streamDownload(function () use ($order) {
+            echo Pdf::loadView('pdf.receipt', ['order' => $order])->output();
+        }, $filename);
+    }
+
+    public function deleteOrder($orderId)
+    {
+        $order = Order::find($orderId);
+        if ($order) {
+            $order->delete();
+        }
     }
 
     public function getViewData(): array

@@ -105,12 +105,12 @@ class OwnerVisualInsightsWidget extends Widget
 
         // 1. Define high-fidelity colors and labels for general overview
         $config = [
-            'batal'        => ['label' => 'Batal',        'color' => '#f87171', 'priority' => 1], // Red
-            'diterima'     => ['label' => 'Diterima',     'color' => '#a855f7', 'priority' => 2], // Purple
-            'antrian'      => ['label' => 'Antrian',      'color' => '#818cf8', 'priority' => 3], // Indigo
-            'diproses'     => ['label' => 'Diproses',     'color' => '#3b82f6', 'priority' => 4], // Blue
+            'batal' => ['label' => 'Batal', 'color' => '#f87171', 'priority' => 1], // Red
+            'diterima' => ['label' => 'Diterima', 'color' => '#a855f7', 'priority' => 2], // Purple
+            'antrian' => ['label' => 'Antrian', 'color' => '#818cf8', 'priority' => 3], // Indigo
+            'diproses' => ['label' => 'Diproses', 'color' => '#3b82f6', 'priority' => 4], // Blue
             'siap_diambil' => ['label' => 'Siap Diambil', 'color' => '#22c55e', 'priority' => 5], // Green
-            'selesai'      => ['label' => 'Selesai',      'color' => '#2dd4bf', 'priority' => 6], // Teal
+            'selesai' => ['label' => 'Selesai', 'color' => '#2dd4bf', 'priority' => 6], // Teal
         ];
 
         $segments = [];
@@ -118,24 +118,22 @@ class OwnerVisualInsightsWidget extends Widget
         // 2. Map counts to standardized segments
         foreach ($config as $statusKey => $meta) {
             $count = $statusCounts[$statusKey] ?? 0;
-            if ($count > 0) {
-                $segments[] = [
-                    'stage'    => $meta['label'],
-                    'pcs'      => (int) $count,
-                    'priority' => $meta['priority'],
-                    'color'    => $meta['color'],
-                ];
-            }
+            $segments[] = [
+                'stage' => $meta['label'],
+                'pcs' => (int) $count,
+                'priority' => $meta['priority'],
+                'color' => $meta['color'],
+            ];
         }
 
         // 3. Handle any unexpected statuses from DB
         foreach ($statusCounts as $status => $count) {
             if (!isset($config[$status])) {
                 $segments[] = [
-                    'stage'    => ucfirst(str_replace('_', ' ', $status)),
-                    'pcs'      => (int) $count,
+                    'stage' => ucfirst(str_replace('_', ' ', $status)),
+                    'pcs' => (int) $count,
                     'priority' => 10,
-                    'color'    => '#94a3b8',
+                    'color' => '#94a3b8',
                 ];
             }
         }
@@ -172,13 +170,13 @@ class OwnerVisualInsightsWidget extends Widget
         $isCurrentMonth = $target->month === $today->month && $target->year === $today->year;
 
         return [
-            'year'           => $target->year,
-            'month'          => $target->month,
-            'monthLabel'     => $target->translatedFormat('F Y'),
-            'daysInMonth'    => $target->daysInMonth,
+            'year' => $target->year,
+            'month' => $target->month,
+            'monthLabel' => $target->translatedFormat('F Y'),
+            'daysInMonth' => $target->daysInMonth,
             'firstDayOfWeek' => $target->copy()->startOfMonth()->dayOfWeekIso,
-            'today'          => $isCurrentMonth ? $today->day : null,
-            'deadlines'      => $deadlines,
+            'today' => $isCurrentMonth ? $today->day : null,
+            'deadlines' => $deadlines,
             'isCurrentMonth' => $isCurrentMonth,
         ];
     }

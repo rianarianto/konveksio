@@ -126,3 +126,10 @@ Dashboard admin menggunakan **2 baris widget** dengan data real dinamis per tena
 - **Shop Settings Centralization**: Fitur 	enantProfile bawaan Filament dimatikan untuk menghindari halaman ganda. Pengaturan toko kini dipusatkan di ShopResource.
 - **User Menu Extension**: Menambahkan menu "Shop Settings" secara dinamis di pojok kanan atas yang langsung mengarah ke halaman edit toko yang sedang aktif.
 
+### Order Action Refactoring (View-Based)
+- **Custom Action Dropdown**: Memindahkan logika HTML/Alpine.js aksi tabel (View, Receipt, Edit, Delete) ke file blade terpisah `resources/views/filament/resources/orders/actions.blade.php`.
+- **Row Interaction Control**: Menggunakan `->recordUrl(null)` dan `->recordAction(null)` pada `OrderResource` untuk mencegah klik baris memicu navigasi, sehingga interaksi terfokus pada tombol aksi dropdown.
+- **CSS Align-Top**: Menambahkan `vertical-align: top` secara global di `AdminPanelProvider` dan padding khusus pada kolom aksi agar sejajar dengan teks nama produk yang berbaris banyak.
+
+---
+*Terakhir Diperbarui: 5 Maret 2026*

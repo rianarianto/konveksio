@@ -45,7 +45,7 @@
             $donutSegments[] = [
                 ...$seg,
                 'dash' => round($dash, 2),
-                'gap'  => round($circumference - $dash, 2),
+                'gap' => round($circumference - $dash, 2),
                 'offset' => round(-$runningOffset, 2),
             ];
             $runningOffset += $dash;
@@ -53,9 +53,12 @@
 
         // ── Rp formatter ─────────────────────────────────────────────────────
         $rpShort = function ($val) {
-            if ($val >= 1_000_000_000) return number_format($val / 1_000_000_000, 1) . 'M';
-            if ($val >= 1_000_000) return number_format($val / 1_000_000, 1) . 'Jt';
-            if ($val >= 1_000) return number_format($val / 1_000, 0) . 'Rb';
+            if ($val >= 1_000_000_000)
+                return number_format($val / 1_000_000_000, 1) . 'M';
+            if ($val >= 1_000_000)
+                return number_format($val / 1_000_000, 1) . 'Jt';
+            if ($val >= 1_000)
+                return number_format($val / 1_000, 0) . 'Rb';
             return number_format($val, 0);
         };
     @endphp
@@ -70,13 +73,23 @@
         }
 
         @media (max-width: 1100px) {
-            .vi-grid { grid-template-columns: 1fr 1fr; }
-            .vi-grid > :first-child { grid-column: 1 / -1; }
+            .vi-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .vi-grid> :first-child {
+                grid-column: 1 / -1;
+            }
         }
 
         @media (max-width: 640px) {
-            .vi-grid { grid-template-columns: 1fr; }
-            .vi-grid > :first-child { grid-column: auto; }
+            .vi-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .vi-grid> :first-child {
+                grid-column: auto;
+            }
         }
 
         .vi-card {
@@ -84,7 +97,7 @@
             border-radius: 18px;
             border: 1px solid #ebebeb;
             padding: 20px;
-            box-shadow: 0 1px 4px rgba(0,0,0,.04);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, .04);
             position: relative;
             overflow: hidden;
             transition: box-shadow .2s;
@@ -93,44 +106,65 @@
         }
 
         .dark .vi-card {
-            background: rgba(30,20,50,.7);
-            border-color: rgba(255,255,255,.07);
+            background: rgba(30, 20, 50, .7);
+            border-color: rgba(255, 255, 255, .07);
         }
 
-        .vi-card:hover { box-shadow: 0 6px 20px rgba(127,0,255,.10); }
+        .vi-card:hover {
+            box-shadow: 0 6px 20px rgba(127, 0, 255, .10);
+        }
 
         .vi-card::before {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0;
+            top: 0;
+            left: 0;
+            right: 0;
             height: 3px;
             background: linear-gradient(90deg, #7F00FF, #bf80ff);
             border-radius: 18px 18px 0 0;
         }
 
-        .vi-title {
-            font-size: 13px;
-            font-weight: 700;
-            color: #222;
-            margin-bottom: 14px;
+        .vi-header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 8px;
+            margin-bottom: 18px;
         }
 
-        .dark .vi-title { color: #f3f4f6; }
+        .vi-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 0;
+        }
+
+        .dark .vi-title {
+            color: #9ca3af;
+        }
 
         .vi-title-icon {
-            width: 28px; height: 28px;
-            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
             background: #f3eeff;
-            display: flex; align-items: center; justify-content: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             flex-shrink: 0;
         }
 
-        .dark .vi-title-icon { background: rgba(127,0,255,.18); }
+        .dark .vi-title-icon {
+            background: rgba(127, 0, 255, .18);
+        }
 
-        .vi-title-icon svg { width: 14px; height: 14px; stroke: #7F00FF; }
+        .vi-title-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke: #7F00FF;
+        }
 
         /* ─── AREA CHART ─── */
         .vi-card-body {
@@ -167,7 +201,8 @@
         }
 
         .vi-legend-dot {
-            width: 8px; height: 8px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             flex-shrink: 0;
         }
@@ -176,7 +211,11 @@
             display: flex;
             justify-content: space-between;
             margin-top: -2px;
-            padding: 0 {{ $padL }}px 0 {{ $padL }}px;
+            padding: 0
+                {{ $padL }}
+                px 0
+                {{ $padL }}
+                px;
         }
 
         .vi-chart-labels span {
@@ -197,7 +236,8 @@
 
         .vi-donut-svg-wrap {
             position: relative;
-            width: 140px; height: 140px;
+            width: 140px;
+            height: 140px;
         }
 
         .vi-donut-svg-wrap svg {
@@ -207,26 +247,33 @@
 
         .vi-donut-center {
             position: absolute;
-            top: 50%; left: 50%;
+            top: 50%;
+            left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
+            width: 80%;
+            pointer-events: none;
         }
 
         .vi-donut-center-val {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 800;
             color: #111;
             line-height: 1;
+            display: block;
         }
 
-        .dark .vi-donut-center-val { color: #f3f4f6; }
+        .dark .vi-donut-center-val {
+            color: #f3f4f6;
+        }
 
         .vi-donut-center-lbl {
-            font-size: 9px;
-            color: #9ca3af;
-            font-weight: 600;
+            font-size: 10px;
+            color: #94a3b8;
+            font-weight: 700;
             text-transform: uppercase;
             margin-top: 2px;
+            display: block;
         }
 
         .vi-donut-legend {
@@ -267,18 +314,54 @@
             transition: transform .15s;
         }
 
-        .vi-cal-cell:hover { transform: scale(1.15); }
+        .vi-cal-cell:hover {
+            transform: scale(1.15);
+        }
 
-        .vi-cal-cell.empty { background: transparent; }
-        .vi-cal-cell.none  { background: #f8fafc; color: #94a3b8; }
-        .vi-cal-cell.low   { background: #dbeafe; color: #1d4ed8; }
-        .vi-cal-cell.med   { background: #fef3c7; color: #92400e; }
-        .vi-cal-cell.high  { background: #fee2e2; color: #dc2626; font-weight: 800; }
+        .vi-cal-cell.empty {
+            background: transparent;
+        }
 
-        .dark .vi-cal-cell.none  { background: rgba(148,163,184,.1); color: #94a3b8; }
-        .dark .vi-cal-cell.low   { background: rgba(59,130,246,.2); color: #60a5fa; }
-        .dark .vi-cal-cell.med   { background: rgba(234,179,8,.2);  color: #fbbf24; }
-        .dark .vi-cal-cell.high  { background: rgba(239,68,68,.2);  color: #f87171; }
+        .vi-cal-cell.none {
+            background: #f8fafc;
+            color: #94a3b8;
+        }
+
+        .vi-cal-cell.low {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .vi-cal-cell.med {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .vi-cal-cell.high {
+            background: #fee2e2;
+            color: #dc2626;
+            font-weight: 800;
+        }
+
+        .dark .vi-cal-cell.none {
+            background: rgba(148, 163, 184, .1);
+            color: #94a3b8;
+        }
+
+        .dark .vi-cal-cell.low {
+            background: rgba(59, 130, 246, .2);
+            color: #60a5fa;
+        }
+
+        .dark .vi-cal-cell.med {
+            background: rgba(234, 179, 8, .2);
+            color: #fbbf24;
+        }
+
+        .dark .vi-cal-cell.high {
+            background: rgba(239, 68, 68, .2);
+            color: #f87171;
+        }
 
         .vi-cal-cell.today {
             box-shadow: 0 0 0 2px #7F00FF;
@@ -302,7 +385,8 @@
         }
 
         .vi-cal-legend-dot {
-            width: 8px; height: 8px;
+            width: 8px;
+            height: 8px;
             border-radius: 3px;
             flex-shrink: 0;
         }
@@ -317,11 +401,14 @@
         }
 
         .vi-cal-nav-btn {
-            width: 24px; height: 24px;
+            width: 24px;
+            height: 24px;
             border-radius: 6px;
             border: 1px solid #e5e7eb;
             background: #fff;
-            display: flex; align-items: center; justify-content: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
             transition: all .15s;
             color: #6b7280;
@@ -335,18 +422,21 @@
         }
 
         .dark .vi-cal-nav-btn {
-            background: rgba(255,255,255,.05);
-            border-color: rgba(255,255,255,.1);
+            background: rgba(255, 255, 255, .05);
+            border-color: rgba(255, 255, 255, .1);
             color: #9ca3af;
         }
 
         .dark .vi-cal-nav-btn:hover {
-            background: rgba(127,0,255,.2);
-            border-color: rgba(127,0,255,.4);
+            background: rgba(127, 0, 255, .2);
+            border-color: rgba(127, 0, 255, .4);
             color: #bf80ff;
         }
 
-        .vi-cal-nav-btn svg { width: 12px; height: 12px; }
+        .vi-cal-nav-btn svg {
+            width: 12px;
+            height: 12px;
+        }
 
         .vi-cal-nav-label {
             font-size: 12px;
@@ -358,10 +448,17 @@
             transition: color .15s;
         }
 
-        .vi-cal-nav-label:hover { color: #7F00FF; }
+        .vi-cal-nav-label:hover {
+            color: #7F00FF;
+        }
 
-        .dark .vi-cal-nav-label { color: #e5e7eb; }
-        .dark .vi-cal-nav-label:hover { color: #bf80ff; }
+        .dark .vi-cal-nav-label {
+            color: #e5e7eb;
+        }
+
+        .dark .vi-cal-nav-label:hover {
+            color: #bf80ff;
+        }
 
         .vi-cal-today-btn {
             font-size: 9px;
@@ -381,8 +478,8 @@
         }
 
         .dark .vi-cal-today-btn {
-            background: rgba(127,0,255,.15);
-            border-color: rgba(127,0,255,.3);
+            background: rgba(127, 0, 255, .15);
+            border-color: rgba(127, 0, 255, .3);
             color: #bf80ff;
         }
 
@@ -405,21 +502,23 @@
             z-index: 10;
         }
 
-        .vi-cal-cell[data-tip]:hover::after { opacity: 1; }
+        .vi-cal-cell[data-tip]:hover::after {
+            opacity: 1;
+        }
     </style>
 
     <div class="vi-grid">
 
         {{-- ═══ COL 1: Revenue vs Cost Area Chart ═══ --}}
         <div class="vi-card">
-            <div class="vi-title">
+            <div class="vi-header">
+                <span class="vi-title">Tren Omzet vs Biaya</span>
                 <div class="vi-title-icon">
                     <svg fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.941" />
                     </svg>
                 </div>
-                Tren Omzet vs Biaya (6 Bulan)
             </div>
 
             <div class="vi-card-body">
@@ -439,8 +538,8 @@
                         {{-- Grid lines --}}
                         @for ($g = 0; $g <= 4; $g++)
                             @php $gy = $padT + ($plotH / 4) * $g; @endphp
-                            <line x1="{{ $padL }}" y1="{{ $gy }}" x2="{{ $padL + $plotW }}" y2="{{ $gy }}"
-                                stroke="#f1f5f9" stroke-width="1" />
+                            <line x1="{{ $padL }}" y1="{{ $gy }}" x2="{{ $padL + $plotW }}" y2="{{ $gy }}" stroke="#f1f5f9"
+                                stroke-width="1" />
                         @endfor
 
                         {{-- Biaya area --}}
@@ -461,18 +560,18 @@
                                 $yB = $padT + $plotH - ($m['biaya'] / $maxVal) * $plotH;
                             @endphp
                             {{-- Omzet dot --}}
-                            <circle cx="{{ round($x, 1) }}" cy="{{ round($yO, 1) }}" r="4"
-                                fill="#7F00FF" stroke="#fff" stroke-width="2">
+                            <circle cx="{{ round($x, 1) }}" cy="{{ round($yO, 1) }}" r="4" fill="#7F00FF" stroke="#fff"
+                                stroke-width="2">
                                 <title>{{ $m['label'] }}: Rp {{ number_format($m['omzet'], 0, ',', '.') }}</title>
                             </circle>
                             {{-- Omzet label --}}
-                            <text x="{{ round($x, 1) }}" y="{{ round(max($yO - 10, 8), 1) }}"
-                                text-anchor="middle" fill="#7F00FF" font-size="10" font-weight="700">
+                            <text x="{{ round($x, 1) }}" y="{{ round(max($yO - 10, 8), 1) }}" text-anchor="middle"
+                                fill="#7F00FF" font-size="10" font-weight="700">
                                 {{ $rpShort($m['omzet']) }}
                             </text>
                             {{-- Biaya dot --}}
-                            <circle cx="{{ round($x, 1) }}" cy="{{ round($yB, 1) }}" r="4"
-                                fill="#94a3b8" stroke="#fff" stroke-width="2">
+                            <circle cx="{{ round($x, 1) }}" cy="{{ round($yB, 1) }}" r="4" fill="#94a3b8" stroke="#fff"
+                                stroke-width="2">
                                 <title>{{ $m['label'] }}: Rp {{ number_format($m['biaya'], 0, ',', '.') }}</title>
                             </circle>
                         @endforeach
@@ -480,9 +579,8 @@
                         {{-- Month labels inside SVG --}}
                         @foreach ($rc as $i => $m)
                             @php $lx = $padL + $i * $stepX; @endphp
-                            <text x="{{ round($lx, 1) }}" y="{{ $baseline + 14 }}"
-                                text-anchor="middle" fill="#9ca3af" font-size="10" font-weight="600"
-                                style="text-transform:uppercase">{{ $m['label'] }}</text>
+                            <text x="{{ round($lx, 1) }}" y="{{ $baseline + 14 }}" text-anchor="middle" fill="#9ca3af"
+                                font-size="10" font-weight="600" style="text-transform:uppercase">{{ $m['label'] }}</text>
                         @endforeach
                     </svg>
                 </div>
@@ -501,16 +599,15 @@
             </div>
         </div>
 
-        {{-- ═══ COL 2: Donut — Production Status ═══ --}}
         <div class="vi-card">
-            {{-- Header Status Produksi --}}
             <div class="vi-header">
-                <div class="vi-icon-box" style="background:#f3e8ff; color:#a855f7;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6l-2-2v-4zm0 8h2v2h-2v-2z"/>
+                <span class="vi-title">Ringkasan Pesanan</span>
+                <div class="vi-title-icon">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
                     </svg>
                 </div>
-                <h3 class="vi-title">Ringkasan Pesanan</h3>
             </div>
 
             <div class="vi-donut-wrap">
@@ -521,11 +618,9 @@
 
                         @if($ps['totalPcs'] > 0)
                             @foreach ($donutSegments as $seg)
-                                <circle cx="70" cy="70" r="54" fill="none"
-                                    stroke="{{ $seg['color'] }}" stroke-width="32"
+                                <circle cx="70" cy="70" r="54" fill="none" stroke="{{ $seg['color'] }}" stroke-width="32"
                                     stroke-dasharray="{{ $seg['dash'] }} {{ $seg['gap'] }}"
-                                    stroke-dashoffset="{{ $seg['offset'] }}"
-                                    stroke-linecap="butt">
+                                    stroke-dashoffset="{{ $seg['offset'] }}" stroke-linecap="butt">
                                     <title>{{ $seg['stage'] }}: {{ number_format($seg['pcs']) }} pcs</title>
                                 </circle>
                             @endforeach
@@ -533,17 +628,10 @@
                     </svg>
 
                     {{-- Center text --}}
-                    @if($ps['totalPcs'] > 0)
-                        <div class="vi-donut-text">
-                            <div class="vi-donut-val">{{ number_format($ps['totalPcs']) }}</div>
-                            <div class="vi-donut-label">Pesanan</div>
-                        </div>
-                    @else
-                        <div class="vi-donut-text">
-                            <div class="vi-donut-val">0</div>
-                            <div class="vi-donut-label">Pesanan</div>
-                        </div>
-                    @endif
+                    <div class="vi-donut-center">
+                        <span class="vi-donut-center-val">{{ number_format($ps['totalPcs']) }}</span>
+                        <span class="vi-donut-center-lbl">Pesanan</span>
+                    </div>
                 </div>
 
                 {{-- Legend --}}
@@ -552,7 +640,8 @@
                         <div class="vi-legend-item">
                             <div class="vi-legend-dot" style="background:{{ $seg['color'] }}"></div>
                             <span style="font-weight: 500;">{{ $seg['stage'] }}</span>
-                            <span style="color: #94a3b8; font-weight: 700; margin-left: 2px;">{{ $seg['pcs'] }}</span>
+                            <span
+                                style="color: #94a3b8; font-weight: 700; margin-left: 2px;">{{ $seg['pcs'] ?: '0' }}</span>
                         </div>
                     @endforeach
                 </div>
@@ -561,14 +650,14 @@
 
         {{-- ═══ COL 3: Heatmap — Deadline Calendar ═══ --}}
         <div class="vi-card">
-            <div class="vi-title">
+            <div class="vi-header">
+                <span class="vi-title">Deadline Heatmap</span>
                 <div class="vi-title-icon">
                     <svg fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
                     </svg>
                 </div>
-                Deadline Heatmap
             </div>
 
             {{-- ◀ Month Navigation ▶ --}}
@@ -613,8 +702,8 @@
                         $isToday = $hm['today'] !== null && $d === $hm['today'];
                         $tip = $count > 0 ? $count . ' pesanan deadline' : '';
                     @endphp
-                    <div class="vi-cal-cell {{ $level }} {{ $isToday ? 'today' : '' }}"
-                        @if($tip) data-tip="{{ $tip }}" @endif>
+                    <div class="vi-cal-cell {{ $level }} {{ $isToday ? 'today' : '' }}" @if($tip) data-tip="{{ $tip }}"
+                    @endif>
                         {{ $d }}
                     </div>
                 @endfor

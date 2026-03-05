@@ -91,6 +91,9 @@ class AdminPanelProvider extends PanelProvider
                         }
                         ' : '') . '
 
+                        /* Global x-cloak */
+                        [x-cloak] { display: none !important; }
+
                         /* Global table vertical alignment */
                         .fi-ta-table td { vertical-align: top !important; }
 

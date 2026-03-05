@@ -1,6 +1,11 @@
 <x-filament-widgets::widget>
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+    </style>
     <div wire:poll.10s
-        style="background:white; border-radius:20px; box-shadow:0 1px 3px rgba(0,0,0,0.07); border:1px solid #e5e7eb; overflow:hidden; font-family:inherit;">
+        style="background:white; border-radius:20px; box-shadow:0 1px 3px rgba(0,0,0,0.07); border:1px solid #e5e7eb; font-family:inherit;">
         {{-- HEADER SECTION --}}
         <div style="padding:24px 24px 16px;">
             <h2 style="font-size:20px; font-weight:600; color:#1f2937; margin-bottom:20px;">
@@ -94,8 +99,8 @@
         </div>
 
         {{-- TABLE SECTION --}}
-        <div style="overflow-x:auto; padding:0 24px 12px;">
-            <div style="min-width:1000px; border:1px solid #f3f4f6; border-radius:16px; overflow:hidden;">
+        <div style="overflow-x:auto; padding:0 24px 50px;">
+            <div style="min-width:1000px; border:1px solid #f3f4f6; border-radius:16px;">
                 <table style="width:100%; border-collapse:collapse; text-align:left;">
                     <thead>
                         <tr style="background:#fafafa; border-bottom:1px solid #f3f4f6;">
@@ -274,98 +279,157 @@
                                                         $itemStatusLabel = 'Antrian';
                                                     }
                                                 }
-                                                @endphp
-                                                @php
-                                                    $statusKey = strtolower($itemStatusLabel);
-                                                    $colorMap = [
-                                                        'antrian' => '#818cf8',
-                                                        'potong' => '#f87171',
-                                                        'jahit' => '#22d3ee',
-                                                        'bordir' => '#fb923c',
-                                                        'kancing' => '#6366f1',
-                                                        'finishing' => '#4ade80',
-                                                        'qc' => '#a855f7',
-                                                        'selesai' => '#2dd4bf',
-                                                        'siap diambil' => '#22c55e',
-                                                        'batal' => '#ef4444',
-                                                        'diterima' => '#d946ef',
-                                                        'dikerjakan' => '#3b82f6',
-                                                    ];
-                                                    
-                                                    $baseColor = $colorMap[$statusKey] ?? ($itemProgress === 100 ? '#16a34a' : '#a855f7');
-                                                    
-                                                    // Generate lighter tints for background and border
-                                                    $barColor = $baseColor;
-                                                    $bgColor = $baseColor . '15'; // 15 is hex for ~8% opacity
-                                                    $borderColor = $baseColor . '30'; // 30 is hex for ~18% opacity
-                                                @endphp
-                                                
-                                                <div style="display:flex; flex-direction:column; gap:2px;">
-                                                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                                        <span
-                                                            style="font-size:14px; font-weight:500; color:#6b7280;">{{ $item->quantity }}x
-                                                            {{ $item->product_name }}</span>
-                                                        <span
-                                                            style="padding:2px 8px; border-radius:4px; border:1px solid {{ $borderColor }}; background:{{ $bgColor }}; color:{{ $barColor }}; font-size:11px; font-weight:500;">{{ $catName }}</span>
-                                                    </div>
+                                            @endphp
+                                            @php
+                                                $statusKey = strtolower($itemStatusLabel);
+                                                $colorMap = [
+                                                    'antrian' => '#818cf8',
+                                                    'potong' => '#f87171',
+                                                    'jahit' => '#22d3ee',
+                                                    'bordir' => '#fb923c',
+                                                    'kancing' => '#6366f1',
+                                                    'finishing' => '#4ade80',
+                                                    'qc' => '#a855f7',
+                                                    'selesai' => '#2dd4bf',
+                                                    'siap diambil' => '#22c55e',
+                                                    'batal' => '#ef4444',
+                                                    'diterima' => '#d946ef',
+                                                    'dikerjakan' => '#3b82f6',
+                                                ];
 
-                                                    {{-- Individual Progress Bar --}}
-                                                    <div style="display:flex; align-items:center; gap:10px; margin-top:2px;">
-                                                        <div
-                                                            style="width:70px; height:6px; background:#f1f5f9; border-radius:9999px; overflow:hidden; border:1px solid #e2e8f0;">
-                                                            <div
-                                                                style="height:100%; background:{{ $barColor }}; border-radius:9999px; width:{{ $itemProgress }}%;">
-                                                            </div>
-                                                        </div>
-                                                        <span
-                                                            style="font-size:10px; font-weight:600; color:{{ $barColor }};">{{ $itemStatusLabel }}</span>
-                                                    </div>
+                                                $baseColor = $colorMap[$statusKey] ?? ($itemProgress === 100 ? '#16a34a' : '#a855f7');
+
+                                                // Generate lighter tints for background and border
+                                                $barColor = $baseColor;
+                                                $bgColor = $baseColor . '15'; // 15 is hex for ~8% opacity
+                                                $borderColor = $baseColor . '30'; // 30 is hex for ~18% opacity
+                                            @endphp
+
+                                            <div style="display:flex; flex-direction:column; gap:2px;">
+                                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                                    <span
+                                                        style="font-size:14px; font-weight:500; color:#6b7280;">{{ $item->quantity }}x
+                                                        {{ $item->product_name }}</span>
+                                                    <span
+                                                        style="padding:2px 8px; border-radius:4px; border:1px solid {{ $borderColor }}; background:{{ $bgColor }}; color:{{ $barColor }}; font-size:11px; font-weight:500;">{{ $catName }}</span>
                                                 </div>
+
+                                                {{-- Individual Progress Bar --}}
+                                                <div style="display:flex; align-items:center; gap:10px; margin-top:2px;">
+                                                    <div
+                                                        style="width:70px; height:6px; background:#f1f5f9; border-radius:9999px; overflow:hidden; border:1px solid #e2e8f0;">
+                                                        <div
+                                                            style="height:100%; background:{{ $barColor }}; border-radius:9999px; width:{{ $itemProgress }}%;">
+                                                        </div>
+                                                    </div>
+                                                    <span
+                                                        style="font-size:10px; font-weight:600; color:{{ $barColor }};">{{ $itemStatusLabel }}</span>
+                                                </div>
+                                            </div>
                                         @endforeach
                                     </div>
                                 </td>
 
                                 {{-- Actions --}}
                                 <td style="padding:16px; vertical-align:top; text-align:right;">
-                                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
-
-                                        <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order]) }}"
-                                            style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#eab308; color:white; font-size:12px; font-weight:600; border-radius:8px; text-decoration:none; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                                                stroke="currentColor" stroke-width="2.5">
-                                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                                                <circle cx="12" cy="12" r="3" />
+                                    <div x-data="{ open: false }"
+                                        style="position:relative; display:inline-block; text-align:left;">
+                                        <button @click.stop="open = !open"
+                                            style="padding:6px; background:#f3f4f6; color:#4b5563; border-radius:10px; border:1px solid #e5e7eb; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center;"
+                                            onmouseover="this.style.background='#e5e7eb'; this.style.borderColor='#d1d5db'"
+                                            onmouseout="this.style.background='#f3f4f6'; this.style.borderColor='#e5e7eb'">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                                stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="1" />
+                                                <circle cx="12" cy="5" r="1" />
+                                                <circle cx="12" cy="19" r="1" />
                                             </svg>
-                                            Detail
-                                        </a>
+                                        </button>
 
-                                        @if(auth()->user()->role === 'owner')
-                                            @php
-                                                $phone = $order->customer->phone ?? '';
-                                                if (str_starts_with($phone, '0')) {
-                                                    $phone = '62' . substr($phone, 1);
-                                                }
-                                                $waUrl = 'https://wa.me/' . preg_replace('/[^0-9]/', '', $phone);
-                                            @endphp
-                                            <a href="{{ $waUrl }}" target="_blank"
-                                                style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#22c55e; color:white; font-size:12px; font-weight:600; border-radius:8px; text-decoration:none; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                                                </svg>
-                                                WhatsApp
+                                        <div x-show="open" x-cloak @click.away="open = false"
+                                            x-transition:enter="transition ease-out duration-100"
+                                            x-transition:enter-start="transform opacity-0 scale-95"
+                                            x-transition:enter-end="transform opacity-100 scale-100"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="transform opacity-100 scale-100"
+                                            x-transition:leave-end="transform opacity-0 scale-95"
+                                            style="position:absolute; right:0; top:calc(100% + 5px); z-index:1000; width:165px; background:white; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding:6px;">
+
+                                            {{-- Detail --}}
+                                            <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order]) }}"
+                                                style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#9333ea; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
+                                                onmouseover="this.style.background='#f5f3ff'"
+                                                onmouseout="this.style.background='transparent'">
+                                                <div
+                                                    style="width:22px; height:22px; background:#f5f3ff; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                                        stroke-linejoin="round">
+                                                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                                                        <circle cx="12" cy="12" r="3" />
+                                                    </svg>
+                                                </div>
+                                                Lihat Detail
                                             </a>
-                                        @else
-                                            <a href="{{ \App\Filament\Resources\ControlProduksis\ControlProduksiResource::getUrl('index') }}"
-                                                style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#7c3aed; color:white; font-size:12px; font-weight:600; border-radius:8px; text-decoration:none; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
-                                                <svg width="16" height="13" viewBox="0 0 24 24" fill="none"
-                                                    stroke="currentColor" stroke-width="2">
-                                                    <path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v10" />
-                                                    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-                                                    <path d="M10.4 12.6a2 2 0 1 1 3 3L8 21l-4 1 1-4Z" />
-                                                </svg>
-                                                Tugas
+
+                                            {{-- Kuitansi --}}
+                                            <button wire:click="downloadReceipt({{ $order->id }})" @click="open = false"
+                                                style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#16a34a; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
+                                                onmouseover="this.style.background='#f0fdf4'"
+                                                onmouseout="this.style.background='transparent'">
+                                                <div
+                                                    style="width:22px; height:22px; background:#f0fdf4; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                                        stroke-linejoin="round">
+                                                        <path
+                                                            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                        <polyline points="14 2 14 8 20 8" />
+                                                        <line x1="12" y1="18" x2="12" y2="12" />
+                                                        <polyline points="9 15 12 18 15 15" />
+                                                    </svg>
+                                                </div>
+                                                Kuitansi
+                                            </button>
+
+                                            {{-- Edit --}}
+                                            <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order]) }}"
+                                                style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#7c3aed; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
+                                                onmouseover="this.style.background='#f5f3ff'"
+                                                onmouseout="this.style.background='transparent'">
+                                                <div
+                                                    style="width:22px; height:22px; background:#f5f3ff; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                                        stroke-linejoin="round">
+                                                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                                                    </svg>
+                                                </div>
+                                                Edit
                                             </a>
-                                        @endif
+
+                                            {{-- Delete --}}
+                                            <button
+                                                @click="if(confirm('Apakah Anda yakin ingin menghapus pesanan ini?')) { $wire.deleteOrder({{ $order->id }}); open = false; }"
+                                                style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ef4444; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
+                                                onmouseover="this.style.background='#fef2f2'"
+                                                onmouseout="this.style.background='transparent'">
+                                                <div
+                                                    style="width:22px; height:22px; background:#fef2f2; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                                        stroke-linejoin="round">
+                                                        <polyline points="3 6 5 6 21 6" />
+                                                        <path
+                                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                        <line x1="10" y1="11" x2="10" y2="17" />
+                                                        <line x1="14" y1="11" x2="14" y2="17" />
+                                                    </svg>
+                                                </div>
+                                                Delete
+                                            </button>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>

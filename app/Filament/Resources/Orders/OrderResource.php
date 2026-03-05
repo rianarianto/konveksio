@@ -38,6 +38,7 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Intervention\Image\Laravel\Facades\Image;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
@@ -1152,7 +1153,7 @@ class OrderResource extends Resource
                             ])->columns(2),
 
                             TextInput::make('total_price')
-                                ->label('Total')
+                                ->label('Total Tagihan')
                                 ->numeric()
                                 ->prefix('Rp')
                                 ->disabled()
@@ -1161,85 +1162,108 @@ class OrderResource extends Resource
                                 ->default(0)
                                 ->columnSpanFull(),
 
-                            // Group::make([
-                            //     TextInput::make('down_payment')
-                            //         ->label('DP')
-                            //         ->numeric()
-                            //         ->prefix('Rp')
-                            //         ->default(0)
-                            //         ->live(),
+                            Section::make('Pembayaran Awal / DP')
+                                ->description('Input pembayaran awal saat pembuatan pesanan. Pembayaran tambahan bisa dikelola di tabel paling bawah setelah pesanan disimpan.')
+                                ->schema([
+                                    Group::make([
+                                        TextInput::make('initial_payment_amount')
+                                            ->label('Nominal Bayar (DP)')
+                                            ->numeric()
+                                            ->prefix('Rp')
+                                            ->default(0)
+                                            ->live()
+                                            ->dehydrated(false) // Virtual field
+                                            ->helperText('Kosongkan jika belum ada pembayaran'),
 
-                            //     Placeholder::make('remaining_payment')
-                            //         ->label('Sisa Tagihan')
-                            //         ->content(function (Get $get): HtmlString {
-                            //             $total = (int) $get('total_price') ?? 0;
-                            //             $dp = (int) $get('down_payment') ?? 0;
-                            //             $remaining = $total - $dp;
-                            //             $color = $remaining > 0 ? 'text-danger-600' : 'text-success-600';
-                            //             return new HtmlString(
-                            //                 '<span class="font-bold ' . $color . '" style="font-size:20px;">'
-                            //                 . 'Rp ' . number_format($remaining, 0, ',', '.')
-                            //                 . '</span>'
-                            //             );
-                            //         }),
-                            // ])->columns(2),
+                                        Select::make('initial_payment_method')
+                                            ->label('Metode Pembayaran')
+                                            ->options([
+                                                'cash' => '💵 Cash',
+                                                'transfer' => '🏦 Transfer',
+                                                'qris' => '📱 QRIS',
+                                            ])
+                                            ->default('cash')
+                                            ->dehydrated(false), // Virtual field
+                                    ])->columns(2),
 
-                            // FileUpload::make('dp_proof')
-                            //     ->label('Bukti Pembayaran DP')
-                            //     ->image()
-                            //     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
-                            //     ->maxSize(5120)
-                            //     ->disk('public')
-                            //     ->directory('payments/proofs')
-                            //     ->downloadable()
-                            //     ->openable()
-                            //     ->previewable()
-                            //     ->columnSpanFull()
-                            //     ->nullable()
-                            //     ->helperText('Upload foto/scan bukti transfer DP (maks. 5MB, otomatis dikompres ke max 1920px/75% quality)')
-                            //     ->getUploadedFileUsing(function (string $file): ?array {
-                            //         $disk = Storage::disk('public');
-                            //         if (!$disk->exists($file)) {
-                            //             return null;
-                            //         }
-                            //         return [
-                            //             'name' => basename($file),
-                            //             'size' => $disk->size($file),
-                            //             'type' => mime_content_type($disk->path($file)) ?: 'image/jpeg',
-                            //             'url' => asset('storage/' . $file),
-                            //         ];
-                            //     })
-                            //     ->saveUploadedFileUsing(function (TemporaryUploadedFile $file): string {
-                            //         $mimeType = $file->getMimeType();
+                                    FileUpload::make('initial_payment_proof')
+                                        ->label('Bukti Bayar')
+                                        ->image()
+                                        ->disk('public')
+                                        ->directory('payments/proofs')
+                                        ->dehydrated(false) // Virtual field
+                                        ->openable()
+                                        ->downloadable()
+                                        ->previewable()
+                                        ->getUploadedFileUsing(function (string $file): ?array {
+                                            $disk = Storage::disk('public');
+                                            if (!$disk->exists($file)) {
+                                                return null;
+                                            }
+                                            return [
+                                                'name' => basename($file),
+                                                'size' => $disk->size($file),
+                                                'type' => (function () use ($disk, $file) {
+                                                    $path = $disk->path($file);
+                                                    if (!file_exists($path))
+                                                        return 'image/jpeg';
+                                                    return mime_content_type($path) ?: 'image/jpeg';
+                                                })(),
+                                                'url' => asset('storage/' . $file),
+                                            ];
+                                        })
+                                        ->saveUploadedFileUsing(function (TemporaryUploadedFile $file): string {
+                                            $mimeType = $file->getMimeType();
 
-                            //         // PDF — simpan langsung tanpa kompres
-                            //         if ($mimeType === 'application/pdf') {
-                            //             $filename = Str::uuid() . '.pdf';
-                            //             $path = 'payments/proofs/' . $filename;
-                            //             Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
-                            //             return $path;
-                            //         }
+                                            // PDF — simpan langsung tanpa kompres
+                                            if ($mimeType === 'application/pdf') {
+                                                $filename = Str::uuid() . '.pdf';
+                                                $path = 'payments/proofs/' . $filename;
+                                                Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
+                                                return $path;
+                                            }
 
-                            //         // Gambar — kompres dengan Intervention Image
-                            //         $img = Image::read($file->getRealPath());
+                                            // Gambar — kompres dengan Intervention Image
+                                            $img = Image::read($file->getRealPath());
 
-                            //         // Resize jika lebar > 1920px (pertahankan aspek rasio)
-                            //         if ($img->width() > 1920) {
-                            //             $img->scaleDown(width: 1920);
-                            //         }
+                                            // Resize jika lebar > 1920px (pertahankan aspek rasio)
+                                            if ($img->width() > 1920) {
+                                                $img->scaleDown(width: 1920);
+                                            }
 
-                            //         // Encode ke JPEG quality 75
-                            //         $encoded = $img->toJpeg(quality: 75);
+                                            // Encode ke JPEG quality 75
+                                            $encoded = $img->toJpeg(quality: 75);
 
-                            //         $filename = Str::uuid() . '.jpg';
-                            //         $path = 'payments/proofs/' . $filename;
-                            //         Storage::disk('public')->put($path, (string) $encoded);
+                                            $filename = Str::uuid() . '.jpg';
+                                            $path = 'payments/proofs/' . $filename;
+                                            Storage::disk('public')->put($path, (string) $encoded);
 
-                            //         return $path;
-                            //     }),
+                                            return $path;
+                                        }),
+
+                                    Placeholder::make('remaining_payment_display')
+                                        ->label('Sisa Yang Harus Dibayar')
+                                        ->content(function (Get $get, ?Order $record): HtmlString {
+                                            $total = (int) ($get('total_price') ?? 0);
+                                            $initial = (int) ($get('initial_payment_amount') ?? 0);
+
+                                            // Jika sedang edit, total paid dari database + initial yang sedang diinput (jika baru)
+                                            // Namun record pembayaran pertama biasanya sudah masuk ke initial_payment_amount saat fill data
+                                            // Jadi kita hitung dari total - initial (virtual)
+                                
+                                            $remaining = $total - $initial;
+                                            $color = $remaining > 0 ? '#ef4444' : '#22c55e';
+                                            $text = $remaining > 0 ? 'Rp ' . number_format($remaining, 0, ',', '.') : 'Lunas';
+
+                                            return new HtmlString('<span style="font-size:18px; font-weight:800; color:' . $color . '">' . $text . '</span>');
+                                        })
+                                ])
+                                ->compact()
+                                ->collapsible(),
+
                         ]),
                 ])
-                    ->columnSpan(2),
+                    ->columnSpan(['lg' => 2, 'default' => 1]),
 
                 // RIGHT SIDE — Ringkasan Pesanan (Sticky Sidebar)
                 Group::make([
@@ -1353,11 +1377,22 @@ class OrderResource extends Resource
                                         $html .= $row('Total Bayar', 'Rp 0');
                                     }
 
-                                    $html .= $divider;
                                     $html .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">';
                                     $html .= '<span style="color:#6b7280;font-size:14px;">Sisa</span>';
                                     $html .= $remainingHtml;
-                                    $html .= '</div></div></div>';
+                                    $html .= '</div>';
+
+                                    // Check if record exists for link generation
+                                    if ($record) {
+                                        $html .= '<div style="margin-top:20px; text-align:center;">'
+                                            . '<p style="font-size:10px; color:#9ca3af; margin-bottom:5px;">💡 Cek detail atau tabel untuk download jika link ini terblokir browser</p>'
+                                            . '<a href="' . route('orders.receipt', $record) . '" target="_blank" style="display:block; text-align:center; padding:10px; background:#f3f4f6; color:#4b5563; border-radius:10px; text-decoration:none; font-weight:700; font-size:12px; border:1px solid #e5e7eb; transition:all 0.2s;">'
+                                            . '📄 Buka Kuitansi (Tab Baru)'
+                                            . '</a>'
+                                            . '</div>';
+                                    }
+
+                                    $html .= '</div></div>';
 
                                     return new HtmlString($html);
                                 })
@@ -1366,10 +1401,10 @@ class OrderResource extends Resource
                         ->columns(1)
                         ->extraAttributes(['style' => 'position:sticky;']),
                 ])
-                    ->columnSpan(1)
+                    ->columnSpan(['lg' => 1, 'default' => 1])
                     ->extraAttributes(['style' => 'align-self:flex-start;position:sticky;top:5rem;']),
             ])
-            ->columns(3);
+            ->columns(['lg' => 3, 'default' => 1]);
     }
 
     // ─── Hitung total satu item dari Get $get (saat live form) ──────────────
@@ -1706,7 +1741,7 @@ class OrderResource extends Resource
 
                         $orderNum = '<div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">'
                             . $expressHtml
-                            . '<div style="font-weight:600; color:#9ca3af; font-size:13px; letter-spacing:0.04em; text-transform:uppercase;">' . htmlspecialchars($record->order_number) . '</div>'
+                            . '<div style="font-weight:600; color:#666666; font-size:13px; letter-spacing:0.04em; text-transform:uppercase;">' . htmlspecialchars($record->order_number) . '</div>'
                             . '</div>';
 
                         $customer = $record->customer;
@@ -1972,6 +2007,13 @@ class OrderResource extends Resource
 
                         return $html;
                     }),
+
+                // ═══ KOLOM 5: Aksi (Action) ══════════════════════════════════
+                TextColumn::make('actions')
+                    ->label('Aksi')
+                    ->alignEnd()
+                    ->view('filament.resources.orders.actions')
+                    ->extraCellAttributes(['style' => 'vertical-align:top; padding-top:16px;']),
             ])
 
             ->filters([
@@ -1998,18 +2040,12 @@ class OrderResource extends Resource
                     }),
             ])
 
-            ->recordActions([
-                Action::make('detail')
-                    ->label('Detail')
-                    ->icon('heroicon-o-eye')
-                    ->color('warning')
-                    ->url(fn(Order $record) => static::getUrl('edit', ['record' => $record])),
-
-                \Filament\Actions\ActionGroup::make([
-                    EditAction::make(),
-                    DeleteAction::make(),
-                ]),
+            ->actions([
+                DeleteAction::make()
+                    ->extraAttributes(['class' => 'hidden']),
             ])
+            ->recordUrl(null)
+            ->recordAction(null)
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

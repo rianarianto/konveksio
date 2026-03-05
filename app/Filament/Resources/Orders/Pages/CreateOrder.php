@@ -29,4 +29,21 @@ class CreateOrder extends CreateRecord
                 'style' => 'background-color: #7F00FF !important; color: white !important;',
             ]);
     }
+
+    protected function afterCreate(): void
+    {
+        $data = $this->form->getRawState();
+
+        if (!empty($data['initial_payment_amount']) && $data['initial_payment_amount'] > 0) {
+            Payment::create([
+                'order_id' => $this->record->id,
+                'amount' => $data['initial_payment_amount'],
+                'payment_date' => now(),
+                'payment_method' => $data['initial_payment_method'] ?? 'cash',
+                'proof_image' => $data['initial_payment_proof'] ?? null,
+                'recorded_by' => auth()->id(),
+                'note' => 'Pembayaran Awal / DP (Otomatis saat pembuatan pesanan)',
+            ]);
+        }
+    }
 }

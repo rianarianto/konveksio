@@ -160,7 +160,7 @@ class PaymentsRelationManager extends RelationManager
             ->headerActions([
                 CreateAction::make()
                     ->label('+ Tambah Pembayaran')
-                    ->color('success')
+                    ->color('primary')
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['recorded_by'] = auth()->id();
                         return $data;
