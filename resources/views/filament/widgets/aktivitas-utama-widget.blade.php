@@ -104,6 +104,36 @@
             color: #c4c4c4;
             font-weight: 400;
         }
+
+        /* ─── DARK MODE ─── */
+        .dark .au-card {
+            background: rgba(30, 20, 50, .7);
+            border-color: rgba(255, 255, 255, .05);
+        }
+
+        .dark .au-label {
+            color: #9ca3af;
+        }
+
+        .dark .au-icon-wrap {
+            background: rgba(127, 0, 255, .15);
+        }
+
+        .dark .au-number {
+            color: #f3f4f6;
+        }
+
+        .dark .au-number.red {
+            color: #f87171;
+        }
+
+        .dark .au-trend-up {
+            color: #4ade80;
+        }
+
+        .dark .au-trend-text {
+            color: #6b7280;
+        }
     </style>
 
     <div class="au-grid">

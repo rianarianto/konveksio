@@ -38,7 +38,9 @@ class KeuanganResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Keuangan';
 
-    protected static ?int $navigationSort = 4;
+    protected static string|\UnitEnum|null $navigationGroup = 'KEUANGAN & PENGATURAN';
+
+    protected static ?int $navigationSort = 1;
 
     protected static bool $isScopedToTenant = true;
 

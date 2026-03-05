@@ -5,7 +5,6 @@
 /* Page background */
 /* Page background */
 body:has(.login-illustration-panel) {
-    background-color: #f0f0f0 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -100,11 +99,13 @@ body:has(.login-illustration-panel) {
 .login-illustration-panel {
     flex: 1 !important;
     display: flex !important;
-    background: #ffffff !important;
+    background: #fff !important;
+    /* Force white background to match card */
     align-items: center !important;
     justify-content: center !important;
     min-height: 100% !important;
-    margin-right: 3rem !important;
+    margin: 0 !important;
+    /* Remove the right margin causing offset */
 }
 
 .login-illustration-content {
@@ -186,12 +187,143 @@ body:has(.login-illustration-panel) {
     border-radius: 0.5rem !important;
     width: 100% !important;
     font-weight: 600 !important;
+    transition: all 0.2s ease-in-out !important;
+    /* Smooth interaction */
+    transform: translateY(0) scale(1) !important;
 }
 
 .fi-simple-layout:has(.login-illustration-panel) .fi-btn-primary:hover {
     background-color: #6d00db !important;
+    transform: translateY(-2px) scale(1.02) !important;
+    /* Lift and slight scaling */
+    box-shadow: 0 10px 15px -3px rgba(127, 0, 255, 0.4), 0 4px 6px -4px rgba(127, 0, 255, 0.2) !important;
+    /* Enhanced glowing shadow */
+}
+
+.fi-simple-layout:has(.login-illustration-panel) .fi-btn-primary:active {
+    transform: translateY(0) scale(0.98) !important;
+    /* Press effect */
+    box-shadow: 0 4px 6px -1px rgba(127, 0, 255, 0.3) !important;
 }
 
 .fi-simple-header-subheading {
     text-align: left !important;
+}
+
+/* ===================================
+   Dark Mode Support
+   =================================== */
+
+/* Add base text colors for the light mode before the overrides */
+/* These were previously incorrectly wrapped in :not(.dark) causing specificity leaks */
+.fi-simple-layout:has(.login-illustration-panel) label,
+.fi-simple-layout:has(.login-illustration-panel) .fi-fo-field-wrp-label,
+.fi-simple-layout:has(.login-illustration-panel) .fi-checkbox-label,
+.fi-simple-layout:has(.login-illustration-panel) .fi-simple-header-heading,
+.fi-simple-layout:has(.login-illustration-panel) span {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: inline-block !important;
+}
+
+.fi-simple-layout:has(.login-illustration-panel) .fi-simple-header-subheading,
+.fi-simple-layout:has(.login-illustration-panel) p.text-sm {
+    color: #4b5563 !important;
+}
+
+.fi-simple-layout:has(.login-illustration-panel) .fi-fo-checkbox-wrp label {
+    display: inline-flex !important;
+    align-items: center !important;
+    color: #374151 !important;
+}
+
+.fi-simple-layout:has(.login-illustration-panel) .fi-fo-field-wrp-label span {
+    color: #374151 !important;
+}
+
+.fi-simple-layout:has(.login-illustration-panel) .fi-fo-field-wrp-label sup {
+    color: #ef4444 !important;
+    /* Error red for required asterisks */
+}
+
+/* Page Background in Dark Mode */
+.dark body:has(.login-illustration-panel) {
+    background-color: #09090b !important;
+    /* Tailwind zinc-950 */
+}
+
+/* Card Container in Dark Mode */
+.dark .fi-simple-layout:has(.login-illustration-panel) {
+    background-color: #18181b !important;
+    /* Tailwind zinc-900 */
+}
+
+.dark .fi-simple-layout:has(.login-illustration-panel)>.fi-simple-main-ctn {
+    background-color: transparent !important;
+    /* Prevent double-drawing background */
+}
+
+/* Illustration Panel Background in Dark Mode */
+.dark .login-illustration-panel {
+    background-color: #18181b !important;
+}
+
+/* Force Light text for ALL labels and text in Dark Mode */
+.dark .fi-simple-layout:has(.login-illustration-panel) h1,
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-page-heading,
+.dark .fi-simple-layout:has(.login-illustration-panel) label,
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-fo-field-wrp-label,
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-checkbox-label,
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-simple-header-heading,
+.dark .fi-simple-layout:has(.login-illustration-panel) span {
+    color: #f4f4f5 !important;
+    /* Tailwind zinc-100 */
+}
+
+/* Secondary text in Dark Mode */
+.dark .fi-simple-layout:has(.login-illustration-panel) p,
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-simple-header-subheading,
+.dark .fi-simple-layout:has(.login-illustration-panel) p.text-sm {
+    color: #a1a1aa !important;
+    /* Tailwind zinc-400 */
+}
+
+/* Checkbox specific in Dark Mode */
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-fo-checkbox-wrp label {
+    color: #e4e4e7 !important;
+    /* Tailwind zinc-200 */
+}
+
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-fo-field-wrp-label span {
+    color: #e4e4e7 !important;
+}
+
+/* Required Asterisk in Dark Mode stays red */
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-fo-field-wrp-label sup {
+    color: #ef4444 !important;
+}
+
+/* Input Fields in Dark Mode */
+.dark .fi-simple-layout:has(.login-illustration-panel) input.custom-input {
+    background-color: #27272a !important;
+    /* Tailwind zinc-800 */
+    border-color: #3f3f46 !important;
+    /* Tailwind zinc-700 */
+    color: #f4f4f5 !important;
+}
+
+.dark .fi-simple-layout:has(.login-illustration-panel) input.custom-input::placeholder {
+    color: #71717a !important;
+    /* Tailwind zinc-500 */
+}
+
+/* Input Wrapper in Dark Mode */
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-input-wrp {
+    background-color: #27272a !important;
+    border-color: #3f3f46 !important;
+}
+
+.dark .fi-simple-layout:has(.login-illustration-panel) .fi-input-wrp:focus-within {
+    border-color: #7F00FF !important;
+    box-shadow: 0 0 0 1px #7F00FF !important;
 }

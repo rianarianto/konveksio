@@ -30,6 +30,10 @@ class DesignTaskResource extends Resource
     protected static ?string $modelLabel = 'Tugas Desain';
     protected static ?string $slug = 'design-tasks';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'PENGELOLAAN PESANAN';
+
+    protected static ?int $navigationSort = 2;
+
     protected static bool $isScopedToTenant = true;
     protected static ?string $tenantOwnershipRelationshipName = 'orderShop';
 

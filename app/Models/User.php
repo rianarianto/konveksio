@@ -28,6 +28,8 @@ class User extends Authenticatable implements HasTenants
         'password',
         'role',
         'shop_id',
+        'max_cash_advance',
+        'current_cash_advance',
     ];
 
     /**
@@ -48,8 +50,10 @@ class User extends Authenticatable implements HasTenants
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'email_verified_at'    => 'datetime',
+            'password'             => 'hashed',
+            'max_cash_advance'     => 'integer',
+            'current_cash_advance' => 'integer',
         ];
     }
 
@@ -104,5 +108,13 @@ class User extends Authenticatable implements HasTenants
     protected static function booted(): void
     {
         static::addGlobalScope(new \App\Models\Scopes\ShopScope);
+    }
+
+    /**
+     * Riwayat kasbon (pinjaman & pelunasan) user ini.
+     */
+    public function cashAdvances(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(CashAdvance::class, 'cash_advanceable');
     }
 }

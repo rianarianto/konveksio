@@ -24,6 +24,15 @@ class WorkerResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'PRODUKSI & KARYAWAN';
+
+    protected static ?int $navigationSort = 2;
+
+    public static function canAccess(): bool
+    {
+        return in_array(auth()->user()->role, ['admin', 'designer']);
+    }
+
     public static function form(Schema $schema): Schema
     {
         return WorkerForm::configure($schema);

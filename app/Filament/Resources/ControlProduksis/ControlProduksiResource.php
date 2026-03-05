@@ -34,6 +34,15 @@ class ControlProduksiResource extends Resource
 
     protected static ?string $slug = 'control-produksi';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'PRODUKSI & KARYAWAN';
+
+    protected static ?int $navigationSort = 1;
+
+    public static function canAccess(): bool
+    {
+        return in_array(auth()->user()->role, ['admin', 'designer']);
+    }
+
     public static function getNavigationIcon(): string
     {
         return 'heroicon-o-squares-2x2';

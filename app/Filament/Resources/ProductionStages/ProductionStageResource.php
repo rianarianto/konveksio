@@ -33,7 +33,17 @@ class ProductionStageResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Data Master';
+        return 'PRODUKSI & KARYAWAN';
+    }
+
+    public static function getNavigationSort(): ?int
+    {
+        return 4;
+    }
+
+    public static function canAccess(): bool
+    {
+        return auth()->user()->role === 'owner';
     }
 
     public static function getModelLabel(): string

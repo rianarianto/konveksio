@@ -17,10 +17,14 @@ class Worker extends Model implements HasTenants
         'name',
         'phone',
         'is_active',
+        'max_cash_advance',
+        'current_cash_advance',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'            => 'boolean',
+        'max_cash_advance'     => 'integer',
+        'current_cash_advance' => 'integer',
     ];
 
     protected $appends = ['active_queue_count', 'pending_count', 'in_progress_count', 'done_count'];
@@ -103,5 +107,13 @@ class Worker extends Model implements HasTenants
             ->whereMonth('completed_at', now()->month)
             ->selectRaw('SUM(wage_amount * quantity) as total')
             ->value('total') ?? 0;
+    }
+
+    /**
+     * Riwayat kasbon (pinjaman & pelunasan) tukang ini.
+     */
+    public function cashAdvances(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(CashAdvance::class, 'cash_advanceable');
     }
 }

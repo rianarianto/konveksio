@@ -24,7 +24,8 @@ class WorkerPayrollResource extends Resource
     protected static ?string $navigationLabel = 'Rekap Upah';
     protected static ?string $modelLabel     = 'Rekap Upah';
     protected static ?string $slug           = 'worker-payroll';
-    protected static ?int $navigationSort    = 30;
+    protected static string|\UnitEnum|null $navigationGroup = 'PRODUKSI & KARYAWAN';
+    protected static ?int $navigationSort    = 3;
 
     protected static bool $isScopedToTenant = true;
 
@@ -96,6 +97,17 @@ class WorkerPayrollResource extends Resource
                     ->dateTime('d M Y, H:i')
                     ->sortable()
                     ->color('gray'),
+
+                TextColumn::make('kasbon_info')
+                    ->label('Sisa Kasbon')
+                    ->state(function (ProductionTask $record): string {
+                        $worker = $record->assignedTo;
+                        if (!$worker || $worker->current_cash_advance <= 0) return '-';
+                        return 'Rp ' . number_format($worker->current_cash_advance, 0, ',', '.');
+                    })
+                    ->color(fn(ProductionTask $record): string => (
+                        $record->assignedTo?->current_cash_advance > 0 ? 'danger' : 'gray'
+                    )),
             ])
             ->filters([
                 SelectFilter::make('assigned_to')
@@ -139,6 +151,11 @@ class WorkerPayrollResource extends Resource
         return [
             'index' => Pages\ManageWorkerPayrolls::route('/'),
         ];
+    }
+
+    public static function canAccess(): bool
+    {
+        return in_array(auth()->user()->role, ['owner', 'admin']);
     }
 
     public static function canCreate(): bool { return false; }

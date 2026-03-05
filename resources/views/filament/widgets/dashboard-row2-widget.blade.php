@@ -267,6 +267,32 @@
             text-align: center;
             padding: 24px 0;
         }
+
+        /* ─── DARK MODE REFINEMENTS ─── */
+        .dark .r2-card,
+        .dark .r2-act-card {
+            background: rgba(30, 20, 50, .7);
+            border-color: rgba(255, 255, 255, .05);
+        }
+
+        .dark .r2-icon-wrap {
+            background: rgba(127, 0, 255, .15);
+        }
+
+        .dark .r2-cashflow-title,
+        .dark .r2-metric-value,
+        .dark .r2-act-title,
+        .dark .r2-act-customer {
+            color: #f3f4f6;
+        }
+
+        .dark .r2-metric-label {
+            color: #9ca3af;
+        }
+
+        .dark .r2-act-item {
+            border-bottom-color: rgba(255, 255, 255, .05);
+        }
     </style>
 
     <div class="r2-grid">

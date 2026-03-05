@@ -3,12 +3,128 @@
         [x-cloak] {
             display: none !important;
         }
+
+        /* ─── BASE STYLES & OVERRIDES ─── */
+        .r3-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+            border: 1px solid #e5e7eb;
+            font-family: inherit;
+        }
+        
+        .r3-header-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+
+        .r3-search-input,
+        .r3-filter-select {
+            background: #f9fafb;
+            color: #374151;
+            border: none;
+        }
+
+        .r3-table-container {
+            min-width: 1000px;
+            border: 1px solid #f3f4f6;
+            border-radius: 16px;
+        }
+
+        .r3-th {
+            background: #fafafa;
+            border-bottom: 1px solid #f3f4f6;
+            color: #666666;
+        }
+
+        .r3-tr {
+            border-bottom: 1px solid #f9fafb;
+        }
+
+        .r3-td-text {
+            color: #666666;
+        }
+        
+        .r3-td-text-bold {
+            color: #374151;
+        }
+
+        .r3-action-btn {
+            background: #f3f4f6;
+            color: #4b5563;
+            border-color: #e5e7eb;
+        }
+
+        .r3-dropdown {
+            background: white;
+            border: 1px solid #e5e7eb;
+        }
+
+        /* ─── DARK MODE ─── */
+        .dark .r3-container {
+            background: rgba(30, 20, 50, .7);
+            border-color: rgba(255, 255, 255, .05);
+        }
+
+        .dark .r3-header-title {
+            color: #f3f4f6;
+        }
+
+        .dark .r3-search-input,
+        .dark .r3-filter-select,
+        .dark .r3-filter-date-container {
+            background: rgba(255, 255, 255, .05) !important;
+            color: #f3f4f6 !important;
+        }
+        
+        .dark .r3-filter-date-input {
+            color: #f3f4f6 !important;
+            color-scheme: dark;
+        }
+
+        .dark .r3-table-container {
+            border-color: rgba(255, 255, 255, .05);
+        }
+
+        .dark .r3-th {
+            background: rgba(0, 0, 0, .2);
+            border-bottom-color: rgba(255, 255, 255, .05);
+            color: #9ca3af;
+        }
+
+        .dark .r3-tr {
+            border-bottom-color: rgba(255, 255, 255, .05);
+        }
+
+        .dark .r3-td-text {
+            color: #d1d5db;
+        }
+
+        .dark .r3-td-text-bold {
+            color: #f3f4f6;
+        }
+
+        .dark .r3-action-btn {
+            background: rgba(255, 255, 255, .05);
+            color: #d1d5db;
+            border-color: rgba(255, 255, 255, .1);
+        }
+
+        .dark .r3-dropdown {
+            background: #18181b;
+            border-color: rgba(255, 255, 255, .1);
+        }
+
+        .dark .r3-dropdown-item {
+            color: #d1d5db !important;
+        }
     </style>
-    <div wire:poll.10s
-        style="background:white; border-radius:20px; box-shadow:0 1px 3px rgba(0,0,0,0.07); border:1px solid #e5e7eb; font-family:inherit;">
+    <div wire:poll.10s class="r3-container">
         {{-- HEADER SECTION --}}
         <div style="padding:24px 24px 16px;">
-            <h2 style="font-size:20px; font-weight:600; color:#1f2937; margin-bottom:20px;">
+            <h2 class="r3-header-title">
                 {{ auth()->user()->role === 'owner' ? 'PANTAUAN PRIORITAS OWNER' : 'Daftar Pesanan Cepat' }}
             </h2>
 
@@ -36,13 +152,15 @@
                             </svg>
                         </div>
                         <input wire:model.live.debounce.500ms="search" type="text" placeholder="Cari"
-                            style="background:#f9fafb; border:none; border-radius:12px; padding:10px 16px 10px 36px; font-size:13px; width:180px; color:#374151; outline:none;">
+                            class="r3-search-input"
+                            style="border-radius:12px; padding:10px 16px 10px 36px; font-size:13px; width:180px; outline:none;">
                     </div>
 
                     {{-- Status Filter --}}
                     <div style="position:relative;">
                         <select wire:model.live="statusFilter"
-                            style="appearance:none; background:#f9fafb; border:none; border-radius:12px; padding:10px 36px 10px 16px; font-size:13px; color:#6b7280; cursor:pointer; min-width:155px; outline:none;">
+                            class="r3-filter-select"
+                            style="appearance:none; border-radius:12px; padding:10px 36px 10px 16px; font-size:13px; cursor:pointer; min-width:155px; outline:none;">
                             <option value="">Status Pesanan</option>
                             <option value="pending">Pending</option>
                             <option value="diterima">Antrian</option>
@@ -59,7 +177,7 @@
                     </div>
 
                     {{-- Date Filter --}}
-                    <div
+                    <div class="r3-filter-date-container"
                         style="display:flex; align-items:center; background:#f9fafb; border-radius:12px; overflow:hidden;">
                         <div style="padding:10px 10px 10px 14px; color:#666666;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -71,14 +189,15 @@
                             </svg>
                         </div>
                         <input wire:model.live="deadlineFilter" type="date"
+                            class="r3-filter-date-input"
                             style="background:transparent; border:none; padding:10px 16px 10px 0; font-size:13px; color:#6b7280; outline:none; cursor:text;">
                     </div>
 
                     {{-- Per Page --}}
                     <div style="display:flex; align-items:center; gap:8px;">
                         <div style="position:relative;">
-                            <select wire:model.live="perPage"
-                                style="appearance:none; background:#f9fafb; border:none; border-radius:12px; padding:10px 28px 10px 12px; font-size:13px; color:#6b7280; cursor:pointer; outline:none;">
+                            <select wire:model.live="perPage" class="r3-filter-select"
+                                style="appearance:none; border-radius:12px; padding:10px 28px 10px 12px; font-size:13px; cursor:pointer; outline:none;">
                                 <option value="5">5</option>
                                 <option value="10">10</option>
                                 <option value="25">25</option>
@@ -100,39 +219,39 @@
 
         {{-- TABLE SECTION --}}
         <div style="overflow-x:auto; padding:0 24px 50px;">
-            <div style="min-width:1000px; border:1px solid #f3f4f6; border-radius:16px;">
+            <div class="r3-table-container">
                 <table style="width:100%; border-collapse:collapse; text-align:left;">
                     <thead>
-                        <tr style="background:#fafafa; border-bottom:1px solid #f3f4f6;">
+                        <tr class="r3-th">
                             <th style="padding:12px 16px; width:40px;"><input type="checkbox" disabled
                                     style="accent-color:#7c3aed;"></th>
-                            <th style="padding:12px 8px; font-size:13px; font-weight:600; color:#666666; width:32px;">#
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:32px;">#
                             </th>
-                            <th style="padding:12px 8px; font-size:13px; font-weight:600; color:#666666; width:22%;">
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:22%;">
                                 Pesanan & Pelanggan</th>
-                            <th style="padding:12px 8px; font-size:13px; font-weight:600; color:#666666; width:15%;">
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:15%;">
                                 Deadline</th>
-                            <th style="padding:12px 8px; font-size:13px; font-weight:600; color:#666666; width:18%;">
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:18%;">
                                 Sisa Tagihan (Sisa/Total)</th>
                             <th
-                                style="padding:12px 8px; font-size:13px; font-weight:600; color:#666666; min-width:280px;">
+                                style="padding:12px 8px; font-size:13px; font-weight:600; min-width:280px;">
                                 Tipe Produk & Status Pesanan</th>
                             <th
-                                style="padding:12px 16px; font-size:13px; font-weight:600; color:#666666; width:120px; text-align:right;">
+                                style="padding:12px 16px; font-size:13px; font-weight:600; width:120px; text-align:right;">
                                 Aksi (Action)</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($orders as $index => $order)
-                            <tr style="border-bottom:1px solid #f9fafb;">
+                            <tr class="r3-tr">
                                 {{-- Checkbox --}}
                                 <td style="padding:16px; vertical-align:top;">
                                     <input type="checkbox" disabled style="accent-color:#7c3aed;">
                                 </td>
 
                                 {{-- Index --}}
-                                <td
-                                    style="padding:16px 8px; vertical-align:top; font-size:15px; font-weight:500; color:#666666;">
+                                <td class="r3-td-text"
+                                    style="padding:16px 8px; vertical-align:top; font-size:15px; font-weight:500;">
                                     {{ $orders->firstItem() + $index }}
                                 </td>
 
@@ -148,8 +267,8 @@
                                                 EXPRESS
                                             </span>
                                         @endif
-                                        <div
-                                            style="font-weight:500; color:#666666; font-size:13px; letter-spacing:0.04em; text-transform:uppercase;">
+                                        <div class="r3-td-text"
+                                            style="font-weight:500; font-size:13px; letter-spacing:0.04em; text-transform:uppercase;">
                                             {{ $order->order_number }}
                                         </div>
                                     </div>
@@ -205,8 +324,8 @@
                                         }
                                     @endphp
                                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                                        <span
-                                            style="font-size:14px; font-weight:500; color:#6b7280;">{{ $deadline->format('d M Y') }}</span>
+                                        <span class="r3-td-text"
+                                            style="font-size:14px; font-weight:500;">{{ $deadline->format('d M Y') }}</span>
                                     </div>
                                     <div
                                         style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:9999px; font-size:11px; font-weight:500; {{ $sisaBadgeStyle }}">
@@ -223,10 +342,10 @@
 
                                 {{-- Sisa Tagihan --}}
                                 <td style="padding:16px 8px; vertical-align:top;">
-                                    <div style="font-size:15px; font-weight:700; color:#374151; margin-bottom:6px;">Rp
+                                    <div class="r3-td-text-bold" style="font-size:15px; font-weight:700; margin-bottom:6px;">Rp
                                         {{ number_format($order->remaining_balance ?? 0, 0, ',', '.') }}
                                     </div>
-                                    <div style="font-size:11px; color:#666666; font-weight:500; margin-bottom:6px;">Total
+                                    <div class="r3-td-text" style="font-size:11px; font-weight:500; margin-bottom:6px;">Total
                                         Tagihan</div>
                                     <div
                                         style="display:inline-flex; padding:4px 12px; border-radius:9999px; background:#faf5ff; border:1px solid #f3e8ff; color:#a855f7; font-size:12px; font-weight:700;">
@@ -307,8 +426,8 @@
 
                                             <div style="display:flex; flex-direction:column; gap:2px;">
                                                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                                    <span
-                                                        style="font-size:14px; font-weight:500; color:#6b7280;">{{ $item->quantity }}x
+                                                    <span class="r3-td-text"
+                                                        style="font-size:14px; font-weight:500;">{{ $item->quantity }}x
                                                         {{ $item->product_name }}</span>
                                                     <span
                                                         style="padding:2px 8px; border-radius:4px; border:1px solid {{ $borderColor }}; background:{{ $bgColor }}; color:{{ $barColor }}; font-size:11px; font-weight:500;">{{ $catName }}</span>
@@ -334,10 +453,10 @@
                                 <td style="padding:16px; vertical-align:top; text-align:right;">
                                     <div x-data="{ open: false }"
                                         style="position:relative; display:inline-block; text-align:left;">
-                                        <button @click.stop="open = !open"
-                                            style="padding:6px; background:#f3f4f6; color:#4b5563; border-radius:10px; border:1px solid #e5e7eb; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center;"
-                                            onmouseover="this.style.background='#e5e7eb'; this.style.borderColor='#d1d5db'"
-                                            onmouseout="this.style.background='#f3f4f6'; this.style.borderColor='#e5e7eb'">
+                                        <button @click.stop="open = !open" class="r3-action-btn"
+                                            style="padding:6px; border-radius:10px; border:1px solid; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center;"
+                                            onmouseover="this.style.opacity='0.8'"
+                                            onmouseout="this.style.opacity='1'">
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
                                                 stroke-linejoin="round">
@@ -354,7 +473,8 @@
                                             x-transition:leave="transition ease-in duration-75"
                                             x-transition:leave-start="transform opacity-100 scale-100"
                                             x-transition:leave-end="transform opacity-0 scale-95"
-                                            style="position:absolute; right:0; top:calc(100% + 5px); z-index:1000; width:165px; background:white; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding:6px;">
+                                            class="r3-dropdown"
+                                            style="position:absolute; right:0; top:calc(100% + 5px); z-index:1000; width:165px; border-radius:12px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding:6px;">
 
                                             {{-- Detail --}}
                                             <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order]) }}"
