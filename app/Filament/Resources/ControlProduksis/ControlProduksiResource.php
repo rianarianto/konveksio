@@ -34,13 +34,13 @@ class ControlProduksiResource extends Resource
 
     protected static ?string $slug = 'control-produksi';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'PRODUKSI & KARYAWAN';
+    protected static string|\UnitEnum|null $navigationGroup = 'PRODUKSI';
 
     protected static ?int $navigationSort = 1;
 
     public static function canAccess(): bool
     {
-        return in_array(auth()->user()->role, ['admin', 'designer']);
+        return in_array(auth()->user()->role, ['admin', 'designer', 'owner']);
     }
 
     public static function getNavigationIcon(): string
@@ -684,7 +684,7 @@ class ControlProduksiResource extends Resource
                                                 if (is_array($state)) {
                                                     foreach ($state as $k => $v) {
                                                         if (!in_array($k, $excludeKeys) && is_numeric($v)) {
-                                                            $total += (int)$v;
+                                                            $total += (int) $v;
                                                         }
                                                     }
                                                 }
@@ -837,9 +837,9 @@ class ControlProduksiResource extends Resource
                                                         ->minValue(0)
                                                         ->default(0)
                                                         ->live(debounce: 300)
-                                                        ->afterStateUpdated(function($state, Set $set, Get $get) use ($recalcQty){
-                                                            $recalcQty($get, $set);
-                                                        });
+                                                        ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcQty) {
+                                                        $recalcQty($get, $set);
+                                                    });
                                                 }
                                             }
 
@@ -898,23 +898,23 @@ class ControlProduksiResource extends Resource
             
                         foreach ($tasksData as $idx => $taskItem) {
                             $stage = $taskItem['stage_name'] ?? null;
-                            
+
                             $calculatedQty = 0;
                             $sqs = [];
                             $excludeKeys = ['id', 'stage_name', 'assigned_to', 'wage_per_pcs', 'quantity', 'description', '_fill_all', 'qty'];
                             foreach ($taskItem as $k => $v) {
-                                if (!in_array($k, $excludeKeys) && is_numeric($v) && (int)$v > 0) {
+                                if (!in_array($k, $excludeKeys) && is_numeric($v) && (int) $v > 0) {
                                     $calculatedQty += (int) $v;
                                     $sqs[$k] = (int) $v;
                                 }
                             }
-                            if ($calculatedQty === 0 && isset($taskItem['qty']) && (int)$taskItem['qty'] > 0) {
-                                $calculatedQty = (int)$taskItem['qty'];
+                            if ($calculatedQty === 0 && isset($taskItem['qty']) && (int) $taskItem['qty'] > 0) {
+                                $calculatedQty = (int) $taskItem['qty'];
                             }
-                            if ($calculatedQty === 0 && isset($taskItem['quantity']) && (int)$taskItem['quantity'] > 0) {
-                                $calculatedQty = (int)$taskItem['quantity'];
+                            if ($calculatedQty === 0 && isset($taskItem['quantity']) && (int) $taskItem['quantity'] > 0) {
+                                $calculatedQty = (int) $taskItem['quantity'];
                             }
-                            
+
                             $qty = $calculatedQty;
 
                             // ─── Cek #1: Setiap baris wajib punya qty > 0 ─────────────

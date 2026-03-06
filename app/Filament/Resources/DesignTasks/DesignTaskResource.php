@@ -30,7 +30,7 @@ class DesignTaskResource extends Resource
     protected static ?string $modelLabel = 'Tugas Desain';
     protected static ?string $slug = 'design-tasks';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'PENGELOLAAN PESANAN';
+    protected static string|\UnitEnum|null $navigationGroup = 'PRODUKSI';
 
     protected static ?int $navigationSort = 2;
 
@@ -39,8 +39,8 @@ class DesignTaskResource extends Resource
 
     public static function canAccess(): bool
     {
-        // Hanya bisa diakses oleh Designer
-        return auth()->user()->role === 'designer';
+        // Akses untuk Designer dan Owner
+        return in_array(auth()->user()->role, ['designer', 'owner']);
     }
 
     public static function scopeEloquentQueryToTenant(Builder $query, ?Model $tenant): Builder

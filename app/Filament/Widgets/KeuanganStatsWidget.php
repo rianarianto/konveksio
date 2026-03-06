@@ -59,7 +59,8 @@ class KeuanganStatsWidget extends BaseWidget
             ->pluck('total', 'kategori');
 
         $breakdownText = $expenseBreakdown->map(fn($val, $key) => $key . ': Rp ' . number_format($val, 0, ',', '.'))->implode(' · ');
-        if (empty($breakdownText)) $breakdownText = 'Belum ada pengeluaran';
+        if (empty($breakdownText))
+            $breakdownText = 'Belum ada pengeluaran';
 
         // 5. Total Kasbon Belum Lunas (semua karyawan + tukang)
         $totalKasbonWorkers = Worker::withoutGlobalScopes()->where('shop_id', $tenantId)->sum('current_cash_advance');
@@ -81,16 +82,6 @@ class KeuanganStatsWidget extends BaseWidget
                 ->description('Pemasukan - Pengeluaran (Bulan: ' . Carbon::now()->translatedFormat('F') . ')')
                 ->descriptionIcon('heroicon-m-wallet')
                 ->color('primary'),
-
-            Stat::make('Total Pengeluaran', 'Rp ' . number_format($expensesBulanIni, 0, ',', '.'))
-                ->description($breakdownText)
-                ->descriptionIcon('heroicon-m-arrow-trending-down')
-                ->color('danger'),
-
-            Stat::make('Kasbon Belum Lunas', 'Rp ' . number_format($totalKasbonBelumLunas, 0, ',', '.'))
-                ->description('Total hutang kasbon semua karyawan')
-                ->descriptionIcon('heroicon-m-exclamation-triangle')
-                ->color($totalKasbonBelumLunas > 0 ? 'danger' : 'gray'),
         ];
     }
 }

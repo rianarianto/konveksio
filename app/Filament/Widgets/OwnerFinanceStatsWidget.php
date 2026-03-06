@@ -35,9 +35,11 @@ class OwnerFinanceStatsWidget extends Widget
         $startOfLastMonth = Carbon::now()->subMonth()->startOfMonth();
         $endOfLastMonth = Carbon::now()->subMonth()->endOfMonth();
 
-        $totalOmzet = Order::where('shop_id', $tenantId)
-            ->whereBetween('order_date', [$startOfMonth, $endOfMonth])
-            ->sum('total_price');
+        $queryBulanIni = Order::where('shop_id', $tenantId)
+            ->whereBetween('order_date', [$startOfMonth, $endOfMonth]);
+
+        $totalOmzet = $queryBulanIni->sum('total_price');
+        $orderCount = $queryBulanIni->count();
 
         $prevOmzet = Order::where('shop_id', $tenantId)
             ->whereBetween('order_date', [$startOfLastMonth, $endOfLastMonth])
@@ -81,7 +83,7 @@ class OwnerFinanceStatsWidget extends Widget
         // CARD 3: BEBAN WORKSHOP
         // ══════════════════════════════════════════════════════════════════════
         $activeOrders = Order::where('shop_id', $tenantId)
-            ->where('status', 'dikerjakan')
+            ->whereIn('status', ['antrian', 'diproses'])
             ->with('orderItems')
             ->get();
 
@@ -94,6 +96,7 @@ class OwnerFinanceStatsWidget extends Widget
         return [
             'omzet' => [
                 'total' => $totalOmzet,
+                'order_count' => $orderCount,
                 'trend_pct' => $omzetTrendPct,
                 'trend_up' => $omzetTrendUp,
                 'trend_label' => $omzetTrendLabel,

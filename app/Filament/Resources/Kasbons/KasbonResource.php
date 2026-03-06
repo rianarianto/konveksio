@@ -37,7 +37,7 @@ class KasbonResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Kasbon';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'KEUANGAN & PENGATURAN';
+    protected static string|\UnitEnum|null $navigationGroup = 'KARYAWAN';
 
     protected static ?int $navigationSort = 3;
 
@@ -75,14 +75,15 @@ class KasbonResource extends Resource
                     ->label('Karyawan / Tukang')
                     ->state(function (CashAdvance $record): string {
                         $person = $record->cashAdvanceable;
-                        if (!$person) return '-';
+                        if (!$person)
+                            return '-';
                         $type = $record->cash_advanceable_type === 'App\\Models\\Worker' ? '🔨' : '👤';
                         return $type . ' ' . $person->name;
                     })
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->where(function ($q) use ($search) {
                             $q->whereHasMorph('cashAdvanceable', [User::class], fn($sub) => $sub->where('name', 'like', "%{$search}%"))
-                              ->orWhereHasMorph('cashAdvanceable', [Worker::class], fn($sub) => $sub->where('name', 'like', "%{$search}%"));
+                                ->orWhereHasMorph('cashAdvanceable', [Worker::class], fn($sub) => $sub->where('name', 'like', "%{$search}%"));
                         });
                     }),
 
@@ -212,12 +213,12 @@ class KasbonResource extends Resource
 
                         // Auto-record to Expense (Buku Kas Keluar)
                         Expense::create([
-                            'shop_id'      => $data['shop_id'],
-                            'keperluan'    => 'Kasbon: ' . $person->name,
-                            'amount'       => $data['amount'],
+                            'shop_id' => $data['shop_id'],
+                            'keperluan' => 'Kasbon: ' . $person->name,
+                            'amount' => $data['amount'],
                             'expense_date' => $data['date'],
-                            'note'         => 'Kasbon Karyawan',
-                            'recorded_by'  => auth()->id(),
+                            'note' => 'Kasbon Karyawan',
+                            'recorded_by' => auth()->id(),
                         ]);
 
                         // Remove helper fields
@@ -229,16 +230,28 @@ class KasbonResource extends Resource
                 Action::make('set_limit')
                     ->label('⚙ Atur Limit Kasbon')
                     ->color('gray')
-                    ->modalHeading('Atur Limit Kasbon Karyawan')
+                    ->modalHeading('Atur Limit Kasbon')
                     ->modalWidth('lg')
                     ->form([
+                        \Filament\Forms\Components\Toggle::make('apply_to_all')
+                            ->label('Atur untuk SEMUA Karyawan & Tukang sekaligus?')
+                            ->helperText('Jika diaktifkan, limit baru akan diterapkan ke semua tukang (borongan) dan karyawan (bulanan) di toko ini.')
+                            ->live()
+                            ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, $state) {
+                                if ($state) {
+                                    $set('limit_employee_type', null);
+                                    $set('limit_employee_id', null);
+                                }
+                            }),
+
                         Select::make('limit_employee_type')
                             ->label('Tipe Karyawan')
                             ->options([
                                 'worker' => '🔨 Tukang (Borongan)',
                                 'user' => '👤 Karyawan (Bulanan)',
                             ])
-                            ->required()
+                            ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => !$get('apply_to_all'))
+                            ->hidden(fn(\Filament\Schemas\Components\Utilities\Get $get) => $get('apply_to_all'))
                             ->live()
                             ->afterStateUpdated(fn(\Filament\Schemas\Components\Utilities\Set $set) => $set('limit_employee_id', null)),
 
@@ -266,7 +279,8 @@ class KasbonResource extends Resource
                             })
                             ->searchable()
                             ->preload()
-                            ->required(),
+                            ->required(fn(\Filament\Schemas\Components\Utilities\Get $get) => !$get('apply_to_all'))
+                            ->hidden(fn(\Filament\Schemas\Components\Utilities\Get $get) => $get('apply_to_all')),
 
                         TextInput::make('new_limit')
                             ->label('Limit Kasbon Baru (Rp)')
@@ -276,22 +290,41 @@ class KasbonResource extends Resource
                             ->minValue(0),
                     ])
                     ->action(function (array $data): void {
-                        $type = $data['limit_employee_type'];
-                        $id = $data['limit_employee_id'];
+                        $shopId = Filament::getTenant()?->id;
+                        $newLimit = $data['new_limit'];
 
-                        if ($type === 'worker') {
-                            $person = Worker::findOrFail($id);
+                        if ($data['apply_to_all'] ?? false) {
+                            // Update All Workers in current shop
+                            Worker::where('shop_id', $shopId)->update(['max_cash_advance' => $newLimit]);
+
+                            // Update All Admin/Designer Users in current shop
+                            User::where('shop_id', $shopId)
+                                ->whereIn('role', ['admin', 'designer'])
+                                ->update(['max_cash_advance' => $newLimit]);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Limit Massal Diperbarui')
+                                ->body("Limit kasbon SEMUA karyawan & tukang telah diubah menjadi Rp " . number_format($newLimit, 0, ',', '.'))
+                                ->send();
                         } else {
-                            $person = User::findOrFail($id);
+                            $type = $data['limit_employee_type'];
+                            $id = $data['limit_employee_id'];
+
+                            if ($type === 'worker') {
+                                $person = Worker::findOrFail($id);
+                            } else {
+                                $person = User::findOrFail($id);
+                            }
+
+                            $person->update(['max_cash_advance' => $newLimit]);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Limit Berhasil Diperbarui')
+                                ->body("Limit kasbon {$person->name} diubah menjadi Rp " . number_format($newLimit, 0, ',', '.'))
+                                ->send();
                         }
-
-                        $person->update(['max_cash_advance' => $data['new_limit']]);
-
-                        Notification::make()
-                            ->success()
-                            ->title('Limit Berhasil Diperbarui')
-                            ->body("Limit kasbon {$person->name} diubah menjadi Rp " . number_format($data['new_limit'], 0, ',', '.'))
-                            ->send();
                     }),
             ])
             ->filters([

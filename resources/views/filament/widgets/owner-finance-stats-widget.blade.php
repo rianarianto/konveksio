@@ -278,6 +278,7 @@
             </div>
 
             <div class="ofs-amount">{{ $rpFormat($omzet['total']) }}</div>
+            <div class="ofs-sub">Bulan ini dari <strong>{{ $omzet['order_count'] }} Pesanan</strong></div>
 
             @php
                 $omzetClass = !$omzet['trend_up'] ? 'grey' : 'green';

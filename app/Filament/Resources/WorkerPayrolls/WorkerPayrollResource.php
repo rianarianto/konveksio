@@ -22,10 +22,10 @@ class WorkerPayrollResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
     protected static ?string $navigationLabel = 'Rekap Upah';
-    protected static ?string $modelLabel     = 'Rekap Upah';
-    protected static ?string $slug           = 'worker-payroll';
-    protected static string|\UnitEnum|null $navigationGroup = 'PRODUKSI & KARYAWAN';
-    protected static ?int $navigationSort    = 3;
+    protected static ?string $modelLabel = 'Rekap Upah';
+    protected static ?string $slug = 'worker-payroll';
+    protected static string|\UnitEnum|null $navigationGroup = 'KARYAWAN';
+    protected static ?int $navigationSort = 3;
 
     protected static bool $isScopedToTenant = true;
 
@@ -34,7 +34,9 @@ class WorkerPayrollResource extends Resource
         return $query->where('shop_id', $tenant?->getKey());
     }
 
-    public static function observeTenancyModelCreation(\Filament\Panel $panel): void {}
+    public static function observeTenancyModelCreation(\Filament\Panel $panel): void
+    {
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -102,7 +104,8 @@ class WorkerPayrollResource extends Resource
                     ->label('Sisa Kasbon')
                     ->state(function (ProductionTask $record): string {
                         $worker = $record->assignedTo;
-                        if (!$worker || $worker->current_cash_advance <= 0) return '-';
+                        if (!$worker || $worker->current_cash_advance <= 0)
+                            return '-';
                         return 'Rp ' . number_format($worker->current_cash_advance, 0, ',', '.');
                     })
                     ->color(fn(ProductionTask $record): string => (
@@ -129,13 +132,15 @@ class WorkerPayrollResource extends Resource
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return $query
-                            ->when($data['dari'],    fn($q, $v) => $q->whereDate('completed_at', '>=', $v))
-                            ->when($data['sampai'],  fn($q, $v) => $q->whereDate('completed_at', '<=', $v));
+                            ->when($data['dari'], fn($q, $v) => $q->whereDate('completed_at', '>=', $v))
+                            ->when($data['sampai'], fn($q, $v) => $q->whereDate('completed_at', '<=', $v));
                     })
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
-                        if ($data['dari'])   $indicators[] = 'Dari: ' . $data['dari'];
-                        if ($data['sampai']) $indicators[] = 'Sampai: ' . $data['sampai'];
+                        if ($data['dari'])
+                            $indicators[] = 'Dari: ' . $data['dari'];
+                        if ($data['sampai'])
+                            $indicators[] = 'Sampai: ' . $data['sampai'];
                         return $indicators;
                     }),
             ])
@@ -158,6 +163,12 @@ class WorkerPayrollResource extends Resource
         return in_array(auth()->user()->role, ['owner', 'admin']);
     }
 
-    public static function canCreate(): bool { return false; }
-    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
 }

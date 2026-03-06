@@ -29,8 +29,8 @@ class AktivitasUtamaWidget extends Widget
         $orderTrend = $this->calculateTrend($countOrderToday, $countOrderYesterday);
 
         // 2. Pesanan Diproses
-        $countDiproses = Order::where('status', 'dikerjakan')->count();
-        $countDiprosesYesterday = Order::where('status', 'dikerjakan')
+        $countDiproses = Order::where('status', 'diproses')->count();
+        $countDiprosesYesterday = Order::where('status', 'diproses')
             ->whereDate('updated_at', Carbon::yesterday())->count();
         $diprosesTrend = $this->calculateTrend($countDiproses, $countDiprosesYesterday);
 

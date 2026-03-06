@@ -33,7 +33,7 @@ class ProductionStageResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'PRODUKSI & KARYAWAN';
+        return 'PRODUKSI';
     }
 
     public static function getNavigationSort(): ?int

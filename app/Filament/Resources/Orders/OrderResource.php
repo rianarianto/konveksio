@@ -6,7 +6,11 @@ use App\Filament\Resources\Orders\Pages;
 use App\Models\Customer;
 use App\Models\CustomerMeasurement;
 use App\Models\Order;
+use App\Models\Material;
+use App\Models\Product;
+use App\Models\AddonOption;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Actions\BulkActionGroup;
 use Filament\Notifications\Notification;
 use Filament\Forms\Components\Hidden;
@@ -54,7 +58,7 @@ class OrderResource extends Resource
 
     protected static ?string $modelLabel = 'Pesanan';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'PENGELOLAAN PESANAN';
+    protected static string|\UnitEnum|null $navigationGroup = 'PENJUALAN';
 
     protected static ?int $navigationSort = 1;
 
@@ -65,74 +69,60 @@ class OrderResource extends Resource
 
     protected static bool $isScopedToTenant = true;
 
-    // ─── Bahan baju dengan warna swatch (sementara hardcode, nanti dari data master) ───
+    // ─── Bahan baju dari Master Data ───
     protected static function getBahanOptions(): array
     {
-        $bahanList = [
-            'JN | Parasut | Hitam' => ['hex' => '#1a1a1a', 'text' => '#ffffff'],
-            'JN | Parasut | Putih' => ['hex' => '#f0f0f0', 'text' => '#333333'],
-            'JN | Parasut | Hijau' => ['hex' => '#166534', 'text' => '#ffffff'],
-            'JN | Parasut | Navy' => ['hex' => '#1e3a5f', 'text' => '#ffffff'],
-            'JN | Parasut | Merah' => ['hex' => '#991b1b', 'text' => '#ffffff'],
-            'JN | Parasut | Abu' => ['hex' => '#6b7280', 'text' => '#ffffff'],
-            'JN | Drill | Hitam' => ['hex' => '#2d2d2d', 'text' => '#ffffff'],
-            'JN | Drill | Coklat' => ['hex' => '#8b5e3c', 'text' => '#ffffff'],
-            'JN | Drill | Cream' => ['hex' => '#f5e6c8', 'text' => '#333333'],
-            'JN | Polo | Putih' => ['hex' => '#ffffff', 'text' => '#333333'],
-            'JN | Polo | Hitam' => ['hex' => '#111111', 'text' => '#ffffff'],
-            'JN | Polo | Merah' => ['hex' => '#b91c1c', 'text' => '#ffffff'],
-            'Lainnya' => ['hex' => '#e5e7eb', 'text' => '#374151'],
-        ];
+        $tenantId = Filament::getTenant()?->id;
+        if (!$tenantId)
+            return [];
 
+        $materials = Material::where('shop_id', $tenantId)->get();
         $options = [];
-        foreach ($bahanList as $label => $color) {
-            $options[$label] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
-                . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $color['hex'] . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
+        foreach ($materials as $material) {
+            $hex = $material->color_code ?: '#e5e7eb';
+            $label = $material->name . ($material->type ? " ({$material->type})" : '');
+
+            $options[$material->id] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
+                . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $hex . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
                 . '<span>' . htmlspecialchars($label) . '</span>'
                 . '</span>';
         }
         return $options;
     }
 
-    // ─── Supplier produk dengan warna swatch ─────────────────────────────────
+    // ─── Supplier produk dari Master Data ─────────────────────────────────
     protected static function getSupplierProductOptions(): array
     {
-        $list = [
-            'kaos_cotton' => ['hex' => '#f59e0b', 'text' => '#ffffff', 'label' => 'Kaos Cotton'],
-            'kaos_rib' => ['hex' => '#d97706', 'text' => '#ffffff', 'label' => 'Kaos Rib / Waffle'],
-            'polo_shirt' => ['hex' => '#ea580c', 'text' => '#ffffff', 'label' => 'Polo Shirt'],
-            'jaket_parasut' => ['hex' => '#2563eb', 'text' => '#ffffff', 'label' => 'Jaket Parasut'],
-            'jaket_hoodie' => ['hex' => '#1d4ed8', 'text' => '#ffffff', 'label' => 'Jaket Hoodie'],
-            'jaket_bomber' => ['hex' => '#1e40af', 'text' => '#ffffff', 'label' => 'Jaket Bomber'],
-            'sweater' => ['hex' => '#7c3aed', 'text' => '#ffffff', 'label' => 'Sweater'],
-            'kemeja' => ['hex' => '#16a34a', 'text' => '#ffffff', 'label' => 'Kemeja'],
-            'rompi' => ['hex' => '#15803d', 'text' => '#ffffff', 'label' => 'Rompi'],
-            'celana_jogger' => ['hex' => '#374151', 'text' => '#ffffff', 'label' => 'Celana Jogger'],
-            'topi' => ['hex' => '#92400e', 'text' => '#ffffff', 'label' => 'Topi / Cap'],
-            'totebag' => ['hex' => '#a16207', 'text' => '#ffffff', 'label' => 'Totebag'],
-            'lainnya' => ['hex' => '#e5e7eb', 'text' => '#374151', 'label' => 'Lainnya'],
-        ];
+        $tenantId = Filament::getTenant()?->id;
+        if (!$tenantId)
+            return [];
 
+        $products = Product::where('shop_id', $tenantId)->get();
         $options = [];
-        foreach ($list as $key => $item) {
-            $options[$key] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
-                . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $item['hex'] . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
-                . '<span>' . htmlspecialchars($item['label']) . '</span>'
+        foreach ($products as $product) {
+            $hex = $product->color_code ?: '#e5e7eb';
+            $label = $product->name . ($product->type ? " ({$product->type})" : '');
+
+            $options[$product->id] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
+                . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $hex . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
+                . '<span>' . htmlspecialchars($label) . '</span>'
                 . '</span>';
         }
         return $options;
     }
 
-    // ─── Request tambahan ────────────────────────────────────────────────────
-    protected static array $requestTambahanOptions = [
-        'Saku Semi Klewang' => 'Saku Semi Klewang',
-        'Saku Biasa' => 'Saku Biasa',
-        'Kancing Ekstra' => 'Kancing Ekstra',
-        'Bordir Nama' => 'Bordir Nama',
-        'Label Jahit' => 'Label Jahit',
-        'Resleting' => 'Resleting',
-        'Lainnya' => 'Lainnya',
-    ];
+    // ─── Request tambahan dari Master Data ────────────────────────────────────────────────────
+    protected static function getRequestTambahanOptions(): array
+    {
+        $tenantId = Filament::getTenant()?->id;
+        if (!$tenantId)
+            return [];
+
+        return AddonOption::where('shop_id', $tenantId)
+            ->where('is_active', true)
+            ->pluck('name', 'name')
+            ->toArray();
+    }
 
     // ─── Lokasi sablon/bordir (kombinasi titik, nanti dari data master) ──────
     protected static array $lokasiSablonOptions = [
@@ -484,7 +474,7 @@ class OrderResource extends Resource
                                                     // Baris 1: Jenis + Ukuran
                                                     Select::make('jenis')
                                                         ->label('Jenis Tambahan')
-                                                        ->options(static::$requestTambahanOptions)
+                                                        ->options(static::getRequestTambahanOptions())
                                                         ->searchable()
                                                         ->required()
                                                         ->columnSpan(1),
@@ -788,7 +778,7 @@ class OrderResource extends Resource
                                                 ->schema([
                                                     Select::make('jenis')
                                                         ->label('Jenis Tambahan')
-                                                        ->options(static::$requestTambahanOptions)
+                                                        ->options(static::getRequestTambahanOptions())
                                                         ->searchable()
                                                         ->columnSpan(2),
 

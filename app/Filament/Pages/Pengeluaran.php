@@ -16,11 +16,11 @@ class Pengeluaran extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static ?string $navigationLabel = 'Pengeluaran';
+    protected static ?string $navigationLabel = 'Laporan Pengeluaran';
 
-    protected static ?string $title = 'Laporan Pengeluaran';
+    protected static ?string $title = 'Laporan Insight Pengeluaran';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'KEUANGAN & PENGATURAN';
+    protected static string|\UnitEnum|null $navigationGroup = 'KEUANGAN';
 
     protected static ?int $navigationSort = 0;
 
