@@ -99,4 +99,9 @@ class Order extends Model
     {
         return max(0, (int) $this->total_price - $this->total_paid);
     }
+
+    public function returns(): HasMany
+    {
+        return $this->hasMany(OrderReturn::class);
+    }
 }

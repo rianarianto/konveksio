@@ -68,7 +68,24 @@
                 Edit
             </a>
 
+            {{-- Retur Barang --}}
+            <button
+                x-on:click.stop="$wire.mountTableAction('create_return', '{{ $record->id }}')"
+                style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ea580c; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
+                onmouseover="this.style.background='#fff7ed'" onmouseout="this.style.background='transparent'">
+                <div
+                    style="width:22px; height:22px; background:#fff7ed; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 14 4 9l5-5" />
+                        <path d="M4 9h12a5 5 0 0 1 0 10H7" />
+                    </svg>
+                </div>
+                Retur Barang
+            </button>
+
             {{-- Delete --}}
+            @if(auth()->user()->role === 'owner')
             <button
                 x-on:click.stop="if(confirm('Apakah Anda yakin ingin menghapus pesanan ini?')) { $wire.mountTableAction('delete', '{{ $record->id }}') }"
                 style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ef4444; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
@@ -85,6 +102,7 @@
                 </div>
                 Delete
             </button>
+            @endif
         </div>
     </div>
 </div>

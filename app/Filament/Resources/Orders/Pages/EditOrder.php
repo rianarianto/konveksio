@@ -21,10 +21,24 @@ class EditOrder extends EditRecord
                 ->label('Download Kuitansi')
                 ->icon('heroicon-o-document-arrow-down')
                 ->color('primary')
-                ->action(fn() => response()->streamDownload(function () {
-                    echo Pdf::loadView('pdf.receipt', ['order' => $this->record])->output();
-                }, 'Kuitansi-' . str_replace('#', '', $this->record->order_number) . '.pdf')),
-            DeleteAction::make(),
+                ->url(fn () => route('orders.receipt', $this->record))
+                ->openUrlInNewTab(),
+            Action::make('create_return')
+                ->label('Catat Retur')
+                ->icon('heroicon-o-arrow-path')
+                ->color('warning')
+                ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
+                ->action(function (array $data): void {
+                    $this->record->returns()->create($data);
+                    \Filament\Notifications\Notification::make()
+                        ->title('Retur Berhasil Dicatat')
+                        ->success()
+                        ->send();
+                })
+                ->modalHeading('Catat Retur Pesanan')
+                ->modalSubmitActionLabel('Simpan Retur'),
+            DeleteAction::make()
+                ->visible(fn () => auth()->user()->role === 'owner'),
         ];
     }
 

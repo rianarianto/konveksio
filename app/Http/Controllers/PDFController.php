@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use Illuminate\Http\Request;
-use Barryvdh\DomPDF\Facade\Pdf;
+
 
 class PDFController extends Controller
 {
@@ -13,12 +13,17 @@ class PDFController extends Controller
         // Load relationships needed for the receipt
         $order->load(['customer', 'shop', 'orderItems', 'payments']);
 
-        $pdf = Pdf::loadView('pdf.receipt', [
+        $pdf = app('dompdf.wrapper')->loadView('pdf.receipt', [
             'order' => $order,
         ]);
 
-        $filename = 'Kuitansi-' . str_replace('#', '', $order->order_number) . '.pdf';
-
-        return $pdf->stream($filename);
+        $pdfOutput = $pdf->output();
+        $base64 = base64_encode($pdfOutput);
+        
+        return response()->make(
+            '<html><head><title>Kuitansi '.$order->order_number.'</title></head><body style="margin:0;padding:0;"><iframe src="data:application/pdf;base64,'.$base64.'" width="100%" height="100%" style="border:none;"></iframe></body></html>',
+            200,
+            ['Content-Type' => 'text/html']
+        );
     }
 }

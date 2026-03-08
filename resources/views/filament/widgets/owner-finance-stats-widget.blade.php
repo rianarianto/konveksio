@@ -290,7 +290,8 @@
         </div>
 
         {{-- ── CARD 2: PIUTANG MACET ──────────────────────────────────────── --}}
-        <div class="ofs-card {{ $piutang['total'] > 0 ? 'danger' : '' }}">
+        <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('index') }}?filter=piutang_macet" style="text-decoration:none; color:inherit;">
+        <div class="ofs-card {{ $piutang['total'] > 0 ? 'danger' : '' }}" style="cursor:pointer; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
             <div class="ofs-header">
                 <span class="ofs-label">Piutang Macet</span>
                 <div class="ofs-icon">
@@ -317,10 +318,15 @@
 
             @if($piutang['count_customers'] > 0)
                 <div class="ofs-tooltip">
-                    💬 Segera tagih {{ $piutang['count_customers'] }} pelanggan
+                    💬 Segera tagih {{ $piutang['count_customers'] }} pelanggan (Klik untuk detail)
+                </div>
+            @else
+                <div class="ofs-tooltip">
+                    💬 Klik untuk lihat riwayat
                 </div>
             @endif
         </div>
+        </a>
 
         {{-- ── CARD 3: BEBAN WORKSHOP ─────────────────────────────────────── --}}
         <div class="ofs-card">

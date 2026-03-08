@@ -1045,3 +1045,41 @@ Desain 3-tab sudah dikonfirmasi dari mockup.
 | app/Filament/Widgets/AktivitasUtamaWidget.php | MODIFIED |
 | app/Filament/Pages/Tenancy/EditTenantProfile.php | DELETED |
 
+
+### 2026-03-08: Financial & Return System Refinement (COMPLETED)
+
+#### 1. Multiple Payments System Migration
+- **Deprecated Down Payment**: Kolom down_payment pada tabel orders kini tidak lagi digunakan (legacy).
+- **Payments Table**: Transaksi pembayaran kini dicatat di tabel payments (one-to-many relationship dengan Order).
+- **Calculation Logic**: emaining_balance pada model Order kini dihitung dengan 	otal_price - total_paid (sum of all payment records).
+- **Dashboard Filter**: Filter " Belum Lunas\ dan \Piutang Macet\ pada OrderResource telah diperbarui menggunakan subquery SQL agar akurat menghitung saldo sisa secara real-time.
+
+#### 2. Order Return System Implementation
+- **New Model**: OrderReturn (shop_id, order_id, return_date, quantity, items_description, reason, status).
+- **Sidebar-less UX**: Resource OrderReturnResource dikonfigurasi untuk tidak muncul di sidebar (shouldRegisterNavigation = false) sesuai permintaan User.
+- **Direct Actions**: Menambahkan tombol \Retur Barang\ pada menu Aksi tabel Pesanan dan tombol \Catat Retur\ pada Header halaman Edit Pesanan.
+- **Form Context**: Form retur otomatis mengenali context pesanan jika dibuka dari halaman pesanan, menyembunyikan input redundan (shop/order).
+
+#### 3. PDF Receipt & Compatibility Fix
+- **IDM Fix**: Mengubah mode download kuitansi dari direct stream ke Base64 stream untuk menghindari interupsi oleh Internet Download Manager atau browser downloader pihak ketiga.
+- **Dynamic Payments**: Kuitansi PDF kini menampilkan riwayat seluruh pembayaran yang pernah dilakukan untuk pesanan tersebut.
+- **Layout Overhaul**: Mengubah layout kuitansi dari side-by-side menjadi *top-to-bottom flow* untuk meningkatkan keterbacaan pada perangkat mobile dan printout standar.
+
+#### 4. Security & Production Flow
+- **Deletion Guard**: Membatasi hak akses hapus pesanan hanya untuk role owner melalui Policy dan Resource guarding.
+- **Production Stage Order**: Mengatur ulang urutan tahapan produksi di dashboard (Kancing kini muncul sebelum Bordir/Sablon) berdasarkan feedback operasional.
+- **Option Limiter**: Membatasi pilihan sablon/bordir hanya pada 3 opsi utama: Sablon, Bordir, Bordir Timbul.
+
+#### Files Modified / Created
+| File | Status |
+|---|---|
+| app/Models/OrderReturn.php | NEW |
+| app/Filament/Resources/OrderReturns/* | NEW |
+| app/Models/Order.php | MODIFIED |
+| app/Filament/Resources/Orders/OrderResource.php | MODIFIED |
+| app/Filament/Resources/Orders/Pages/EditOrder.php | MODIFIED |
+| app/Http/Controllers/PDFController.php | MODIFIED |
+| resources/views/pdf/receipt.blade.php | MODIFIED |
+| resources/views/filament/resources/orders/actions.blade.php | MODIFIED |
+| resources/views/filament/widgets/owner-finance-stats-widget.blade.php | MODIFIED |
+

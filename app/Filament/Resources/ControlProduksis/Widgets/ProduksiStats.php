@@ -58,8 +58,8 @@ class ProduksiStats extends Widget
         $categoriesMap = [
             'Potong'       => ['Potong'],
             'Jahit'        => ['Jahit'],
-            'Kancing'      => ['Kancing'],
             'Bordir/Sablon'=> ['Bordir', 'Sablon', 'Bordir/Sablon'],
+            'Kancing'      => ['Kancing'],
             'Finishing'    => ['Finishing'],
             'QC'           => ['QC', 'Quality Control'],
         ];

@@ -67,6 +67,16 @@ class OrderResource extends Resource
         return in_array(auth()->user()->role, ['owner', 'admin']);
     }
 
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return auth()->user()->role === 'owner';
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()->role === 'owner';
+    }
+
     protected static bool $isScopedToTenant = true;
 
     // ─── Bahan baju dari Master Data ───
@@ -364,8 +374,7 @@ class OrderResource extends Resource
                                                     ->options([
                                                         'Sablon' => 'Sablon',
                                                         'Bordir' => 'Bordir',
-                                                        'DTF' => 'DTF',
-                                                        'Lainnya' => 'Lainnya',
+                                                        'Bordir Timbul' => 'Bordir Timbul',
                                                     ])
                                                     ->searchable()
                                                     ->dehydrated(true)
@@ -712,8 +721,7 @@ class OrderResource extends Resource
                                                         ->options([
                                                             'Sablon' => 'Sablon',
                                                             'Bordir' => 'Bordir',
-                                                            'DTF' => 'DTF',
-                                                            'Lainnya' => 'Lainnya',
+                                                            'Bordir Timbul' => 'Bordir Timbul',
                                                         ])
                                                         ->required()
                                                         ->columnSpan(2),
@@ -2013,7 +2021,11 @@ class OrderResource extends Resource
             ->filters([
                 Filter::make('hutang')
                     ->label('Belum Lunas (Piutang)')
-                    ->query(fn(Builder $query) => $query->whereColumn('down_payment', '<', 'total_price')),
+                    ->query(fn(Builder $query) => $query->whereRaw('(SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id) < orders.total_price')),
+
+                Filter::make('piutang_macet')
+                    ->label('Piutang Macet')
+                    ->query(fn(Builder $query) => $query->whereRaw('(SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id) < orders.total_price')->where('deadline', '<', now()->startOfDay())),
 
                 Filter::make('deadline_dekat')
                     ->label('Deadline ≤ 3 Hari')
@@ -2035,14 +2047,31 @@ class OrderResource extends Resource
             ])
 
             ->actions([
+                Action::make('create_return')
+                    ->label('Retur Pesanan')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
+                    ->action(function (Order $record, array $data): void {
+                        $record->returns()->create($data);
+                        Notification::make()
+                            ->title('Retur Berhasil Dicatat')
+                            ->success()
+                            ->send();
+                    })
+                    ->modalHeading('Catat Retur Pesanan')
+                    ->modalSubmitActionLabel('Simpan Retur')
+                    ->extraAttributes(['class' => 'hidden']),
                 DeleteAction::make()
+                    ->visible(fn () => auth()->user()->role === 'owner')
                     ->extraAttributes(['class' => 'hidden']),
             ])
             ->recordUrl(null)
             ->recordAction(null)
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn () => auth()->user()->role === 'owner'),
                 ]),
             ])
             ->defaultSort('is_express', 'desc')
@@ -2055,6 +2084,7 @@ class OrderResource extends Resource
     {
         return [
             \App\Filament\Resources\Orders\RelationManagers\PaymentsRelationManager::class,
+            \App\Filament\Resources\Orders\RelationManagers\ReturnsRelationManager::class,
         ];
     }
 

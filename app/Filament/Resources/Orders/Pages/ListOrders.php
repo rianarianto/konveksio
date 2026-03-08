@@ -16,4 +16,13 @@ class ListOrders extends ListRecords
             CreateAction::make(),
         ];
     }
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        if (request()->query('filter') === 'piutang_macet') {
+            $this->tableFilters['piutang_macet'] = ['isActive' => true];
+        }
+    }
 }

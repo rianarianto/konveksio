@@ -282,8 +282,8 @@
             </tbody>
         </table>
 
-        <div class="clearfix">
-            <div style="float: left; width: 60%;">
+        <div>
+            <div style="width: 100%; margin-bottom: 30px;">
                 <div class="payments-section">
                     <div class="section-title">Riwayat Pembayaran</div>
                     @forelse($order->payments as $pay)
@@ -299,8 +299,9 @@
                     @endforelse
                 </div>
             </div>
-            <div style="float: right; width: 35%;">
-                <table class="totals-table">
+            
+            <div style="width: 100%; display: flex; justify-content: flex-end;">
+                <table class="totals-table" style="width: 40%; margin-left: auto;">
                     <tr>
                         <td class="totals-label">Subtotal</td>
                         <td class="totals-value">Rp {{ number_format($order->subtotal, 0, ',', '.') }}</td>

@@ -131,5 +131,14 @@ Dashboard admin menggunakan **2 baris widget** dengan data real dinamis per tena
 - **Row Interaction Control**: Menggunakan `->recordUrl(null)` dan `->recordAction(null)` pada `OrderResource` untuk mencegah klik baris memicu navigasi, sehingga interaksi terfokus pada tombol aksi dropdown.
 - **CSS Align-Top**: Menambahkan `vertical-align: top` secara global di `AdminPanelProvider` dan padding khusus pada kolom aksi agar sejajar dengan teks nama produk yang berbaris banyak.
 
+### Multiple Payments Architecture
+- **Payment Record Migration**: Sistem beralih dari satu kolom `down_payment` ke tabel `payments`. Setiap pesanan (`orders`) dapat memiliki banyak catatan pembayaran (`payments`).
+- **Dynamic Balance Calculation**: Saldo sisa (`remaining_balance`) dihitung secara dinamis di level model dengan menjumlahkan seluruh nilai `amount` pada tabel `payments` dan menguranginya dari `total_price`.
+- **Legacy Compatibility**: Kolom `down_payment` dipertahankan sebagai backup namun tidak lagi digunakan di UI atau filter pencarian.
+
+### Order Return & Damage Tracking
+- **OrderReturn Component**: Modul baru untuk mencatat barang rusak atau retur yang terhubung langsung ke `Order`.
+- **Integrated UX Actions**: Fitur retur tidak lagi diletakkan di sidebar, melainkan diintegrasikan sebagai *Table Action* di daftar pesanan dan *Header Action* di halaman edit, untuk alur kerja yang lebih intuitif bagi operator.
+
 ---
-*Terakhir Diperbarui: 5 Maret 2026*
+*Terakhir Diperbarui: 8 Maret 2026*
