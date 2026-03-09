@@ -69,8 +69,7 @@
             </a>
 
             {{-- Retur Barang --}}
-            <button
-                x-on:click.stop="$wire.mountTableAction('create_return', '{{ $record->id }}')"
+            <button x-on:click.stop="open = false; $wire.mountTableAction('create_return', '{{ $record->id }}')"
                 style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ea580c; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
                 onmouseover="this.style.background='#fff7ed'" onmouseout="this.style.background='transparent'">
                 <div
@@ -86,22 +85,22 @@
 
             {{-- Delete --}}
             @if(auth()->user()->role === 'owner')
-            <button
-                x-on:click.stop="if(confirm('Apakah Anda yakin ingin menghapus pesanan ini?')) { $wire.mountTableAction('delete', '{{ $record->id }}') }"
-                style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ef4444; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
-                onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">
-                <div
-                    style="width:22px; height:22px; background:#fef2f2; border-radius:6px; display:flex; align-items:center; justify-content:center;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        <line x1="10" y1="11" x2="10" y2="17" />
-                        <line x1="14" y1="11" x2="14" y2="17" />
-                    </svg>
-                </div>
-                Delete
-            </button>
+                <button
+                    x-on:click.stop="if(confirm('Apakah Anda yakin ingin menghapus pesanan ini?')) { $wire.mountTableAction('delete', '{{ $record->id }}') }"
+                    style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ef4444; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
+                    onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">
+                    <div
+                        style="width:22px; height:22px; background:#fef2f2; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            <line x1="10" y1="11" x2="10" y2="17" />
+                            <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                    </div>
+                    Delete
+                </button>
             @endif
         </div>
     </div>

@@ -365,30 +365,26 @@ class OrderResource extends Resource
                                     // ── ALUR A: PRODUKSI (SIZE TOKO) ──────────────────
                                     // ═══════════════════════════════════════════════════
 
-                                    // A1: Sablon/Bordir — 2 field statis (berlaku untuk semua varian)
+                                    // A1: Sablon/Bordir — 2 dropdown terpisah (Jenis + Lokasi dari Master Data)
                                     Section::make('Sablon / Bordir')
                                         ->schema([
                                             Group::make([
                                                 Select::make('sablon_jenis')
-                                                    ->label('Teknik')
-                                                    ->options([
-                                                        'Sablon' => 'Sablon',
-                                                        'Bordir' => 'Bordir',
-                                                        'Bordir Timbul' => 'Bordir Timbul',
-                                                    ])
+                                                    ->label('Jenis / Teknik')
+                                                    ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'jenis')->pluck('name', 'name')->toArray())
                                                     ->searchable()
                                                     ->dehydrated(true)
-                                                    ->placeholder('Pilih teknik...'),
+                                                    ->placeholder('Pilih jenis...'),
 
                                                 Select::make('sablon_lokasi')
                                                     ->label('Lokasi / Titik')
-                                                    ->options(static::$lokasiSablonOptions)
+                                                    ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'lokasi')->pluck('name', 'name')->toArray())
                                                     ->searchable()
                                                     ->dehydrated(true)
-                                                    ->placeholder('Pilih kombinasi lokasi...'),
+                                                    ->placeholder('Pilih lokasi...'),
                                             ])->columns(2),
                                         ])
-                                        ->visible(fn(Get $get) => $get('production_category') === 'produksi')
+                                        ->visible(fn(Get $get) => in_array($get('production_category'), ['produksi', 'custom']))
                                         ->compact(),
 
                                     // A2: Varian Ukuran
@@ -710,50 +706,7 @@ class OrderResource extends Resource
                                         ->collapsed()
                                         ->compact(),
 
-                                    // B2: Sablon/Bordir (Custom) — ukuran jadi text cmxcm
-                                    Section::make('Sablon / Bordir')
-                                        ->schema([
-                                            Repeater::make('sablon_bordir_custom')
-                                                ->label(false)
-                                                ->schema([
-                                                    Select::make('jenis')
-                                                        ->label('Sablon/Bordir')
-                                                        ->options([
-                                                            'Sablon' => 'Sablon',
-                                                            'Bordir' => 'Bordir',
-                                                            'Bordir Timbul' => 'Bordir Timbul',
-                                                        ])
-                                                        ->required()
-                                                        ->columnSpan(2),
 
-                                                    Select::make('lokasi')
-                                                        ->label('Lokasi Titik')
-                                                        ->options([
-                                                            'Dada Kanan' => 'Dada Kanan',
-                                                            'Dada Kiri' => 'Dada Kiri',
-                                                            'Dada Kanan Nama' => 'Dada Kanan Nama',
-                                                            'Dada Kiri Logo' => 'Dada Kiri Logo',
-                                                            'Punggung' => 'Punggung',
-                                                            'Lengan Kiri' => 'Lengan Kiri',
-                                                            'Lengan Kanan' => 'Lengan Kanan',
-                                                        ])
-                                                        ->searchable()
-                                                        ->columnSpan(6),
-
-                                                    // ✅ REVISI: TextInput bebas (misal: 5x5 cm, A4)
-                                                    TextInput::make('ukuran_cmxcm')
-                                                        ->label('Ukuran (cmxcm)')
-                                                        ->placeholder('cth: 5x5 cm, A4, 30x10 cm')
-                                                        ->columnSpan(2),
-                                                ])
-                                                ->columns(10)
-                                                ->defaultItems(0)
-                                                ->addActionLabel('+ Tambah Varian')
-                                                ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;']))
-                                                ->dehydrated(true),
-                                        ])
-                                        ->visible(fn(Get $get) => $get('production_category') === 'custom')
-                                        ->compact(),
 
                                     // B3: Jumlah & Harga (Custom)
                                     Section::make('Jumlah & Harga')
@@ -816,28 +769,23 @@ class OrderResource extends Resource
 
 
 
-                                    // C2: Sablon/Bordir (sama dengan Produksi — 2 field statis)
+                                    // C2: Sablon/Bordir — 2 dropdown terpisah (Jenis + Lokasi)
                                     Section::make('Sablon / Bordir')
                                         ->schema([
                                             Group::make([
                                                 Select::make('np_sablon_jenis')
-                                                    ->label('Teknik')
-                                                    ->options([
-                                                        'Sablon' => 'Sablon',
-                                                        'Bordir' => 'Bordir',
-                                                        'DTF' => 'DTF',
-                                                        'Lainnya' => 'Lainnya',
-                                                    ])
+                                                    ->label('Jenis / Teknik')
+                                                    ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'jenis')->pluck('name', 'name')->toArray())
                                                     ->searchable()
                                                     ->dehydrated(true)
-                                                    ->placeholder('Pilih teknik...'),
+                                                    ->placeholder('Pilih jenis...'),
 
                                                 Select::make('np_sablon_lokasi')
                                                     ->label('Lokasi / Titik')
-                                                    ->options(static::$lokasiSablonOptions)
+                                                    ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'lokasi')->pluck('name', 'name')->toArray())
                                                     ->searchable()
                                                     ->dehydrated(true)
-                                                    ->placeholder('Pilih kombinasi lokasi...'),
+                                                    ->placeholder('Pilih lokasi...'),
                                             ])->columns(2),
                                         ])
                                         ->visible(fn(Get $get) => $get('production_category') === 'non_produksi')
@@ -934,23 +882,18 @@ class OrderResource extends Resource
                                     // D1: Seluruh input Jasa dalam 1 section
                                     Section::make('Detail Jasa')
                                         ->schema([
-                                            // Sablon/Bordir — dalam satu section
+                                            // Sablon/Bordir — 2 dropdown terpisah
                                             Group::make([
                                                 Select::make('jasa_sablon_jenis')
-                                                    ->label('Teknik Pengerjaan')
-                                                    ->options([
-                                                        'Sablon' => 'Sablon',
-                                                        'Bordir' => 'Bordir',
-                                                        'DTF' => 'DTF',
-                                                        'Lainnya' => 'Lainnya',
-                                                    ])
+                                                    ->label('Jenis / Teknik')
+                                                    ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'jenis')->pluck('name', 'name')->toArray())
                                                     ->searchable()
                                                     ->dehydrated(true)
-                                                    ->placeholder('Pilih teknik...'),
+                                                    ->placeholder('Pilih jenis...'),
 
                                                 Select::make('jasa_sablon_lokasi')
                                                     ->label('Lokasi / Titik')
-                                                    ->options(static::$lokasiSablonOptions)
+                                                    ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'lokasi')->pluck('name', 'name')->toArray())
                                                     ->searchable()
                                                     ->dehydrated(true)
                                                     ->placeholder('Pilih lokasi...'),
@@ -1536,7 +1479,8 @@ class OrderResource extends Resource
                 'category' => 'custom',
                 'bahan' => $data['bahan_baju'] ?? null,
                 'detail_custom' => $detailCustom,
-                'sablon_bordir' => $data['sablon_bordir_custom'] ?? [],
+                'sablon_jenis' => $data['sablon_jenis'] ?? null,
+                'sablon_lokasi' => $data['sablon_lokasi'] ?? null,
                 'request_tambahan' => $extras,
                 'harga_satuan' => $harga,
             ];
@@ -1660,7 +1604,8 @@ class OrderResource extends Resource
         if ($cat === 'custom') {
             $data['bahan_baju'] = $details['bahan'] ?? null;
             $data['detail_custom'] = $details['detail_custom'] ?? [];
-            $data['sablon_bordir_custom'] = $details['sablon_bordir'] ?? [];
+            $data['sablon_jenis'] = $details['sablon_jenis'] ?? null;
+            $data['sablon_lokasi'] = $details['sablon_lokasi'] ?? null;
             $data['request_tambahan_custom'] = $details['request_tambahan'] ?? [];
             $data['harga_custom_satuan'] = $details['harga_satuan'] ?? 0;
 
@@ -2050,7 +1995,6 @@ class OrderResource extends Resource
                 Action::make('create_return')
                     ->label('Retur Pesanan')
                     ->icon('heroicon-o-arrow-path')
-                    ->color('warning')
                     ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
                     ->action(function (Order $record, array $data): void {
                         $record->returns()->create($data);
@@ -2063,7 +2007,7 @@ class OrderResource extends Resource
                     ->modalSubmitActionLabel('Simpan Retur')
                     ->extraAttributes(['class' => 'hidden']),
                 DeleteAction::make()
-                    ->visible(fn () => auth()->user()->role === 'owner')
+                    ->visible(fn() => auth()->user()->role === 'owner')
                     ->extraAttributes(['class' => 'hidden']),
             ])
             ->recordUrl(null)
@@ -2071,7 +2015,7 @@ class OrderResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->visible(fn () => auth()->user()->role === 'owner'),
+                        ->visible(fn() => auth()->user()->role === 'owner'),
                 ]),
             ])
             ->defaultSort('is_express', 'desc')

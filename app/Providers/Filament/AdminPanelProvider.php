@@ -117,11 +117,26 @@ class AdminPanelProvider extends PanelProvider
                             border: 1px solid #e5e7eb !important; border-radius: 6px !important; overflow: hidden !important; 
                             font-size: 12px !important; height: 26px !important;
                         }
+                        /* Custom Payment Pill */
                         .custom-payment-pill {
                             display: inline-flex !important; align-items: center !important; gap: 4px !important; 
                             padding: 2px 6px !important; background-color: #f3f4f6 !important; border: 1px solid #e5e7eb !important; 
                             border-radius: 4px !important; font-size: 10px !important; color: #4b5563 !important;
                         }
+
+                        /* Fix Modal Z-Index Overlap on Table Actions */
+                        .fi-modal {
+                            z-index: 9999 !important;
+                        }
+                        .fi-modal-window {
+                            z-index: 10000 !important;
+                        }
+                        
+                        /* Ensure table action dropdowns don\'t cover modals */
+                        .fi-dropdown-panel {
+                            z-index: 40 !important; 
+                        }
+
                     </style>
                 '),
             )

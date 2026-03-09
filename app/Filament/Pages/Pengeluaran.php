@@ -16,9 +16,9 @@ class Pengeluaran extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static ?string $navigationLabel = 'Laporan Pengeluaran';
+    protected static ?string $navigationLabel = 'Pengeluaran / Kas Keluar';
 
-    protected static ?string $title = 'Laporan Insight Pengeluaran';
+    protected static ?string $title = 'Pengeluaran / Kas Keluar';
 
     protected static string|\UnitEnum|null $navigationGroup = 'KEUANGAN';
 
@@ -28,7 +28,7 @@ class Pengeluaran extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()->role === 'owner';
+        return in_array(auth()->user()->role, ['owner', 'admin']);
     }
 
     public string $periodo = 'bulan_ini';

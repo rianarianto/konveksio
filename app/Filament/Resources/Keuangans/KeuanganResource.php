@@ -32,7 +32,7 @@ class KeuanganResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
-    protected static ?string $navigationLabel = 'Keuangan';
+    protected static ?string $navigationLabel = 'Kas Masuk & Piutang';
 
     protected static ?string $modelLabel = 'Keuangan';
 

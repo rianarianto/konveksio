@@ -21,12 +21,11 @@ class EditOrder extends EditRecord
                 ->label('Download Kuitansi')
                 ->icon('heroicon-o-document-arrow-down')
                 ->color('primary')
-                ->url(fn () => route('orders.receipt', $this->record))
+                ->url(fn() => route('orders.receipt', $this->record))
                 ->openUrlInNewTab(),
             Action::make('create_return')
                 ->label('Catat Retur')
                 ->icon('heroicon-o-arrow-path')
-                ->color('warning')
                 ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
                 ->action(function (array $data): void {
                     $this->record->returns()->create($data);
@@ -38,7 +37,7 @@ class EditOrder extends EditRecord
                 ->modalHeading('Catat Retur Pesanan')
                 ->modalSubmitActionLabel('Simpan Retur'),
             DeleteAction::make()
-                ->visible(fn () => auth()->user()->role === 'owner'),
+                ->visible(fn() => auth()->user()->role === 'owner'),
         ];
     }
 
