@@ -8,11 +8,11 @@
         .r3-container {
             background: white;
             border-radius: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
             border: 1px solid #e5e7eb;
             font-family: inherit;
         }
-        
+
         .r3-header-title {
             font-size: 20px;
             font-weight: 600;
@@ -46,7 +46,7 @@
         .r3-td-text {
             color: #666666;
         }
-        
+
         .r3-td-text-bold {
             color: #374151;
         }
@@ -78,7 +78,7 @@
             background: rgba(255, 255, 255, .05) !important;
             color: #f3f4f6 !important;
         }
-        
+
         .dark .r3-filter-date-input {
             color: #f3f4f6 !important;
             color-scheme: dark;
@@ -137,7 +137,7 @@
                         <path d="M5 12h14" />
                         <path d="M12 5v14" />
                     </svg>
-                    Tambah Pesanan
+                    Tambah Pesanan Baru
                 </a>
 
                 {{-- Filters --}}
@@ -158,8 +158,7 @@
 
                     {{-- Status Filter --}}
                     <div style="position:relative;">
-                        <select wire:model.live="statusFilter"
-                            class="r3-filter-select"
+                        <select wire:model.live="statusFilter" class="r3-filter-select"
                             style="appearance:none; border-radius:12px; padding:10px 36px 10px 16px; font-size:13px; cursor:pointer; min-width:155px; outline:none;">
                             <option value="">Status Pesanan</option>
                             <option value="pending">Pending</option>
@@ -188,8 +187,7 @@
                                 <line x1="3" x2="21" y1="10" y2="10" />
                             </svg>
                         </div>
-                        <input wire:model.live="deadlineFilter" type="date"
-                            class="r3-filter-date-input"
+                        <input wire:model.live="deadlineFilter" type="date" class="r3-filter-date-input"
                             style="background:transparent; border:none; padding:10px 16px 10px 0; font-size:13px; color:#6b7280; outline:none; cursor:text;">
                     </div>
 
@@ -233,8 +231,7 @@
                                 Deadline</th>
                             <th style="padding:12px 8px; font-size:13px; font-weight:600; width:18%;">
                                 Sisa Tagihan (Sisa/Total)</th>
-                            <th
-                                style="padding:12px 8px; font-size:13px; font-weight:600; min-width:280px;">
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; min-width:280px;">
                                 Tipe Produk & Status Pesanan</th>
                             <th
                                 style="padding:12px 16px; font-size:13px; font-weight:600; width:120px; text-align:right;">
@@ -342,10 +339,12 @@
 
                                 {{-- Sisa Tagihan --}}
                                 <td style="padding:16px 8px; vertical-align:top;">
-                                    <div class="r3-td-text-bold" style="font-size:15px; font-weight:700; margin-bottom:6px;">Rp
+                                    <div class="r3-td-text-bold"
+                                        style="font-size:15px; font-weight:700; margin-bottom:6px;">Rp
                                         {{ number_format($order->remaining_balance ?? 0, 0, ',', '.') }}
                                     </div>
-                                    <div class="r3-td-text" style="font-size:11px; font-weight:500; margin-bottom:6px;">Total
+                                    <div class="r3-td-text" style="font-size:11px; font-weight:500; margin-bottom:6px;">
+                                        Total
                                         Tagihan</div>
                                     <div
                                         style="display:inline-flex; padding:4px 12px; border-radius:9999px; background:#faf5ff; border:1px solid #f3e8ff; color:#a855f7; font-size:12px; font-weight:700;">
@@ -455,8 +454,7 @@
                                         style="position:relative; display:inline-block; text-align:left;">
                                         <button @click.stop="open = !open" class="r3-action-btn"
                                             style="padding:6px; border-radius:10px; border:1px solid; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center;"
-                                            onmouseover="this.style.opacity='0.8'"
-                                            onmouseout="this.style.opacity='1'">
+                                            onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
                                                 stroke-linejoin="round">
@@ -472,8 +470,7 @@
                                             x-transition:enter-end="transform opacity-100 scale-100"
                                             x-transition:leave="transition ease-in duration-75"
                                             x-transition:leave-start="transform opacity-100 scale-100"
-                                            x-transition:leave-end="transform opacity-0 scale-95"
-                                            class="r3-dropdown"
+                                            x-transition:leave-end="transform opacity-0 scale-95" class="r3-dropdown"
                                             style="position:absolute; right:0; top:calc(100% + 5px); z-index:1000; width:165px; border-radius:12px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding:6px;">
 
                                             {{-- Detail --}}

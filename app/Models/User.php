@@ -30,6 +30,8 @@ class User extends Authenticatable implements HasTenants
         'shop_id',
         'max_cash_advance',
         'current_cash_advance',
+        'wage_type',
+        'base_salary',
     ];
 
     /**
@@ -50,10 +52,11 @@ class User extends Authenticatable implements HasTenants
     protected function casts(): array
     {
         return [
-            'email_verified_at'    => 'datetime',
-            'password'             => 'hashed',
-            'max_cash_advance'     => 'integer',
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'max_cash_advance' => 'integer',
             'current_cash_advance' => 'integer',
+            'base_salary' => 'integer',
         ];
     }
 

@@ -79,16 +79,24 @@ class EditOrder extends EditRecord
         $data = $this->form->getRawState();
 
         if (isset($data['initial_payment_amount'])) {
+            $proofImage = $data['initial_payment_proof'] ?? null;
+            if (is_array($proofImage)) {
+                $proofImage = array_values($proofImage)[0] ?? null;
+            }
+
             $firstPayment = Payment::where('order_id', $this->record->id)
                 ->orderBy('payment_date', 'asc')
                 ->orderBy('id', 'asc')
                 ->first();
 
             if ($firstPayment) {
+                // Jangan override dengan null jika sebelumnya ada gambar dan user tidak mengupload baru
+                // Tapi kalau user klik hapus gambar, $proofImage mungkin string kosong atau null di raw state? 
+                // Di Filament jika dihapus biasanya state di-set null. $data['initial_payment_proof'] bernilai null.
                 $firstPayment->update([
                     'amount' => (int) $data['initial_payment_amount'],
                     'payment_method' => $data['initial_payment_method'] ?? $firstPayment->payment_method,
-                    'proof_image' => $data['initial_payment_proof'] ?? $firstPayment->proof_image,
+                    'proof_image' => array_key_exists('initial_payment_proof', $data) ? $proofImage : $firstPayment->proof_image,
                 ]);
             } elseif ($data['initial_payment_amount'] > 0) {
                 Payment::create([
@@ -96,7 +104,7 @@ class EditOrder extends EditRecord
                     'amount' => (int) $data['initial_payment_amount'],
                     'payment_date' => now(),
                     'payment_method' => $data['initial_payment_method'] ?? 'cash',
-                    'proof_image' => $data['initial_payment_proof'] ?? null,
+                    'proof_image' => $proofImage,
                     'recorded_by' => auth()->id(),
                     'note' => 'Pembayaran Awal / DP (Otomatis dari form pesanan)',
                 ]);

@@ -8,9 +8,12 @@ use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\Filter;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Tables\Table;
 use Filament\Forms\Components\DatePicker;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,7 +28,7 @@ class WorkerPayrollResource extends Resource
     protected static ?string $modelLabel = 'Rekap Upah';
     protected static ?string $slug = 'worker-payroll';
     protected static string|\UnitEnum|null $navigationGroup = 'KARYAWAN';
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static bool $isScopedToTenant = true;
 
@@ -119,16 +122,19 @@ class WorkerPayrollResource extends Resource
                     ->searchable()
                     ->preload(),
 
+                Tables\Filters\TernaryFilter::make('is_paid')
+                    ->label('Status Bayar')
+                    ->placeholder('Semua')
+                    ->trueLabel('Sudah Dibayar')
+                    ->falseLabel('Belum Dibayar')
+                    ->default(false),
+
                 Filter::make('periode')
                     ->form([
                         DatePicker::make('dari')
-                            ->label('Dari Tanggal')
-                            ->native(false)
-                            ->default(now()->startOfMonth()),
+                            ->label('Dari Tanggal'),
                         DatePicker::make('sampai')
-                            ->label('Sampai Tanggal')
-                            ->native(false)
-                            ->default(now()->endOfMonth()),
+                            ->label('Sampai Tanggal'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return $query
@@ -144,7 +150,64 @@ class WorkerPayrollResource extends Resource
                         return $indicators;
                     }),
             ])
-            ->filtersFormColumns(2)
+            ->filtersFormColumns(3)
+            ->actions([
+                Action::make('pay')
+                    ->label('Bayar Upah')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('success')
+                    ->hidden(fn($record) => $record->is_paid)
+                    ->requiresConfirmation()
+                    ->modalHeading('Konfirmasi Pembayaran Upah')
+                    ->modalDescription('Apakah Anda yakin ingin membayar upah untuk tugas ini? Tindakan ini akan mencatat pengeluaran otomatis.')
+                    ->action(function (ProductionTask $record) {
+                        $record->update(['is_paid' => true]);
+
+                        \App\Models\Expense::create([
+                            'shop_id' => $record->shop_id,
+                            'keperluan' => "Upah Borongan: {$record->assignedTo->name} (#{$record->orderItem->order->order_number})",
+                            'amount' => $record->wage_amount * $record->quantity,
+                            'expense_date' => now(),
+                            'note' => 'Gaji / Upah',
+                            'recorded_by' => auth()->id(),
+                        ]);
+
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Pembayaran Berhasil')
+                            ->body('Upah telah dibayar dan dicatat di Pengeluaran.')
+                            ->send();
+                    }),
+            ])
+            ->bulkActions([
+                BulkAction::make('pay_selected')
+                    ->label('Bayar Massal')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->action(function (\Illuminate\Support\Collection $records) {
+                        $records->each(function (ProductionTask $record) {
+                            if (!$record->is_paid) {
+                                $record->update(['is_paid' => true]);
+
+                                \App\Models\Expense::create([
+                                    'shop_id' => $record->shop_id,
+                                    'keperluan' => "Upah Borongan: {$record->assignedTo->name} (#{$record->orderItem->order->order_number})",
+                                    'amount' => $record->wage_amount * $record->quantity,
+                                    'expense_date' => now(),
+                                    'note' => 'Gaji / Upah',
+                                    'recorded_by' => auth()->id(),
+                                ]);
+                            }
+                        });
+
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Pembayaran Massal Berhasil')
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion(),
+            ])
             ->defaultSort('completed_at', 'desc')
             ->heading('Rekap Upah Karyawan')
             ->description('Daftar pekerjaan selesai beserta upah. Filter berdasarkan periode & karyawan.')

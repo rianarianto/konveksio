@@ -142,3 +142,28 @@ Dashboard admin menggunakan **2 baris widget** dengan data real dinamis per tena
 
 ---
 *Terakhir Diperbarui: 8 Maret 2026*
+
+### 10 Maret 2026 — Keuangan Unification & Production UI Fixes
+
+#### ✅ Keuangan & Pengeluaran Consolidation
+- **Unifikasi Menu**: Menyederhanakan navigasi keuangan menjadi dua menu utama: **Kas Masuk & Piutang** dan **Kas Keluar / Pengeluaran**.
+- **Refaktor Resource**: Memindahkan fitur Pengeluaran (Expenses) ke dalam `KeuanganResource` sebagai tab "Daftar Pengeluaran" untuk menghindari redundansi halaman.
+- **Pembersihan**: Menghapus `PengeluaranResource` (halaman lama) guna merampingkan struktur aplikasi.
+- **Widget Integration**: Mengintegrasikan statistik "Ringkasan Pengeluaran" langsung di atas tabel pengeluaran baru.
+
+#### ✅ Production Task UI Improvements
+- **Material Labeling**: Memperbaiki tampilan ID Material/Produk menjadi Nama asli yang mudah dibaca pada modal "Atur Tugas".
+- **Visual Polish**: Menghapus badge biru (*hardcoded cyan*) dan menggantinya dengan desain yang lebih netral dan premium sesuai tema sistem.
+- **Detail Ukuran Lengkap**: Memastikan seluruh field ukuran custom (LD, LP, P, PL, LB, LPi, PB) tampil secara transparan dan tidak terpotong.
+- **Validasi Qty Custom**: Memperbaiki logika penghitungan quantity pada item custom agar sesuai dengan jumlah nama yang diinput.
+
+#### Files Modified / Created
+| File | Status |
+|---|---|
+| app/Filament/Resources/Keuangans/KeuanganResource.php | MODIFIED |
+| app/Filament/Resources/Keuangans/KasMasukResource.php | MODIFIED |
+| app/Filament/Resources/ControlProduksis/ControlProduksiResource.php | MODIFIED |
+| app/Filament/Resources/PengeluaranResource.php | DELETE |
+
+---
+*

@@ -18,6 +18,7 @@ class ProductionTask extends Model
         'quantity',
         'size_quantities',
         'status',
+        'is_paid',
         'description',
     ];
 
@@ -26,6 +27,7 @@ class ProductionTask extends Model
         'quantity' => 'integer',
         'size_quantities' => 'array',
         'status' => 'string',
+        'is_paid' => 'boolean',
     ];
 
     protected static function booted(): void

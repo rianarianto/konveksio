@@ -27,6 +27,22 @@ class WorkerForm
                     ->label('Status Aktif')
                     ->default(true)
                     ->required(),
+                Select::make('wage_type')
+                    ->label('Sistem Upah')
+                    ->options([
+                        'piece_rate' => '🔨 Borongan (Per Pcs)',
+                        'monthly' => '📅 Bulanan (Gaji Pokok)',
+                    ])
+                    ->default('piece_rate')
+                    ->required()
+                    ->native(false)
+                    ->live(),
+                TextInput::make('base_salary')
+                    ->label('Gaji Pokok (Rp)')
+                    ->numeric()
+                    ->prefix('Rp')
+                    ->visible(fn($get) => $get('wage_type') === 'monthly')
+                    ->required(fn($get) => $get('wage_type') === 'monthly'),
             ]);
     }
 }

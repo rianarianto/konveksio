@@ -1083,3 +1083,24 @@ Desain 3-tab sudah dikonfirmasi dari mockup.
 | resources/views/filament/resources/orders/actions.blade.php | MODIFIED |
 | resources/views/filament/widgets/owner-finance-stats-widget.blade.php | MODIFIED |
 
+
+### 10 Maret 2026 — Keuangan Unification & Production UI Fixes
+
+#### ✅ Keuangan & Pengeluaran Consolidation
+- **Unifikasi Menu**: Menyederhanakan navigasi keuangan menjadi dua menu utama: **Kas Masuk & Piutang** dan **Kas Keluar / Pengeluaran**.
+- **Refaktor Resource**: Memindahkan fitur Pengeluaran (Expenses) ke dalam \KeuanganResource\ sebagai tab "Daftar Pengeluaran" untuk menghindari redundansi halaman.
+- **Pembersihan**: Menghapus \PengeluaranResource\ (halaman lama) guna merampingkan struktur aplikasi.
+
+#### ✅ Production Task UI Improvements
+- **Material Labeling**: Memperbaiki tampilan ID Material/Produk menjadi Nama asli pada modal "Atur Tugas".
+- **Visual Polish**: Mengganti badge cyan (#00bcd4) dengan styling netral.
+- **Detail Ukuran Lengkap**: Menampilkan detail ukuran custom (LD, LP, P, dll) secara transparan.
+- **Validasi Qty Custom**: Memperbaiki penghitungan quantity pada item custom.
+
+#### Files Modified / Created
+| File | Status |
+|---|---|
+| app/Filament/Resources/Keuangans/KeuanganResource.php | MODIFIED |
+| app/Filament/Resources/Keuangans/KasMasukResource.php | MODIFIED |
+| app/Filament/Resources/ControlProduksis/ControlProduksiResource.php | MODIFIED |
+| app/Filament/Resources/PengeluaranResource.php | DELETE |

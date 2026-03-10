@@ -1,35 +1,21 @@
 <?php
 
-namespace App\Filament\Pages;
+namespace App\Filament\Resources\PengeluaranResource\Pages;
 
+use App\Filament\Resources\PengeluaranResource;
+use Filament\Resources\Pages\ListRecords;
 use App\Models\Expense;
 use App\Models\ProductionTask;
-use App\Models\CashAdvance;
 use App\Models\Worker;
 use App\Models\User;
-use BackedEnum;
 use Filament\Facades\Filament;
-use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
 
-class Pengeluaran extends Page
+class ListPengeluaran extends ListRecords
 {
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string $resource = PengeluaranResource::class;
 
-    protected static ?string $navigationLabel = 'Pengeluaran / Kas Keluar';
-
-    protected static ?string $title = 'Pengeluaran / Kas Keluar';
-
-    protected static string|\UnitEnum|null $navigationGroup = 'KEUANGAN';
-
-    protected static ?int $navigationSort = 0;
-
-    protected string $view = 'filament.pages.pengeluaran';
-
-    public static function canAccess(): bool
-    {
-        return in_array(auth()->user()->role, ['owner', 'admin']);
-    }
+    protected string $view = 'filament.resources.pengeluaran.pages.list-pengeluaran';
 
     public string $periodo = 'bulan_ini';
 
@@ -80,14 +66,6 @@ class Pengeluaran extends Page
         // ── 5. Grand Total ──
         $grandTotal = $totalAllExpenses + $totalUpahBorongan;
 
-        // ── 6. Detail List (terbaru 50) ──
-        $detailList = Expense::withoutGlobalScopes()
-            ->where('shop_id', $tenantId)
-            ->whereBetween('expense_date', [$dari, $sampai])
-            ->orderByDesc('expense_date')
-            ->limit(50)
-            ->get();
-
         return [
             'totalOperasional' => $totalOperasional,
             'totalKasbonExpense' => $totalKasbonExpense,
@@ -96,7 +74,6 @@ class Pengeluaran extends Page
             'totalKasbonBelumLunas' => $totalKasbonBelumLunas,
             'grandTotal' => $grandTotal,
             'breakdown' => $breakdown,
-            'detailList' => $detailList,
             'periodoLabel' => match ($this->periodo) {
                 'hari_ini' => 'Hari Ini (' . Carbon::today()->translatedFormat('d M Y') . ')',
                 'minggu_ini' => 'Minggu Ini',

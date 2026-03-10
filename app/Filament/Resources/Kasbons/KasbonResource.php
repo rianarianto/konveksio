@@ -47,7 +47,7 @@ class KasbonResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->role === 'owner';
+        return in_array(auth()->user()->role, ['owner', 'admin']);
     }
 
     public static function getEloquentQuery(): Builder
@@ -229,6 +229,7 @@ class KasbonResource extends Resource
 
                 Action::make('set_limit')
                     ->label('⚙ Atur Limit Kasbon')
+                    ->visible(fn() => auth()->user()->role === 'owner')
                     ->color('gray')
                     ->modalHeading('Atur Limit Kasbon')
                     ->modalWidth('lg')

@@ -76,6 +76,44 @@ class KasMasukTableWidget extends BaseWidget
                     ->extraCellAttributes(['style' => 'vertical-align: top;']),
             ])
             ->emptyStateHeading('Belum Ada Kas Masuk')
-            ->emptyStateDescription('Catat pembayaran melalui detail pesanan atau tab Piutang.');
+            ->emptyStateDescription('Catat pembayaran melalui detail pesanan atau tab Piutang.')
+            ->filters([
+                Tables\Filters\Filter::make('payment_date')
+                    ->form([
+                        \Filament\Forms\Components\DatePicker::make('from')
+                            ->label('Dari Tanggal'),
+                        \Filament\Forms\Components\DatePicker::make('until')
+                            ->label('Sampai Tanggal'),
+                    ])
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                        return $query
+                            ->when(
+                                $data['from'] ?? null,
+                                fn(\Illuminate\Database\Eloquent\Builder $query, $date): \Illuminate\Database\Eloquent\Builder => $query->whereDate('payment_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['until'] ?? null,
+                                fn(\Illuminate\Database\Eloquent\Builder $query, $date): \Illuminate\Database\Eloquent\Builder => $query->whereDate('payment_date', '<=', $date),
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if ($data['from'] ?? null) {
+                            $indicators['from'] = 'Dari ' . \Illuminate\Support\Carbon::parse($data['from'])->format('d M Y');
+                        }
+                        if ($data['until'] ?? null) {
+                            $indicators['until'] = 'Sampai ' . \Illuminate\Support\Carbon::parse($data['until'])->format('d M Y');
+                        }
+                        return $indicators;
+                    }),
+
+                Tables\Filters\SelectFilter::make('payment_method')
+                    ->label('Metode Pembayaran')
+                    ->options([
+                        'cash' => 'Cash',
+                        'transfer' => 'Transfer Bank',
+                        'qris' => 'QRIS',
+                    ]),
+            ]);
     }
 }

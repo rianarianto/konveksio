@@ -27,9 +27,9 @@ class UserForm
                 TextInput::make('password')
                     ->password()
                     ->revealable()
-                    ->required(fn (string $operation): bool => $operation === 'create')
-                    ->dehydrated(fn ($state) => filled($state))
-                    ->dehydrateStateUsing(fn ($state) => Hash::make($state))
+                    ->required(fn(string $operation): bool => $operation === 'create')
+                    ->dehydrated(fn($state) => filled($state))
+                    ->dehydrateStateUsing(fn($state) => Hash::make($state))
                     ->maxLength(255)
                     ->helperText('Kosongkan jika tidak ingin mengubah password.'),
 
@@ -41,6 +41,24 @@ class UserForm
                     ->default('admin')
                     ->required()
                     ->native(false),
+
+                Select::make('wage_type')
+                    ->label('Sistem Gaji')
+                    ->options([
+                        'monthly' => '📅 Bulanan (Gaji Pokok)',
+                        'piece_rate' => '🔨 Borongan (Hanya jika ada tugas)',
+                    ])
+                    ->default('monthly')
+                    ->required()
+                    ->native(false)
+                    ->live(),
+
+                TextInput::make('base_salary')
+                    ->label('Gaji Pokok (Rp)')
+                    ->numeric()
+                    ->prefix('Rp')
+                    ->visible(fn($get) => $get('wage_type') === 'monthly')
+                    ->required(fn($get) => $get('wage_type') === 'monthly'),
             ]);
     }
 }

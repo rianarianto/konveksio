@@ -48,6 +48,20 @@ class AdminPanelProvider extends PanelProvider
             ->font('Rethink Sans')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
+            ->navigationGroups([
+                \Filament\Navigation\NavigationGroup::make()
+                    ->label('PENJUALAN'),
+                \Filament\Navigation\NavigationGroup::make()
+                    ->label('KEUANGAN'),
+                \Filament\Navigation\NavigationGroup::make()
+                    ->label('PRODUKSI'),
+                \Filament\Navigation\NavigationGroup::make()
+                    ->label('INVENTORI & MASTER'),
+                \Filament\Navigation\NavigationGroup::make()
+                    ->label('KARYAWAN'),
+                \Filament\Navigation\NavigationGroup::make()
+                    ->label('PENGATURAN'),
+            ])
             ->pages([
                 \Filament\Pages\Dashboard::class,
             ])

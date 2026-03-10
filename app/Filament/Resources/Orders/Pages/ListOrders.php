@@ -13,7 +13,9 @@ class ListOrders extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->label('Tambah Pesanan Baru')
+                ->icon('heroicon-o-plus'),
         ];
     }
 

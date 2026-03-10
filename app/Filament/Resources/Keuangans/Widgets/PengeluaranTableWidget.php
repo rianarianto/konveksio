@@ -10,8 +10,10 @@ use Filament\Forms\Components\TextInput;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Tables;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Filament\Facades\Filament;
@@ -94,6 +96,7 @@ class PengeluaranTableWidget extends BaseWidget
                                 'Gaji / Upah' => 'Gaji / Upah',
                                 'Transport' => 'Transport',
                                 'Alat & Mesin' => 'Alat & Mesin',
+                                'Kasbon Karyawan' => 'Kasbon Karyawan',
                                 'Lainnya' => 'Lainnya',
                             ])
                             ->placeholder('Pilih kategori...'),
@@ -144,6 +147,7 @@ class PengeluaranTableWidget extends BaseWidget
                                 'Gaji / Upah' => 'Gaji / Upah',
                                 'Transport' => 'Transport',
                                 'Alat & Mesin' => 'Alat & Mesin',
+                                'Kasbon Karyawan' => 'Kasbon Karyawan',
                                 'Lainnya' => 'Lainnya',
                             ]),
 
@@ -163,6 +167,38 @@ class PengeluaranTableWidget extends BaseWidget
                 }),
             ])
             ->defaultSort('expense_date', 'desc')
+            ->filters([
+                SelectFilter::make('note')
+                    ->label('Kategori')
+                    ->options([
+                        'Bahan Baku' => 'Bahan Baku',
+                        'Operasional' => 'Operasional',
+                        'Gaji / Upah' => 'Gaji / Upah',
+                        'Transport' => 'Transport',
+                        'Alat & Mesin' => 'Alat & Mesin',
+                        'Kasbon Karyawan' => 'Kasbon Karyawan',
+                        'Lainnya' => 'Lainnya',
+                    ]),
+                Tables\Filters\Filter::make('expense_date')
+                    ->form([
+                        DatePicker::make('from')->label('Dari Tanggal'),
+                        DatePicker::make('until')->label('Sampai Tanggal'),
+                    ])
+                    ->query(function ($query, array $data) {
+                        return $query
+                            ->when($data['from'], fn($q, $v) => $q->whereDate('expense_date', '>=', $v))
+                            ->when($data['until'], fn($q, $v) => $q->whereDate('expense_date', '<=', $v));
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if ($data['from'])
+                            $indicators[] = 'Dari: ' . $data['from'];
+                        if ($data['until'])
+                            $indicators[] = 'Sampai: ' . $data['until'];
+                        return $indicators;
+                    }),
+            ])
+            ->filtersFormColumns(2)
             ->emptyStateHeading('Belum ada pengeluaran')
             ->emptyStateDescription('Klik "+ Tambah Pengeluaran" untuk mencatat pengeluaran operasional.');
     }

@@ -1,56 +1,53 @@
 <?php
 
-namespace App\Filament\Resources\Keuangans;
+namespace App\Filament\Resources;
 
-use App\Filament\Resources\Keuangans\Pages;
+use App\Filament\Resources\PengeluaranResource\Pages;
 use App\Models\Expense;
-use App\Models\Order;
-use App\Models\Payment;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-
-use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
+use Filament\Actions\CreateAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\HtmlString;
-use Illuminate\Support\Facades\Storage;
 use Filament\Facades\Filament;
 
-class KeuanganResource extends Resource
+class PengeluaranResource extends Resource
 {
     protected static ?string $model = Expense::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowTrendingDown;
 
-    protected static ?string $navigationLabel = 'Kas Masuk & Piutang';
+    protected static ?string $navigationLabel = 'Kas Keluar / Pengeluaran';
 
-    protected static ?string $modelLabel = 'Keuangan';
+    protected static ?string $modelLabel = 'Pengeluaran';
 
-    protected static ?string $pluralModelLabel = 'Keuangan';
+    protected static ?string $pluralModelLabel = 'Pengeluaran';
 
     protected static string|\UnitEnum|null $navigationGroup = 'KEUANGAN';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     protected static bool $isScopedToTenant = true;
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-        return in_array($user->role, ['owner', 'admin']);
+        return in_array(auth()->user()->role, ['owner', 'admin']);
     }
 
-    // ── Form untuk Tambah/Edit Pengeluaran ───────────────────────────────────
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -80,6 +77,7 @@ class KeuanganResource extends Resource
                     'Gaji / Upah' => 'Gaji / Upah',
                     'Transport' => 'Transport',
                     'Alat & Mesin' => 'Alat & Mesin',
+                    'Kasbon Karyawan' => 'Kasbon Karyawan',
                     'Lainnya' => 'Lainnya',
                 ])
                 ->placeholder('Pilih kategori...'),
@@ -94,15 +92,9 @@ class KeuanganResource extends Resource
         ])->columns(2);
     }
 
-    // ── Tabel Pengeluaran (default tab 3) ───────────────────────────────────
     public static function table(Table $table): Table
     {
         return $table
-            ->query(
-                Expense::query()
-                    ->where('shop_id', Filament::getTenant()?->id)
-                    ->latest('expense_date')
-            )
             ->columns([
                 TextColumn::make('expense_date')
                     ->label('Tanggal')
@@ -137,8 +129,31 @@ class KeuanganResource extends Resource
                     ->height(48)
                     ->defaultImageUrl(null),
             ])
+            ->filters([
+                SelectFilter::make('note')
+                    ->label('Kategori')
+                    ->options([
+                        'Bahan Baku' => 'Bahan Baku',
+                        'Operasional' => 'Operasional',
+                        'Gaji / Upah' => 'Gaji / Upah',
+                        'Transport' => 'Transport',
+                        'Alat & Mesin' => 'Alat & Mesin',
+                        'Kasbon Karyawan' => 'Kasbon Karyawan',
+                        'Lainnya' => 'Lainnya',
+                    ]),
+                Filter::make('expense_date')
+                    ->form([
+                        DatePicker::make('from')->label('Dari Tanggal'),
+                        DatePicker::make('until')->label('Sampai Tanggal'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when($data['from'], fn($q, $v) => $q->whereDate('expense_date', '>=', $v))
+                            ->when($data['until'], fn($q, $v) => $q->whereDate('expense_date', '<=', $v));
+                    }),
+            ])
             ->headerActions([
-                \Filament\Actions\CreateAction::make()
+                CreateAction::make()
                     ->label('+ Tambah Pengeluaran')
                     ->modalHeading('Tambah Pengeluaran')
                     ->mutateFormDataUsing(function (array $data): array {
@@ -148,12 +163,14 @@ class KeuanganResource extends Resource
                     }),
             ])
             ->actions([
-                EditAction::make()->modalHeading('Edit Pengeluaran'),
+                EditAction::make(),
                 DeleteAction::make(),
             ])
-            ->defaultSort('expense_date', 'desc')
-            ->emptyStateHeading('Belum ada pengeluaran')
-            ->emptyStateDescription('Klik "+ Tambah Pengeluaran" untuk mencatat pengeluaran operasional.');
+            ->bulkActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                ]),
+            ]);
     }
 
     public static function getRelations(): array
@@ -164,7 +181,7 @@ class KeuanganResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListKeuangan::route('/'),
+            'index' => Pages\ListPengeluaran::route('/'),
         ];
     }
 }

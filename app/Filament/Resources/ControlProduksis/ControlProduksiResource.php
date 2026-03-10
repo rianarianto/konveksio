@@ -359,240 +359,116 @@ class ControlProduksiResource extends Resource
                                     if (!$item)
                                         return new HtmlString('');
 
-                                    $name = htmlspecialchars($item->product_name ?? 'Produk Tak Bernama');
-                                    $qty = $item->quantity ?? 0;
-                                    $cat = $item->production_category ?? 'produksi';
                                     $details = $item->size_and_request_details ?? [];
+                                    $html = '<div class="space-y-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800">';
 
-                                    // Lacak Ukuran S:4, M:10 dari berbagai skema array (termasuk varian_ukuran untuk Produksi Standard)
-                                    $sizes = [];
-                                    if (isset($details['sizes']) && is_array($details['sizes'])) {
-                                        foreach ($details['sizes'] as $s => $q) {
-                                            if ($q > 0)
-                                                $sizes[] = strtoupper($s) . ':' . $q;
-                                        }
-                                    } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
-                                        foreach ($details['varian_ukuran'] as $v) {
-                                            $sz = strtoupper($v['ukuran'] ?? '');
-                                            $qtySz = (int) ($v['qty'] ?? 0);
-                                            if ($sz && $qtySz > 0) {
-                                                $sizes[] = $sz . ':' . $qtySz;
-                                            }
-                                        }
-                                    } elseif (isset($details['detail_custom']) && is_array($details['detail_custom'])) {
-                                        $sizeCounts = [];
-                                        foreach ($details['detail_custom'] as $u) {
-                                            $sz = strtoupper($u['ukuran'] ?? 'CUSTOM');
-                                            $sizeCounts[$sz] = ($sizeCounts[$sz] ?? 0) + 1;
-                                        }
-                                        foreach ($sizeCounts as $s => $q) {
-                                            $sizes[] = $s . ':' . $q;
-                                        }
-                                    }
-                                    $sizeString = empty($sizes) ? '' : htmlspecialchars(implode(', ', $sizes));
+                                    // --- Row 1: Header (Product Name & Badges) ---
+                                    $html .= '<div class="flex flex-wrap items-center gap-3">';
+                                    $html .= '<h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 leading-none">' . htmlspecialchars($item->product_name ?? 'Produk Tak Bernama') . '</h3>';
 
-                                    // Badge Kategori Produk
+                                    $cat = $item->production_category ?? 'produksi';
                                     $catLabel = mb_convert_case(str_replace('_', ' ', $cat), MB_CASE_TITLE, "UTF-8");
-                                    $baseStyle = 'display: inline-flex; align-items: center; justify-content: center; min-height: 1.25rem; padding: 0.125rem 0.5rem; font-size: 0.75rem; font-weight: 500; border-radius: 0.375rem; white-space: nowrap;';
-                                    $catBadge = '<span style="' . $baseStyle . ' background-color: #F2E6FF; color: #8000FF; box-shadow: inset 0 0 0 1px rgba(128, 0, 255, 0.2);">' . $catLabel . '</span>';
+                                    $html .= '<span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 border border-primary-100 dark:border-primary-800">' . $catLabel . '</span>';
 
-                                    // Status Progress Bar Layout (Top Right)
-                                    $tasks = $item->productionTasks;
-                                    $statusText = 'Belum Diproses';
-                                    $statusColor = '#8000FF';
-                                    $progressPerc = 0;
-                                    if ($tasks->count() > 0) {
-                                        $totalTasks = $tasks->count();
-                                        $doneTasks = $tasks->where('status', 'done')->count();
-                                        if ($doneTasks === $totalTasks) {
-                                            $statusText = 'Selesai';
-                                            $statusColor = '#10B981'; // Green Emrald
-                                            $progressPerc = 100;
-                                        } else {
-                                            $statusText = 'Sedang Diproses';
-                                            $statusColor = '#8000FF';
-                                            $progressPerc = max(10, round(($doneTasks / $totalTasks) * 100));
-                                        }
-                                    }
-                                    $bgTrack = $statusText === 'Selesai' ? 'rgba(16,185,129,0.2)' : 'rgba(128,0,255,0.2)';
-                                    $barHtml = '<div style="width: 48px; height: 8px; border-radius: 9999px; background-color: ' . $bgTrack . '; overflow: hidden; display: flex;"><div style="width: ' . $progressPerc . '%; height: 100%; background-color: ' . $statusColor . '; border-radius: 9999px;"></div></div>';
-
-                                    // Badge Detail Material (Brand Bahan, Warna, dll)
-                                    $badges = [];
                                     $bahanArr = [];
+                                    $resolveName = function ($id, $type = 'material') {
+                                        if (!is_numeric($id))
+                                            return $id;
+                                        if ($type === 'material') {
+                                            return \App\Models\Material::find($id)?->name ?? $id;
+                                        }
+                                        return \App\Models\Product::find($id)?->name ?? $id;
+                                    };
+
                                     if ($cat === 'non_produksi') {
                                         if (!empty($details['supplier_product']))
-                                            $bahanArr[] = htmlspecialchars($details['supplier_product']);
+                                            $bahanArr[] = htmlspecialchars($resolveName($details['supplier_product'], 'product'));
                                     } elseif ($cat !== 'jasa') {
                                         if (!empty($details['brand_bahan']))
                                             $bahanArr[] = htmlspecialchars($details['brand_bahan']);
                                         if (!empty($details['bahan']))
-                                            $bahanArr[] = htmlspecialchars($details['bahan']);
+                                            $bahanArr[] = htmlspecialchars($resolveName($details['bahan'], 'material'));
                                         if (!empty($details['warna_bahan']))
                                             $bahanArr[] = htmlspecialchars($details['warna_bahan']);
                                     }
 
                                     if (!empty($bahanArr)) {
-                                        $badges[] = '<span class="px-2.5 py-2 rounded-md text-[11px] font-bold tracking-wide" style="background-color: #00bcd4; color: white;">' . implode(' &nbsp;&nbsp;|&nbsp;&nbsp; ', $bahanArr) . '</span>';
-                                    } else {
-                                        $badges[] = '<span class="px-2.5 py-2 rounded-md text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700"> Tidak ada detail bahan </span>';
+                                        $html .= '<span class="px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 shadow-sm">' . implode(' &nbsp;•&nbsp; ', $bahanArr) . '</span>';
                                     }
+                                    $html .= '</div>';
 
-                                    // Sablon / Bordir text (Center Right)
-                                    $sablonBordirText = '';
-                                    if (isset($details['sablon_bordir']) && is_array($details['sablon_bordir'])) {
-                                        $sbItems = [];
-                                        foreach ($details['sablon_bordir'] as $s) {
-                                            $j = htmlspecialchars($s['jenis'] ?? '');
-                                            $l = htmlspecialchars($s['lokasi'] ?? '');
-                                            if ($j || $l)
-                                                $sbItems[] = trim("$j $l");
-                                        }
-                                        $sablonBordirText = implode(', ', $sbItems);
-                                    } elseif (!empty($details['sablon_jenis']) || !empty($details['sablon_lokasi'])) {
-                                        $j = htmlspecialchars($details['sablon_jenis'] ?? '');
-                                        $l = htmlspecialchars($details['sablon_lokasi'] ?? '');
-                                        $sablonBordirText = trim("$j $l");
-                                    }
-                                    if (empty($sablonBordirText)) {
-                                        $sablonBordirText = '<span class="text-gray-400 italic font-normal">- Tidak ada detail sablon/bordir -</span>';
-                                    }
+                                    // --- Row 2: Specs (Sablon/Bordir & Additional Request) ---
+                                    $specs = [];
+                                    if (!empty($details['sablon_jenis']))
+                                        $specs[] = '🎨 ' . htmlspecialchars($details['sablon_jenis']) . ' (' . htmlspecialchars($details['sablon_lokasi'] ?? 'Lokasi tidak diset') . ')';
 
-                                    // Tambahan Request Box (Bottom Outline Box)
-                                    $requestBox = '';
-                                    $reqItems = [];
-                                    if (!empty($details['request_tambahan']) && is_array($details['request_tambahan'])) {
-                                        foreach ($details['request_tambahan'] as $req) {
-                                            if (is_array($req)) {
-                                                $jenis = htmlspecialchars($req['jenis'] ?? '');
-                                                $ukuran = htmlspecialchars($req['ukuran'] ?? '');
-                                                if ($ukuran === '__semua__') {
-                                                    $ukuran = 'Semua Ukuran';
-                                                }
-                                                $qty = htmlspecialchars($req['qty_tambahan'] ?? '');
-                                                $qtyText = $qty ? "({$qty} pcs)" : '';
-
-                                                if (empty($jenis) || empty($ukuran)) {
-                                                    $reqItems[] = htmlspecialchars(implode(' ', array_values(array_filter($req))));
-                                                } else {
-                                                    $itemText = implode(' ', array_filter([$jenis, $ukuran, $qtyText]));
-                                                    $reqItems[] = trim($itemText);
-                                                }
-                                            } else {
-                                                $reqItems[] = htmlspecialchars((string) $req);
+                                    $requests = $details['request_tambahan'] ?? [];
+                                    if (!empty($requests)) {
+                                        $reqStr = [];
+                                        foreach ($requests as $r) {
+                                            if (isset($r['jenis'])) {
+                                                $uk = isset($r['ukuran']) ? ($r['ukuran'] === '__semua__' ? 'Semua Ukuran' : $r['ukuran']) : '';
+                                                $reqStr[] = htmlspecialchars($r['jenis']) . ($uk ? " ($uk)" : "");
                                             }
                                         }
+                                        if (!empty($reqStr))
+                                            $specs[] = '🛠️ ' . implode(', ', $reqStr);
                                     }
 
-                                    if (!empty($details['catatan_tambahan'])) {
-                                        $reqItems[] = htmlspecialchars($details['catatan_tambahan']);
+                                    if (!empty($specs)) {
+                                        $html .= '<div class="flex flex-wrap gap-x-6 gap-y-2 text-xs font-medium text-gray-600 dark:text-gray-400">';
+                                        foreach ($specs as $s) {
+                                            $html .= '<span>' . $s . '</span>';
+                                        }
+                                        $html .= '</div>';
                                     }
 
-                                    $requestContentHtml = '';
-                                    if (!empty($reqItems)) {
-                                        $requestContentHtml .= '<div class="mb-2">' . implode('<br>', $reqItems) . '</div>';
-                                    }
+                                    // --- Row 3: Measurement Details ---
+                                    $html .= '<div class="pt-3 border-t border-dashed border-gray-200 dark:border-gray-700">';
 
-                                    // Custom Size Details text inside Tambahan Request 
                                     if ($cat === 'custom' && !empty($details['detail_custom'])) {
+                                        $html .= '<p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Detail Ukuran Custom</p>';
                                         $customItems = [];
                                         foreach ($details['detail_custom'] as $u) {
                                             $person = htmlspecialchars($u['nama'] ?? 'TN');
-                                            $ld = htmlspecialchars($u['LD'] ?? '-');
-                                            $lp = htmlspecialchars($u['LP'] ?? '-');
-                                            $p = htmlspecialchars($u['P'] ?? '-');
-                                            $customItems[] = "<span class='font-bold text-gray-800 dark:text-gray-200'>$person</span> <span class='text-gray-500'>(LD:$ld LP:$lp P:$p)</span>";
-                                        }
+                                            $mParts = [];
+                                            if (!empty($u['LD']))
+                                                $mParts[] = "LD:$u[LD]";
+                                            if (!empty($u['PL']))
+                                                $mParts[] = "PL:$u[PL]";
+                                            if (!empty($u['LP']))
+                                                $mParts[] = "LP:$u[LP]";
+                                            if (!empty($u['LB']))
+                                                $mParts[] = "LB:$u[LB]";
+                                            if (!empty($u['LPi']))
+                                                $mParts[] = "LPi:$u[LPi]";
+                                            if (!empty($u['PB']))
+                                                $mParts[] = "PB:$u[PB]";
 
-                                        if (count($customItems) > 0) {
-                                            if (count($customItems) > 2) {
-                                                $requestContentHtml .= '
-                                                <details class="group mt-2 mb-1">
-                                                    <summary class="cursor-pointer text-primary-600 font-bold hover:underline mb-2 select-none">Tampilkan ' . count($customItems) . ' Detail Ukuran Custom</summary>
-                                                    <div class="pl-3 border-l-2 border-primary-200 dark:border-primary-800 space-y-1 mt-2 text-xs">
-                                                        ' . implode('<br>', $customItems) . '
-                                                    </div>
-                                                </details>';
-                                            } else {
-                                                $requestContentHtml .= '
-                                                <div class="pl-3 border-l-2 border-gray-200 dark:border-gray-700 space-y-1 mt-2 text-xs">
-                                                    ' . implode('<br>', $customItems) . '
-                                                </div>';
+                                            $mStr = !empty($mParts) ? '<span class="text-gray-500 font-normal"> (' . implode(' ', $mParts) . ')</span>' : '';
+                                            $customItems[] = "<div class='text-xs py-1 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-100 dark:border-gray-800 shadow-sm'><span class='font-bold text-gray-800 dark:text-gray-200'>$person</span>$mStr</div>";
+                                        }
+                                        $html .= '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">' . implode('', $customItems) . '</div>';
+                                    } else {
+                                        $varian = $details['varian_ukuran'] ?? [];
+                                        if (!empty($varian)) {
+                                            $html .= '<p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Daftar Ukuran</p>';
+                                            $vItems = [];
+                                            foreach ($varian as $v) {
+                                                $size = htmlspecialchars($v['ukuran'] ?? '-');
+                                                $qty = htmlspecialchars($v['qty'] ?? 0);
+                                                $vItems[] = "<span class='px-2 py-1 bg-white dark:bg-gray-800 rounded border border-gray-100 dark:border-gray-800 text-xs font-bold text-gray-700 dark:text-gray-300'>Size $size: <span class='text-primary-600'>$qty pcs</span></span>";
                                             }
+                                            $html .= '<div class="flex flex-wrap gap-2">' . implode('', $vItems) . '</div>';
                                         }
                                     }
+                                    $html .= '</div>';
 
-                                    if (!empty($requestContentHtml)) {
-                                        $requestBox = '
-                                        <fieldset class="mt-5 border border-gray-200 dark:border-gray-700 rounded-lg px-4 pb-3 pt-2">
-                                            <legend class="px-2 ml-1 text-[10px] uppercase tracking-widest text-gray-500 font-bold bg-white dark:bg-gray-900">Tambahan Request</legend>
-                                            <div class="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
-                                                ' . $requestContentHtml . '
-                                            </div>
-                                        </fieldset>';
-                                    }
-
-                                    // Design Links
-                                    $designLinksHtml = '';
-                                    if (!empty($item->design_links) && is_array($item->design_links)) {
-                                        $links = [];
-                                        foreach ($item->design_links as $link) {
-                                            $url = htmlspecialchars($link['link'] ?? '#');
-                                            $lbl = htmlspecialchars($link['title'] ?? 'Desain');
-                                            $links[] = '<a href="' . $url . '" target="_blank" class="inline-flex items-center px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-gray-100 transition"><svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' . $lbl . '</a>';
-                                        }
-                                        if (count($links) > 0) {
-                                            $designLinksHtml = '<div class="mt-4 flex flex-wrap gap-2 items-center"><span class="text-[11px] text-gray-500 font-bold uppercase tracking-wider mr-1">File Desain:</span>' . implode('', $links) . '</div>';
-                                        }
-                                    }
-
-                                    // Validasi qty khusus untuk Custom (menghitung jumlah orang)
-                                    $displayQty = $qty;
-                                    if ($cat === 'custom' && !empty($details['detail_custom'])) {
-                                        $displayQty = count($details['detail_custom']);
-                                    }
-
-                                    $html = '
-                                    <div class="p-5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 shadow-sm mb-4">
-                                        
-                                        <!-- Row 1: Kategori & Status -->
-                                        <div class="flex items-center justify-between mb-4">
-                                            <div>
-                                                ' . $catBadge . '
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                ' . $barHtml . '
-                                                <span class="text-xs font-bold" style="color: ' . $statusColor . ';">' . $statusText . '</span>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Row 2: Qty, Name & Sizes -->
-                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                                            <h3 class="text-base font-bold text-gray-800 dark:text-gray-100">
-                                                <span class="text-gray-500 font-semibold">' . $displayQty . 'x</span> ' . $name . '
-                                            </h3>
-                                            ' . ($sizeString ? '<div class="text-[13px] font-medium text-gray-600 dark:text-gray-400">' . $sizeString . '</div>' : '') . '
-                                        </div>
-                                        
-                                        <!-- Row 3: Material Badges & Sablon/Bordir Description -->
-                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-                                            <div class="flex flex-wrap gap-1.5 items-center">
-                                                ' . implode('', $badges) . '
-                                            </div>
-                                            <div class="text-[13px] font-medium text-gray-500 dark:text-gray-400 text-left sm:text-right max-w-md leading-tight">
-                                                ' . $sablonBordirText . '
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Bottom Section: Tambahan & Files -->
-                                        ' . $requestBox . '
-                                        ' . $designLinksHtml . '
-                                    </div>
-                                    ';
-
+                                    $html .= '</div>';
                                     return new HtmlString($html);
                                 })
                                 ->columnSpanFull(),
+
 
                             \Filament\Forms\Components\Repeater::make('productionTasks')
                                 ->label('Daftar Tugas Produksi')

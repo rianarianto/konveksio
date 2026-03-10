@@ -31,7 +31,7 @@ class AddonOptionResource extends Resource
     protected static ?string $pluralModelLabel = 'Request Tambahan';
 
     protected static string|\UnitEnum|null $navigationGroup = 'INVENTORI & MASTER';
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     protected static bool $isScopedToTenant = true;
 

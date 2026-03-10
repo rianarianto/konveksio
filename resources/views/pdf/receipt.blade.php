@@ -223,60 +223,136 @@
             </thead>
             <tbody>
                 @foreach($order->orderItems as $index => $item)
+                                @php
+                                    $details = $item->size_and_request_details;
+                                    $itemsText = [];
+                                    if (!empty($details['bahan'])) {
+                                        $bahanName = \App\Models\Material::find($details['bahan'])?->name ?? $details['bahan'];
+                                        $itemsText[] = "Bahan: " . $bahanName;
+                                    }
+                                    if (!empty($details['sablon_jenis']))
+                                        $itemsText[] = "Sablon: " . $details['sablon_jenis'];
+
+                                    $descString = implode(' | ', $itemsText);
+
+                                    // Build variant rows
+                                    $variantRows = [];
+                                    $actualTotal = 0;
+                                    $cat = $item->production_category;
+
+                                    if ($cat === 'custom') {
+                                        $qty = count($details['detail_custom'] ?? []);
+                                        $harga = (int) ($details['harga_satuan'] ?? 0);
+                                        $actualTotal = $qty * $harga;
+                                        if ($qty > 0) {
+                                            $variantRows[] = ['label' => 'Ukuran Custom', 'qty' => $qty, 'price' => $harga, 'total' => $actualTotal];
+                                        }
+                                    } else if ($cat === 'non_produksi') {
+                                        foreach ($details['varian_ukuran'] ?? [] as $v) {
+                                            $sz = $v['ukuran'] ?? $v['size'] ?? '?';
+                                            $q = (int) ($v['qty'] ?? 0);
+                                            $h = (int) ($v['harga_satuan'] ?? 0);
+                                            if ($q > 0) {
+                                                $actualTotal += ($q * $h);
+                                                $variantRows[] = ['label' => 'Ukuran ' . $sz, 'qty' => $q, 'price' => $h, 'total' => $q * $h];
+                                            }
+                                        }
+                                    } else if ($cat === 'jasa') {
+                                        $q = (int) ($details['jumlah'] ?? 0);
+                                        $h = (int) ($details['harga_satuan'] ?? 0);
+                                        $actualTotal = $q * $h;
+                                        if ($q > 0) {
+                                            $variantRows[] = ['label' => 'Jasa', 'qty' => $q, 'price' => $h, 'total' => $actualTotal];
+                                        }
+                                    } else {
+                                        // Produksi (default)
+                                        foreach ($details['varian_ukuran'] ?? [] as $v) {
+                                            $sz = $v['ukuran'] ?? $v['size'] ?? '?';
+                                            $q = (int) ($v['qty'] ?? 0);
+                                            $h = (int) ($v['harga_satuan'] ?? 0);
+                                            if ($q > 0) {
+                                                $actualTotal += ($q * $h);
+                                                $variantRows[] = ['label' => 'Ukuran ' . $sz, 'qty' => $q, 'price' => $h, 'total' => $q * $h];
+                                            }
+                                        }
+                                        // Tambahan Request
+                                        foreach ($details['request_tambahan'] ?? [] as $e) {
+                                            $qExtra = (int) ($e['qty_tambahan'] ?? 0);
+                                            $hExtra = (int) ($e['harga_extra_satuan'] ?? 0);
+                                            if ($qExtra > 0) {
+                                                $actualTotal += ($qExtra * $hExtra);
+                                                $jenis = $e['jenis'] ?? 'Ekstra';
+                                                $variantRows[] = ['label' => '+ ' . $jenis, 'qty' => $qExtra, 'price' => $hExtra, 'total' => $qExtra * $hExtra];
+                                            }
+                                        }
+                                    }
+                                @endphp
                                 <tr>
-                                    <td style="text-align: center; color: #888;">{{ $index + 1 }}</td>
-                                    <td>
+                                    <td style="text-align: center; color: #888; border-bottom: none;">{{ $index + 1 }}</td>
+                                    <td style="border-bottom: none; padding-bottom: 4px;">
                                         <div class="item-name">{{ $item->product_name }}</div>
                                         <div class="item-badge">
-                                            {{ match ($item->production_category) {
+                                            {{ match ($cat) {
                         'custom' => 'Custom',
                         'non_produksi' => 'Non-Produksi',
                         'jasa' => 'Jasa',
                         default => 'Produksi'
                     } }}
                                         </div>
-                                        <div class="item-details">
-                                            @php
-                                                $details = $item->size_and_request_details;
-                                                $itemsText = [];
-                                                if (!empty($details['bahan']))
-                                                    $itemsText[] = "Bahan: " . $details['bahan'];
-                                                if (!empty($details['sablon_jenis']))
-                                                    $itemsText[] = "Sablon: " . $details['sablon_jenis'];
+                                        @if($descString)
+                                            <div class="item-details" style="margin-bottom: 4px;">{{ $descString }}</div>
+                                        @endif
+                                    </td>
+                                    {{-- If there's NO variant row, display it inline nicely as fallback --}}
+                                    @if(count($variantRows) === 0)
+                                        <td style="text-align: center; font-weight: bold; border-bottom: none;">{{ $item->quantity }}</td>
+                                        <td style="text-align: right; border-bottom: none;">Rp {{ number_format($item->price, 0, ',', '.') }}</td>
+                                        <td style="text-align: right; font-weight: bold; border-bottom: none;">Rp
+                                            {{ number_format($item->price * $item->quantity, 0, ',', '.') }}</td>
+                                    @else
+                                        <td style="text-align: center; border-bottom: none;"></td>
+                                        <td style="border-bottom: none;"></td>
+                                        <td style="text-align: right; font-weight: bold; border-bottom: none;"></td>
+                                    @endif
+                                </tr>
 
-                                                // Sizing
-                                                $sizing = [];
-                                                if ($item->production_category === 'custom') {
-                                                    $sizing[] = count($details['detail_custom'] ?? []) . " pcs";
-                                                } else if ($item->production_category === 'non_produksi') {
-                                                    foreach ($details['varian_ukuran'] ?? [] as $v) {
-                                                        $sz = $v['ukuran'] ?? $v['size'] ?? '?';
-                                                        $q = $v['qty'] ?? 0;
-                                                        if ($q > 0)
-                                                            $sizing[] = "$sz: $q";
-                                                    }
-                                                } else if ($item->production_category === 'jasa') {
-                                                    $sizing[] = ($details['jumlah'] ?? 0) . " unit";
-                                                } else {
-                                                    foreach ($details['varian_ukuran'] ?? [] as $v) {
-                                                        $sz = $v['ukuran'] ?? $v['size'] ?? '?';
-                                                        $q = $v['qty'] ?? 0;
-                                                        if ($q > 0)
-                                                            $sizing[] = "$sz: $q";
-                                                    }
-                                                }
-                                            @endphp
-                                            {{ implode(' | ', $itemsText) }}
-                                            @if(count($sizing) > 0)
-                                                <div style="margin-top: 2px;">Ukuran: {{ implode(', ', $sizing) }}</div>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td style="text-align: center; font-weight: bold;">{{ $item->quantity }}</td>
-                                    <td style="text-align: right;">Rp {{ number_format($item->price, 0, ',', '.') }}</td>
-                                    <td style="text-align: right; font-weight: bold;">Rp
-                                        {{ number_format($item->price * $item->quantity, 0, ',', '.') }}
-                                    </td>
+                                {{-- If any variants exist, list them below the main item row --}}
+                                @if(count($variantRows) > 0)
+                                    @foreach($variantRows as $vIdx => $vRow)
+                                        <tr>
+                                            <td style="border-bottom: none; border-top: none;"></td>
+                                            <td
+                                                style="color: #666; font-size: 11px; padding-left: 15px; border-bottom: none; border-top: none; padding-top: 0; padding-bottom: {{ $loop->last ? '12px' : '4px' }};">
+                                                &#8226; {{ $vRow['label'] }}
+                                            </td>
+                                            <td
+                                                style="text-align: center; font-weight: bold; border-bottom: none; border-top: none; padding-top: 0; padding-bottom: {{ $loop->last ? '12px' : '4px' }};">
+                                                {{ $vRow['qty'] }}
+                                            </td>
+                                            <td
+                                                style="text-align: right; color: #555; border-bottom: none; border-top: none; padding-top: 0; padding-bottom: {{ $loop->last ? '12px' : '4px' }};">
+                                                Rp {{ number_format($vRow['price'], 0, ',', '.') }}
+                                            </td>
+                                            <td
+                                                style="text-align: right; font-weight: bold; color: #333; border-bottom: none; border-top: none; padding-top: 0; padding-bottom: {{ $loop->last ? '12px' : '4px' }};">
+                                                Rp {{ number_format($vRow['total'], 0, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                @endif
+                                
+                                {{-- Subtotal row for this product (always display for consistency) --}}
+                                <tr>
+                                    <td colspan="2"
+                                        style="text-align: right; font-size: 10px; color: #888; padding-top: 6px; padding-bottom: 12px; border-top: 1px solid #eee; border-bottom: 1px solid #eee;">
+                                        Subtotal Produk:</td>
+                                    <td
+                                        style="text-align: center; font-weight: bold; padding-top: 6px; padding-bottom: 12px; border-top: 1px solid #eee; border-bottom: 1px solid #eee;">
+                                        {{ $item->quantity }}</td>
+                                    <td style="border-top: 1px solid #eee; border-bottom: 1px solid #eee;"></td>
+                                    <td
+                                        style="text-align: right; font-weight: bold; color: #7F00FF; padding-top: 6px; padding-bottom: 12px; border-top: 1px solid #eee; border-bottom: 1px solid #eee;">
+                                        Rp {{ number_format($actualTotal > 0 ? $actualTotal : ($item->price * $item->quantity), 0, ',', '.') }}</td>
                                 </tr>
                 @endforeach
             </tbody>
@@ -299,7 +375,7 @@
                     @endforelse
                 </div>
             </div>
-            
+
             <div style="width: 100%; display: flex; justify-content: flex-end;">
                 <table class="totals-table" style="width: 40%; margin-left: auto;">
                     <tr>

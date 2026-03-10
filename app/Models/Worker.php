@@ -19,12 +19,15 @@ class Worker extends Model implements HasTenants
         'is_active',
         'max_cash_advance',
         'current_cash_advance',
+        'wage_type',
+        'base_salary',
     ];
 
     protected $casts = [
-        'is_active'            => 'boolean',
-        'max_cash_advance'     => 'integer',
+        'is_active' => 'boolean',
+        'max_cash_advance' => 'integer',
         'current_cash_advance' => 'integer',
+        'base_salary' => 'integer',
     ];
 
     protected $appends = ['active_queue_count', 'pending_count', 'in_progress_count', 'done_count'];
