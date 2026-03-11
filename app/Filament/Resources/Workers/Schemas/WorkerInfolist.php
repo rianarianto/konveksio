@@ -89,14 +89,36 @@ class WorkerInfolist
                         RepeatableEntry::make('productionTasksDone')
                             ->label('')
                             ->schema([
-                                TextEntry::make('stage_name')->label('Tahap'),
-                                TextEntry::make('quantity')->label('Qty')->suffix(' pcs')->badge()->color('success'),
-                                TextEntry::make('wage_amount')->label('Upah/pcs')->money('IDR'),
-                                TextEntry::make('orderItem.product_name')->label('Produk'),
-                                TextEntry::make('completed_at')->label('Selesai Pada')->dateTime('d M Y, H:i'),
+                                TextEntry::make('orderItem.order.order_number')
+                                    ->label('No. Pesanan')
+                                    ->color('primary')
+                                    ->weight('bold'),
+                                TextEntry::make('orderItem.product_name')
+                                    ->label('Produk')
+                                    ->description(fn($record) => "Kategori: " . ($record['orderItem']['production_category'] ?? '-')),
+                                TextEntry::make('stage_name')
+                                    ->label('Tahap'),
+                                TextEntry::make('quantity')
+                                    ->label('Qty')
+                                    ->suffix(' pcs')
+                                    ->badge()
+                                    ->color('success'),
+                                TextEntry::make('wage_amount')
+                                    ->label('Upah/pcs')
+                                    ->money('IDR'),
+                                TextEntry::make('completed_at')
+                                    ->label('Selesai Pada')
+                                    ->dateTime('d M Y, H:i'),
                             ])
                             ->columns(3)
-                            ->getStateUsing(fn($record) => $record->productionTasks()->where('status', 'done')->with('orderItem')->latest('completed_at')->get()->toArray()),
+                            ->getStateUsing(
+                                fn($record) => $record->productionTasks()
+                                    ->where('status', 'done')
+                                    ->with(['orderItem.order'])
+                                    ->latest('completed_at')
+                                    ->get()
+                                    ->toArray()
+                            ),
                     ]),
             ]);
     }

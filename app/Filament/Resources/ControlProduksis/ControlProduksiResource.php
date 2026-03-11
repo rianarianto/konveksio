@@ -182,7 +182,7 @@ class ControlProduksiResource extends Resource
             ])
             ->actions([
                 Action::make('update_progress')
-                    ->hidden(fn(OrderItem $record) => $record->productionTasks()->count() === 0)
+                    ->hidden(fn(OrderItem $record) => $record->productionTasks()->where('status', '!=', 'done')->count() === 0)
                     ->label('Update Progress')
                     ->icon('heroicon-o-arrow-path')
                     ->color('info')
@@ -323,27 +323,47 @@ class ControlProduksiResource extends Resource
 
 
                 Action::make('atur_tugas')
-                    ->label('Atur Tugas')
+                    ->hidden(fn(OrderItem $record) => $record->productionTasks()->exists() && $record->productionTasks()->where('status', '!=', 'done')->count() === 0)
+                    ->label(fn(OrderItem $record) => $record->productionTasks()->exists() ? 'Edit Tugas' : 'Atur Tugas')
                     ->icon('heroicon-o-clipboard-document-list')
                     ->color('primary')
-                    ->hidden(fn(OrderItem $record): bool => $record->productionTasks()->count() > 0)
                     ->slideOver()
                     ->modalWidth('xl')
-                    ->modalHeading('Atur Tugas Produksi')
+                    ->modalHeading(fn(OrderItem $record) => $record->productionTasks()->exists() ? 'Edit Tugas Produksi' : 'Atur Tugas Produksi')
                     ->fillForm(function (OrderItem $record) {
                         $item = $record->load('productionTasks');
                         $tasksForRepeater = [];
                         foreach ($item->productionTasks as $task) {
                             $wagePerPcs = $task->quantity > 0 ? (int) ($task->wage_amount / $task->quantity) : 0;
-                            $tasksForRepeater[(string) \Illuminate\Support\Str::uuid()] = [
+                            $taskRow = [
                                 'id' => $task->id,
                                 'stage_name' => $task->stage_name,
                                 'assigned_to' => $task->assigned_to,
                                 'quantity' => $task->quantity,
                                 'wage_per_pcs' => $wagePerPcs,
-                                'size_quantities' => $task->size_quantities,
                                 'description' => $task->description,
                             ];
+
+                            // Unpack size_quantities into the flat row state
+                            if (is_array($task->size_quantities)) {
+                                $details = $item->size_and_request_details ?? [];
+                                foreach ($task->size_quantities as $sz => $qty) {
+                                    $szUpper = strtoupper($sz);
+                                    $taskRow[$szUpper] = $qty;
+
+                                    // Mapping for custom items (backward compatibility)
+                                    if ($item->production_category === 'custom' && !empty($details['detail_custom'])) {
+                                        foreach ($details['detail_custom'] as $index => $u) {
+                                            $pName = trim($u['nama'] ?? 'Person ' . ($index + 1));
+                                            $safeKey = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', $pName)) . '_' . $index;
+                                            if ($szUpper === strtoupper($pName) || $szUpper === $safeKey) {
+                                                $taskRow[$safeKey] = $qty;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            $tasksForRepeater[(string) \Illuminate\Support\Str::uuid()] = $taskRow;
                         }
                         return [
                             'productionTasks' => $tasksForRepeater,
@@ -540,7 +560,7 @@ class ControlProduksiResource extends Resource
                                                 ->helperText('Dihitung otomatis'),
                                         ]),
 
-                                    \Filament\Schemas\Components\Fieldset::make('size_quantities')
+                                    \Filament\Schemas\Components\Fieldset::make(null)
                                         ->label('Detail Qty per Ukuran')
                                         ->schema(function (\App\Models\OrderItem $record) use ($item) {
                                             $fields = [];
@@ -590,9 +610,14 @@ class ControlProduksiResource extends Resource
                                                 $people = [];
                                                 if (!empty($details['detail_custom']) && is_array($details['detail_custom'])) {
                                                     foreach ($details['detail_custom'] as $index => $u) {
-                                                        $person = htmlspecialchars($u['nama'] ?? 'Person ' . ($index + 1));
+                                                        $person = trim($u['nama'] ?? 'Person ' . ($index + 1));
                                                         $sz = strtoupper($u['ukuran'] ?? 'CUSTOM');
-                                                        $people[] = ['key' => $person, 'sz' => $sz];
+                                                        $safeKey = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', $person) . '_' . $index);
+                                                        $people[] = [
+                                                            'key' => $safeKey,
+                                                            'label' => $person,
+                                                            'sz' => $sz
+                                                        ];
                                                     }
                                                 }
 
@@ -611,7 +636,7 @@ class ControlProduksiResource extends Resource
 
                                                 foreach ($people as $p) {
                                                     $fields[] = \Filament\Forms\Components\TextInput::make($p['key'])
-                                                        ->label($p['key'])
+                                                        ->label($p['label'])
                                                         ->placeholder($p['sz'])
                                                         ->numeric()
                                                         ->minValue(0)
@@ -905,8 +930,9 @@ class ControlProduksiResource extends Resource
                                 $details = $item->size_and_request_details ?? [];
                                 if (!empty($details['detail_custom']) && is_array($details['detail_custom'])) {
                                     foreach ($details['detail_custom'] as $index => $u) {
-                                        $person = $u['nama'] ?? 'Person ' . ($index + 1);
-                                        $sizesToLookFor[] = $person;
+                                        $person = trim($u['nama'] ?? 'Person ' . ($index + 1));
+                                        $safeKey = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', $person) . '_' . $index);
+                                        $sizesToLookFor[] = $safeKey;
                                     }
                                 }
                             } else {

@@ -1,0 +1,42 @@
+{
+    "id": 15,
+    "category": "custom",
+    "item_details": {
+        "bahan": 2,
+        "category": "custom",
+        "harga_satuan": 100000,
+        "sablon_jenis": "Bordir",
+        "detail_custom": [
+            {
+                "LB": 8,
+                "LD": 8,
+                "LP": 8,
+                "PB": 8,
+                "PL": 8,
+                "LPi": 8,
+                "nama": "Ana"
+            },
+            {
+                "LB": 9,
+                "LD": 9,
+                "LP": 9,
+                "PB": 9,
+                "PL": 9,
+                "LPi": 9,
+                "nama": "Ani "
+            }
+        ],
+        "sablon_lokasi": "Dada Kiri",
+        "request_tambahan": [
+            {
+                "jenis": "Saku Semi Klewang",
+                "price": 0,
+                "quantity": 1,
+                "subtotal": 0,
+                "total_price": 0,
+                "harga_extra_satuan": 15000
+            }
+        ]
+    },
+    "size_quantities": null
+}
