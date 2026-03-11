@@ -385,16 +385,12 @@
                                                         $itemStatusLabel = 'Antrian';
                                                     }
                                                 } else {
-                                                    // Fallback to order status
-                                                    if ($order->status === 'pending' || $order->status === 'diterima') {
-                                                        $itemProgress = 0;
-                                                        $itemStatusLabel = 'Belum Diproses';
-                                                    } elseif ($order->status === 'selesai' || $order->status === 'diambil') {
-                                                        $itemProgress = 100;
-                                                        $itemStatusLabel = 'Selesai';
+                                                    // No tasks assigned yet
+                                                    $itemProgress = 0;
+                                                    if ($order->status === 'batal') {
+                                                        $itemStatusLabel = 'Batal';
                                                     } else {
-                                                        $itemProgress = 0;
-                                                        $itemStatusLabel = 'Antrian';
+                                                        $itemStatusLabel = 'Belum Diatur';
                                                     }
                                                 }
                                             @endphp

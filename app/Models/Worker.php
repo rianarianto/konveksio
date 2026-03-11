@@ -30,7 +30,7 @@ class Worker extends Model implements HasTenants
         'base_salary' => 'integer',
     ];
 
-    protected $appends = ['active_queue_count', 'pending_count', 'in_progress_count', 'done_count'];
+    protected $appends = ['active_queue_count', 'pending_count', 'in_progress_count', 'done_count', 'unpaid_wage'];
 
     protected static function booted(): void
     {
@@ -95,7 +95,7 @@ class Worker extends Model implements HasTenants
     {
         return (int) $this->productionTasks()
             ->where('status', 'done')
-            ->selectRaw('SUM(wage_amount * quantity) as total')
+            ->selectRaw('SUM(wage_amount) as total')
             ->value('total') ?? 0;
     }
 
@@ -108,7 +108,19 @@ class Worker extends Model implements HasTenants
             ->where('status', 'done')
             ->whereYear('completed_at', now()->year)
             ->whereMonth('completed_at', now()->month)
-            ->selectRaw('SUM(wage_amount * quantity) as total')
+            ->selectRaw('SUM(wage_amount) as total')
+            ->value('total') ?? 0;
+    }
+
+    /**
+     * Total upah yang sudah dikerjakan tapi belum dibayar tunai.
+     */
+    public function getUnpaidWageAttribute(): int
+    {
+        return (int) $this->productionTasks()
+            ->where('status', 'done')
+            ->where('is_paid', false)
+            ->selectRaw('SUM(wage_amount) as total')
             ->value('total') ?? 0;
     }
 

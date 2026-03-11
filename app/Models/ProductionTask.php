@@ -20,6 +20,7 @@ class ProductionTask extends Model
         'status',
         'is_paid',
         'description',
+        'completed_at',
     ];
 
     protected $casts = [
@@ -28,6 +29,7 @@ class ProductionTask extends Model
         'size_quantities' => 'array',
         'status' => 'string',
         'is_paid' => 'boolean',
+        'completed_at' => 'datetime',
     ];
 
     protected static function booted(): void

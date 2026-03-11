@@ -33,94 +33,42 @@ class WorkerInfolist
                 Section::make('💰 Ringkasan Upah')
                     ->columns(3)
                     ->schema([
+                        TextEntry::make('pending_count')
+                            ->label('⏳ Antrian')
+                            ->state(fn(Worker $record): string => number_format($record->pending_count, 0, ',', '.') . ' pcs')
+                            ->badge()
+                            ->color('warning'),
+
+                        TextEntry::make('in_progress_count')
+                            ->label('🔨 Dikerjakan')
+                            ->state(fn(Worker $record): string => number_format($record->in_progress_count, 0, ',', '.') . ' pcs')
+                            ->badge()
+                            ->color('info'),
+
+                        TextEntry::make('done_count')
+                            ->label('✅ Selesai')
+                            ->state(fn(Worker $record): string => number_format($record->done_count, 0, ',', '.') . ' pcs')
+                            ->badge()
+                            ->color('success'),
+
+                        TextEntry::make('unpaid_wage')
+                            ->label('💸 Upah Belum Dibayar')
+                            ->state(fn(Worker $record): string => 'Rp ' . number_format($record->unpaid_wage, 0, ',', '.'))
+                            ->badge()
+                            ->color('danger'),
+
                         TextEntry::make('monthly_earned')
-                            ->label('Upah Bulan Ini')
+                            ->label('🗓️ Upah Bulan Ini')
                             ->state(fn(Worker $record): string => 'Rp ' . number_format($record->monthly_earned, 0, ',', '.'))
                             ->badge()
                             ->color('success'),
 
                         TextEntry::make('total_earned')
-                            ->label('Total Upah (All Time)')
+                            ->label('🏆 Total Upah (All Time)')
                             ->state(fn(Worker $record): string => 'Rp ' . number_format($record->total_earned, 0, ',', '.'))
                             ->badge()
                             ->color('primary'),
-
-                        TextEntry::make('done_count')
-                            ->label('Total Pcs Selesai')
-                            ->state(fn(Worker $record): string => number_format($record->done_count, 0, ',', '.') . ' pcs')
-                            ->badge()
-                            ->color('info'),
-                    ]),
-
-                Section::make('⏳ Antrian Tugas (Pending)')
-                    ->collapsible()
-                    ->schema([
-                        RepeatableEntry::make('productionTasks')
-                            ->label('')
-                            ->schema([
-                                TextEntry::make('stage_name')->label('Tahap'),
-                                TextEntry::make('quantity')->label('Qty')->suffix(' pcs')->badge()->color('warning'),
-                                TextEntry::make('orderItem.product_name')->label('Produk'),
-                                TextEntry::make('created_at')->label('Ditugaskan')->dateTime('d M Y'),
-                            ])
-                            ->columns(4)
-                            ->getStateUsing(fn($record) => $record->productionTasks()->where('status', 'pending')->with('orderItem')->get()->toArray()),
-                    ]),
-
-                Section::make('🔨 Sedang Dikerjakan (In Progress)')
-                    ->collapsible()
-                    ->schema([
-                        RepeatableEntry::make('productionTasksInProgress')
-                            ->label('')
-                            ->schema([
-                                TextEntry::make('stage_name')->label('Tahap'),
-                                TextEntry::make('quantity')->label('Qty')->suffix(' pcs')->badge()->color('info'),
-                                TextEntry::make('orderItem.product_name')->label('Produk'),
-                                TextEntry::make('updated_at')->label('Mulai Dikerjakan')->dateTime('d M Y'),
-                            ])
-                            ->columns(4)
-                            ->getStateUsing(fn($record) => $record->productionTasks()->where('status', 'in_progress')->with('orderItem')->get()->toArray()),
-                    ]),
-
-                Section::make('✅ Riwayat Pekerjaan Selesai')
-                    ->collapsible()
-                    ->collapsed()
-                    ->schema([
-                        RepeatableEntry::make('productionTasksDone')
-                            ->label('')
-                            ->schema([
-                                TextEntry::make('orderItem.order.order_number')
-                                    ->label('No. Pesanan')
-                                    ->color('primary')
-                                    ->weight('bold'),
-                                TextEntry::make('orderItem.product_name')
-                                    ->label('Produk')
-                                    ->description(fn($record) => "Kategori: " . ($record['orderItem']['production_category'] ?? '-')),
-                                TextEntry::make('stage_name')
-                                    ->label('Tahap'),
-                                TextEntry::make('quantity')
-                                    ->label('Qty')
-                                    ->suffix(' pcs')
-                                    ->badge()
-                                    ->color('success'),
-                                TextEntry::make('wage_amount')
-                                    ->label('Upah/pcs')
-                                    ->money('IDR'),
-                                TextEntry::make('completed_at')
-                                    ->label('Selesai Pada')
-                                    ->dateTime('d M Y, H:i'),
-                            ])
-                            ->columns(3)
-                            ->getStateUsing(
-                                fn($record) => $record->productionTasks()
-                                    ->where('status', 'done')
-                                    ->with(['orderItem.order'])
-                                    ->latest('completed_at')
-                                    ->get()
-                                    ->toArray()
-                            ),
                     ]),
             ]);
     }
 }
-

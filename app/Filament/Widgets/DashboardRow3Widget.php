@@ -55,10 +55,13 @@ class DashboardRow3Widget extends Widget
         }
 
         if (auth()->user()->role === 'owner') {
-            $query->whereNotIn('status', ['selesai', 'diambil', 'batal'])
+            $query->where('status', '!=', 'batal')
                 ->where(function (Builder $query) {
-                    $query->whereDate('deadline', '<=', now()->addDays(3))
-                        ->orWhereRaw('total_price > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)');
+                    $query->whereRaw('total_price > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)')
+                        ->orWhere(function (Builder $sub) {
+                            $sub->whereNotIn('status', ['selesai', 'diambil'])
+                                ->whereDate('deadline', '<=', now()->addDays(3));
+                        });
                 });
         }
 

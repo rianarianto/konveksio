@@ -50,7 +50,7 @@ class ListPengeluaran extends ListRecords
             ->where('shop_id', $tenantId)
             ->where('status', 'done')
             ->whereBetween('completed_at', [$dari, $sampai])
-            ->selectRaw('SUM(wage_amount * quantity) as total')
+            ->selectRaw('SUM(wage_amount) as total')
             ->value('total') ?? 0;
 
         // ── 3. Total Kasbon Belum Lunas ──

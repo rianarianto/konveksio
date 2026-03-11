@@ -8,13 +8,15 @@ use App\Models\Expense;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables;
+use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Actions\Action;
-use Filament\Tables\Table;
+use Filament\Actions\ActionGroup;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
-use Filament\Notifications\Notification;
+use App\Filament\Resources\WorkerPayrolls\Pages\ManageWorkerPayrolls;
+use Illuminate\Support\HtmlString; // Added missing import
 
 class WorkerPayrollResource extends Resource
 {
@@ -40,113 +42,166 @@ class WorkerPayrollResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')
-                    ->label('Karyawan')
-                    ->searchable()
-                    ->sortable()
-                    ->weight('bold'),
+            TextColumn::make('name')
+            ->label('Karyawan')
+            ->searchable()
+            ->sortable()
+            ->weight('bold'),
 
-                TextColumn::make('pesanan_count')
-                    ->label('Jml Pesanan')
-                    ->state(function (Worker $record): int {
-                        return $record->productionTasks()
-                            ->where('production_tasks.status', 'done')
-                            ->where('production_tasks.is_paid', false)
-                            ->join('order_items', 'production_tasks.order_item_id', '=', 'order_items.id')
-                            ->distinct('order_items.order_id')
-                            ->count('order_items.order_id');
-                    }),
+            TextColumn::make('pesanan_count')
+            ->label('Jml Pesanan')
+            ->state(function (Worker $record): int {
+            return $record->productionTasks()
+                ->where('production_tasks.status', 'done')
+                ->where('production_tasks.is_paid', false)
+                ->join('order_items', 'production_tasks.order_item_id', '=', 'order_items.id')
+                ->distinct('order_items.order_id')
+                ->count('order_items.order_id');
+        }),
 
-                TextColumn::make('items_count')
-                    ->label('Jml Item')
-                    ->state(function (Worker $record): int {
-                        return $record->productionTasks()
-                            ->where('status', 'done')
-                            ->where('is_paid', false)
-                            ->distinct('order_item_id')
-                            ->count('order_item_id');
-                    }),
+            TextColumn::make('items_count')
+            ->label('Jml Item')
+            ->state(function (Worker $record): int {
+            return $record->productionTasks()
+                ->where('status', 'done')
+                ->where('is_paid', false)
+                ->distinct('order_item_id')
+                ->count('order_item_id');
+        }),
 
-                TextColumn::make('total_pcs')
-                    ->label('Total Pcs')
-                    ->state(function (Worker $record): int {
-                        return (int) $record->productionTasks()
-                            ->where('status', 'done')
-                            ->where('is_paid', false)
-                            ->sum('quantity');
-                    })
-                    ->badge()
-                    ->color('info'),
+            TextColumn::make('total_pcs')
+            ->label('Total Pcs')
+            ->state(function (Worker $record): int {
+            return (int)$record->productionTasks()
+                ->where('status', 'done')
+                ->where('is_paid', false)
+                ->sum('quantity');
+        })
+            ->badge()
+            ->color('info'),
 
-                TextColumn::make('total_wage')
-                    ->label('Total Nominal Upah')
-                    ->state(function (Worker $record): int {
-                        return (int) $record->productionTasks()
-                            ->where('status', 'done')
-                            ->where('is_paid', false)
-                            ->selectRaw('SUM(wage_amount * quantity) as total')
-                            ->value('total') ?? 0;
-                    })
-                    ->money('IDR')
-                    ->weight('bold')
-                    ->color('success'),
+            TextColumn::make('total_wage')
+            ->label('Total Nominal Upah')
+            ->state(function (Worker $record): int {
+            return (int)$record->productionTasks()
+                ->where('status', 'done')
+                ->where('is_paid', false)
+                ->selectRaw('SUM(wage_amount) as total')
+                ->value('total') ?? 0;
+        })
+            ->money('IDR')
+            ->weight('bold')
+            ->color('success'),
 
-                TextColumn::make('current_cash_advance')
-                    ->label('Sisa Kasbon')
-                    ->money('IDR')
-                    ->color(fn($state) => $state > 0 ? 'danger' : 'gray'),
-            ])
+            TextColumn::make('current_cash_advance')
+            ->label('Sisa Kasbon (-) ')
+            ->money('IDR')
+            ->color(fn($state): string => $state > 0 ? 'danger' : 'gray'),
+
+            TextColumn::make('net_wage')
+            ->label('Upah Bersih')
+            ->state(function (Worker $record): int {
+            $totalWage = (int)$record->productionTasks()
+                ->where('status', 'done')
+                ->where('is_paid', false)
+                ->selectRaw('SUM(wage_amount) as total')
+                ->value('total') ?? 0;
+
+            return max(0, $totalWage - $record->current_cash_advance);
+        })
+            ->money('IDR')
+            ->weight('bold')
+            ->color('primary'),
+        ])
             ->actions([
-                Action::make('pay_all')
-                    ->label('Bayar Borongan')
-                    ->icon('heroicon-o-banknotes')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->modalHeading('Bayar Semua Upah Selesai')
-                    ->modalDescription(function (Worker $record) {
-                        $total = (int) $record->productionTasks()
-                            ->where('status', 'done')
-                            ->where('is_paid', false)
-                            ->selectRaw('SUM(wage_amount * quantity) as total')
-                            ->value('total') ?? 0;
-                        return "Apakah Anda yakin ingin membayar seluruh upah selesai untuk {$record->name} sebesar Rp " . number_format($total, 0, ',', '.') . "?";
-                    })
-                    ->action(function (Worker $record) {
-                        $unpaidTasks = $record->productionTasks()
-                            ->where('status', 'done')
-                            ->where('is_paid', false)
-                            ->get();
+            Action::make('pay_all')
+            ->label('Bayar Upah')
+            ->icon('heroicon-o-banknotes')
+            ->color('success')
+            ->requiresConfirmation()
+            ->modalHeading('Bayar Semua Upah Selesai')
+            ->modalDescription(function (Worker $record) {
+            $totalWage = (int)$record->productionTasks()
+                ->where('status', 'done')
+                ->where('is_paid', false)
+                ->selectRaw('SUM(wage_amount) as total')
+                ->value('total') ?? 0;
 
-                        if ($unpaidTasks->isEmpty())
-                            return;
+            $kasbon = (int)$record->current_cash_advance;
+            $netWage = max(0, $totalWage - $kasbon);
 
-                        $totalAmount = 0;
-                        foreach ($unpaidTasks as $task) {
-                            $totalAmount += ($task->wage_amount * $task->quantity);
-                            $task->update(['is_paid' => true]);
-                        }
+            $desc = "Total Upah: Rp " . number_format($totalWage, 0, ',', '.') . "\n";
+            if ($kasbon > 0) {
+                $desc .= "Potongan Kasbon: Rp " . number_format($kasbon, 0, ',', '.') . "\n";
+                $desc .= "Jumlah Dibayarkan: Rp " . number_format($netWage, 0, ',', '.') . "\n\n";
 
-                        Expense::create([
-                            'shop_id' => $record->shop_id,
-                            'keperluan' => "Upah Borongan: {$record->name} (" . now()->format('d/m/Y') . ")",
-                            'amount' => $totalAmount,
-                            'expense_date' => now(),
-                            'note' => 'Gaji / Upah',
-                            'recorded_by' => auth()->id(),
-                        ]);
+                if ($kasbon > $totalWage) {
+                    $desc .= "⚠️ Upah tidak mencukupi untuk melunasi kasbon. Sisa kasbon akan berkurang Rp " . number_format($totalWage, 0, ',', '.') . ".";
+                }
+                else {
+                    $desc .= "✅ Kasbon akan dianggap LUNAS.";
+                }
+            }
+            else {
+                $desc .= "Apakah Anda yakin ingin membayar seluruh upah selesai?";
+            }
 
-                        Notification::make()
-                            ->success()
-                            ->title('Pembayaran Berhasil')
-                            ->body("Upah sebesar Rp " . number_format($totalAmount, 0, ',', '.') . " telah dibayar dan dicatat.")
-                            ->send();
-                    }),
+            return new \Illuminate\Support\HtmlString(nl2br(e($desc)));
+        })
+            ->action(function (Worker $record) {
+            $unpaidTasks = $record->productionTasks()
+                ->where('status', 'done')
+                ->where('is_paid', false)
+                ->get();
 
-                Action::make('detail')
-                    ->label('Rincian')
-                    ->icon('heroicon-o-eye')
-                    ->url(fn(Worker $record) => \App\Filament\Resources\Workers\WorkerResource::getUrl('view', ['record' => $record])),
-            ])
+            if ($unpaidTasks->isEmpty())
+                return;
+
+            $totalWage = 0;
+            foreach ($unpaidTasks as $task) {
+                $totalWage += $task->wage_amount;
+                $task->update(['is_paid' => true]);
+            }
+
+            $kasbonBefore = (int)$record->current_cash_advance;
+            $deduction = min($totalWage, $kasbonBefore);
+            $netToPay = $totalWage - $deduction;
+
+            $record->decrement('current_cash_advance', $deduction);
+
+            if ($netToPay > 0) {
+                Expense::create([
+                        'shop_id' => $record->shop_id,
+                        'keperluan' => "Upah Borongan (Net): {$record->name} (" . now()->format('d/m/Y') . ")",
+                        'amount' => $netToPay,
+                        'expense_date' => now(),
+                        'note' => 'Gaji / Upah',
+                        'recorded_by' => auth()->id(),
+                    ]);
+            }
+
+            if ($deduction > 0) {
+                $record->cashAdvances()->create([
+                        'shop_id' => $record->shop_id,
+                        'amount' => $deduction,
+                        'type' => 'repayment',
+                        'description' => "Potong dari upah borongan (" . now()->format('d/m/Y') . ")",
+                        'recorded_by' => auth()->id(),
+                    ]);
+            }
+
+            Notification::make()
+                ->success()
+                ->title('Pembayaran Selesai')
+                ->body("Upah Rp " . number_format($totalWage, 0, ',', '.') . " diproses. Potong Kasbon: Rp " . number_format($deduction, 0, ',', '.') . ". Dibayar Tunai: Rp " . number_format($netToPay, 0, ',', '.') . ".")
+                ->send();
+        }),
+
+            Action::make('detail')
+            ->label('Rincian')
+            ->icon('heroicon-o-eye')
+            ->url(fn(Worker $record) => \App\Filament\Resources\Workers\WorkerResource::getUrl('view', ['record' => $record])),
+        ])
             ->bulkActions([])
             ->defaultSort('name');
     }
@@ -164,5 +219,12 @@ class WorkerPayrollResource extends Resource
     public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
     {
         return false;
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => ManageWorkerPayrolls::route('/'),
+        ];
     }
 }

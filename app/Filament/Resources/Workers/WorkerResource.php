@@ -15,6 +15,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use App\Filament\Resources\Workers\RelationManagers\ProductionTasksRelationManager;
 
 class WorkerResource extends Resource
 {
@@ -51,7 +52,7 @@ class WorkerResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ProductionTasksRelationManager::class,
         ];
     }
 

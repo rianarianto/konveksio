@@ -74,7 +74,7 @@ class OwnerVisualInsightsWidget extends Widget
             $wages = (int) (ProductionTask::where('shop_id', $tenantId)
                 ->where('status', 'done')
                 ->whereBetween('completed_at', [$start, $end])
-                ->selectRaw('SUM(wage_amount * quantity) as total')
+                ->selectRaw('SUM(wage_amount) as total')
                 ->value('total') ?? 0);
 
             $months[] = [
