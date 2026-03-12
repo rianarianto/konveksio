@@ -91,6 +91,11 @@ class AdminPanelProvider extends PanelProvider
                 fn() => view('filament.login-illustration'),
                 scopes: \App\Filament\Pages\Auth\CustomLogin::class,
             )
+            ->sidebarCollapsibleOnDesktop()
+            ->icons([
+                'panels::sidebar.collapse-button' => 'heroicon-o-chevron-double-left',
+                'panels::sidebar.expand-button' => 'heroicon-o-chevron-double-right',
+            ])
             ->renderHook(
                 \Filament\View\PanelsRenderHook::STYLES_AFTER,
                 fn() => new \Illuminate\Support\HtmlString('
@@ -166,7 +171,7 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-building-storefront')
                     ->visible(fn(): bool => auth()->check() && auth()->user()->role === 'owner' && filament()->getTenant() !== null),
             ])
-            ->sidebarCollapsibleOnDesktop()
-            ->brandName('Konveksio');
+            ->brandLogo(fn() => view('filament.brand-logo'))
+            ->brandLogoHeight('2.5rem');
     }
 }
