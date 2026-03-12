@@ -63,7 +63,7 @@ class AdminPanelProvider extends PanelProvider
                     ->label('PENGATURAN'),
             ])
             ->pages([
-                \Filament\Pages\Dashboard::class,
+                \App\Filament\Pages\Dashboard::class,
             ])
             ->widgets([
                 \App\Filament\Widgets\OwnerFinanceStatsWidget::class,
