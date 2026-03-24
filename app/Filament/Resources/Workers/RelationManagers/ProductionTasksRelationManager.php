@@ -24,6 +24,7 @@ class ProductionTasksRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('stage_name')
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['orderItem.order']))
             ->columns([
                 TextColumn::make('orderItem.order.order_number')
                     ->label('No. Pesanan')

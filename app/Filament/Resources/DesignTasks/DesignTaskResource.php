@@ -61,6 +61,7 @@ class DesignTaskResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->with(['order.customer'])
             ->whereIn('design_status', ['pending', 'uploaded']);
     }
 

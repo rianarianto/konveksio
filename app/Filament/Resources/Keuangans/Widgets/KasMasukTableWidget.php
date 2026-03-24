@@ -21,6 +21,7 @@ class KasMasukTableWidget extends BaseWidget
         return $table
             ->query(
                 Payment::query()
+                    ->with(['order.customer', 'recorder'])
                     ->whereHas('order', function ($q) {
                         $q->withoutGlobalScopes(); // In case ShopScope is not yet applied correctly? No, it's better to use tenant.
                         $q->where('shop_id', Filament::getTenant()?->id);

@@ -136,6 +136,7 @@ class ProductResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn(\Illuminate\Database\Eloquent\Builder $query) => $query->with('supplier'))
             ->columns([
                 TextColumn::make('name')
                     ->label('Nama Barang')

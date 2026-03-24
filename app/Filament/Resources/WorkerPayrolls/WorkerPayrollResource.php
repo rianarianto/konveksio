@@ -35,6 +35,9 @@ class WorkerPayrollResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->with(['productionTasks' => function ($query) {
+                $query->where('status', 'done')->where('is_paid', false)->with('orderItem');
+            }])
             ->whereHas('productionTasks', fn($q) => $q->where('status', 'done')->where('is_paid', false));
     }
 
@@ -51,28 +54,29 @@ class WorkerPayrollResource extends Resource
             TextColumn::make('pesanan_count')
             ->label('Jml Pesanan')
             ->state(function (Worker $record): int {
-            return $record->productionTasks()
-                ->where('production_tasks.status', 'done')
-                ->where('production_tasks.is_paid', false)
-                ->join('order_items', 'production_tasks.order_item_id', '=', 'order_items.id')
-                ->distinct('order_items.order_id')
-                ->count('order_items.order_id');
+            return $record->productionTasks
+                ->where('status', 'done')
+                ->where('is_paid', false)
+                ->pluck('orderItem.order_id')
+                ->unique()
+                ->count();
         }),
 
             TextColumn::make('items_count')
             ->label('Jml Item')
             ->state(function (Worker $record): int {
-            return $record->productionTasks()
+            return $record->productionTasks
                 ->where('status', 'done')
                 ->where('is_paid', false)
-                ->distinct('order_item_id')
-                ->count('order_item_id');
+                ->pluck('order_item_id')
+                ->unique()
+                ->count();
         }),
 
             TextColumn::make('total_pcs')
             ->label('Total Pcs')
             ->state(function (Worker $record): int {
-            return (int)$record->productionTasks()
+            return (int)$record->productionTasks
                 ->where('status', 'done')
                 ->where('is_paid', false)
                 ->sum('quantity');
@@ -83,11 +87,10 @@ class WorkerPayrollResource extends Resource
             TextColumn::make('total_wage')
             ->label('Total Nominal Upah')
             ->state(function (Worker $record): int {
-            return (int)$record->productionTasks()
+            return (int)$record->productionTasks
                 ->where('status', 'done')
                 ->where('is_paid', false)
-                ->selectRaw('SUM(wage_amount) as total')
-                ->value('total') ?? 0;
+                ->sum('wage_amount');
         })
             ->money('IDR')
             ->weight('bold')
@@ -101,11 +104,10 @@ class WorkerPayrollResource extends Resource
             TextColumn::make('net_wage')
             ->label('Upah Bersih')
             ->state(function (Worker $record): int {
-            $totalWage = (int)$record->productionTasks()
+            $totalWage = (int)$record->productionTasks
                 ->where('status', 'done')
                 ->where('is_paid', false)
-                ->selectRaw('SUM(wage_amount) as total')
-                ->value('total') ?? 0;
+                ->sum('wage_amount');
 
             return max(0, $totalWage - $record->current_cash_advance);
         })

@@ -28,6 +28,7 @@ class PengeluaranTableWidget extends BaseWidget
         return $table
             ->query(
                 Expense::query()
+                    ->with('recorder')
                     ->where('shop_id', Filament::getTenant()?->id)
                     ->latest('expense_date')
             )

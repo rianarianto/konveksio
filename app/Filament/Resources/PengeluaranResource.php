@@ -95,6 +95,7 @@ class PengeluaranResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn(Builder $query) => $query->with('recorder'))
             ->columns([
                 TextColumn::make('expense_date')
                     ->label('Tanggal')

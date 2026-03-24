@@ -14,6 +14,7 @@ class OrderReturnsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (\Illuminate\Database\Eloquent\Builder $query) => $query->with('order'))
             ->columns([
                 TextColumn::make('order.order_number')
                     ->label('Pesanan')
