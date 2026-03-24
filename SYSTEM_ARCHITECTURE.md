@@ -165,5 +165,10 @@ Dashboard admin menggunakan **2 baris widget** dengan data real dinamis per tena
 | app/Filament/Resources/ControlProduksis/ControlProduksiResource.php | MODIFIED |
 | app/Filament/Resources/PengeluaranResource.php | DELETE |
 
+#### ✅ Performa & N+1 Query Optimization
+- **Eager Loading Rule**: Mulai saat ini dan seterusnya, setiap relasi pada Filament Resources (`Table->modifyQueryUsing` atau `getEloquentQuery()`) serta `Widgets` wajib menggunakan `->with(['relasi'])` untuk mencegah *N+1 query problem*.
+- **Agregasi Data**: Hindari memanggil *query builder database* seperti `sum()` atau `count()` secara berulang di dalam pembuatan kolom tabel (contoh kasus lama: `WorkerPayrollResource`). Gunakan metode *PHP Collection* dari data yang telah di-*eager load* ke memori.
+- **Monitoring**: Gunakan `barryvdh/laravel-debugbar` selama proses *development* untuk memantau tab **Queries** secara aktif.
+
 ---
 *
