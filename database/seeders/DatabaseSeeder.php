@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
         // Create Owner
         User::factory()->create([
             'name' => 'Owner',
-            'email' => 'owner@konveksio.test',
+            'email' => 'owner@duniabordirkomputer.com',
             'password' => bcrypt('password'),
             'role' => 'owner',
             'shop_id' => null,

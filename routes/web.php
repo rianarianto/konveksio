@@ -23,3 +23,9 @@ Route::get('/orders/{order}/receipt', [PDFController::class, 'downloadReceipt'])
     ->middleware(['web', 'auth'])
     ->name('orders.receipt');
 
+// Temporary route to seed database on Railway
+Route::get('/setup-database', function() {
+    \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
+    return 'Database berhasil diisi dengan akun Owner! Silakan kembali ke halaman awal /app untuk login.';
+});
+
