@@ -28,6 +28,13 @@ class ProductionStage extends Model
     protected static function booted(): void
     {
         static::addGlobalScope(new ShopScope());
+
+        static::creating(function ($model) {
+            if (is_null($model->order_sequence)) {
+                $maxSequence = static::where('shop_id', $model->shop_id)->max('order_sequence') ?? 0;
+                $model->order_sequence = $maxSequence + 1;
+            }
+        });
     }
 
     public function shop(): BelongsTo
