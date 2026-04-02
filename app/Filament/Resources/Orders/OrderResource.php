@@ -123,6 +123,19 @@ class OrderResource extends Resource
         return $options;
     }
 
+    // ─── Size dari Master Data ────────────────────────────────────────────────────
+    protected static function getStoreSizeOptions(): array
+    {
+        $tenantId = \Filament\Facades\Filament::getTenant()?->id;
+        if (!$tenantId) return [];
+
+        return \App\Models\StoreSize::where('shop_id', $tenantId)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->pluck('name', 'name')
+            ->toArray();
+    }
+
     // ─── Request tambahan dari Master Data ────────────────────────────────────────────────────
     protected static function getRequestTambahanOptions(): array
     {
@@ -397,15 +410,7 @@ class OrderResource extends Resource
                                                 ->schema([
                                                     Select::make('ukuran')
                                                         ->label('Ukuran')
-                                                        ->options([
-                                                            'XS' => 'XS',
-                                                            'S' => 'S',
-                                                            'M' => 'M',
-                                                            'L' => 'L',
-                                                            'XL' => 'XL',
-                                                            'XXL' => 'XXL',
-                                                            'XXXL' => 'XXXL',
-                                                        ])
+                                                        ->options(static::getStoreSizeOptions())
                                                         ->required()
                                                         ->columnSpan(2),
 
@@ -484,6 +489,16 @@ class OrderResource extends Resource
                                                         ->options(static::getRequestTambahanOptions())
                                                         ->searchable()
                                                         ->required()
+                                                        ->live()
+                                                        ->afterStateUpdated(function (Set $set, $state) {
+                                                            if ($state) {
+                                                                $addon = \App\Models\AddonOption::where('shop_id', \Filament\Facades\Filament::getTenant()?->id)
+                                                                    ->where('name', $state)->first();
+                                                                if ($addon) {
+                                                                    $set('harga_extra_satuan', $addon->default_price);
+                                                                }
+                                                            }
+                                                        })
                                                         ->columnSpan(1),
 
                                                     Select::make('ukuran')
@@ -743,6 +758,16 @@ class OrderResource extends Resource
                                                         ->label('Jenis Tambahan')
                                                         ->options(static::getRequestTambahanOptions())
                                                         ->searchable()
+                                                        ->live()
+                                                        ->afterStateUpdated(function (Set $set, $state) {
+                                                            if ($state) {
+                                                                $addon = \App\Models\AddonOption::where('shop_id', \Filament\Facades\Filament::getTenant()?->id)
+                                                                    ->where('name', $state)->first();
+                                                                if ($addon) {
+                                                                    $set('harga_extra_satuan', $addon->default_price);
+                                                                }
+                                                            }
+                                                        })
                                                         ->columnSpan(2),
 
                                                     TextInput::make('harga_extra_satuan')
@@ -801,15 +826,7 @@ class OrderResource extends Resource
                                                 ->schema([
                                                     Select::make('ukuran')
                                                         ->label('Ukuran')
-                                                        ->options([
-                                                            'XS' => 'XS',
-                                                            'S' => 'S',
-                                                            'M' => 'M',
-                                                            'L' => 'L',
-                                                            'XL' => 'XL',
-                                                            'XXL' => 'XXL',
-                                                            'XXXL' => 'XXXL',
-                                                        ])
+                                                        ->options(static::getStoreSizeOptions())
                                                         ->required()
                                                         ->columnSpan(2),
 
