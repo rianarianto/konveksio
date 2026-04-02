@@ -6,7 +6,7 @@ use App\Http\Controllers\MonitorController;
 use App\Http\Controllers\PDFController;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect('/app');
 });
 
 // Route untuk update status tugas per baris (dari tombol di modal Update Progress)
