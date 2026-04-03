@@ -329,6 +329,8 @@ class ControlProduksiResource extends Resource
                     ->color('primary')
                     ->slideOver()
                     ->modalWidth('xl')
+                    ->closeModalByClickingAway(false)
+                    ->closeModalByEscaping(false)
                     ->modalHeading(fn(OrderItem $record) => $record->productionTasks()->exists() ? 'Edit Tugas Produksi' : 'Atur Tugas Produksi')
                     ->fillForm(function (OrderItem $record) {
                         $item = $record->load('productionTasks');
@@ -488,6 +490,22 @@ class ControlProduksiResource extends Resource
                                     return new HtmlString($html);
                                 })
                                 ->columnSpanFull(),
+                                
+                            Placeholder::make('browser_guard')
+                                ->hiddenLabel()
+                                ->content(new HtmlString('
+                                    <script>
+                                        if(!window.isBrowserGuardSet) {
+                                            window.addEventListener("beforeunload", (e) => {
+                                                if (document.querySelector(".fi-modal-window")) {
+                                                    e.preventDefault();
+                                                    e.returnValue = "";
+                                                }
+                                            });
+                                            window.isBrowserGuardSet = true;
+                                        }
+                                    </script>
+                                ')),
 
 
                             \Filament\Forms\Components\Repeater::make('productionTasks')
@@ -546,7 +564,7 @@ class ControlProduksiResource extends Resource
                                             TextInput::make('wage_per_pcs')
                                                 ->label('Upah Satuan Dasar (Rp)')
                                                 ->numeric()
-                                                ->default(0)
+                                                ->placeholder('0')
                                                 ->prefix('Rp')
                                                 ->helperText('Otomatis/Bisa diubah'),
 
@@ -555,7 +573,7 @@ class ControlProduksiResource extends Resource
                                                 ->numeric()
                                                 ->readOnly()
                                                 ->dehydrated()
-                                                ->default(0)
+                                                ->placeholder('0')
                                                 ->extraInputAttributes(['style' => 'font-weight:700;color:#7c3aed;cursor:not-allowed;'])
                                                 ->helperText('Dihitung otomatis'),
                                         ]),
@@ -641,7 +659,7 @@ class ControlProduksiResource extends Resource
                                                         ->numeric()
                                                         ->minValue(0)
                                                         ->maxValue(1)
-                                                        ->default(0)
+                                                        ->placeholder('0')
                                                         ->readOnly(fn(Get $get) => (bool) $get('_fill_all'))
                                                         ->extraInputAttributes(fn(Get $get) => array_merge(
                                                             [
@@ -704,7 +722,7 @@ class ControlProduksiResource extends Resource
                                                             ->numeric()
                                                             ->minValue(0)
                                                             ->maxValue($maxQty)
-                                                            ->default(0)
+                                                            ->placeholder('0')
                                                             ->readOnly(fn(Get $get) => (bool) $get('_fill_all'))
                                                             ->extraInputAttributes(fn(Get $get) => array_merge(
                                                                 [
@@ -736,7 +754,7 @@ class ControlProduksiResource extends Resource
                                                         ->label('Target Qty')
                                                         ->numeric()
                                                         ->minValue(0)
-                                                        ->default(0)
+                                                        ->placeholder('0')
                                                         ->live(debounce: 300)
                                                         ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcQty) {
                                                         $recalcQty($get, $set);

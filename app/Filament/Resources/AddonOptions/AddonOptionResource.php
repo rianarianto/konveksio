@@ -55,7 +55,7 @@ class AddonOptionResource extends Resource
                     ->helperText('Bisa diubah saat input pesanan')
                     ->numeric()
                     ->prefix('Rp')
-                    ->default(0),
+                    ->placeholder('0'),
 
                 Toggle::make('is_active')
                     ->label('Aktif')

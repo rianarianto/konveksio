@@ -208,7 +208,7 @@ class OrderResource extends Resource
                                 ->label('Biaya Express (Rp)')
                                 ->numeric()
                                 ->prefix('Rp')
-                                ->default(0)
+                                ->placeholder('0')
                                 ->visible(fn(Get $get): bool => (bool) $get('is_express'))
                                 ->helperText('Biaya tambahan untuk layanan express')
                                 ->columnSpan(1),
@@ -412,6 +412,8 @@ class OrderResource extends Resource
                                                         ->label('Ukuran')
                                                         ->options(static::getStoreSizeOptions())
                                                         ->required()
+                                                        ->distinct()
+                                                        ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                                         ->columnSpan(2),
 
                                                     TextInput::make('harga_satuan')
@@ -828,6 +830,8 @@ class OrderResource extends Resource
                                                         ->label('Ukuran')
                                                         ->options(static::getStoreSizeOptions())
                                                         ->required()
+                                                        ->distinct()
+                                                        ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                                         ->columnSpan(2),
 
                                                     TextInput::make('harga_satuan')
@@ -1087,13 +1091,13 @@ class OrderResource extends Resource
                                     ->prefix('Rp')
                                     ->disabled()
                                     ->dehydrated()
-                                    ->default(0),
+                                    ->placeholder('0'),
 
                                 TextInput::make('tax')
                                     ->label('PPN 11%')
                                     ->numeric()
                                     ->prefix('Rp')
-                                    ->default(0)
+                                    ->placeholder('0')
                                     ->live()
                                     ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
                             ])->columns(2),
@@ -1103,7 +1107,7 @@ class OrderResource extends Resource
                                     ->label('Ongkos Kirim')
                                     ->numeric()
                                     ->prefix('Rp')
-                                    ->default(0)
+                                    ->placeholder('0')
                                     ->live()
                                     ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
 
@@ -1111,7 +1115,7 @@ class OrderResource extends Resource
                                     ->label('Discount')
                                     ->numeric()
                                     ->prefix('Rp')
-                                    ->default(0)
+                                    ->placeholder('0')
                                     ->live()
                                     ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get)),
                             ])->columns(2),
@@ -1123,7 +1127,7 @@ class OrderResource extends Resource
                                 ->disabled()
                                 ->extraInputAttributes(['style' => 'font-size: 1.25rem; font-weight: bold; color: #7e22ce;'])
                                 ->dehydrated()
-                                ->default(0)
+                                ->placeholder('0')
                                 ->columnSpanFull(),
 
                             Section::make('Pembayaran Awal / DP')
@@ -1134,7 +1138,7 @@ class OrderResource extends Resource
                                             ->label('Nominal Bayar (DP)')
                                             ->numeric()
                                             ->prefix('Rp')
-                                            ->default(0)
+                                            ->placeholder('0')
                                             ->live()
                                             ->dehydrated(false) // Virtual field
                                             ->helperText('Kosongkan jika belum ada pembayaran'),

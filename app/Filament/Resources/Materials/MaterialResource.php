@@ -77,13 +77,13 @@ class MaterialResource extends Resource
                 TextInput::make('current_stock')
                     ->label('Stok Saat Ini')
                     ->numeric()
-                    ->default(0)
+                    ->placeholder('0')
                     ->suffix(fn($get) => $get('unit') ?? 'Kg'),
 
                 TextInput::make('min_stock')
                     ->label('Stok Minimal (Peringatan)')
                     ->numeric()
-                    ->default(0)
+                    ->placeholder('0')
                     ->helperText('Sistem akan memberi peringatan jika stok di bawah angka ini.')
                     ->suffix(fn($get) => $get('unit') ?? 'Kg'),
 

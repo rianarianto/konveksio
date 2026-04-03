@@ -109,7 +109,9 @@ class ProductResource extends Resource
                                 'XXXL' => 'XXXL',
                                 'All Size' => 'All Size',
                             ])
-                            ->required(),
+                            ->required()
+                            ->distinct()
+                            ->disableOptionsWhenSelectedInSiblingRepeaterItems(),
                         TextInput::make('purchase_price')
                             ->label('Harga Beli (Modal)')
                             ->numeric()
@@ -123,7 +125,7 @@ class ProductResource extends Resource
                         TextInput::make('stock')
                             ->label('Stok')
                             ->numeric()
-                            ->default(0)
+                            ->placeholder('0')
                             ->required(),
                     ])
                     ->columns(4)

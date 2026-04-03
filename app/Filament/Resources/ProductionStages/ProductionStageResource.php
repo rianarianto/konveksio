@@ -70,7 +70,7 @@ class ProductionStageResource extends Resource
                     ->label('Upah Satuan Dasar (Rp)')
                     ->numeric()
                     ->required()
-                    ->default(0)
+                    ->placeholder('0')
                     ->prefix('Rp'),
                 Toggle::make('for_produksi_custom')
                     ->label('Kategori Produksi & Custom')
