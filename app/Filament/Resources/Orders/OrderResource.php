@@ -26,6 +26,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Resources\Resource;
@@ -94,9 +95,14 @@ class OrderResource extends Resource
             $hex = $material->color_code ?: '#e5e7eb';
             $label = $material->name . ($material->type ? " ({$material->type})" : '');
 
+            $stockInfo = '';
+            if ($material->current_stock > 0) {
+                $stockInfo = ' <small style="color:#7c3aed;font-weight:700;margin-left:4px;">(Stok: ' . $material->current_stock . ' ' . $material->unit . ')</small>';
+            }
+
             $options[$material->id] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
                 . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $hex . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
-                . '<span>' . htmlspecialchars($label) . '</span>'
+                . '<span>' . htmlspecialchars($label) . $stockInfo . '</span>'
                 . '</span>';
         }
         return $options;
@@ -109,15 +115,21 @@ class OrderResource extends Resource
         if (!$tenantId)
             return [];
 
-        $products = Product::where('shop_id', $tenantId)->get();
+        $products = Product::where('shop_id', $tenantId)->withSum('variants', 'stock')->get();
         $options = [];
         foreach ($products as $product) {
             $hex = $product->color_code ?: '#e5e7eb';
             $label = $product->name . ($product->type ? " ({$product->type})" : '');
 
+            $totalStock = (int) ($product->variants_sum_stock ?? 0);
+            $stockInfo = '';
+            if ($totalStock > 0) {
+                $stockInfo = ' <small style="color:#7c3aed;font-weight:700;margin-left:4px;">(Stok: ' . $totalStock . ' pcs)</small>';
+            }
+
             $options[$product->id] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
                 . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $hex . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
-                . '<span>' . htmlspecialchars($label) . '</span>'
+                . '<span>' . htmlspecialchars($label) . $stockInfo . '</span>'
                 . '</span>';
         }
         return $options;
@@ -127,7 +139,8 @@ class OrderResource extends Resource
     protected static function getStoreSizeOptions(): array
     {
         $tenantId = \Filament\Facades\Filament::getTenant()?->id;
-        if (!$tenantId) return [];
+        if (!$tenantId)
+            return [];
 
         return \App\Models\StoreSize::where('shop_id', $tenantId)
             ->where('is_active', true)
@@ -332,49 +345,101 @@ class OrderResource extends Resource
                                         ->columnSpanFull()
                                         ->visible(fn($record) => $record && $record->design_image),
 
-                                    // ── LAYER 1: Nama Produk + Kategori ───────────────
-                                    Group::make([
-                                        TextInput::make('product_name')
-                                            ->label('Nama Produk Pesanan')
-                                            ->required()
-                                            ->maxLength(255)
-                                            ->columnSpan(3),
+                                    // ── SEKSI 1: INFORMASI DASAR PRODUK ─────────────────
+                                    Section::make('Informasi Produk')
+                                        ->schema([
+                                            Grid::make(2)
+                                                ->schema([
+                                                    TextInput::make('product_name')
+                                                        ->label('Nama Produk Pesanan')
+                                                        ->required()
+                                                        ->maxLength(255)
+                                                        ->columnSpan(1),
 
-                                        Select::make('production_category')
-                                            ->label('Kategori Pesanan')
-                                            ->options([
-                                                'produksi' => 'Produksi (Size Toko)',
-                                                'custom' => 'Produksi Custom (Ukur Badan)',
-                                                'non_produksi' => 'Non-Produksi (Barang Jadi Supplier)',
-                                                'jasa' => 'Jasa',
-                                            ])
-                                            ->default('produksi')
-                                            ->required()
-                                            ->live()
-                                            ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
-                                            ->columnSpan(2),
-                                    ])->columns(5),
+                                                    Select::make('production_category')
+                                                        ->label('Kategori Pesanan')
+                                                        ->options([
+                                                            'produksi' => 'Produksi (Size Toko)',
+                                                            'custom' => 'Produksi Custom (Ukur Badan)',
+                                                            'non_produksi' => 'Non-Produksi (Barang Jadi Supplier)',
+                                                            'jasa' => 'Jasa',
+                                                        ])
+                                                        ->default('produksi')
+                                                        ->required()
+                                                        ->live()
+                                                        ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                        ->columnSpan(1),
+                                                ]),
 
+                                            Grid::make(2)
+                                                ->schema([
+                                                    Select::make('bahan_baju')
+                                                        ->label('Katalog Material/Bahan')
+                                                        ->options(static::getBahanOptions())
+                                                        ->allowHtml()
+                                                        ->searchable()
+                                                        ->live()
+                                                        ->dehydrated(true)
+                                                        ->columnSpan(function (Get $get) {
+                                                            $bahanId = $get('bahan_baju');
+                                                            if (!$bahanId)
+                                                                return 2;
+                                                            $bahan = \App\Models\Material::find($bahanId);
+                                                            return ($bahan && $bahan->current_stock > 0) ? 1 : 2;
+                                                        }),
 
-                                    // ── LAYER 2: Pilih Bahan (hanya Produksi & Custom) ─────
-                                    Select::make('bahan_baju')
-                                        ->label('Bahan Baju')
-                                        ->options(static::getBahanOptions())
-                                        ->allowHtml()
-                                        ->searchable()
-                                        ->dehydrated(true)
-                                        ->visible(fn(Get $get) => in_array($get('production_category'), ['produksi', 'custom']))
-                                        ->columnSpanFull(),
+                                                    TextInput::make('bahan_usage')
+                                                        ->label('Pemakaian Bahan')
+                                                        ->numeric()
+                                                        ->placeholder('0')
+                                                        ->visible(function (Get $get) {
+                                                            $bahanId = $get('bahan_baju');
+                                                            if (!$bahanId)
+                                                                return false;
+                                                            $bahan = \App\Models\Material::find($bahanId);
+                                                            return $bahan && $bahan->current_stock > 0;
+                                                        })
+                                                        ->maxValue(function (Get $get) {
+                                                            $bahanId = $get('bahan_baju');
+                                                            if (!$bahanId)
+                                                                return null;
+                                                            return \App\Models\Material::find($bahanId)?->current_stock;
+                                                        })
+                                                        ->validationMessages([
+                                                            'max' => 'Stok tidak mencukupi (Tersedia: :max)',
+                                                        ])
+                                                        ->helperText(function (Get $get) {
+                                                            $bahanId = $get('bahan_baju');
+                                                            if (!$bahanId)
+                                                                return null;
+                                                            $bahan = \App\Models\Material::find($bahanId);
+                                                            if (!$bahan)
+                                                                return null;
+                                                            return "Stok tersedia: {$bahan->current_stock} {$bahan->unit}";
+                                                        })
+                                                        ->suffix(function (Get $get) {
+                                                            $bahanId = $get('bahan_baju');
+                                                            if (!$bahanId)
+                                                                return null;
+                                                            return \App\Models\Material::find($bahanId)?->unit;
+                                                        })
+                                                        ->columnSpan(1),
+                                                ])
+                                                ->visible(fn(Get $get) => in_array($get('production_category'), ['produksi', 'custom'])),
 
-                                    Select::make('supplier_product')
-                                        ->label('Jenis Produk Supplier')
-                                        ->options(static::getSupplierProductOptions())
-                                        ->allowHtml()
-                                        ->searchable()
-                                        ->dehydrated(true)
-                                        ->placeholder('Pilih jenis produk supplier...')
-                                        ->visible(fn(Get $get) => $get('production_category') === 'non_produksi')
-                                        ->columnSpanFull(),
+                                            Select::make('supplier_product')
+                                                ->label('Katalog Baju')
+                                                ->options(static::getSupplierProductOptions())
+                                                ->allowHtml()
+                                                ->searchable()
+                                                ->live()
+                                                ->dehydrated(true)
+                                                ->placeholder('Pilih baju dari katalog...')
+                                                ->visible(fn(Get $get) => $get('production_category') === 'non_produksi')
+                                                ->columnSpanFull(),
+                                        ])
+                                        ->columnSpanFull()
+                                        ->compact(),
 
                                     // ═══════════════════════════════════════════════════
                                     // ── ALUR A: PRODUKSI (SIZE TOKO) ──────────────────
@@ -796,26 +861,25 @@ class OrderResource extends Resource
                                     // ── ALUR C: NON-PRODUKSI (BARANG JADI SUPPLIER) ────
                                     // ═══════════════════════════════════════════════════
 
-
-
                                     // C2: Sablon/Bordir — 2 dropdown terpisah (Jenis + Lokasi)
                                     Section::make('Sablon / Bordir')
                                         ->schema([
-                                            Group::make([
-                                                Select::make('np_sablon_jenis')
-                                                    ->label('Jenis / Teknik')
-                                                    ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'jenis')->pluck('name', 'name')->toArray())
-                                                    ->searchable()
-                                                    ->dehydrated(true)
-                                                    ->placeholder('Pilih jenis...'),
+                                            Grid::make(2)
+                                                ->schema([
+                                                    Select::make('np_sablon_jenis')
+                                                        ->label('Jenis / Teknik')
+                                                        ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'jenis')->pluck('name', 'name')->toArray())
+                                                        ->searchable()
+                                                        ->dehydrated(true)
+                                                        ->placeholder('Pilih jenis...'),
 
-                                                Select::make('np_sablon_lokasi')
-                                                    ->label('Lokasi / Titik')
-                                                    ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'lokasi')->pluck('name', 'name')->toArray())
-                                                    ->searchable()
-                                                    ->dehydrated(true)
-                                                    ->placeholder('Pilih lokasi...'),
-                                            ])->columns(2),
+                                                    Select::make('np_sablon_lokasi')
+                                                        ->label('Lokasi / Titik')
+                                                        ->options(fn() => \App\Models\PrintType::where('is_active', true)->where('category', 'lokasi')->pluck('name', 'name')->toArray())
+                                                        ->searchable()
+                                                        ->dehydrated(true)
+                                                        ->placeholder('Pilih lokasi...'),
+                                                ]),
                                         ])
                                         ->visible(fn(Get $get) => $get('production_category') === 'non_produksi')
                                         ->compact(),
@@ -825,6 +889,7 @@ class OrderResource extends Resource
                                         ->schema([
                                             Repeater::make('np_varian_ukuran')
                                                 ->label(false)
+                                                ->columns(4)
                                                 ->schema([
                                                     Select::make('ukuran')
                                                         ->label('Ukuran')
@@ -832,10 +897,11 @@ class OrderResource extends Resource
                                                         ->required()
                                                         ->distinct()
                                                         ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                                        ->live()
                                                         ->columnSpan(2),
 
                                                     TextInput::make('harga_satuan')
-                                                        ->label('Harga Satuan')
+                                                        ->label('Harga/unit')
                                                         ->numeric()
                                                         ->prefix('Rp')
                                                         ->required()
@@ -844,13 +910,60 @@ class OrderResource extends Resource
                                                         ->columnSpan(2),
 
                                                     TextInput::make('qty')
-                                                        ->label('Kuantitas')
+                                                        ->label('Qty')
                                                         ->numeric()
                                                         ->required()
                                                         ->default(1)
                                                         ->minValue(1)
                                                         ->live(debounce: 500)
                                                         ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
+                                                        ->columnSpan(2),
+
+                                                    TextInput::make('stok_digunakan')
+                                                        ->label('Pakai Stok?')
+                                                        ->numeric()
+                                                        ->placeholder('0')
+                                                        ->visible(function (Get $get) {
+                                                            $productId = $get('../../supplier_product');
+                                                            $size = $get('ukuran');
+                                                            if (!$productId || !$size)
+                                                                return false;
+                                                            $variant = \App\Models\ProductVariant::where('product_id', $productId)
+                                                                ->where(function ($q) use ($size) {
+                                                                    $q->whereRaw('LOWER(size) = ?', [strtolower($size)])
+                                                                        ->orWhere('size', '=', $size);
+                                                                })->first();
+                                                            return $variant && $variant->stock > 0;
+                                                        })
+                                                        ->maxValue(function (Get $get) {
+                                                            $productId = $get('../../supplier_product');
+                                                            $size = $get('ukuran');
+                                                            if (!$productId || !$size)
+                                                                return null;
+                                                            return \App\Models\ProductVariant::where('product_id', $productId)
+                                                                ->where(function ($q) use ($size) {
+                                                                    $q->whereRaw('LOWER(size) = ?', [strtolower($size)])
+                                                                        ->orWhere('size', '=', $size);
+                                                                })->first()?->stock;
+                                                        })
+                                                        ->validationMessages([
+                                                            'max' => 'Stok tidak mencukupi (Tersedia: :max)',
+                                                        ])
+                                                        ->helperText(function (Get $get) {
+                                                            $productId = $get('../../supplier_product');
+                                                            $size = $get('ukuran');
+                                                            if (!$productId || !$size)
+                                                                return null;
+                                                            $variant = \App\Models\ProductVariant::where('product_id', $productId)
+                                                                ->where(function ($q) use ($size) {
+                                                                    $q->whereRaw('LOWER(size) = ?', [strtolower($size)])
+                                                                        ->orWhere('size', '=', $size);
+                                                                })->first();
+                                                            if (!$variant)
+                                                                return null;
+                                                            return "Tersedia: {$variant->stock} pcs";
+                                                        })
+                                                        ->suffix('pcs')
                                                         ->columnSpan(2),
 
                                                     Placeholder::make('subtotal_np_varian')
@@ -862,7 +975,7 @@ class OrderResource extends Resource
                                                         })
                                                         ->columnSpan(2),
                                                 ])
-                                                ->columns(8)
+                                                ->columns(10)
                                                 ->defaultItems(0)
                                                 ->addActionLabel('+ Tambah Varian')
                                                 ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;']))
@@ -1332,6 +1445,13 @@ class OrderResource extends Resource
                                     $html = '<div style="font-family:inherit;">' . $itemsHtml;
                                     $html .= '<div style="margin-top:12px;">';
                                     $html .= $row('Subtotal', $fmt($subtotal), true, true);
+                                    
+                                    // Tampilkan Biaya Express jika ada
+                                    $expressFee = (int) ($get('express_fee') ?? 0);
+                                    if ($get('is_express') && $expressFee > 0) {
+                                        $html .= $row('Biaya Express ⚡', $fmt($expressFee), true);
+                                    }
+
                                     $html .= $row('Ongkos Kirim', $fmt($shipping));
                                     $html .= $row('PPn 11%', $fmt($tax));
                                     $html .= $row('Diskon', $fmt($discount));
@@ -1501,6 +1621,7 @@ class OrderResource extends Resource
             $data['size_and_request_details'] = [
                 'category' => 'custom',
                 'bahan' => $data['bahan_baju'] ?? null,
+                'bahan_usage' => $data['bahan_usage'] ?? null,
                 'detail_custom' => $detailCustom,
                 'sablon_jenis' => $data['sablon_jenis'] ?? null,
                 'sablon_lokasi' => $data['sablon_lokasi'] ?? null,
@@ -1560,6 +1681,7 @@ class OrderResource extends Resource
             $data['size_and_request_details'] = [
                 'category' => 'produksi',
                 'bahan' => $data['bahan_baju'] ?? null,
+                'bahan_usage' => $data['bahan_usage'] ?? null,
                 'sablon_jenis' => $data['sablon_jenis'] ?? null,
                 'sablon_lokasi' => $data['sablon_lokasi'] ?? null,
                 'varian_ukuran' => $data['varian_ukuran'] ?? [],
@@ -1572,6 +1694,8 @@ class OrderResource extends Resource
         // Bersihkan semua virtual fields sebelum simpan
         // CATATAN: Filament butuh `$data['id']` dsb untuk menghapus (kalau ada)
         unset(
+            $data['bahan_usage'],
+            $data['stok_digunakan'],
             $data['bahan_baju'],
             $data['sablon_jenis'],
             $data['sablon_lokasi'],
@@ -1626,6 +1750,7 @@ class OrderResource extends Resource
 
         if ($cat === 'custom') {
             $data['bahan_baju'] = $details['bahan'] ?? null;
+            $data['bahan_usage'] = $details['bahan_usage'] ?? null;
             $data['detail_custom'] = $details['detail_custom'] ?? [];
             $data['sablon_jenis'] = $details['sablon_jenis'] ?? null;
             $data['sablon_lokasi'] = $details['sablon_lokasi'] ?? null;
@@ -1647,6 +1772,7 @@ class OrderResource extends Resource
         } else {
             // produksi (default)
             $data['bahan_baju'] = $details['bahan'] ?? null;
+            $data['bahan_usage'] = $details['bahan_usage'] ?? null;
             $data['sablon_jenis'] = $details['sablon_jenis'] ?? null;
             $data['sablon_lokasi'] = $details['sablon_lokasi'] ?? null;
             $data['varian_ukuran'] = $details['varian_ukuran'] ?? [];

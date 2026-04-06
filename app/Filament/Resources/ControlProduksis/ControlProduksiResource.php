@@ -490,7 +490,7 @@ class ControlProduksiResource extends Resource
                                     return new HtmlString($html);
                                 })
                                 ->columnSpanFull(),
-                                
+
                             Placeholder::make('browser_guard')
                                 ->hiddenLabel()
                                 ->content(new HtmlString('

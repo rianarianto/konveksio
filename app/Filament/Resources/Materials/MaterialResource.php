@@ -29,9 +29,9 @@ class MaterialResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSquare3Stack3d;
 
-    protected static ?string $navigationLabel = 'Stok Bahan';
-    protected static ?string $modelLabel = 'Bahan Baku';
-    protected static ?string $pluralModelLabel = 'Stok Bahan';
+    protected static ?string $navigationLabel = 'Katalog Bahan';
+    protected static ?string $modelLabel = 'Bahan';
+    protected static ?string $pluralModelLabel = 'Katalog Bahan';
 
     protected static string|\UnitEnum|null $navigationGroup = 'INVENTORI & MASTER';
     protected static ?int $navigationSort = 1;
@@ -77,12 +77,16 @@ class MaterialResource extends Resource
                 TextInput::make('current_stock')
                     ->label('Stok Saat Ini')
                     ->numeric()
+                    ->default(0)
+                    ->required()
                     ->placeholder('0')
                     ->suffix(fn($get) => $get('unit') ?? 'Kg'),
 
                 TextInput::make('min_stock')
                     ->label('Stok Minimal (Peringatan)')
                     ->numeric()
+                    ->default(0)
+                    ->required()
                     ->placeholder('0')
                     ->helperText('Sistem akan memberi peringatan jika stok di bawah angka ini.')
                     ->suffix(fn($get) => $get('unit') ?? 'Kg'),

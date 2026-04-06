@@ -5,6 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
+use App\Models\Material;
+use App\Models\ProductVariant;
 
 class OrderItem extends Model
 {
@@ -26,6 +29,88 @@ class OrderItem extends Model
         'design_status' => 'string',
     ];
 
+    protected static function booted(): void
+    {
+        // 1. Potong Stok Saat Pesanan Dibuat
+        static::created(function (OrderItem $item) {
+            $item->adjustStock(null, $item->size_and_request_details);
+        });
+
+        // 2. Sinkronkan Stok Saat Pesanan Diubah (Edit)
+        static::updated(function (OrderItem $item) {
+            // Kita bandingkan data lama dan baru
+            $oldDetails = $item->getOriginal('size_and_request_details');
+            $newDetails = $item->size_and_request_details;
+
+            $item->adjustStock($oldDetails, $newDetails);
+        });
+
+        // 3. Kembalikan Stok Saat Pesanan Dihapus (Refund Sebelum Selesai)
+        static::deleted(function (OrderItem $item) {
+            $item->adjustStock($item->size_and_request_details, null);
+        });
+    }
+
+    /**
+     * Logika Utama Penyesuaian Stok (Bahan & Baju)
+     */
+    protected function adjustStock(?array $oldDetails, ?array $newDetails): void
+    {
+        DB::transaction(function () use ($oldDetails, $newDetails) {
+            // --- A. PENANGANAN BAHAN BAKU (PRODUKSI/CUSTOM) ---
+            $oldBahanId = $oldDetails['bahan'] ?? null;
+            $oldBahanUsage = (float) ($oldDetails['bahan_usage'] ?? 0);
+            
+            $newBahanId = $newDetails['bahan'] ?? null;
+            $newBahanUsage = (float) ($newDetails['bahan_usage'] ?? 0);
+
+            // Jika ada perubahan bahan atau jumlah pemakaian
+            if ($oldBahanId !== $newBahanId || $oldBahanUsage !== $newBahanUsage) {
+                // Refund data lama jika ada
+                if ($oldBahanId && $oldBahanUsage > 0) {
+                    Material::where('id', $oldBahanId)->increment('current_stock', $oldBahanUsage);
+                }
+                // Potong data baru jika ada
+                if ($newBahanId && $newBahanUsage > 0) {
+                    Material::where('id', $newBahanId)->decrement('current_stock', $newBahanUsage);
+                }
+            }
+
+            // --- B. PENANGANAN BAJU JADI (NON-PRODUKSI) ---
+            $oldProduct = $oldDetails['supplier_product'] ?? null;
+            $oldVariants = $oldDetails['varian_ukuran'] ?? [];
+            
+            $newProduct = $newDetails['supplier_product'] ?? null;
+            $newVariants = $newDetails['varian_ukuran'] ?? [];
+
+            // 1. Refund semua stok varian lama
+            if ($oldProduct) {
+                foreach ($oldVariants as $ov) {
+                    $sz = $ov['ukuran'] ?? null;
+                    $usage = (int) ($ov['stok_digunakan'] ?? 0);
+                    if ($sz && $usage > 0) {
+                        ProductVariant::where('product_id', $oldProduct)
+                            ->whereRaw('LOWER(size) = ?', [strtolower($sz)])
+                            ->increment('stock', $usage);
+                    }
+                }
+            }
+
+            // 2. Potong stok varian baru
+            if ($newProduct) {
+                foreach ($newVariants as $nv) {
+                    $sz = $nv['ukuran'] ?? null;
+                    $usage = (int) ($nv['stok_digunakan'] ?? 0);
+                    if ($sz && $usage > 0) {
+                        ProductVariant::where('product_id', $newProduct)
+                            ->whereRaw('LOWER(size) = ?', [strtolower($sz)])
+                            ->decrement('stock', $usage);
+                    }
+                }
+            }
+        });
+    }
+
     protected $appends = [
         'bahan_baju',
         'sablon_jenis',
@@ -36,6 +121,7 @@ class OrderItem extends Model
         'sablon_bordir_custom',
         'request_tambahan_custom',
         'harga_custom_satuan',
+        'bahan_usage',
     ];
 
     // ─── Virtual Accessors untuk data JSON ────────────────────────────────────
@@ -83,6 +169,11 @@ class OrderItem extends Model
     public function getHargaCustomSatuanAttribute()
     {
         return $this->size_and_request_details['harga_satuan'] ?? 0;
+    }
+
+    public function getBahanUsageAttribute()
+    {
+        return $this->size_and_request_details['bahan_usage'] ?? null;
     }
 
     // ──────────────────────────────────────────────────────────────────────────

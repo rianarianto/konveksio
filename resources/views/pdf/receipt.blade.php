@@ -382,6 +382,12 @@
                         <td class="totals-label">Subtotal</td>
                         <td class="totals-value">Rp {{ number_format($order->subtotal, 0, ',', '.') }}</td>
                     </tr>
+                    @if($order->is_express && $order->express_fee > 0)
+                        <tr>
+                            <td class="totals-label" style="color: #7F00FF;">Biaya Express ⚡</td>
+                            <td class="totals-value" style="color: #7F00FF;">Rp {{ number_format($order->express_fee, 0, ',', '.') }}</td>
+                        </tr>
+                    @endif
                     @if($order->shipping_cost > 0)
                         <tr>
                             <td class="totals-label">Ongkos Kirim</td>

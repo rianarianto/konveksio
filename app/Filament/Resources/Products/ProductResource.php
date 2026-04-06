@@ -30,9 +30,9 @@ class ProductResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingBag;
 
-    protected static ?string $navigationLabel = 'Stok Barang Jadi';
-    protected static ?string $modelLabel = 'Barang Jadi';
-    protected static ?string $pluralModelLabel = 'Stok Barang Jadi';
+    protected static ?string $navigationLabel = 'Katalog Baju';
+    protected static ?string $modelLabel = 'Baju';
+    protected static ?string $pluralModelLabel = 'Katalog Baju';
 
     protected static string|\UnitEnum|null $navigationGroup = 'INVENTORI & MASTER';
     protected static ?int $navigationSort = 2;
