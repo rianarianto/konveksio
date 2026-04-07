@@ -214,6 +214,7 @@ class OrderResource extends Resource
                                 ->helperText('Pesanan ini akan diprioritaskan di antrian produksi')
                                 ->default(false)
                                 ->live()
+                                ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get))
                                 ->onColor('danger')
                                 ->columnSpan(2),
 
@@ -222,6 +223,8 @@ class OrderResource extends Resource
                                 ->numeric()
                                 ->prefix('Rp')
                                 ->placeholder('0')
+                                ->live()
+                                ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get))
                                 ->visible(fn(Get $get): bool => (bool) $get('is_express'))
                                 ->helperText('Biaya tambahan untuk layanan express')
                                 ->columnSpan(1),
@@ -479,7 +482,7 @@ class OrderResource extends Resource
                                                         ->required()
                                                         ->distinct()
                                                         ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                                        ->columnSpan(2),
+                                                        ->columnSpan(1),
 
                                                     TextInput::make('harga_satuan')
                                                         ->label('Harga Satuan')
@@ -488,7 +491,7 @@ class OrderResource extends Resource
                                                         ->required()
                                                         ->live(debounce: 500)
                                                         ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
-                                                        ->columnSpan(2),
+                                                        ->columnSpan(1),
 
                                                     TextInput::make('qty')
                                                         ->label('Kuantitas')
@@ -498,18 +501,23 @@ class OrderResource extends Resource
                                                         ->minValue(1)
                                                         ->live(debounce: 500)
                                                         ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
-                                                        ->columnSpan(2),
+                                                        ->columnSpan(1),
 
                                                     Placeholder::make('subtotal_varian')
-                                                        ->label('Subtotal')
-                                                        ->content(function (Get $get): string {
+                                                        ->hiddenLabel()
+                                                        ->content(function (Get $get): HtmlString {
                                                             $h = (int) ($get('harga_satuan') ?? 0);
                                                             $q = (int) ($get('qty') ?? 0);
-                                                            return 'Rp ' . number_format($h * $q, 0, ',', '.');
+                                                            return new HtmlString(
+                                                                '<div style="display:flex;justify-content:space-between;padding:8px 4px 0;border-top:1px dashed #e2e8f0;margin-top:8px;">'
+                                                                . '<span style="font-size:12px;color:#94a3b8;">Subtotal Varian</span>'
+                                                                . '<span style="font-size:13px;color:#64748b;font-weight:600;">Rp ' . number_format($h * $q, 0, ',', '.') . '</span>'
+                                                                . '</div>'
+                                                            );
                                                         })
-                                                        ->columnSpan(2),
+                                                        ->columnSpanFull(),
                                                 ])
-                                                ->columns(8)
+                                                ->columns(3)
                                                 ->defaultItems(0)
                                                 ->addActionLabel('+ Tambah Varian')
                                                 ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;']))
@@ -889,7 +897,7 @@ class OrderResource extends Resource
                                         ->schema([
                                             Repeater::make('np_varian_ukuran')
                                                 ->label(false)
-                                                ->columns(4)
+                                                ->columns(12)
                                                 ->schema([
                                                     Select::make('ukuran')
                                                         ->label('Ukuran')
@@ -898,7 +906,9 @@ class OrderResource extends Resource
                                                         ->distinct()
                                                         ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                                         ->live()
-                                                        ->columnSpan(2),
+                                                        ->columnSpan(function (Get $get) {
+                                                            return static::isStokVisibleForVariant($get) ? 3 : 4;
+                                                        }),
 
                                                     TextInput::make('harga_satuan')
                                                         ->label('Harga/unit')
@@ -907,7 +917,9 @@ class OrderResource extends Resource
                                                         ->required()
                                                         ->live(debounce: 500)
                                                         ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
-                                                        ->columnSpan(2),
+                                                        ->columnSpan(function (Get $get) {
+                                                            return static::isStokVisibleForVariant($get) ? 3 : 4;
+                                                        }),
 
                                                     TextInput::make('qty')
                                                         ->label('Qty')
@@ -917,24 +929,15 @@ class OrderResource extends Resource
                                                         ->minValue(1)
                                                         ->live(debounce: 500)
                                                         ->afterStateUpdated(fn(Set $set, Get $get) => static::recalcItemTotal($set, $get))
-                                                        ->columnSpan(2),
+                                                        ->columnSpan(function (Get $get) {
+                                                            return static::isStokVisibleForVariant($get) ? 3 : 4;
+                                                        }),
 
                                                     TextInput::make('stok_digunakan')
                                                         ->label('Pakai Stok?')
                                                         ->numeric()
                                                         ->placeholder('0')
-                                                        ->visible(function (Get $get) {
-                                                            $productId = $get('../../supplier_product');
-                                                            $size = $get('ukuran');
-                                                            if (!$productId || !$size)
-                                                                return false;
-                                                            $variant = \App\Models\ProductVariant::where('product_id', $productId)
-                                                                ->where(function ($q) use ($size) {
-                                                                    $q->whereRaw('LOWER(size) = ?', [strtolower($size)])
-                                                                        ->orWhere('size', '=', $size);
-                                                                })->first();
-                                                            return $variant && $variant->stock > 0;
-                                                        })
+                                                        ->visible(fn(Get $get) => static::isStokVisibleForVariant($get))
                                                         ->maxValue(function (Get $get) {
                                                             $productId = $get('../../supplier_product');
                                                             $size = $get('ukuran');
@@ -964,18 +967,22 @@ class OrderResource extends Resource
                                                             return "Tersedia: {$variant->stock} pcs";
                                                         })
                                                         ->suffix('pcs')
-                                                        ->columnSpan(2),
+                                                        ->columnSpan(3),
 
                                                     Placeholder::make('subtotal_np_varian')
-                                                        ->label('Subtotal')
-                                                        ->content(function (Get $get): string {
+                                                        ->hiddenLabel()
+                                                        ->content(function (Get $get): HtmlString {
                                                             $h = (int) ($get('harga_satuan') ?? 0);
                                                             $q = (int) ($get('qty') ?? 0);
-                                                            return 'Rp ' . number_format($h * $q, 0, ',', '.');
+                                                            return new HtmlString(
+                                                                '<div style="display:flex;justify-content:space-between;padding:8px 4px 0;border-top:1px dashed #e2e8f0;margin-top:8px;">'
+                                                                . '<span style="font-size:12px;color:#94a3b8;">Subtotal Varian</span>'
+                                                                . '<span style="font-size:13px;color:#64748b;font-weight:600;">Rp ' . number_format($h * $q, 0, ',', '.') . '</span>'
+                                                                . '</div>'
+                                                            );
                                                         })
-                                                        ->columnSpan(2),
+                                                        ->columnSpanFull(),
                                                 ])
-                                                ->columns(10)
                                                 ->defaultItems(0)
                                                 ->addActionLabel('+ Tambah Varian')
                                                 ->addAction(fn($action) => $action->color('primary')->extraAttributes(['style' => 'color:#7F00FF;border-color:#7F00FF;background:#F3E8FF;']))
@@ -1445,7 +1452,7 @@ class OrderResource extends Resource
                                     $html = '<div style="font-family:inherit;">' . $itemsHtml;
                                     $html .= '<div style="margin-top:12px;">';
                                     $html .= $row('Subtotal', $fmt($subtotal), true, true);
-                                    
+
                                     // Tampilkan Biaya Express jika ada
                                     $expressFee = (int) ($get('express_fee') ?? 0);
                                     if ($get('is_express') && $expressFee > 0) {
@@ -1807,7 +1814,13 @@ class OrderResource extends Resource
         $tax = (int) ($get('tax') ?? 0);
         $shipping = (int) ($get('shipping_cost') ?? 0);
         $discount = (int) ($get('discount') ?? 0);
-        $set('total_price', max(0, $subtotal + $tax + $shipping - $discount));
+
+        $expressFee = 0;
+        if ((bool) $get('is_express')) {
+            $expressFee = (int) ($get('express_fee') ?? 0);
+        }
+
+        $set('total_price', max(0, $subtotal + $tax + $shipping + $expressFee - $discount));
     }
 
     public static function table(Table $table): Table
@@ -2188,5 +2201,23 @@ class OrderResource extends Resource
             'create' => Pages\CreateOrder::route('/create'),
             'edit' => Pages\EditOrder::route('/{record}/edit'),
         ];
+    }
+
+    public static function isStokVisibleForVariant(Get $get): bool
+    {
+        $productId = $get('../../supplier_product');
+        $size = $get('ukuran');
+
+        if (!$productId || !$size) {
+            return false;
+        }
+
+        $variant = \App\Models\ProductVariant::where('product_id', $productId)
+            ->where(function ($q) use ($size) {
+                $q->whereRaw('LOWER(size) = ?', [strtolower($size)])
+                    ->orWhere('size', '=', $size);
+            })->first();
+
+        return $variant && $variant->stock > 0;
     }
 }

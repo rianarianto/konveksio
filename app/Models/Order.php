@@ -31,6 +31,11 @@ class Order extends Model
         'deadline'    => 'date',
         'is_express'  => 'boolean',
         'express_fee' => 'integer',
+        'subtotal'    => 'integer',
+        'tax'         => 'integer',
+        'shipping_cost' => 'integer',
+        'discount'    => 'integer',
+        'total_price' => 'integer',
     ];
 
     protected static function booted(): void
@@ -42,6 +47,19 @@ class Order extends Model
             if (empty($order->order_number)) {
                 $order->order_number = static::generateOrderNumber($order->shop_id);
             }
+        });
+
+        // Ensure financial fields are never null and recalculate total_price
+        static::saving(function ($order) {
+            $order->tax = $order->tax ?? 0;
+            $order->shipping_cost = $order->shipping_cost ?? 0;
+            $order->discount = $order->discount ?? 0;
+            $order->express_fee = $order->express_fee ?? 0;
+            $order->subtotal = $order->subtotal ?? 0;
+            
+            // Recalculate total price to ensure consistency
+            $actualExpressFee = $order->is_express ? $order->express_fee : 0;
+            $order->total_price = max(0, $order->subtotal + $order->tax + $order->shipping_cost + $actualExpressFee - $order->discount);
         });
     }
 
