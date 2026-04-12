@@ -12,6 +12,7 @@ class StoreSize extends Model
     protected $fillable = [
         'shop_id',
         'name',
+        'size_details',
         'sort_order',
         'is_active',
     ];

@@ -15,8 +15,10 @@ use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use App\Models\WorkerPayroll;
 use App\Filament\Resources\WorkerPayrolls\Pages\ManageWorkerPayrolls;
-use Illuminate\Support\HtmlString; // Added missing import
+use Illuminate\Support\HtmlString; 
+use Filament\Notifications\Actions\Action as NotificationAction;
 
 class WorkerPayrollResource extends Resource
 {
@@ -120,6 +122,7 @@ class WorkerPayrollResource extends Resource
             ->label('Bayar Upah')
             ->icon('heroicon-o-banknotes')
             ->color('success')
+            ->visible(fn() => auth()->user()->role === 'owner')
             ->requiresConfirmation()
             ->modalHeading('Bayar Semua Upah Selesai')
             ->modalDescription(function (Worker $record) {
@@ -151,52 +154,80 @@ class WorkerPayrollResource extends Resource
             return new \Illuminate\Support\HtmlString(nl2br(e($desc)));
         })
             ->action(function (Worker $record) {
-            $unpaidTasks = $record->productionTasks()
-                ->where('status', 'done')
-                ->where('is_paid', false)
-                ->get();
+            DB::transaction(function () use ($record) {
+                $unpaidTasks = $record->productionTasks()
+                    ->where('status', 'done')
+                    ->where('is_paid', false)
+                    ->get();
 
-            if ($unpaidTasks->isEmpty())
-                return;
+                if ($unpaidTasks->isEmpty())
+                    return;
 
-            $totalWage = 0;
-            foreach ($unpaidTasks as $task) {
-                $totalWage += $task->wage_amount;
-                $task->update(['is_paid' => true]);
-            }
+                $totalWage = 0;
+                foreach ($unpaidTasks as $task) {
+                    $totalWage += $task->wage_amount;
+                }
 
-            $kasbonBefore = (int)$record->current_cash_advance;
-            $deduction = min($totalWage, $kasbonBefore);
-            $netToPay = $totalWage - $deduction;
+                $kasbonBefore = (int)$record->current_cash_advance;
+                $deduction = min($totalWage, $kasbonBefore);
+                $netToPay = $totalWage - $deduction;
 
-            $record->decrement('current_cash_advance', $deduction);
+                // 1. Create Employee Payroll Record
+                $payroll = WorkerPayroll::create([
+                    'shop_id' => $record->shop_id,
+                    'worker_id' => $record->id,
+                    'total_wage' => $totalWage,
+                    'kasbon_deduction' => $deduction,
+                    'net_amount' => $netToPay,
+                    'payment_date' => now(),
+                    'recorded_by' => auth()->id(),
+                ]);
 
-            if ($netToPay > 0) {
-                Expense::create([
+                // 2. Update Tasks
+                foreach ($unpaidTasks as $task) {
+                    $task->update([
+                        'is_paid' => true,
+                        'worker_payroll_id' => $payroll->id,
+                    ]);
+                }
+
+                // 3. Handle Cash Advance / Kasbon
+                $record->decrement('current_cash_advance', $deduction);
+
+                if ($netToPay > 0) {
+                    Expense::create([
                         'shop_id' => $record->shop_id,
-                        'keperluan' => "Upah Borongan (Net): {$record->name} (" . now()->format('d/m/Y') . ")",
+                        'keperluan' => "Upah Borongan (Net): {$record->name} (#{$payroll->id})",
                         'amount' => $netToPay,
                         'expense_date' => now(),
                         'note' => 'Gaji / Upah',
                         'recorded_by' => auth()->id(),
                     ]);
-            }
+                }
 
-            if ($deduction > 0) {
-                $record->cashAdvances()->create([
+                if ($deduction > 0) {
+                    $record->cashAdvances()->create([
                         'shop_id' => $record->shop_id,
                         'amount' => $deduction,
                         'type' => 'repayment',
-                        'description' => "Potong dari upah borongan (" . now()->format('d/m/Y') . ")",
+                        'description' => "Potong dari upah borongan (#{$payroll->id})",
                         'recorded_by' => auth()->id(),
                     ]);
-            }
+                }
 
-            Notification::make()
-                ->success()
-                ->title('Pembayaran Selesai')
-                ->body("Upah Rp " . number_format($totalWage, 0, ',', '.') . " diproses. Potong Kasbon: Rp " . number_format($deduction, 0, ',', '.') . ". Dibayar Tunai: Rp " . number_format($netToPay, 0, ',', '.') . ".")
-                ->send();
+                Notification::make()
+                    ->success()
+                    ->title('Pembayaran Selesai')
+                    ->body("Upah Rp " . number_format($totalWage, 0, ',', '.') . " diproses.")
+                    ->actions([
+                        NotificationAction::make('print_slip')
+                            ->label('Cetak Slip')
+                            ->color('success')
+                            ->icon('heroicon-o-printer')
+                            ->url(route('payroll.print', $payroll->id), shouldOpenInNewTab: true)
+                    ])
+                    ->send();
+            });
         }),
 
             Action::make('detail')

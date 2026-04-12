@@ -31,7 +31,7 @@ class WorkerResource extends Resource
 
     public static function canAccess(): bool
     {
-        return in_array(auth()->user()->role, ['admin', 'designer', 'owner']);
+        return in_array(auth()->user()->role, ['admin', 'owner']);
     }
 
     public static function form(Schema $schema): Schema

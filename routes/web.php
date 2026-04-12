@@ -29,3 +29,9 @@ Route::get('/setup-database', function() {
     return 'Database berhasil diisi dengan akun Owner! Silakan kembali ke halaman awal /app untuk login.';
 });
 
+// Download Slip Upah PDF
+Route::get('/payroll/{payroll}/print', [\App\Http\Controllers\PayrollController::class, 'print'])
+    ->middleware(['web', 'auth'])
+    ->name('payroll.print');
+
+

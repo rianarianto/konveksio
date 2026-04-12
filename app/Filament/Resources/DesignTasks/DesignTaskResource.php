@@ -62,7 +62,7 @@ class DesignTaskResource extends Resource
     {
         return parent::getEloquentQuery()
             ->with(['order.customer'])
-            ->whereIn('design_status', ['pending', 'uploaded']);
+            ->whereIn('design_status', ['pending', 'uploaded', 'approved']);
     }
 
     public static function form(Schema $schema): Schema
@@ -105,16 +105,36 @@ class DesignTaskResource extends Resource
 
                                         $ukurans = $details['detail_custom'] ?? [];
                                         if (count($ukurans) > 0) {
-                                            $html .= '<p class="mt-2 mb-1 font-semibold">Referensi Ukuran Custom:</p>';
-                                            $html .= '<div class="max-h-[200px] overflow-y-auto pr-2">';
+                                            $html .= '<p class="mt-4 mb-2 font-bold text-[10px] uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 text-center border-b border-gray-100 dark:border-gray-800 pb-1">REFERENSI UKURAN CUSTOM</p>';
+                                            
+                                            $html .= '<div class="max-h-[350px] overflow-y-auto custom-scrollbar border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 shadow-sm">';
+                                            $html .= '<table class="w-full text-left border-collapse">';
+                                            $html .= '<thead class="sticky top-0 bg-gray-100 dark:bg-gray-800 z-10">';
+                                            $html .= '<tr>';
+                                            $html .= '<th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">Nama</th>';
+                                            $html .= '<th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">Detail Ukuran</th>';
+                                            $html .= '</tr>';
+                                            $html .= '</thead>';
+                                            $html .= '<tbody class="divide-y divide-gray-100 dark:divide-gray-800">';
+                                            
                                             foreach ($ukurans as $u) {
                                                 $person = htmlspecialchars($u['nama'] ?? 'Tanpa Nama');
-                                                $ld = htmlspecialchars($u['LD'] ?? '-');
-                                                $lp = htmlspecialchars($u['LP'] ?? '-');
-                                                $html .= '<div class="text-sm mb-1 pb-1 border-b border-dotted border-gray-200 dark:border-gray-700">';
-                                                $html .= '<strong>' . $person . '</strong> — LD: ' . $ld . ', LP: ' . $lp;
-                                                $html .= '</div>';
+                                                $sizeDetails = [];
+                                                foreach ($u as $key => $val) {
+                                                    if ($key !== 'nama' && $val) {
+                                                        $sizeDetails[] = '<span class="text-gray-400 dark:text-gray-500">' . htmlspecialchars($key) . ':</span> <span class="font-bold text-gray-700 dark:text-gray-200 mr-2">' . htmlspecialchars($val) . '</span>';
+                                                    }
+                                                }
+                                                $detailsHtml = implode(' ', $sizeDetails);
+
+                                                $html .= '<tr class="hover:bg-white dark:hover:bg-gray-800 transition-colors">';
+                                                $html .= '<td class="px-3 py-2 text-[12px] font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap border-r border-gray-100 dark:border-gray-800">' . $person . '</td>';
+                                                $html .= '<td class="px-3 py-2 text-[11px] leading-snug">' . $detailsHtml . '</td>';
+                                                $html .= '</tr>';
                                             }
+                                            
+                                            $html .= '</tbody>';
+                                            $html .= '</table>';
                                             $html .= '</div>';
                                         }
 
@@ -211,6 +231,14 @@ class DesignTaskResource extends Resource
                         'approved' => 'success',
                         default => 'gray',
                     }),
+
+                \Filament\Tables\Columns\ImageColumn::make('design_image')
+                    ->label('Desain')
+                    ->disk('public')
+                    ->visibility('public')
+                    ->square()
+                    ->size(40)
+                    ->toggleable(),
             ])
             ->filters([
                 //

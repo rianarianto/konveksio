@@ -19,6 +19,7 @@ class ProductionTask extends Model
         'size_quantities',
         'status',
         'is_paid',
+        'worker_payroll_id',
         'description',
         'completed_at',
     ];
@@ -67,5 +68,13 @@ class ProductionTask extends Model
     public function shop(): BelongsTo
     {
         return $this->belongsTo(Shop::class);
+    }
+
+    /**
+     * Payroll yang mencatat pembayaran tugas ini.
+     */
+    public function workerPayroll(): BelongsTo
+    {
+        return $this->belongsTo(WorkerPayroll::class);
     }
 }

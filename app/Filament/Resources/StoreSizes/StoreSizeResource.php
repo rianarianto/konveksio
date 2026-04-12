@@ -24,9 +24,9 @@ class StoreSizeResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'INVENTORI & MASTER';
 
-    protected static ?string $modelLabel = 'Ukuran Toko';
+    protected static ?string $modelLabel = 'Size Toko';
     
-    protected static ?string $pluralModelLabel = 'Daftar Ukuran Toko';
+    protected static ?string $pluralModelLabel = 'Daftar Size Toko';
 
     protected static ?int $navigationSort = 6;
 

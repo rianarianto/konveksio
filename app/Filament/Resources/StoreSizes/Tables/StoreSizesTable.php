@@ -14,9 +14,12 @@ class StoreSizesTable
         return $table
             ->columns([
                 \Filament\Tables\Columns\TextColumn::make('name')
-                    ->label('Nama Ukuran')
+                    ->label('Nama Size')
                     ->searchable()
                     ->sortable(),
+                \Filament\Tables\Columns\TextColumn::make('size_details')
+                    ->label('Detail Ukuran')
+                    ->searchable(),
                 \Filament\Tables\Columns\TextColumn::make('sort_order')
                     ->label('Urutan')
                     ->sortable(),

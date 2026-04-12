@@ -10,12 +10,16 @@ class StoreSizeForm
     {
         return $schema
             ->components([
-                \Filament\Schemas\Components\Section::make('Informasi Ukuran Toko')
+                \Filament\Schemas\Components\Section::make('Informasi Size Toko')
                     ->schema([
                         \Filament\Forms\Components\TextInput::make('name')
-                            ->label('Nama Ukuran (Misal: S, M, L)')
+                            ->label('Nama Size (Misal: S, M, L, XL)')
                             ->required()
                             ->maxLength(255),
+                        \Filament\Forms\Components\TextInput::make('size_details')
+                            ->label('Detail Ukuran')
+                            ->placeholder('Misal: LD: 50cm, P: 70cm')
+                            ->helperText('Gunakan koma untuk memisahkan detail'),
                         \Filament\Forms\Components\TextInput::make('sort_order')
                             ->label('Urutan Sorting')
                             ->numeric()
