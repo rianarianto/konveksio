@@ -110,5 +110,26 @@ class EditOrder extends EditRecord
                 ]);
             }
         }
+
+        // Sync Spreadsheet Items
+        $payload = $data['order_items_payload'] ?? null;
+        if ($payload) {
+            $items = json_decode($payload, true);
+            
+            // Wipe and re-create (simplest stateless sync)
+            $this->record->orderItems()->delete();
+            
+            foreach ($items as $item) {
+                $this->record->orderItems()->create([
+                    'product_name' => $item['product_name'] ?? '',
+                    'production_category' => $item['production_category'] ?? 'produksi',
+                    'size' => $item['size'] ?? 'M',
+                    'bahan_baju' => $item['bahan_baju'] ?? null,
+                    'price' => $item['price'] ?? 0,
+                    'quantity' => $item['quantity'] ?? 1,
+                    'shop_id' => $this->record->shop_id,
+                ]);
+            }
+        }
     }
 }

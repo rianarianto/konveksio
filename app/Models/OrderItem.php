@@ -17,6 +17,8 @@ class OrderItem extends Model
         'quantity',
         'price',
         'production_category',
+        'size',
+        'bahan_id',
         'size_and_request_details',
         'design_status',
         'design_image',
@@ -181,6 +183,11 @@ class OrderItem extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function bahan(): BelongsTo
+    {
+        return $this->belongsTo(Material::class, 'bahan_id');
     }
 
     public function productionTasks(): HasMany

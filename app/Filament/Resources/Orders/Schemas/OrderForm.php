@@ -43,7 +43,7 @@ class OrderForm
             ->collapsed() // Default tertutup biar gak menuhin layar kalau gak butuh
             ->compact()
             ->schema([
-                Grid::make(3)
+                Grid::make(2)
                     ->schema([
                         Select::make('bulk_category')
                             ->label('Kategori Default')
@@ -53,15 +53,17 @@ class OrderForm
                                 'non_produksi' => 'Baju Jadi',
                             ])
                             ->default('produksi')
-                            ->required(),
+                            ->live(),
                         Select::make('bulk_material')
                             ->label('Material Default')
                             ->options(OrderResource::getBahanOptions())
+                            ->visible(fn(Get $get) => $get('bulk_category') === 'produksi')
                             ->allowHtml()
                             ->searchable(),
                         Select::make('bulk_product')
-                            ->label('Baju Jadi (Jika Baju Jadi)')
+                            ->label('Baju Jadi (Pilih Produk)')
                             ->options(OrderResource::getSupplierProductOptions())
+                            ->visible(fn(Get $get) => $get('bulk_category') === 'non_produksi')
                             ->allowHtml()
                             ->searchable(),
                     ]),
@@ -72,22 +74,21 @@ class OrderForm
                         Select::make('bulk_gender')
                             ->label('Jenis Kelamin')
                             ->options(['L' => 'Laki-laki', 'P' => 'Perempuan'])
-                            ->default('L'),
+                            ->placeholder('Opsi...'),
                         Select::make('bulk_sleeve')
                             ->label('Model Lengan')
                             ->options(['pendek' => 'Pendek', 'panjang' => 'Panjang', '3/4' => '3/4'])
-                            ->default('pendek'),
+                            ->placeholder('Opsi...'),
                         Select::make('bulk_pocket')
                             ->label('Model Saku')
                             ->options(['tanpa_saku' => 'Tanpa Saku', 'tempel' => 'Saku Tempel', 'bobok' => 'Saku Bobok', 'double' => 'Double Saku'])
-                            ->default('tanpa_saku'),
+                            ->placeholder('Opsi...'),
                         Select::make('bulk_buttons')
                             ->label('Model Kancing')
                             ->options(['biasa' => 'Biasa', 'tertutup' => 'Snap/Tertutup'])
-                            ->default('biasa'),
-                    ])
-                    ->visible(fn(Get $get) => $get('bulk_category') === 'produksi'),
-                
+                            ->placeholder('Opsi...'),
+                    ]),
+
                 Grid::make(2)
                     ->schema([
                         Toggle::make('bulk_is_tunic')
@@ -98,9 +99,8 @@ class OrderForm
                             ->numeric()
                             ->prefix('Rp')
                             ->visible(fn(Get $get) => (bool) $get('bulk_is_tunic')),
-                    ])
-                    ->visible(fn(Get $get) => $get('bulk_category') === 'produksi'),
-                
+                    ]),
+
                 Group::make([
                     Placeholder::make('size_counts_label')
                         ->content(new HtmlString('<span class="text-xs font-bold uppercase tracking-wider text-gray-500">Jumlah per Ukuran (Pcs)</span>')),
@@ -117,12 +117,11 @@ class OrderForm
                             }
                             // Tambah slot custom (tanpa nama ukuran fix)
                             $inputs[] = TextInput::make('qty_custom_slots')
-                                ->label('ukurbadan')
+                                ->label('UkurBadan')
                                 ->numeric()
                                 ->placeholder('0')
-                                ->hint('Slot kosong')
                                 ->extraInputAttributes(['class' => 'text-center']);
-                            
+
                             return $inputs;
                         }),
                 ])->extraAttributes(['class' => 'p-4 border rounded-xl bg-gray-50/50']),
@@ -136,7 +135,7 @@ class OrderForm
                         $category = $get('bulk_category');
                         $material = $get('bulk_material');
                         $product = $get('bulk_product');
-                        
+
                         // Add extra attributes to the data
                         $gender = $get('bulk_gender');
                         $sleeve = $get('bulk_sleeve');
@@ -146,6 +145,7 @@ class OrderForm
                         $tunicFee = (int) ($get('bulk_tunic_fee') ?? 0);
 
                         // Generate dari ukuran fix
+                        $sizes = \App\Filament\Resources\Orders\OrderResource::getStoreSizeOptions();
                         foreach ($sizes as $size) {
                             $qtyVal = (int) ($get("qty_{$size}") ?? 0);
                             for ($i = 0; $i < $qtyVal; $i++) {
@@ -208,6 +208,43 @@ class OrderForm
         return Section::make('Daftar Item Pesanan (Pool)')
             ->description('Kustomisasi setiap item yang telah digenerate di sini.')
             ->headerActions([
+                Action::make('bulk_price')
+                    ->label('Ubah Harga Semua')
+                    ->icon('heroicon-o-currency-dollar')
+                    ->color('warning')
+                    ->form([
+                        TextInput::make('new_price')
+                            ->label('Harga Baru')
+                            ->numeric()
+                            ->required(),
+                    ])
+                    ->action(function (Set $set, Get $get, array $data) {
+                        $items = $get('orderItems') ?? [];
+                        foreach ($items as &$item) {
+                            $item['price'] = $data['new_price'];
+                        }
+                        $set('orderItems', $items);
+                        \Filament\Notifications\Notification::make()->title('Harga semua item berhasil diupdate')->success()->send();
+                    }),
+                Action::make('bulk_material')
+                    ->label('Ubah Bahan Semua')
+                    ->icon('heroicon-o-beaker')
+                    ->color('warning')
+                    ->form([
+                        Select::make('new_material')
+                            ->label('Bahan/Produk Baru')
+                            ->options(\App\Models\Material::pluck('name', 'id'))
+                            ->searchable()
+                            ->required(),
+                    ])
+                    ->action(function (Set $set, Get $get, array $data) {
+                        $items = $get('orderItems') ?? [];
+                        foreach ($items as &$item) {
+                            $item['bahan_baju'] = $data['new_material'];
+                        }
+                        $set('orderItems', $items);
+                        \Filament\Notifications\Notification::make()->title('Bahan semua item berhasil diupdate')->success()->send();
+                    }),
                 Action::make('clear_pool')
                     ->label('Kosongkan Tabel')
                     ->color('danger')
@@ -218,97 +255,88 @@ class OrderForm
             ->schema([
                 static::getPersistenceScript(), // State recovery script
                 Placeholder::make('table_header')
-                    ->label(false)
+                    ->hiddenLabel()
                     ->content(new HtmlString('
-                        <div class="hidden lg:grid grid-cols-12 gap-4 px-4 py-2 bg-gray-100/80 border-b border-gray-200 font-bold text-[10px] uppercase tracking-wider text-gray-500 rounded-t-xl sticky top-0 z-10">
+                        <style>
+                            .order-items-pool .fi-fo-repeater-item-header { display: none !important; }
+                            .order-items-pool .fi-fo-repeater-item {
+                                background: white !important;
+                                border: none !important;
+                                border-bottom: 1px solid #e5e7eb !important;
+                                box-shadow: none !important;
+                                padding: 0 !important;
+                                margin: 0 !important;
+                                border-radius: 0 !important;
+                            }
+                            .order-items-pool .fi-fo-repeater-item:hover { background: #f9fafb !important; }
+                            .order-items-pool .fi-fo-repeater-item > div { padding: 4px !important; }
+                            /* Hide validation asterisks in table */
+                            .order-items-pool .fi-fo-field-wrp-label sup { display: none !important; }
+                            .order-items-pool input, .order-items-pool select {
+                                border: 1px solid transparent !important;
+                                box-shadow: none !important;
+                                font-size: 13px !important;
+                                padding: 2px 4px !important;
+                            }
+                            .order-items-pool input:focus, .order-items-pool select:focus {
+                                border-color: #7c3aed !important;
+                                background: white !important;
+                            }
+                        </style>
+                        <div class="hidden lg:grid grid-cols-12 gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200 font-bold text-[10px] uppercase tracking-[0.05em] text-gray-500 rounded-t-xl sticky top-0 z-10">
                             <div class="col-span-3">Item / Pemesan</div>
-                            <div class="col-span-2">Ukuran & Kategori</div>
-                            <div class="col-span-3">Spek & Bahan</div>
-                            <div class="col-span-2 text-right">Harga Satuan</div>
+                            <div class="col-span-1">Size</div>
+                            <div class="col-span-1 text-center">Kat</div>
+                            <div class="col-span-3">Bahan / Produk</div>
+                            <div class="col-span-2 text-right">Harga</div>
                             <div class="col-span-1 text-center">Qty</div>
-                            <div class="col-span-1 text-right">Subtotal</div>
+                            <div class="col-span-1 text-right pr-8">Aksi</div>
                         </div>
                     ')),
 
                 Repeater::make('orderItems')
                     ->relationship('orderItems')
-                    ->label(false)
+                    ->hiddenLabel()
                     ->schema([
-                        // Baris Utama (Table Row)
                         Grid::make(12)
                             ->schema([
-                                // 1. Nama Item (3)
                                 TextInput::make('product_name')
-                                    ->label('Nama/Item')
                                     ->hiddenLabel()
-                                    ->placeholder('Nama Pemesan...')
+                                    ->placeholder('Nama/Item...')
                                     ->required()
                                     ->columnSpan(3),
-                                
-                                // 2. Sizing & Category (2)
-                                Group::make([
-                                    Select::make('size')
-                                        ->label('Size')
-                                        ->hiddenLabel()
-                                        ->options(OrderResource::getStoreSizeOptions())
-                                        ->placeholder('Size')
-                                        ->searchable()
-                                        ->columnSpan(1),
-                                    Select::make('production_category')
-                                        ->label('Kategori')
-                                        ->hiddenLabel()
-                                        ->options([
-                                            'produksi' => 'Konveksi',
-                                            'custom' => 'Custom',
-                                            'non_produksi' => 'Baju Jadi',
-                                            'jasa' => 'Jasa',
-                                        ])
-                                        ->placeholder('Kat')
-                                        ->required()
-                                        ->columnSpan(1),
-                                ])->columns(2)->columnSpan(2),
-
-                                // 3. Bahan & Spec Summary (3)
-                                Group::make([
-                                    Select::make('bahan_baju')
-                                        ->label('Bahan')
-                                        ->hiddenLabel()
-                                        ->options(OrderResource::getBahanOptions())
-                                        ->placeholder('Pilih Bahan...')
-                                        ->allowHtml()
-                                        ->columnSpan(2),
-                                    Section::make('Spec')
-                                        ->label(false)
-                                        ->compact()
-                                        ->collapsible()
-                                        ->collapsed()
-                                        ->schema([
-                                            Grid::make(2)
-                                                ->schema([
-                                                    Select::make('gender')->options(['L' => 'Laki-laki', 'P' => 'Perempuan'])->default('L'),
-                                                    Select::make('sleeve_model')->options(['pendek' => 'Pendek', 'panjang' => 'Panjang', '3/4' => '3/4']),
-                                                    Select::make('pocket_model')->options(['tanpa_saku' => 'Tanpa Saku', 'tempel' => 'Tempel', 'bobok' => 'Bobok']),
-                                                    Select::make('button_model')->options(['biasa' => 'Biasa', 'tertutup' => 'Snap']),
-                                                ])
-                                        ])
-                                        ->columnSpan(1),
-                                ])->columns(3)->columnSpan(3),
-
-                                // 4. Harga (2)
+                                Select::make('size')
+                                    ->hiddenLabel()
+                                    ->options(OrderResource::getStoreSizeOptions())
+                                    ->placeholder('Size')
+                                    ->searchable()
+                                    ->columnSpan(1),
+                                Select::make('production_category')
+                                    ->hiddenLabel()
+                                    ->options([
+                                        'produksi' => 'Konv.',
+                                        'custom' => 'Cust.',
+                                        'non_produksi' => 'Jadi',
+                                        'jasa' => 'Jasa',
+                                    ])
+                                    ->required()
+                                    ->columnSpan(1),
+                                Select::make('bahan_baju')
+                                    ->hiddenLabel()
+                                    ->options(OrderResource::getBahanOptions())
+                                    ->placeholder('Bahan...')
+                                    ->allowHtml()
+                                    ->columnSpan(3),
                                 TextInput::make('price')
-                                    ->label('Harga')
                                     ->hiddenLabel()
                                     ->numeric()
                                     ->prefix('Rp')
                                     ->required()
                                     ->live(debounce: 500)
                                     ->afterStateUpdated(fn(Set $set, Get $get) => OrderResource::updateSubtotal($set, $get))
-                                    ->extraInputAttributes(['class' => 'text-right font-medium'])
+                                    ->extraInputAttributes(['class' => 'text-right'])
                                     ->columnSpan(2),
-
-                                // 5. Qty (1)
                                 TextInput::make('quantity')
-                                    ->label('Qty')
                                     ->hiddenLabel()
                                     ->numeric()
                                     ->default(1)
@@ -317,37 +345,37 @@ class OrderForm
                                     ->afterStateUpdated(fn(Set $set, Get $get) => OrderResource::updateSubtotal($set, $get))
                                     ->extraInputAttributes(['class' => 'text-center'])
                                     ->columnSpan(1),
-
-                                // 6. Total (1)
                                 Placeholder::make('item_subtotal')
-                                    ->label('Total')
                                     ->hiddenLabel()
-                                    ->content(fn(Get $get) => new HtmlString('<div class="text-right font-bold text-primary-600">Rp ' . number_format((int)$get('price') * (int)$get('quantity'), 0, ',', '.') . '</div>'))
+                                    ->content(fn(Get $get) => new HtmlString('<div class="text-right font-bold text-primary-600 pr-2">Rp ' . number_format((int) $get('price') * (int) $get('quantity'), 0, ',', '.') . '</div>'))
                                     ->columnSpan(1),
-                            ]),
-
-
-                                    Section::make('Ukuran Custom (Body Measurement)')
-                                        ->collapsible()
-                                        ->collapsed()
-                                        ->compact()
-                                        ->schema([
-                                            Grid::make(3)
-                                                ->schema([
-                                                    TextInput::make('LD')->label('LD (Lebar Dada)')->numeric()->suffix('cm'),
-                                                    TextInput::make('PB')->label('PB (Panjang Baju)')->numeric()->suffix('cm'),
-                                                    TextInput::make('PL')->label('PL (Panjang Lengan)')->numeric()->suffix('cm'),
-                                                    TextInput::make('LB')->label('LB (Lebar Bahu)')->numeric()->suffix('cm'),
-                                                    TextInput::make('LP')->label('LP (Lingkar Perut)')->numeric()->suffix('cm'),
-                                                    TextInput::make('LPh')->label('LPh (Lingkar Paha)')->numeric()->suffix('cm'),
-                                                ]),
-                                        ])->columnSpan(1),
-                                ])
-                            ->extraAttributes(['class' => 'mt-2 p-2 bg-gray-50/30 rounded-lg'])
-                    ->itemLabel(fn(array $state): ?string => ($state['product_name'] ?? 'Item Baru') . ' - ' . ($state['size'] ?? 'No Size'))
-                    ->collapsible()
-                    ->collapsed()
-                    ->defaultItems(0) // Biar user generate aja
+                            ])->gap(1),
+                    ])
+                    ->extraAttributes(['class' => 'order-items-pool'])
+                    ->extraItemActions([
+                        Action::make('edit_details')
+                            ->label('Detail')
+                            ->icon('heroicon-m-adjustments-vertical')
+                            ->modalSubmitActionLabel('Simpan')
+                            ->form([
+                                Section::make('Spesifikasi & Ukuran Badan')
+                                    ->columns(3)
+                                    ->schema([
+                                        Select::make('gender')->label('Gender')->options(['L' => 'Laki-laki', 'P' => 'Perempuan']),
+                                        Select::make('sleeve_model')->label('Lengan')->options(['pendek' => 'Pendek', 'panjang' => 'Panjang', '3/4' => '3/4']),
+                                        Select::make('pocket_model')->label('Saku')->options(['tanpa_saku' => 'Tanpa Saku', 'tempel' => 'Tempel', 'bobok' => 'Bobok']),
+                                        Select::make('button_model')->label('Kancing')->options(['biasa' => 'Biasa', 'snap/snap' => 'Snap/Tertutup']),
+                                        TextInput::make('LD')->label('LD (L. Dada)')->numeric()->suffix('cm'),
+                                        TextInput::make('PB')->label('PB (P. Baju)')->numeric()->suffix('cm'),
+                                        TextInput::make('PL')->label('PL (P. Lengan)')->numeric()->suffix('cm'),
+                                        TextInput::make('LB')->label('LB (L. Bahu)')->numeric()->suffix('cm'),
+                                        TextInput::make('LP')->label('LP (L. Perut)')->numeric()->suffix('cm'),
+                                        TextInput::make('LPh')->label('LPh (L. Paha)')->numeric()->suffix('cm'),
+                                    ]),
+                            ])
+                            ->action(function () { }),
+                    ])
+                    ->defaultItems(0)
                     ->addActionLabel('Tambah Item Manual')
                     ->live()
                     ->afterStateUpdated(fn(Set $set, Get $get) => OrderResource::updateSubtotal($set, $get))
@@ -359,7 +387,7 @@ class OrderForm
     protected static function getPersistenceScript(): Placeholder
     {
         return Placeholder::make('persistence_script')
-            ->label(false)
+            ->hiddenLabel()
             ->content(new HtmlString('
                 <script>
                 document.addEventListener("DOMContentLoaded", () => {

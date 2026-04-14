@@ -309,9 +309,31 @@ class OrderResource extends Resource
                         ])
                         ->columns(2),
 
-                    // Section 3: Data Produk Pesanan (MENGGUNAKAN MODUL BARU)
-                    OrderForm::getBulkGenerator(),
-                    OrderForm::getItemPool(),
+                    // Section 3: Spreadsheet Produk (TABEL STATELESS)
+                    Section::make('Daftar Produk / Item Pesanan')
+                        ->description('Input produk pesanan di sini secara fleksibel. Klik "Simpan" di akhir untuk memasukkan ke database.')
+                        ->icon('heroicon-o-table-cells')
+                        ->schema([
+                            // Hidden field to store JSON payload from spreadsheet
+                            Hidden::make('order_items_payload')
+                                ->id('order_items_payload')
+                                ->live(),
+
+                            \Filament\Schemas\Components\Livewire::make(\App\Livewire\OrderItemsSpreadsheet::class, function (Get $get, ?Order $record) {
+                                // For Edit mode, we pre-fill from database if payload is empty
+                                $items = [];
+                                if ($record) {
+                                    $items = $record->orderItems()->get()->toArray();
+                                }
+                                
+                                return [
+                                    'items' => $items,
+                                    'orderId' => $record?->id,
+                                ];
+                            })
+                            ->key('items-spreadsheet'),
+                        ])
+                        ->collapsible(),
 
                     // Section 4: Pembayaran
                     Section::make('Pembayaran')
@@ -444,9 +466,11 @@ class OrderResource extends Resource
                                     Placeholder::make('remaining_payment_display')
                                         ->label('Sisa Yang Harus Dibayar')
                                         ->content(function (Get $get, ?Order $record): HtmlString {
+                                            if ($record) {
+                                                $record->refresh();
+                                            }
                                             $total = (int) ($get('total_price') ?? 0);
                                             $initial = (int) ($get('initial_payment_amount') ?? 0);
-
                                             // Jika sedang edit, total paid dari database + initial yang sedang diinput (jika baru)
                                             // Namun record pembayaran pertama biasanya sudah masuk ke initial_payment_amount saat fill data
                                             // Jadi kita hitung dari total - initial (virtual)
@@ -467,25 +491,81 @@ class OrderResource extends Resource
 
                 // SIDEBAR - Ringkasan Pesanan
                 Group::make([
-                    Section::make('Ringkasan Pesanan')
+                    Section::make('Status & Ringkasan')
                         ->schema([
+                            Select::make('status')
+                                ->label('Status Pesanan')
+                                ->options([
+                                    'draft' => 'Draf (Belum Konfirmasi)',
+                                    'diterima' => 'Diterima',
+                                    'antrian' => 'Antrian',
+                                    'diproses' => 'Diproses',
+                                    'selesai' => 'Selesai',
+                                    'siap_diambil' => 'Siap Diambil',
+                                ])
+                                ->required()
+                                ->selectablePlaceholder(false)
+                                ->native(false)
+                                ->prefixIcon('heroicon-o-flag'),
+
                             Placeholder::make('summary_full')
                                 ->live()
                                 ->label(false)
                                 ->content(function (Get $get, ?Order $record): HtmlString {
-                                    $items = $get('orderItems') ?? [];
-                                    $subtotal = (int) ($get('subtotal') ?? 0);
+                                    $fmt = fn(int $v) => 'Rp ' . number_format($v, 0, ',', '.');
+                                    // READ FROM SPREADSHEET PAYLOAD (STATELASS/JSON)
+                                    $payload = $get('order_items_payload');
+                                    $itemsState = $payload ? json_decode($payload, true) : [];
+                                    
+                                    $subtotal = 0;
+                                    $itemsHtml = '';
+                                    $hasItems = false;
+                                    
+                                    foreach ($itemsState as $item) {
+                                        $name = htmlspecialchars($item['product_name'] ?? 'Pilih Produk...');
+                                        $price = (int) ($item['price'] ?? 0);
+                                        $qty = (int) ($item['quantity'] ?? 1);
+                                        $itemTotal = $price * $qty;
+                                        $subtotal += $itemTotal;
+                                        $hasItems = true;
+                                        $cat = $item['production_category'] ?? 'produksi';
+                                        
+                                        $badgeStyle = 'background:#f3e8ff;color:#7c3aed;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;';
+                                        $badgeLabel = match ($cat) {
+                                            'custom' => 'Custom',
+                                            'non_produksi' => 'Non-Produksi',
+                                            'jasa' => 'Jasa',
+                                            default => 'Produksi',
+                                        };
+                                        $badge = '<span style="' . $badgeStyle . '">' . $badgeLabel . '</span>';
+                                        
+                                        $sizeLabel = ($item['size'] ?? null) ? ' (' . htmlspecialchars($item['size']) . ')' : '';
+                                        $itemsHtml .= '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e9d5ff;border-radius:10px;background:#faf5ff;margin-bottom:8px;">';
+                                        $itemsHtml .= $badge;
+                                        $itemsHtml .= '<div style="flex:1;min-width:0;">';
+                                        $itemsHtml .= '<div style="font-size:13px;font-weight:500;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' . $qty . 'x ' . $name . $sizeLabel . '</div>';
+                                        $itemsHtml .= '<div style="font-size:12px;color:#7c3aed;">' . $fmt($itemTotal) . '</div>';
+                                        $itemsHtml .= '</div></div>';
+                                    }
+
+                                    if (!$hasItems) {
+                                        $itemsHtml = '<p style="color:#9ca3af;font-size:13px;">Belum ada produk ditambahkan</p>';
+                                    }
+
                                     $shipping = (int) ($get('shipping_cost') ?? 0);
                                     $tax = (int) ($get('tax') ?? 0);
                                     $discount = (int) ($get('discount') ?? 0);
-                                    $total = (int) ($get('total_price') ?? 0);
+                                    $isExpress = (bool) $get('is_express');
+                                    $expressFeeVal = (int) ($get('express_fee') ?? 0);
+                                    
+                                    $total = max(0, $subtotal + $tax + $shipping + ($isExpress ? $expressFeeVal : 0) - $discount);
 
-                                    // Hitung total bayar & sisa tagihan dari riwayat pembayaran
+                                    // Hitung total bayar (jika edit)
                                     $totalPaid = 0;
                                     $paymentsHtml = '';
                                     if ($record) {
                                         $payments = $record->payments()->orderBy('payment_date', 'asc')->get();
-                                        $totalPaid = $payments->sum('amount');
+                                        $totalPaid = (int) $payments->sum('amount');
 
                                         foreach ($payments as $index => $pay) {
                                             $methodLabel = match ($pay->payment_method) {
@@ -493,62 +573,17 @@ class OrderResource extends Resource
                                                 'qris' => 'QRIS',
                                                 default => 'Cash',
                                             };
-                                            $label = "Bayar #" . ($index + 1) . " {$methodLabel}";
                                             $paymentsHtml .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">'
-                                                . '<span style="color:#6b7280;font-size:13px;">' . $label . '</span>'
-                                                . '<span style="font-size:13px;color:#374151;">' . 'Rp ' . number_format($pay->amount, 0, ',', '.') . '</span>'
+                                                . '<span style="color:#6b7280;font-size:13px;">Bayar #' . ($index + 1) . ' (' . $methodLabel . ')</span>'
+                                                . '<span style="font-size:13px;color:#374151;">' . $fmt($pay->amount) . '</span>'
                                                 . '</div>';
                                         }
+                                    } else {
+                                        $initial = (int) ($get('initial_payment_amount') ?? 0);
+                                        $totalPaid = $initial;
                                     }
 
                                     $remaining = $total - $totalPaid;
-
-                                    $fmt = fn(int $v) => 'Rp ' . number_format($v, 0, ',', '.');
-
-                                    $itemsHtml = '';
-                                    $hasItems = false;
-                                    foreach ($items as $item) {
-                                        if (!empty($item['product_name'])) {
-                                            $hasItems = true;
-                                            $cat = $item['production_category'] ?? 'produksi';
-                                            $name = htmlspecialchars($item['product_name']);
-                                            $itemTotal = static::calcItemTotalFromArray($item);
-
-                                            $badgeStyle = 'background:#f3e8ff;color:#7c3aed;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;';
-                                            if ($cat === 'custom') {
-                                                $itemQty = count($item['detail_custom'] ?? []);
-                                                $badgeLabel = 'Custom';
-                                            } elseif ($cat === 'non_produksi') {
-                                                $itemQty = 0;
-                                                foreach ($item['np_varian_ukuran'] ?? [] as $v) {
-                                                    $itemQty += (int) ($v['qty'] ?? 0);
-                                                }
-                                                $badgeLabel = 'Non-Produksi';
-                                            } elseif ($cat === 'jasa') {
-                                                $itemQty = (int) ($item['jumlah_jasa'] ?? 0);
-                                                $badgeLabel = 'Jasa';
-                                            } else {
-                                                // produksi (default)
-                                                $itemQty = 0;
-                                                foreach ($item['varian_ukuran'] ?? [] as $v) {
-                                                    $itemQty += (int) ($v['qty'] ?? 0);
-                                                }
-                                                $badgeLabel = 'Produksi';
-                                            }
-                                            $badge = '<span style="' . $badgeStyle . '">' . $badgeLabel . '</span>';
-
-                                            $itemsHtml .= '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e9d5ff;border-radius:10px;background:#faf5ff;margin-bottom:8px;">';
-                                            $itemsHtml .= $badge;
-                                            $itemsHtml .= '<div style="flex:1;min-width:0;">';
-                                            $itemsHtml .= '<div style="font-size:13px;font-weight:500;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' . $itemQty . 'x ' . $name . '</div>';
-                                            $itemsHtml .= '<div style="font-size:12px;color:#7c3aed;">' . $fmt($itemTotal) . '</div>';
-                                            $itemsHtml .= '</div></div>';
-                                        }
-                                    }
-                                    if (!$hasItems) {
-                                        $itemsHtml = '<p style="color:#9ca3af;font-size:13px;">Belum ada produk ditambahkan</p>';
-                                    }
-
                                     $row = fn(string $label, string $value, bool $purple = false, bool $bold = false) =>
                                         '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">'
                                         . '<span style="color:#6b7280;font-size:14px;">' . $label . '</span>'
@@ -557,42 +592,32 @@ class OrderResource extends Resource
 
                                     $divider = '<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">';
 
-                                    $remainingHtml = $remaining <= 0
+                                    $remainingLabel = $remaining <= 0
                                         ? '<span style="background:#22c55e;color:white;font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;">Lunas</span>'
                                         : '<span style="color:#7c3aed;font-weight:700;font-size:14px;">' . $fmt($remaining) . '</span>';
 
                                     $html = '<div style="font-family:inherit;">' . $itemsHtml;
                                     $html .= '<div style="margin-top:12px;">';
                                     $html .= $row('Subtotal', $fmt($subtotal), true, true);
-
-                                    // Tampilkan Biaya Express jika ada
-                                    $expressFee = (int) ($get('express_fee') ?? 0);
-                                    if ($get('is_express') && $expressFee > 0) {
-                                        $html .= $row('Biaya Express', $fmt($expressFee), true);
+                                    if ($isExpress && $expressFeeVal > 0) {
+                                        $html .= $row('Biaya Express', $fmt($expressFeeVal), true);
                                     }
-
                                     $html .= $row('Ongkos Kirim', $fmt($shipping));
                                     $html .= $row('PPn 11%', $fmt($tax));
                                     $html .= $row('Diskon', $fmt($discount));
                                     $html .= $divider;
                                     $html .= $row('Total', $fmt($total), true, true);
-
-                                    // Tampilkan riwayat pembayaran jika ada
+                                    $html .= $row('Total Bayar', $fmt($totalPaid));
                                     if ($paymentsHtml) {
-                                        $html .= $paymentsHtml;
-                                    } else {
-                                        $html .= $row('Total Bayar', 'Rp 0');
+                                        $html .= '<div style="margin-top:10px;border-top:1px dashed #e5e7eb;padding-top:10px;">' . $paymentsHtml . '</div>';
                                     }
-
                                     $html .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">';
                                     $html .= '<span style="color:#6b7280;font-size:14px;">Sisa</span>';
-                                    $html .= $remainingHtml;
+                                    $html .= $remainingLabel;
                                     $html .= '</div>';
-
-                                    // Check if record exists for link generation
+                                    
                                     if ($record) {
                                         $html .= '<div style="margin-top:20px; text-align:center;">'
-                                            . '<p style="font-size:10px; color:#9ca3af; margin-bottom:5px;">Check detail atau tabel untuk download jika link ini terblokir browser</p>'
                                             . '<a href="' . route('orders.receipt', $record) . '" target="_blank" style="display:block; text-align:center; padding:10px; background:#f3f4f6; color:#4b5563; border-radius:10px; text-decoration:none; font-weight:700; font-size:12px; border:1px solid #e5e7eb; transition:all 0.2s;">'
                                             . 'Lihat Kuitansi (Tab Baru)'
                                             . '</a>'
@@ -655,45 +680,10 @@ class OrderResource extends Resource
         return $totalHarga;
     }
 
-    // Hitung total satu item dari array $state (card label & sidebar)
+    // Hitung total satu item dari array $state (sidebar & table)
     protected static function calcItemTotalFromArray(array $state): int
     {
-        $cat = $state['production_category'] ?? 'produksi';
-
-        if ($cat === 'custom') {
-            $qty = count($state['detail_custom'] ?? []);
-            $harga = (int) ($state['harga_custom_satuan'] ?? 0);
-            $extras = $state['request_tambahan_custom'] ?? [];
-            $extraSum = 0;
-            foreach ($extras as $e) {
-                $extraSum += (int) ($e['harga_extra_satuan'] ?? 0);
-            }
-            return $qty * ($harga + $extraSum);
-        }
-
-        if ($cat === 'non_produksi') {
-            $totalHarga = 0;
-            foreach ($state['np_varian_ukuran'] ?? [] as $v) {
-                $totalHarga += (int) ($v['qty'] ?? 0) * (int) ($v['harga_satuan'] ?? 0);
-            }
-            return $totalHarga;
-        }
-
-        if ($cat === 'jasa') {
-            $qty = (int) ($state['jumlah_jasa'] ?? 0);
-            $harga = (int) ($state['harga_satuan_jasa'] ?? 0);
-            return $qty * $harga;
-        }
-
-        // produksi (default)
-        $totalHarga = 0;
-        foreach ($state['varian_ukuran'] ?? [] as $v) {
-            $totalHarga += (int) ($v['qty'] ?? 0) * (int) ($v['harga_satuan'] ?? 0);
-        }
-        foreach ($state['request_tambahan'] ?? [] as $e) {
-            $totalHarga += (int) ($e['qty_tambahan'] ?? 0) * (int) ($e['harga_extra_satuan'] ?? 0);
-        }
-        return $totalHarga;
+        return (int) ($state['price'] ?? 0) * (int) ($state['quantity'] ?? 0);
     }
 
     // Live recalc price + quantity satu item
@@ -724,128 +714,46 @@ class OrderResource extends Resource
         static::updateSubtotal($set, $get);
     }
 
-    // Mutate sebelum simpan ke DB: pack JSON + simpan measurements
+    // Mutate sebelum simpan ke DB: pack JSON + bersihkan virtual fields
     public static function mutateItemData(array $data): array
     {
-        $cat = $data['production_category'] ?? 'produksi';
+        // 1. Pack all UI fields into JSON for persistence and back-compatibility
+        $data['size_and_request_details'] = [
+            'category'          => $data['production_category'] ?? 'produksi',
+            'size'              => $data['size'] ?? ($data['ukuran'] ?? null),
+            'bahan'             => $data['bahan_baju'] ?? null,
+            'gender'            => $data['gender'] ?? null,
+            'sleeve_model'      => $data['sleeve_model'] ?? null,
+            'pocket_model'      => $data['pocket_model'] ?? null,
+            'button_model'      => $data['button_model'] ?? null,
+            'measurements'      => [
+                'LD'  => $data['LD'] ?? null,
+                'PB'  => $data['PB'] ?? null,
+                'PL'  => $data['PL'] ?? null,
+                'LB'  => $data['LB'] ?? null,
+                'LP'  => $data['LP'] ?? null,
+                'LPh' => $data['LPh'] ?? null,
+            ],
+            // For backward compatibility with stock cutting logic (if used)
+            'supplier_product'  => $data['supplier_product'] ?? null,
+            'varian_ukuran'     => [
+                [
+                    'ukuran'         => $data['size'] ?? 'No Size',
+                    'qty'            => (int) ($data['quantity'] ?? 0),
+                    'harga_satuan'   => (int) ($data['price'] ?? 0),
+                    'stok_digunakan' => (int) ($data['quantity'] ?? 0),
+                ]
+            ],
+        ];
 
-        if ($cat === 'custom') {
-            $detailCustom = $data['detail_custom'] ?? [];
-            $qty = count($detailCustom);
-            $harga = (int) ($data['harga_custom_satuan'] ?? 0);
-            $extras = $data['request_tambahan_custom'] ?? [];
-            $extraSum = array_sum(array_map(fn($e) => (int) ($e['harga_extra_satuan'] ?? 0), $extras));
-            $total = $qty * ($harga + $extraSum);
-
-            $data['size_and_request_details'] = [
-                'category' => 'custom',
-                'bahan' => $data['bahan_baju'] ?? null,
-                'bahan_usage' => $data['bahan_usage'] ?? null,
-                'detail_custom' => $detailCustom,
-                'sablon_jenis' => $data['sablon_jenis'] ?? null,
-                'sablon_lokasi' => $data['sablon_lokasi'] ?? null,
-                'request_tambahan' => $extras,
-                'harga_satuan' => $harga,
-            ];
-            $data['quantity'] = max(1, $qty);
-            $data['price'] = $qty > 0 ? intdiv($total, $qty) : 0;
-
-        } elseif ($cat === 'non_produksi') {
-            $varianNp = $data['np_varian_ukuran'] ?? [];
-            $totalQty = (int) array_sum(array_map(fn($v) => (int) ($v['qty'] ?? 0), $varianNp));
-            $totalHarga = 0;
-            foreach ($varianNp as $v) {
-                $totalHarga += (int) ($v['qty'] ?? 0) * (int) ($v['harga_satuan'] ?? 0);
-            }
-
-            $data['size_and_request_details'] = [
-                'category' => 'non_produksi',
-                'supplier_product' => $data['supplier_product'] ?? null,
-                'sablon_jenis' => $data['np_sablon_jenis'] ?? null,
-                'sablon_lokasi' => $data['np_sablon_lokasi'] ?? null,
-                'varian_ukuran' => $varianNp,
-            ];
-            $data['quantity'] = max(1, $totalQty);
-            $data['price'] = $totalQty > 0 ? intdiv($totalHarga, $totalQty) : 0;
-
-        } elseif ($cat === 'jasa') {
-            $qty = (int) ($data['jumlah_jasa'] ?? 0);
-            $harga = (int) ($data['harga_satuan_jasa'] ?? 0);
-
-            $data['size_and_request_details'] = [
-                'category' => 'jasa',
-                'jumlah' => $qty,
-                'harga_satuan' => $harga,
-                'sablon_jenis' => $data['jasa_sablon_jenis'] ?? null,
-                'sablon_lokasi' => $data['jasa_sablon_lokasi'] ?? null,
-            ];
-            $data['quantity'] = max(1, $qty);
-            $data['price'] = $harga;
-
-        } else {
-            // produksi (default)
-            $totalQty = 0;
-            $totalHarga = 0;
-            foreach ($data['varian_ukuran'] ?? [] as $v) {
-                $q = (int) ($v['qty'] ?? 0);
-                $h = (int) ($v['harga_satuan'] ?? 0);
-                $totalQty += $q;
-                $totalHarga += $q * $h;
-            }
-            $extras = $data['request_tambahan'] ?? [];
-            foreach ($extras as $e) {
-                $totalHarga += (int) ($e['qty_tambahan'] ?? 0) * (int) ($e['harga_extra_satuan'] ?? 0);
-            }
-
-            $data['size_and_request_details'] = [
-                'category' => 'produksi',
-                'bahan' => $data['bahan_baju'] ?? null,
-                'bahan_usage' => $data['bahan_usage'] ?? null,
-                'sablon_jenis' => $data['sablon_jenis'] ?? null,
-                'sablon_lokasi' => $data['sablon_lokasi'] ?? null,
-                'varian_ukuran' => $data['varian_ukuran'] ?? [],
-                'request_tambahan' => $extras,
-            ];
-            $data['quantity'] = max(1, $totalQty);
-            $data['price'] = $totalQty > 0 ? intdiv($totalHarga, $totalQty) : 0;
-        }
-
-        // Bersihkan semua virtual fields sebelum simpan
-        // CATATAN: Filament butuh `$data['id']` dsb untuk menghapus (kalau ada)
+        // 2. Bersihkan virtual fields agar tidak error SQL "Column not found"
         unset(
-            $data['bahan_usage'],
-            $data['stok_digunakan'],
-            $data['bahan_baju'],
-            $data['sablon_jenis'],
-            $data['sablon_lokasi'],
-            $data['sablon_bordir'],
-            $data['sablon_bordir_custom'],
-            $data['varian_ukuran'],
-            $data['request_tambahan'],
-            $data['request_tambahan_custom'],
-            $data['detail_custom'],
-            $data['harga_custom_satuan'],
-            // Non-Produksi
-            $data['supplier_product'],
-            $data['np_sablon_jenis'],
-            $data['np_sablon_lokasi'],
-            $data['np_varian_ukuran'],
-            $data['np_request_tambahan'],
-            // Jasa
-            $data['nama_jasa'],
-            $data['jumlah_jasa'],
-            $data['harga_satuan_jasa'],
-            $data['jasa_sablon_jenis'],
-            $data['jasa_sablon_lokasi'],
-            $data['jasa_total_display'],
-            // Display fields
-            $data['total_item_display'],
-            $data['total_qty_display'],
-            $data['total_varian_summary'],
-            $data['qty_custom_display'],
-            $data['load_measurements_hint'],
-            $data['qty_tambahan_error'],
-            $data['subtotal_np_varian'],
+            $data['LD'], $data['PB'], $data['PL'], $data['LB'], $data['LP'], $data['LPh'],
+            $data['bahan_baju'], $data['gender'], $data['sleeve_model'], 
+            $data['pocket_model'], $data['button_model'],
+            $data['bahan_usage'], $data['stok_digunakan'], $data['varian_ukuran'],
+            $data['request_tambahan'], $data['detail_custom'], $data['supplier_product'],
+            $data['np_varian_ukuran'], $data['np_request_tambahan']
         );
 
         return $data;
@@ -859,44 +767,27 @@ class OrderResource extends Resource
             return $data;
         }
 
+        // 1. Dasar: Kategori & Ukuran
         $cat = $details['category'] ?? ($data['production_category'] ?? 'produksi');
         $data['production_category'] = $cat;
+        $data['size'] = $details['size'] ?? ($data['ukuran'] ?? null);
 
-        // PASTIKAN ID TIDAK HILANG AGAR BISA DI-DELETE/UPDATE
-        if (!isset($data['id']) && isset($data['record_id'])) {
-            $data['id'] = $data['record_id'];
-        }
+        // 2. Unpack Detail Spec
+        $data['bahan_baju'] = $details['bahan'] ?? null;
+        $data['gender'] = $details['gender'] ?? null;
+        $data['sleeve_model'] = $details['sleeve_model'] ?? null;
+        $data['pocket_model'] = $details['pocket_model'] ?? null;
+        $data['button_model'] = $details['button_model'] ?? null;
+        $data['supplier_product'] = $details['supplier_product'] ?? null;
 
-        if ($cat === 'custom') {
-            $data['bahan_baju'] = $details['bahan'] ?? null;
-            $data['bahan_usage'] = $details['bahan_usage'] ?? null;
-            $data['detail_custom'] = $details['detail_custom'] ?? [];
-            $data['sablon_jenis'] = $details['sablon_jenis'] ?? null;
-            $data['sablon_lokasi'] = $details['sablon_lokasi'] ?? null;
-            $data['request_tambahan_custom'] = $details['request_tambahan'] ?? [];
-            $data['harga_custom_satuan'] = $details['harga_satuan'] ?? 0;
-
-        } elseif ($cat === 'non_produksi') {
-            $data['supplier_product'] = $details['supplier_product'] ?? null;
-            $data['np_sablon_jenis'] = $details['sablon_jenis'] ?? null;
-            $data['np_sablon_lokasi'] = $details['sablon_lokasi'] ?? null;
-            $data['np_varian_ukuran'] = $details['varian_ukuran'] ?? [];
-
-        } elseif ($cat === 'jasa') {
-            $data['jumlah_jasa'] = $details['jumlah'] ?? 0;
-            $data['harga_satuan_jasa'] = $details['harga_satuan'] ?? 0;
-            $data['jasa_sablon_jenis'] = $details['sablon_jenis'] ?? null;
-            $data['jasa_sablon_lokasi'] = $details['sablon_lokasi'] ?? null;
-
-        } else {
-            // produksi (default)
-            $data['bahan_baju'] = $details['bahan'] ?? null;
-            $data['bahan_usage'] = $details['bahan_usage'] ?? null;
-            $data['sablon_jenis'] = $details['sablon_jenis'] ?? null;
-            $data['sablon_lokasi'] = $details['sablon_lokasi'] ?? null;
-            $data['varian_ukuran'] = $details['varian_ukuran'] ?? [];
-            $data['request_tambahan'] = $details['request_tambahan'] ?? [];
-        }
+        // 3. Unpack Measurements (LD, PB, dsb)
+        $measurements = $details['measurements'] ?? [];
+        $data['LD'] = $measurements['LD'] ?? null;
+        $data['PB'] = $measurements['PB'] ?? null;
+        $data['PL'] = $measurements['PL'] ?? null;
+        $data['LB'] = $measurements['LB'] ?? null;
+        $data['LP'] = $measurements['LP'] ?? null;
+        $data['LPh'] = $measurements['LPh'] ?? null;
 
         return $data;
     }
