@@ -1,5 +1,5 @@
 <div 
-    class="space-y-6"
+    class="space-y-4"
     x-data="{
         updatePayload(payload) {
              const input = document.getElementById('order_items_payload');
@@ -12,80 +12,81 @@
     @spreadsheet-updated.window="updatePayload($event.detail.payload)"
 >
     <!-- Header Actions -->
-    <div class="flex flex-wrap items-center justify-between gap-4 p-5 bg-white border border-gray-200 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-gray-900/5">
+    <div class="flex flex-wrap items-center justify-between gap-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm ring-1 ring-gray-950/5">
         <div class="flex flex-wrap items-center gap-3">
-            <button wire:click="addItem" type="button" class="group relative inline-flex items-center px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl hover:from-indigo-500 hover:to-indigo-600 transition-all shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-indigo-500/50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                <svg class="w-5 h-5 mr-2 -ml-1 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+            <button wire:click="addItem" type="button" class="inline-flex items-center px-4 py-2 text-sm font-bold text-white bg-primary-600 rounded-lg hover:bg-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all shadow-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                 Tambah Baris
             </button>
             
-            <button @click="$wire.set('showBulkModal', true)" type="button" class="group relative inline-flex items-center px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl hover:from-purple-500 hover:to-purple-600 transition-all shadow-[0_4px_14px_0_rgba(147,51,234,0.39)] hover:shadow-purple-500/50 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
-                <svg class="w-5 h-5 mr-2 -ml-1 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            <button @click="$wire.set('showBulkModal', true)" type="button" class="inline-flex items-center px-3 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-primary-500/10 transition-all">
+                <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                 Bulk Generate
             </button>
             
-            <button @click="$wire.set('showPriceModal', true)" type="button" class="inline-flex items-center px-5 py-2.5 text-sm font-bold text-orange-700 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 hover:border-orange-300 transition-all shadow-sm">
-                <svg class="w-5 h-5 mr-2 -ml-1 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Ganti Semua Harga
+            <button @click="$wire.set('showPriceModal', true)" type="button" class="inline-flex items-center px-3 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
+                <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Ganti Harga
             </button>
         </div>
 
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-6">
              <div class="text-right">
-                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Total Item</div>
-                <div class="text-lg font-black text-gray-900 leading-none">{{ count($items) }}</div>
+                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Total Baris</div>
+                <div class="text-base font-bold text-gray-900 leading-none">{{ count($items) }}</div>
              </div>
-             <button wire:click="clearAll" onclick="return confirm('Apakah Anda yakin ingin menghapus semua item?')" type="button" class="p-2.5 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all border border-transparent hover:border-red-100" title="Kosongkan Tabel">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+             <button wire:click="clearAll" onclick="return confirm('Apakah Anda yakin ingin menghapus semua item?')" type="button" class="p-2 text-gray-400 hover:text-danger-600 transition-colors" title="Kosongkan Tabel">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
         </div>
     </div>
 
     <!-- Table Container -->
-    <div class="border border-gray-200 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.02)] bg-white overflow-hidden ring-1 ring-gray-900/5">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ring-1 ring-gray-950/5">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200/60 table-fixed">
-                <thead class="bg-[#fcfdfd] border-b border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 table-fixed">
+                <thead class="bg-gray-50 border-b border-gray-200">
                     <tr>
-                        <th class="w-14 px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-[0.1em]">#</th>
-                        <th class="w-1/4 px-4 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-[0.1em]">Produk / Pemesan</th>
-                        <th class="w-24 px-4 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-[0.1em]">Size</th>
-                        <th class="w-32 px-4 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-[0.1em]">Kategori</th>
-                        <th class="w-1/4 px-4 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-[0.1em]">Bahan</th>
-                        <th class="w-40 px-4 py-4 text-right text-[11px] font-black text-gray-500 uppercase tracking-[0.1em]">Harga Unit</th>
-                        <th class="w-24 px-4 py-4 text-center text-[11px] font-black text-gray-500 uppercase tracking-[0.1em]">Qty</th>
-                        <th class="w-44 px-4 py-4 text-right text-[11px] font-black text-indigo-600 uppercase tracking-[0.1em] opacity-80">Subtotal</th>
-                        <th class="w-14 px-4 py-4"></th>
+                        <th class="w-12 px-3 py-3 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">#</th>
+                        <th class="w-1/4 px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Produk / Pemesan</th>
+                        <th class="w-24 px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Size</th>
+                        <th class="w-32 px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Kategori</th>
+                        <th class="w-1/4 px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Bahan</th>
+                        <th class="w-24 px-3 py-3 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">Specs</th>
+                        <th class="w-36 px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Harga Unit</th>
+                        <th class="w-24 px-3 py-3 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">Qty</th>
+                        <th class="w-44 px-4 py-3 text-right text-[10px] font-bold text-primary-600 uppercase tracking-widest bg-primary-50/30">Subtotal</th>
+                        <th class="w-12 px-3 py-3"></th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100/80">
+                <tbody class="divide-y divide-gray-100">
                     @forelse($items as $index => $item)
-                        <tr class="hover:bg-indigo-50/20 transition-all duration-150 ease-in-out group">
-                            <td class="px-4 py-4 text-center text-xs font-bold text-gray-300 group-hover:text-indigo-300">
-                                {{ str_pad($index + 1, 2, '0', STR_PAD_LEFT) }}
+                        <tr class="hover:bg-gray-50/50 transition-colors group">
+                            <td class="px-3 py-4 text-center text-xs font-medium text-gray-400 bg-gray-50/30 border-r border-gray-100">
+                                {{ $index + 1 }}
                             </td>
                             <td class="px-4 py-4">
                                 <input 
                                     type="text" 
                                     wire:model.blur="items.{{ $index }}.product_name"
                                     placeholder="Input nama produk..."
-                                    class="w-full text-sm border-0 focus:ring-0 focus:bg-white bg-transparent p-0 font-bold text-gray-800 placeholder-gray-300 transition-all"
+                                    class="w-full text-xs border-0 focus:ring-0 bg-transparent p-0 font-medium text-gray-900 placeholder-gray-300"
                                 >
                             </td>
-                            <td class="px-4 py-4">
+                            <td class="px-3 py-4">
                                 <select 
                                     wire:model.change="items.{{ $index }}.size"
-                                    class="w-full text-sm border-0 focus:ring-0 bg-transparent p-0 text-gray-600 font-medium cursor-pointer hover:text-indigo-600"
+                                    class="w-full text-xs border-0 focus:ring-0 bg-transparent p-0 text-gray-600 font-medium cursor-pointer"
                                 >
                                     @foreach($sizeOptions as $val => $label)
                                         <option value="{{ $val }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
                             </td>
-                            <td class="px-4 py-4">
+                            <td class="px-3 py-4">
                                 <select 
                                     wire:model.change="items.{{ $index }}.production_category"
-                                    class="w-full text-[11px] font-black uppercase tracking-wider border border-transparent hover:border-indigo-100 rounded-lg bg-indigo-50/50 p-1.5 px-3 text-indigo-600 focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all cursor-pointer ring-inset"
+                                    class="w-full text-[10px] font-bold uppercase tracking-widest border border-gray-100 rounded bg-gray-50 p-1 px-2 text-primary-600 focus:ring-1 focus:ring-primary-500 focus:bg-white transition-all cursor-pointer"
                                 >
                                     @foreach($productionCategories as $val => $label)
                                         <option value="{{ $val }}">{{ $label }}</option>
@@ -95,56 +96,58 @@
                             <td class="px-4 py-4">
                                 <select 
                                     wire:model.change="items.{{ $index }}.bahan_baju"
-                                    class="w-full text-sm border-0 focus:ring-0 bg-transparent p-0 text-gray-600 font-medium cursor-pointer hover:text-indigo-600"
+                                    class="w-full text-xs border-0 focus:ring-0 bg-transparent p-0 text-gray-600 font-medium cursor-pointer"
                                 >
                                     @foreach($materialOptions as $val => $label)
                                         <option value="{{ $val }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
                             </td>
+                            <td class="px-3 py-4 text-center">
+                                <button 
+                                    wire:click="openDetail({{ $index }})"
+                                    type="button"
+                                    class="inline-flex items-center px-2 py-1 text-[10px] font-bold text-primary-600 bg-primary-50 rounded hover:bg-primary-100 transition-colors border border-primary-100 shadow-sm"
+                                >
+                                    SPECS
+                                </button>
+                            </td>
                             <td class="px-4 py-4 text-right">
                                 <div class="flex items-center justify-end relative">
-                                    <span class="text-[10px] font-black text-gray-300 mr-1.5 align-middle">RP</span>
+                                    <span class="text-[9px] font-bold text-gray-300 mr-1 select-none">RP</span>
                                     <input 
                                         type="number" 
                                         wire:model.blur="items.{{ $index }}.price"
-                                        class="w-32 text-sm text-right border-0 focus:ring-2 focus:ring-indigo-100 rounded-lg bg-transparent hover:bg-gray-50 p-1.5 font-black text-gray-900 transition-all"
+                                        class="w-28 text-sm text-right border-0 focus:ring-1 focus:ring-primary-500 rounded bg-transparent hover:bg-gray-100/50 p-1 font-bold text-gray-900 transition-all"
                                     >
                                 </div>
                             </td>
-                            <td class="px-4 py-4 text-center">
+                            <td class="px-3 py-4 text-center">
                                 <input 
                                     type="number" 
                                     wire:model.blur="items.{{ $index }}.quantity"
-                                    class="w-16 text-sm text-center border-0 focus:ring-2 focus:ring-indigo-100 rounded-lg bg-transparent hover:bg-gray-50 p-1.5 font-black text-gray-900 transition-all"
+                                    class="w-14 text-sm text-center border-0 focus:ring-1 focus:ring-primary-500 rounded bg-transparent hover:bg-gray-100/50 p-1 font-bold text-gray-900 transition-all"
                                 >
                             </td>
-                            <td class="px-4 py-4 text-right">
-                                 <span class="text-sm font-black text-indigo-600 tracking-tight">
+                            <td class="px-4 py-4 text-right bg-primary-50/20">
+                                 <span class="text-sm font-bold text-primary-600">
                                     {{ number_format($item['price'] * $item['quantity'], 0, ',', '.') }}
                                  </span>
                             </td>
-                            <td class="px-4 py-4 text-center">
+                            <td class="px-3 py-4 text-center">
                                 <button 
                                     wire:click="removeItem({{ $index }})"
                                     type="button"
-                                    class="text-gray-200 hover:text-red-500 bg-transparent hover:bg-red-50 p-2 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                                    title="Hapus Baris"
+                                    class="text-gray-300 hover:text-danger-500 p-1 transition-colors opacity-0 group-hover:opacity-100"
                                 >
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="px-4 py-20 text-center bg-gray-50/30">
-                                <div class="flex flex-col items-center justify-center space-y-3">
-                                    <div class="p-4 bg-white rounded-full shadow-sm ring-1 ring-gray-100">
-                                        <svg class="w-10 h-10 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                                    </div>
-                                    <div class="text-sm font-bold text-gray-400">Belum ada item pesanan</div>
-                                    <p class="text-[11px] text-gray-300 uppercase tracking-widest font-black">Gunakan tombol di atas untuk memulai</p>
-                                </div>
+                            <td colspan="10" class="px-4 py-12 text-center text-gray-400">
+                                <p class="text-xs font-medium uppercase tracking-widest">Belum ada item pesanan.</p>
                             </td>
                         </tr>
                     @endforelse
@@ -153,11 +156,12 @@
         </div>
     </div>
 
+    <!-- Estimasi Subtotal -->
     @if($items)
-    <div class="flex justify-end pr-8">
+    <div class="flex justify-end pt-2">
         <div class="text-right">
-            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 block">Estimasi Subtotal</span>
-            <div class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-indigo-800 tracking-tighter">
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Estimasi Subtotal</span>
+            <div class="text-2xl font-bold text-primary-600 tracking-tight">
                 Rp {{ number_format(collect($items)->sum(fn($i) => $i['price'] * $i['quantity']), 0, ',', '.') }}
             </div>
         </div>
@@ -165,12 +169,13 @@
     @endif
 
     <!-- State Sync Label -->
-    <div class="mt-4 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-gray-300">
-        <span>Stateless Spreadsheet v2.0</span>
-        <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Auto-Sync Active</span>
+    <div class="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-gray-300 px-1 mt-6">
+        <span>Stateless Spreadsheet Engine v2.5</span>
+        <span class="flex items-center gap-1.5 font-bold"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> AUTO-SYNC ACTIVE</span>
     </div>
 
     <!-- Modals -->
+
     <!-- Bulk Generate Modal -->
     <div 
         x-show="$wire.showBulkModal" 
@@ -180,41 +185,41 @@
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
-        class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/75 backdrop-blur-sm"
         style="display: none;"
     >
         <div 
             @click.away="$wire.set('showBulkModal', false)"
-            x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0 scale-95 translate-y-4"
-            x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-            class="w-full max-w-xl bg-white rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] overflow-hidden border border-gray-100"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            class="w-full max-w-xl bg-white rounded-xl shadow-2xl overflow-hidden ring-1 ring-gray-950/5"
         >
-            <div class="px-10 py-8 bg-gradient-to-br from-purple-600 to-indigo-700 flex justify-between items-center relative overflow-hidden">
-                <div class="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
-                <div class="relative">
-                    <h3 class="text-xl font-black text-white uppercase tracking-wider mb-1">Bulk Generate</h3>
-                    <p class="text-indigo-100 text-xs font-bold opacity-80 uppercase tracking-widest">Tambah banyak item sekaligus</p>
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-900 uppercase">Bulk Generation</h3>
+                    <p class="text-[10px] text-gray-500 font-medium">Input massal secara instan.</p>
                 </div>
-                <button @click="$wire.set('showBulkModal', false)" class="relative p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                <button @click="$wire.set('showBulkModal', false)" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
 
-            <div class="p-10 space-y-8">
-                <div class="grid grid-cols-2 gap-8 text-left">
-                    <div class="space-y-2">
-                        <label class="block text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Katalog Bahan / Produk</label>
-                        <select wire:model="bulkMaterial" class="w-full text-sm font-bold border-gray-100 bg-gray-50/50 rounded-2xl p-4 focus:ring-purple-500 focus:border-purple-500 transition-all">
+            <div class="p-6 space-y-6 max-h-[85vh] overflow-y-auto scrollbar-thin">
+                <!-- Group 1: Production -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-gray-700 ml-1">Katalog Produk / Bahan</label>
+                        <select wire:model="bulkMaterial" class="w-full text-xs border-gray-300 rounded-lg focus:border-primary-500 focus:ring-primary-500 shadow-sm h-9">
                             <option value="">-- Pilih Katalog --</option>
                             @foreach($materialOptions as $id => $name)
                                 <option value="{{ $id }}">{{ $name }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="space-y-2">
-                        <label class="block text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Kategori Produksi</label>
-                        <select wire:model="bulkCategory" class="w-full text-sm font-bold border-gray-100 bg-gray-50/50 rounded-2xl p-4 focus:ring-purple-500 focus:border-purple-500 transition-all">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-gray-700 ml-1">Kategori Produksi</label>
+                        <select wire:model="bulkCategory" class="w-full text-xs border-gray-300 rounded-lg focus:border-primary-500 focus:ring-primary-500 shadow-sm h-9">
                             @foreach($productionCategories as $val => $label)
                                 <option value="{{ $val }}">{{ $label }}</option>
                             @endforeach
@@ -222,42 +227,81 @@
                     </div>
                 </div>
 
-                <div class="space-y-4">
-                    <label class="block text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Pilih Ukuran & Variasi</label>
-                    <div class="grid grid-cols-5 gap-3">
-                        @foreach($sizeOptions as $val => $label)
-                            <label class="group relative flex items-center justify-center p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 {{ in_array($val, $bulkSizes) ? 'bg-purple-50 border-purple-500 shadow-sm' : 'bg-white border-gray-100 hover:border-purple-200' }}">
-                                <input type="checkbox" wire:model="bulkSizes" value="{{ $val }}" class="hidden">
-                                <span class="text-sm font-black {{ in_array($val, $bulkSizes) ? 'text-purple-600' : 'text-gray-400 group-hover:text-gray-600' }}">{{ $label }}</span>
-                                @if(in_array($val, $bulkSizes))
-                                    <div class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center ring-2 ring-white">
-                                        <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>
-                                    </div>
+                <!-- Group 2: Specs -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    @foreach(['bulkGender' => 'Gender', 'bulkSleeve' => 'Lengan', 'bulkPocket' => 'Saku', 'bulkButtons' => 'Kancing'] as $model => $label)
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-bold text-gray-600 ml-1">{{ $label }}</label>
+                            <select wire:model="{{ $model }}" class="w-full text-xs border-gray-300 rounded-lg focus:border-primary-500 focus:ring-primary-500 shadow-sm h-8">
+                                @if($model === 'bulkGender')
+                                    <option value="L">L-laki</option>
+                                    <option value="P">P-uan</option>
+                                @else
+                                    @foreach(${$model === 'bulkSleeve' ? 'sleeveOptions' : ($model === 'bulkPocket' ? 'pocketOptions' : 'buttonOptions')} as $val => $optLabel)
+                                        <option value="{{ $val }}">{{ $optLabel }}</option>
+                                    @endforeach
                                 @endif
-                            </label>
-                        @endforeach
-                    </div>
+                            </select>
+                        </div>
+                    @endforeach
                 </div>
 
-                <div class="flex items-center gap-8 pt-4 border-t border-gray-50">
-                    <div class="flex-1 space-y-2">
-                        <label class="block text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Qty per Ukuran</label>
-                        <div class="flex items-center">
-                            <input type="number" wire:model="bulkQty" class="w-full text-center text-xl font-black border-gray-100 bg-gray-50/50 rounded-2xl p-4 focus:ring-purple-500 focus:border-purple-500">
+                <!-- Tunik -->
+                <div class="flex items-center gap-4 p-3 bg-gray-50/50 rounded-lg border border-gray-200">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" wire:model.live="bulkIsTunic" class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+                        <label class="text-xs font-bold text-gray-900">Model Tunik?</label>
+                    </div>
+                    @if($bulkIsTunic)
+                        <div class="flex-1 max-w-[150px] relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">RP</span>
+                            <input type="number" wire:model="bulkTunicFee" class="w-full pl-9 py-1 text-xs border-gray-300 rounded-lg h-8 focus:border-primary-500 focus:ring-primary-500">
+                        </div>
+                    @endif
+                </div>
+
+                <!-- Sizes -->
+                <div class="space-y-3 pt-2">
+                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider text-center">Jumlah per Ukuran (Pcs)</h4>
+                    <div class="bg-gray-50/50 p-4 border border-gray-200 rounded-xl">
+                        <div class="grid grid-cols-4 md:grid-cols-8 gap-2 mb-4">
+                            @foreach($sizeOptions as $val => $label)
+                                <div class="space-y-1">
+                                    <label class="block text-[10px] font-bold text-gray-400 text-center">{{ $label }}</label>
+                                    <input type="number" wire:model="bulkSzQty.{{ $val }}" class="w-full text-center text-xs font-bold border-gray-300 rounded-lg h-9 shadow-sm focus:border-primary-500 bg-white">
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                             <div class="space-y-1">
+                                <label class="text-[11px] font-bold text-gray-900 ml-1">Ukur Badan</label>
+                                <input type="number" wire:model="bulkCustomQty" class="w-full text-center text-xs font-bold border-gray-300 rounded-lg h-10 shadow-sm bg-white" placeholder="0">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[11px] font-bold text-gray-900 ml-1">Harga Satuan</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">RP</span>
+                                    <input type="number" wire:model="bulkPrice" class="w-full pl-8 pr-3 text-sm font-bold border-gray-300 rounded-lg h-10 shadow-sm bg-white" placeholder="0">
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="flex-[2] flex items-end">
-                        <button wire:click="generateBulk" type="button" class="w-full group relative inline-flex items-center justify-center px-8 py-5 text-base font-black text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl hover:from-purple-500 hover:to-indigo-500 transition-all shadow-[0_10px_20px_-5px_rgba(124,58,237,0.4)] hover:shadow-purple-500/50">
-                            GENERATE SEKARANG
-                            <svg class="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
-                        </button>
-                    </div>
                 </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                 <button @click="$wire.set('showBulkModal', false)" class="px-4 py-2 text-xs font-bold text-gray-400 uppercase hover:text-gray-600 transition-colors">
+                    CANCEL
+                </button>
+                <button wire:click="generateBulk" class="px-6 py-2 bg-primary-600 text-white text-xs font-bold rounded-lg hover:bg-primary-500 transition-all shadow-md uppercase">
+                    GENERATE
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Bulk Price Modal -->
+    <!-- Update Price Modal -->
     <div 
         x-show="$wire.showPriceModal" 
         x-transition:enter="transition ease-out duration-300"
@@ -266,33 +310,121 @@
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
-        class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/75 backdrop-blur-sm"
         style="display: none;"
     >
         <div 
             @click.away="$wire.set('showPriceModal', false)"
-            x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0 scale-95"
-            x-transition:enter-end="opacity-100 scale-100"
-            class="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100"
+            class="w-full max-w-sm bg-white rounded-xl shadow-2xl overflow-hidden ring-1 ring-gray-950/5"
         >
-            <div class="px-8 py-6 bg-gradient-to-br from-orange-500 to-red-600 flex justify-between items-center">
-                <h3 class="text-lg font-black text-white uppercase tracking-widest">Update Harga</h3>
-                <button @click="$wire.set('showPriceModal', false)" class="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-full transition-all">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                <h3 class="text-sm font-bold text-gray-900 uppercase">Update Harga Masal</h3>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="space-y-1.5 text-center">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Masukkan Harga Satuan Baru</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-300">RP</span>
+                        <input type="number" wire:model="newBulkPrice" class="w-full pl-10 pr-4 py-3 text-2xl font-bold border-gray-300 rounded-xl focus:border-primary-500 focus:ring-primary-500 shadow-sm text-center" placeholder="0">
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <button wire:click="applyBulkPrice" class="w-full py-3 bg-primary-600 text-white text-xs font-bold rounded-lg hover:bg-primary-500 transition-all shadow-md uppercase">
+                        APPLY TO ALL
+                    </button>
+                    <button @click="$wire.set('showPriceModal', false)" class="w-full py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">
+                        CLOSE
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Specs Modal -->
+    <div 
+        x-show="$wire.showDetailModal" 
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/75 backdrop-blur-sm"
+        style="display: none;"
+    >
+        <div 
+            @click.away="$wire.set('showDetailModal', false)"
+            class="w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden ring-1 ring-gray-950/5"
+        >
+            <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-900 uppercase">Spesifikasi Detail</h3>
+                    <p class="text-[10px] text-gray-500 font-medium tracking-tight">Kustomisasi mendalam per item.</p>
+                </div>
+                <button @click="$wire.set('showDetailModal', false)" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <div class="p-10 text-center">
-                <div class="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-6 ring-1 ring-orange-100">
-                    <svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+
+            <div class="p-6 space-y-6 max-h-[85vh] overflow-y-auto scrollbar-thin">
+                @if($editingIndex !== null)
+                <!-- Garment Model -->
+                <div class="grid grid-cols-2 gap-4">
+                    @foreach(['gender' => 'Gender', 'sleeve_model' => 'Lengan', 'pocket_model' => 'Saku', 'button_model' => 'Kancing'] as $model => $label)
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-700 ml-1">{{ $label }}</label>
+                            <select wire:model="editingItem.{{ $model }}" class="w-full text-xs border-gray-300 rounded-lg focus:border-primary-500 h-9">
+                                @if($model === 'gender')
+                                    <option value="L">Laki-laki</option>
+                                    <option value="P">Perempuan</option>
+                                @else
+                                    @foreach(${$model === 'sleeve_model' ? 'sleeveOptions' : ($model === 'pocket_model' ? 'pocketOptions' : 'buttonOptions')} as $val => $optLabel)
+                                        <option value="{{ $val }}">{{ $optLabel }}</option>
+                                    @endforeach
+                                @endif
+                            </select>
+                        </div>
+                    @endforeach
                 </div>
-                <p class="text-sm text-gray-500 mb-6 font-bold leading-relaxed px-4 text-center">Ini akan mengubah harga <span class="text-orange-600 font-extrabold underline decoration-2 underline-offset-4">{{ count($items) }} item</span> dalam tabel menjadi:</p>
-                <div class="relative mb-8">
-                    <span class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 font-black text-lg">RP</span>
-                    <input type="number" wire:model="newBulkPrice" class="w-full pl-16 pr-8 py-5 text-3xl font-black border-gray-100 bg-gray-50/50 rounded-3xl focus:ring-orange-500 focus:border-orange-500 transition-all text-center tracking-tighter shadow-inner">
+
+                <div class="flex items-center gap-4 p-3 bg-gray-50/50 rounded-lg border border-gray-200">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" wire:model.live="editingItem.is_tunic" class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+                        <label class="text-xs font-bold text-gray-900">Pakai Tunik?</label>
+                    </div>
+                    @if($editingItem['is_tunic'] ?? false)
+                        <div class="flex-1 max-w-[150px] relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">RP</span>
+                            <input type="number" wire:model="editingItem.tunic_fee" class="w-full pl-9 py-1 text-xs border-gray-300 rounded-lg h-8 focus:border-primary-500">
+                        </div>
+                    @endif
                 </div>
-                <button wire:click="applyBulkPrice" type="button" class="w-full py-5 text-base font-black text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl hover:from-orange-400 hover:to-red-500 transition-all shadow-lg hover:shadow-orange-500/50">
-                    TERAPKAN HARGA BARU
+
+                <!-- Custom Measurements -->
+                <div class="space-y-3 pt-2">
+                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider text-center border-b border-gray-100 pb-1">Ukur Badan (Custom)</h4>
+                    <div class="grid grid-cols-3 gap-3">
+                        @foreach(['LD' => 'L. Dada', 'PB' => 'P. Baju', 'PL' => 'P. Lengan', 'LB' => 'L. Bahu', 'LP' => 'L. Perut', 'LPh' => 'L. Paha'] as $key => $label)
+                            <div class="space-y-1 text-center">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase">{{ $label }}</label>
+                                <div class="relative">
+                                    <input type="number" wire:model="editingItem.measurements.{{ $key }}" step="0.5" class="w-full text-center text-xs font-bold border-gray-300 rounded-lg h-9 shadow-sm bg-gray-50/10 focus:bg-white pr-5">
+                                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-bold text-gray-300">CM</span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                <button @click="$wire.set('showDetailModal', false)" class="px-4 py-2 text-xs font-bold text-gray-400 uppercase hover:text-gray-600">
+                    CLOSE
+                </button>
+                <button wire:click="saveDetail" class="px-6 py-2 bg-primary-600 text-white text-xs font-bold rounded-lg hover:bg-primary-500 transition-all shadow-md uppercase">
+                    SAVE CHANGES
                 </button>
             </div>
         </div>

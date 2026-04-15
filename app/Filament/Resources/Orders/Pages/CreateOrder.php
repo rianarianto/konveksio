@@ -22,10 +22,21 @@ class CreateOrder extends CreateRecord
                     'product_name' => $item['product_name'] ?? '',
                     'production_category' => $item['production_category'] ?? 'produksi',
                     'size' => $item['size'] ?? 'M',
-                    'bahan_baju' => $item['bahan_baju'] ?? null,
+                    'bahan_id' => $item['bahan_baju'] ?? null,
                     'price' => $item['price'] ?? 0,
                     'quantity' => $item['quantity'] ?? 1,
                     'shop_id' => $this->record->shop_id,
+                    'size_and_request_details' => [
+                        'gender' => $item['gender'] ?? 'L',
+                        'sleeve_model' => $item['sleeve_model'] ?? 'pendek',
+                        'pocket_model' => $item['pocket_model'] ?? 'tanpa_saku',
+                        'button_model' => $item['button_model'] ?? 'biasa',
+                        'is_tunic' => $item['is_tunic'] ?? false,
+                        'tunic_fee' => $item['tunic_fee'] ?? 0,
+                        'measurements' => $item['measurements'] ?? [],
+                        'bahan' => $item['bahan_baju'] ?? null, // Duplicated for legacy compatibility
+                        'size' => $item['size'] ?? 'M', // Duplicated for legacy compatibility
+                    ],
                 ]);
             }
         }

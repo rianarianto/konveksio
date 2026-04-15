@@ -19,18 +19,37 @@ class OrderItemsSpreadsheet extends Component
     public array $sizeOptions = [];
     // Form fields for Bulk Generate
     public $bulkMaterial;
-    public $bulkQty = 1;
     public $bulkCategory = 'produksi';
-    public $bulkSizes = [];
-    public $showBulkModal = false;
+    public $bulkPrice = 0;
+    public $bulkCustomQty = 0;
+    public array $bulkSzQty = []; // [ 'S' => 0, 'M' => 0, ... ]
+    
+    // New garment attributes for bulk generate
+    public $bulkGender = 'L';
+    public $bulkSleeve = 'pendek';
+    public $bulkPocket = 'tanpa_saku';
+    public $bulkButtons = 'biasa';
+    public $bulkIsTunic = false;
+    public $bulkTunicFee = 0;
+
+    // UI States
+    public bool $showBulkModal = false;
+    public bool $showPriceModal = false;
+    public bool $showDetailModal = false;
     public $newBulkPrice = 0;
-    public $showPriceModal = false;
+    public $editingIndex = null;
+    public array $editingItem = [];
+
     public array $productionCategories = [
         'produksi' => 'Produksi',
         'custom' => 'Custom',
         'non_produksi' => 'Non-Produksi',
         'jasa' => 'Jasa',
     ];
+
+    public array $sleeveOptions = ['pendek' => 'Pendek', 'panjang' => 'Panjang', '3/4' => '3/4'];
+    public array $pocketOptions = ['tanpa_saku' => 'Tanpa Saku', 'tempel' => 'Tempel', 'bobok' => 'Bobok', 'double' => 'Double Saku'];
+    public array $buttonOptions = ['biasa' => 'Biasa', 'snap' => 'Snap/Tertutup'];
 
     public function mount($items = [], $orderId = null)
     {
@@ -40,18 +59,33 @@ class OrderItemsSpreadsheet extends Component
         // Pre-fetch options to keep the view clean
         $this->materialOptions = Material::pluck('name', 'id')->toArray();
         $this->sizeOptions = \App\Filament\Resources\Orders\OrderResource::getStoreSizeOptions();
+        
+        // Initialize bulkSzQty
+        foreach ($this->sizeOptions as $key => $label) {
+            $this->bulkSzQty[$key] = 0;
+        }
     }
 
     public function addItem()
     {
         $this->items[] = [
-            'id' => null,
+            'id' => (string) \Illuminate\Support\Str::uuid(),
             'product_name' => '',
             'production_category' => 'produksi',
-            'size' => 'M', // Default
+            'size' => 'M', 
             'bahan_baju' => array_key_first($this->materialOptions),
             'price' => 0,
             'quantity' => 1,
+            // Garment Specs
+            'gender' => 'L',
+            'sleeve_model' => 'pendek',
+            'pocket_model' => 'tanpa_saku',
+            'button_model' => 'biasa',
+            'is_tunic' => false,
+            'tunic_fee' => 0,
+            'measurements' => [
+                'LD' => null, 'PB' => null, 'PL' => null, 'LB' => null, 'LP' => null, 'LPh' => null
+            ],
         ];
         
         $this->updatedItems();
@@ -81,29 +115,92 @@ class OrderItemsSpreadsheet extends Component
      */
     public function generateBulk()
     {
-        if (!$this->bulkMaterial || empty($this->bulkSizes)) {
-            Notification::make()->title('Pilih bahan dan size terlebih dahulu')->danger()->send();
+        $material = Material::find($this->bulkMaterial);
+        $materialName = $material ? $material->name : '';
+        $bahanId = $this->bulkMaterial ?: null;
+        $price = (int) $this->bulkPrice;
+
+        $generatedCount = 0;
+
+        // Generate normally sized items
+        foreach ($this->bulkSzQty as $sizeKey => $qty) {
+            $qty = (int) $qty;
+            if ($qty > 0) {
+                for ($i = 0; $i < $qty; $i++) {
+                    $this->items[] = [
+                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                        'product_name' => $materialName,
+                        'production_category' => $this->bulkCategory,
+                        'size' => $sizeKey,
+                        'bahan_baju' => $bahanId,
+                        'price' => $price,
+                        'quantity' => 1,
+                        // Apply bulk garment specs
+                        'gender' => $this->bulkGender,
+                        'sleeve_model' => $this->bulkSleeve,
+                        'pocket_model' => $this->bulkPocket,
+                        'button_model' => $this->bulkButtons,
+                        'is_tunic' => (bool)$this->bulkIsTunic,
+                        'tunic_fee' => (int)$this->bulkTunicFee,
+                        'measurements' => [
+                            'LD' => null, 'PB' => null, 'PL' => null, 'LB' => null, 'LP' => null, 'LPh' => null
+                        ],
+                    ];
+                    $generatedCount++;
+                }
+            }
+        }
+
+        // Generate Custom (Ukur Badan) sized items
+        $customQty = (int) $this->bulkCustomQty;
+        if ($customQty > 0) {
+            for ($i = 0; $i < $customQty; $i++) {
+                $this->items[] = [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'product_name' => $materialName,
+                    'production_category' => 'custom',
+                    'size' => 'Custom',
+                    'bahan_baju' => $bahanId,
+                    'price' => $price,
+                    'quantity' => 1,
+                    // Apply bulk garment specs
+                    'gender' => $this->bulkGender,
+                    'sleeve_model' => $this->bulkSleeve,
+                    'pocket_model' => $this->bulkPocket,
+                    'button_model' => $this->bulkButtons,
+                    'is_tunic' => (bool)$this->bulkIsTunic,
+                    'tunic_fee' => (int)$this->bulkTunicFee,
+                    'measurements' => [
+                        'LD' => null, 'PB' => null, 'PL' => null, 'LB' => null, 'LP' => null, 'LPh' => null
+                    ],
+                ];
+                $generatedCount++;
+            }
+        }
+        
+        if ($generatedCount === 0) {
+            Notification::make()->title('Isi setidaknya satu Qty yang valid')->warning()->send();
             return;
         }
 
-        $material = Material::find($this->bulkMaterial);
-        if (!$material) return;
-
-        foreach ($this->bulkSizes as $size) {
-            $this->items[] = [
-                'id' => null,
-                'product_name' => $material->name,
-                'production_category' => $this->bulkCategory,
-                'size' => $size,
-                'bahan_baju' => $this->bulkMaterial,
-                'price' => $material->price ?? 0,
-                'quantity' => (int) $this->bulkQty,
-            ];
+        // Reset Qty fields and modal
+        foreach ($this->sizeOptions as $key => $label) {
+            $this->bulkSzQty[$key] = 0;
         }
-        
+        $this->bulkCustomQty = 0;
+        $this->bulkPrice = 0;
+        $this->bulkMaterial = null;
+        $this->bulkCategory = 'produksi';
+        $this->bulkGender = 'L';
+        $this->bulkSleeve = 'pendek';
+        $this->bulkPocket = 'tanpa_saku';
+        $this->bulkButtons = 'biasa';
+        $this->bulkIsTunic = false;
+        $this->bulkTunicFee = 0;
+
         $this->showBulkModal = false;
         $this->updatedItems();
-        Notification::make()->title('Item berhasil digenerate massal')->success()->send();
+        Notification::make()->title($generatedCount . ' item berhasil digenerate massal')->success()->send();
     }
 
     public function applyBulkPrice()
@@ -114,6 +211,25 @@ class OrderItemsSpreadsheet extends Component
         $this->showPriceModal = false;
         $this->updatedItems();
         Notification::make()->title('Harga semua item berhasil diupdate')->success()->send();
+    }
+
+    /**
+     * Item Detail Logic
+     */
+    public function openDetail($index)
+    {
+        $this->editingIndex = $index;
+        $this->editingItem = $this->items[$index];
+        $this->showDetailModal = true;
+    }
+
+    public function saveDetail()
+    {
+        $this->items[$this->editingIndex] = $this->editingItem;
+        $this->showDetailModal = false;
+        $this->editingIndex = null;
+        $this->updatedItems();
+        Notification::make()->title('Uraian item berhasil disimpan')->success()->send();
     }
 
     public function updatedItems()

@@ -115,6 +115,13 @@ class OrderItem extends Model
 
     protected $appends = [
         'bahan_baju',
+        'gender',
+        'sleeve_model',
+        'pocket_model',
+        'button_model',
+        'is_tunic',
+        'tunic_fee',
+        'measurements',
         'sablon_jenis',
         'sablon_lokasi',
         'varian_ukuran',
@@ -130,7 +137,44 @@ class OrderItem extends Model
 
     public function getBahanBajuAttribute()
     {
-        return $this->size_and_request_details['bahan'] ?? null;
+        return $this->bahan_id ?: ($this->size_and_request_details['bahan'] ?? null);
+    }
+
+    public function getGenderAttribute()
+    {
+        return $this->size_and_request_details['gender'] ?? 'L';
+    }
+
+    public function getSleeveModelAttribute()
+    {
+        return $this->size_and_request_details['sleeve_model'] ?? 'pendek';
+    }
+
+    public function getPocketModelAttribute()
+    {
+        return $this->size_and_request_details['pocket_model'] ?? 'tanpa_saku';
+    }
+
+    public function getButtonModelAttribute()
+    {
+        return $this->size_and_request_details['button_model'] ?? 'biasa';
+    }
+
+    public function getIsTunicAttribute()
+    {
+        return (bool) ($this->size_and_request_details['is_tunic'] ?? false);
+    }
+
+    public function getTunicFeeAttribute()
+    {
+        return (int) ($this->size_and_request_details['tunic_fee'] ?? 0);
+    }
+
+    public function getMeasurementsAttribute()
+    {
+        return $this->size_and_request_details['measurements'] ?? [
+            'LD' => null, 'PB' => null, 'PL' => null, 'LB' => null, 'LP' => null, 'LPh' => null
+        ];
     }
 
     public function getSablonJenisAttribute()
