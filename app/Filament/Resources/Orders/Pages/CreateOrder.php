@@ -20,6 +20,7 @@ class CreateOrder extends CreateRecord
             foreach ($items as $item) {
                 $this->record->orderItems()->create([
                     'product_name' => $item['product_name'] ?? '',
+                    'recipient_name' => $item['person_name'] ?? null,
                     'production_category' => $item['production_category'] ?? 'produksi',
                     'size' => $item['size'] ?? 'M',
                     'bahan_id' => $item['bahan_baju'] ?? null,
@@ -35,7 +36,12 @@ class CreateOrder extends CreateRecord
                         'tunic_fee' => $item['tunic_fee'] ?? 0,
                         'measurements' => $item['measurements'] ?? [],
                         'bahan' => $item['bahan_baju'] ?? null, // Duplicated for legacy compatibility
+                        'warna' => $item['warna'] ?? '',
                         'size' => $item['size'] ?? 'M', // Duplicated for legacy compatibility
+                        'material_details' => [
+                            'bahan' => $item['bahan_baju'] ? (\App\Models\Material::find($item['bahan_baju'])->name ?? '') : '',
+                            'warna' => $item['warna'] ?? '',
+                        ],
                     ],
                 ]);
             }

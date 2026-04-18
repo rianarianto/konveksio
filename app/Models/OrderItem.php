@@ -19,6 +19,7 @@ class OrderItem extends Model
         'production_category',
         'size',
         'bahan_id',
+        'recipient_name',
         'size_and_request_details',
         'design_status',
         'design_image',

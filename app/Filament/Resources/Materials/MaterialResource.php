@@ -7,6 +7,9 @@ use App\Models\Supplier;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\ColorPicker;
+use Filament\Schemas\Components\Grid;
+use Filament\Forms\Components\Repeater;
+use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
@@ -47,80 +50,95 @@ class MaterialResource extends Resource
     {
         return $schema
             ->components([
-                TextInput::make('name')
-                    ->label('Nama Bahan')
-                    ->placeholder('Contoh: Cotton Combed 30s')
-                    ->required()
-                    ->maxLength(255),
-
-                TextInput::make('type')
-                    ->label('Jenis Bahan')
-                    ->placeholder('Contoh: Kain, Benang, Kancing')
-                    ->maxLength(255),
-
-                Select::make('unit')
-                    ->label('Satuan')
-                    ->options([
-                        'Kg' => 'Kg',
-                        'Meter' => 'Meter',
-                        'Roll' => 'Roll',
-                        'Yard' => 'Yard',
-                        'Pcs' => 'Pcs',
-                        'Lusin' => 'Lusin',
-                    ])
-                    ->default('Kg')
-                    ->required(),
-
-                ColorPicker::make('color_code')
-                    ->label('Warna'),
-
-                TextInput::make('current_stock')
-                    ->label('Stok Saat Ini')
-                    ->numeric()
-                    ->default(0)
-                    ->required()
-                    ->placeholder('0')
-                    ->suffix(fn($get) => $get('unit') ?? 'Kg'),
-
-                TextInput::make('min_stock')
-                    ->label('Stok Minimal (Peringatan)')
-                    ->numeric()
-                    ->default(0)
-                    ->required()
-                    ->placeholder('0')
-                    ->helperText('Sistem akan memberi peringatan jika stok di bawah angka ini.')
-                    ->suffix(fn($get) => $get('unit') ?? 'Kg'),
-
-                Select::make('supplier_id')
-                    ->label('Supplier')
-                    ->relationship('supplier', 'name')
-                    ->searchable()
-                    ->preload()
-                    ->createOptionForm([
+                Section::make('Informasi Dasar Bahan')
+                    ->columns(2)
+                    ->schema([
                         TextInput::make('name')
-                            ->label('Nama Supplier')
-                            ->required(),
-                        TextInput::make('phone')
-                            ->label('No. HP')
-                            ->tel(),
-                        Select::make('type')
-                            ->label('Kategori')
+                            ->label('Nama Bahan')
+                            ->placeholder('Contoh: Cotton Combed 30s')
+                            ->required()
+                            ->maxLength(255),
+
+                        TextInput::make('type')
+                            ->label('Jenis Bahan')
+                            ->placeholder('Contoh: Kain, Benang, Kancing')
+                            ->maxLength(255),
+
+                        Select::make('unit')
+                            ->label('Satuan')
                             ->options([
-                                'Kain' => '🧵 Kain',
-                                'Aksesoris' => '🪡 Aksesoris',
-                                'Baju Jadi' => '👕 Baju Jadi',
-                                'Lainnya' => '📦 Lainnya',
-                            ]),
-                    ])
-                    ->createOptionUsing(function (array $data): int {
-                        return Supplier::create([
-                            'shop_id' => Filament::getTenant()->id,
-                            'name' => $data['name'],
-                            'phone' => $data['phone'] ?? null,
-                            'type' => $data['type'] ?? null,
-                        ])->getKey();
-                    })
-                    ->nullable(),
+                                'Kg' => 'Kg',
+                                'Meter' => 'Meter',
+                                'Roll' => 'Roll',
+                                'Yard' => 'Yard',
+                                'Pcs' => 'Pcs',
+                                'Lusin' => 'Lusin',
+                            ])
+                            ->default('Kg')
+                            ->required(),
+
+                        Select::make('supplier_id')
+                            ->label('Supplier')
+                            ->relationship('supplier', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->createOptionForm([
+                                TextInput::make('name')
+                                    ->label('Nama Supplier')
+                                    ->required(),
+                                TextInput::make('phone')
+                                    ->label('No. HP')
+                                    ->tel(),
+                                Select::make('type')
+                                    ->label('Kategori')
+                                    ->options([
+                                        'Kain' => '🧵 Kain',
+                                        'Aksesoris' => '🪡 Aksesoris',
+                                        'Baju Jadi' => '👕 Baju Jadi',
+                                        'Lainnya' => '📦 Lainnya',
+                                    ]),
+                            ])
+                            ->createOptionUsing(function (array $data): int {
+                                return \App\Models\Supplier::create([
+                                    'shop_id' => Filament::getTenant()->id,
+                                    'name' => $data['name'],
+                                    'phone' => $data['phone'] ?? null,
+                                    'type' => $data['type'] ?? null,
+                                ])->getKey();
+                            })
+                            ->nullable(),
+                    ]),
+
+                Section::make('Varian Warna & Stok')
+                    ->schema([
+                        Repeater::make('variants')
+                            ->label('Daftar Warna')
+                            ->relationship()
+                            ->schema([
+                                Grid::make(4)
+                                    ->schema([
+                                        TextInput::make('color_name')
+                                            ->label('Nama Warna')
+                                            ->placeholder('misal: Navy Blue')
+                                            ->required(),
+                                        ColorPicker::make('color_code')
+                                            ->label('Visual'),
+                                        TextInput::make('current_stock')
+                                            ->label('Stok Saat Ini')
+                                            ->numeric()
+                                            ->default(0)
+                                            ->required(),
+                                        TextInput::make('min_stock')
+                                            ->label('Stok Min.')
+                                            ->numeric()
+                                            ->default(0)
+                                            ->required(),
+                                    ]),
+                            ])
+                            ->collapsible()
+                            ->defaultItems(1)
+                            ->itemLabel(fn(array $state): ?string => $state['color_name'] ?? null),
+                    ]),
             ]);
     }
 
@@ -136,17 +154,42 @@ class MaterialResource extends Resource
                 TextColumn::make('type')
                     ->label('Jenis')
                     ->searchable(),
-                ColorColumn::make('color_code')
-                    ->label('Warna'),
-                TextColumn::make('current_stock')
-                    ->label('Stok')
-                    ->formatStateUsing(fn($record) => number_format($record->current_stock, 0, ',', '.') . ' ' . $record->unit)
-                    ->sortable()
-                    ->color(fn($record) => $record->current_stock <= $record->min_stock ? 'danger' : null),
-                TextColumn::make('min_stock')
-                    ->label('Min')
-                    ->formatStateUsing(fn($record) => number_format($record->min_stock, 0, ',', '.') . ' ' . $record->unit)
-                    ->sortable(),
+
+                TextColumn::make('variants_summary')
+                    ->label('Warna & Stok')
+                    ->getStateUsing(function ($record) {
+                        $variants = collect($record->variants);
+                        $count = $variants->count();
+                        $limit = 6;
+                        $display = $variants->take($limit);
+
+                        $html = '<div class="flex flex-wrap gap-1.5 py-1">';
+                        foreach ($display as $v) {
+                            $dot = $v->color_code ? "<span class='w-2 h-2 rounded-full border border-black/10 shrink-0' style='background-color:{$v->color_code}'></span>" : "";
+                            $stock = number_format($v->current_stock, 0, ',', '.');
+                            $html .= "<div class='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-50 border border-gray-200 shadow-sm whitespace-nowrap'>";
+                            $html .= $dot;
+                            $html .= "<span class='text-[10px] font-bold text-gray-700'>{$v->color_name}</span>";
+                            $unit = match ($record->unit) {
+                                'Meter' => 'M',
+                                'Kg' => 'Kg',
+                                'Lusin' => 'Lsn',
+                                default => strtolower($record->unit),
+                            };
+                            $html .= "<span class='text-[10px] font-black text-primary-600 border-l border-gray-200 pl-1.5'>{$stock} {$unit}</span>";
+                            $html .= "</div>";
+                        }
+
+                        if ($count > $limit) {
+                            $remaining = $count - $limit;
+                            $html .= "<span class='text-[10px] font-bold text-gray-400 py-0.5 px-1 whitespace-nowrap'>+{$remaining} lainnya</span>";
+                        }
+
+                        $html .= '</div>';
+                        return $html;
+                    })
+                    ->html()
+                    ->searchable(['variants.color_name']),
                 TextColumn::make('supplier.name')
                     ->label('Supplier')
                     ->placeholder('—'),

@@ -105,6 +105,12 @@ class ControlProduksiResource extends Resource
                         default => '🏭 Produksi',
                     }),
 
+                TextColumn::make('recipient_name')
+                    ->label('Penerima')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('-'),
+
                 TextColumn::make('quantity')
                     ->label('Qty')
                     ->numeric()

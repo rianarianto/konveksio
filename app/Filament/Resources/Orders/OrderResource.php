@@ -90,18 +90,22 @@ class OrderResource extends Resource
         if (!$tenantId)
             return [];
 
-        $materials = Material::where('shop_id', $tenantId)->get();
+        $variants = \App\Models\MaterialVariant::join('materials', 'material_variants.material_id', '=', 'materials.id')
+            ->where('materials.shop_id', $tenantId)
+            ->select('material_variants.*', 'materials.name as material_name', 'materials.unit', 'materials.type')
+            ->get();
+
         $options = [];
-        foreach ($materials as $material) {
-            $hex = $material->color_code ?: '#e5e7eb';
-            $label = $material->name . ($material->type ? " ({$material->type})" : '');
+        foreach ($variants as $variant) {
+            $hex = $variant->color_code ?: '#e5e7eb';
+            $label = $variant->material_name . ($variant->color_name ? " - {$variant->color_name}" : "") . ($variant->type ? " ({$variant->type})" : '');
 
             $stockInfo = '';
-            if ($material->current_stock > 0) {
-                $stockInfo = ' <small style="color:#7c3aed;font-weight:700;margin-left:4px;">(Stok: ' . $material->current_stock . ' ' . $material->unit . ')</small>';
+            if ($variant->current_stock > 0) {
+                $stockInfo = ' <small style="color:#7c3aed;font-weight:700;margin-left:4px;">(Stok: ' . $variant->current_stock . ' ' . $variant->unit . ')</small>';
             }
 
-            $options[$material->id] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
+            $options[$variant->id] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
                 . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $hex . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
                 . '<span>' . htmlspecialchars($label) . $stockInfo . '</span>'
                 . '</span>';
@@ -176,7 +180,6 @@ class OrderResource extends Resource
         'Lengan Kanan' => 'Lengan Kanan',
         'Lengan Kiri + Lengan Kanan' => 'Lengan Kiri + Lengan Kanan',
         'Lengan Kiri + Lengan Kanan + Punggung' => 'Lengan Kiri + Lengan Kanan + Punggung',
-        'Dada Kiri + Lengan Kanan + Punggung' => 'Dada Kiri + Lengan Kanan + Punggung',
         'Dada Kanan + Lengan Kiri + Punggung' => 'Dada Kanan + Lengan Kiri + Punggung',
         'Full (Dada Ka/Ki + Lengan Ka/Ki + Punggung)' => 'Full (Dada Ka/Ki + Lengan Ka/Ki + Punggung)',
         'Lainnya' => 'Lainnya',
@@ -186,7 +189,7 @@ class OrderResource extends Resource
     {
         return $schema
             ->components([
-                // LEFT SIDE (Main Content) - 2 columns
+                // MAIN CONTAINER - Expanded to full width
                 Group::make([
                     // Section 1: Data Pesanan
                     Section::make('Data Pesanan')
@@ -309,18 +312,16 @@ class OrderResource extends Resource
                         ])
                         ->columns(2),
 
-                    // Section 3: Spreadsheet Produk (TABEL STATELESS)
+                    // Section 3: Spreadsheet Produk
                     Section::make('Daftar Produk / Item Pesanan')
                         ->description('Input produk pesanan di sini secara fleksibel. Klik "Simpan" di akhir untuk memasukkan ke database.')
                         ->icon('heroicon-o-table-cells')
                         ->schema([
-                            // Hidden field to store JSON payload from spreadsheet
                             Hidden::make('order_items_payload')
                                 ->id('order_items_payload')
                                 ->live(),
 
                             \Filament\Schemas\Components\Livewire::make(\App\Livewire\OrderItemsSpreadsheet::class, function (Get $get, ?Order $record) {
-                                // For Edit mode, we pre-fill from database if payload is empty
                                 $items = [];
                                 if ($record) {
                                     $items = $record->orderItems()->get()->toArray();
@@ -394,7 +395,7 @@ class OrderResource extends Resource
                                             ->prefix('Rp')
                                             ->placeholder('0')
                                             ->live()
-                                            ->dehydrated(false) // Virtual field
+                                            ->dehydrated(false)
                                             ->helperText('Kosongkan jika belum ada pembayaran'),
 
                                         Select::make('initial_payment_method')
@@ -405,7 +406,7 @@ class OrderResource extends Resource
                                                 'qris' => 'QRIS',
                                             ])
                                             ->default('cash')
-                                            ->dehydrated(false), // Virtual field
+                                            ->dehydrated(false),
                                     ])->columns(2),
 
                                     FileUpload::make('initial_payment_proof')
@@ -413,7 +414,7 @@ class OrderResource extends Resource
                                         ->image()
                                         ->disk('public')
                                         ->directory('payments/proofs')
-                                        ->dehydrated(false) // Virtual field
+                                        ->dehydrated(false)
                                         ->openable()
                                         ->downloadable()
                                         ->previewable()
@@ -436,30 +437,20 @@ class OrderResource extends Resource
                                         })
                                         ->saveUploadedFileUsing(function (TemporaryUploadedFile $file): string {
                                             $mimeType = $file->getMimeType();
-
-                                            // PDF - simpan langsung tanpa kompres
                                             if ($mimeType === 'application/pdf') {
                                                 $filename = Str::uuid() . '.pdf';
                                                 $path = 'payments/proofs/' . $filename;
                                                 Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
                                                 return $path;
                                             }
-
-                                            // Gambar - kompres dengan Intervention Image
                                             $img = Image::read($file->getRealPath());
-
-                                            // Resize jika lebar > 1920px (pertahankan aspek rasio)
                                             if ($img->width() > 1920) {
                                                 $img->scaleDown(width: 1920);
                                             }
-
-                                            // Encode ke JPEG quality 75
                                             $encoded = $img->toJpeg(quality: 75);
-
                                             $filename = Str::uuid() . '.jpg';
                                             $path = 'payments/proofs/' . $filename;
                                             Storage::disk('public')->put($path, (string) $encoded);
-
                                             return $path;
                                         }),
 
@@ -471,14 +462,9 @@ class OrderResource extends Resource
                                             }
                                             $total = (int) ($get('total_price') ?? 0);
                                             $initial = (int) ($get('initial_payment_amount') ?? 0);
-                                            // Jika sedang edit, total paid dari database + initial yang sedang diinput (jika baru)
-                                            // Namun record pembayaran pertama biasanya sudah masuk ke initial_payment_amount saat fill data
-                                            // Jadi kita hitung dari total - initial (virtual)
-                                
                                             $remaining = $total - $initial;
                                             $color = $remaining > 0 ? '#ef4444' : '#22c55e';
                                             $text = $remaining > 0 ? 'Rp ' . number_format($remaining, 0, ',', '.') : 'Lunas';
-
                                             return new HtmlString('<span style="font-size:18px; font-weight:800; color:' . $color . '">' . $text . '</span>');
                                         })
                                 ])
@@ -486,11 +472,8 @@ class OrderResource extends Resource
                                 ->collapsible(),
 
                         ]),
-                ])
-                    ->columnSpan(['lg' => 2, 'default' => 1]),
 
-                // SIDEBAR - Ringkasan Pesanan
-                Group::make([
+                    // Section 5: Status & Ringkasan (MOVED FROM SIDEBAR)
                     Section::make('Status & Ringkasan')
                         ->schema([
                             Select::make('status')
@@ -513,14 +496,11 @@ class OrderResource extends Resource
                                 ->label(false)
                                 ->content(function (Get $get, ?Order $record): HtmlString {
                                     $fmt = fn(int $v) => 'Rp ' . number_format($v, 0, ',', '.');
-                                    // READ FROM SPREADSHEET PAYLOAD (STATELASS/JSON)
                                     $payload = $get('order_items_payload');
                                     $itemsState = $payload ? json_decode($payload, true) : [];
-                                    
                                     $subtotal = 0;
                                     $itemsHtml = '';
                                     $hasItems = false;
-                                    
                                     foreach ($itemsState as $item) {
                                         $name = htmlspecialchars($item['product_name'] ?? 'Pilih Produk...');
                                         $price = (int) ($item['price'] ?? 0);
@@ -529,7 +509,6 @@ class OrderResource extends Resource
                                         $subtotal += $itemTotal;
                                         $hasItems = true;
                                         $cat = $item['production_category'] ?? 'produksi';
-                                        
                                         $badgeStyle = 'background:#f3e8ff;color:#7c3aed;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;';
                                         $badgeLabel = match ($cat) {
                                             'custom' => 'Custom',
@@ -538,7 +517,6 @@ class OrderResource extends Resource
                                             default => 'Produksi',
                                         };
                                         $badge = '<span style="' . $badgeStyle . '">' . $badgeLabel . '</span>';
-                                        
                                         $sizeLabel = ($item['size'] ?? null) ? ' (' . htmlspecialchars($item['size']) . ')' : '';
                                         $itemsHtml .= '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e9d5ff;border-radius:10px;background:#faf5ff;margin-bottom:8px;">';
                                         $itemsHtml .= $badge;
@@ -547,26 +525,20 @@ class OrderResource extends Resource
                                         $itemsHtml .= '<div style="font-size:12px;color:#7c3aed;">' . $fmt($itemTotal) . '</div>';
                                         $itemsHtml .= '</div></div>';
                                     }
-
                                     if (!$hasItems) {
                                         $itemsHtml = '<p style="color:#9ca3af;font-size:13px;">Belum ada produk ditambahkan</p>';
                                     }
-
                                     $shipping = (int) ($get('shipping_cost') ?? 0);
                                     $tax = (int) ($get('tax') ?? 0);
                                     $discount = (int) ($get('discount') ?? 0);
                                     $isExpress = (bool) $get('is_express');
                                     $expressFeeVal = (int) ($get('express_fee') ?? 0);
-                                    
                                     $total = max(0, $subtotal + $tax + $shipping + ($isExpress ? $expressFeeVal : 0) - $discount);
-
-                                    // Hitung total bayar (jika edit)
                                     $totalPaid = 0;
                                     $paymentsHtml = '';
                                     if ($record) {
                                         $payments = $record->payments()->orderBy('payment_date', 'asc')->get();
                                         $totalPaid = (int) $payments->sum('amount');
-
                                         foreach ($payments as $index => $pay) {
                                             $methodLabel = match ($pay->payment_method) {
                                                 'transfer' => 'TF',
@@ -582,16 +554,13 @@ class OrderResource extends Resource
                                         $initial = (int) ($get('initial_payment_amount') ?? 0);
                                         $totalPaid = $initial;
                                     }
-
                                     $remaining = $total - $totalPaid;
                                     $row = fn(string $label, string $value, bool $purple = false, bool $bold = false) =>
                                         '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">'
                                         . '<span style="color:#6b7280;font-size:14px;">' . $label . '</span>'
                                         . '<span style="font-size:14px;' . ($purple ? 'color:#7c3aed;' : 'color:#374151;') . ($bold ? 'font-weight:700;' : '') . '">' . $value . '</span>'
                                         . '</div>';
-
                                     $divider = '<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">';
-
                                     $remainingLabel = $remaining <= 0
                                         ? '<span style="background:#22c55e;color:white;font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;">Lunas</span>'
                                         : '<span style="color:#7c3aed;font-weight:700;font-size:14px;">' . $fmt($remaining) . '</span>';
@@ -615,7 +584,6 @@ class OrderResource extends Resource
                                     $html .= '<span style="color:#6b7280;font-size:14px;">Sisa</span>';
                                     $html .= $remainingLabel;
                                     $html .= '</div>';
-                                    
                                     if ($record) {
                                         $html .= '<div style="margin-top:20px; text-align:center;">'
                                             . '<a href="' . route('orders.receipt', $record) . '" target="_blank" style="display:block; text-align:center; padding:10px; background:#f3f4f6; color:#4b5563; border-radius:10px; text-decoration:none; font-weight:700; font-size:12px; border:1px solid #e5e7eb; transition:all 0.2s;">'
@@ -623,20 +591,16 @@ class OrderResource extends Resource
                                             . '</a>'
                                             . '</div>';
                                     }
-
                                     $html .= '</div></div>';
-
                                     return new HtmlString($html);
                                 })
                                 ->columnSpanFull(),
                         ])
-                        ->columns(1)
-                        ->extraAttributes(['style' => 'position:sticky;']),
+                        ->columns(1),
                 ])
-                    ->columnSpan(['lg' => 1, 'default' => 1])
-                    ->extraAttributes(['style' => 'align-self:flex-start;position:sticky;top:5rem;']),
+                ->columnSpanFull(),
             ])
-            ->columns(['lg' => 3, 'default' => 1]);
+            ->columns(1);
     }
 
     // Hitung total satu item dari Get $get (saat live form)

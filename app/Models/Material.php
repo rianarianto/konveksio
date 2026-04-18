@@ -12,11 +12,13 @@ class Material extends Model
         'category',
         'type',
         'unit',
-        'color_code',
-        'current_stock',
-        'min_stock',
         'supplier_id',
     ];
+
+    public function variants()
+    {
+        return $this->hasMany(MaterialVariant::class);
+    }
 
     public function shop()
     {
