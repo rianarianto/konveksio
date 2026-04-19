@@ -5,8 +5,74 @@
                     input.value = payload;
                     input.dispatchEvent(new Event('input'));
                 }
+        },
+        flashCell(el) {
+            el.classList.add('cell-flash');
+            setTimeout(() => el.classList.remove('cell-flash'), 800);
         }
     }" @spreadsheet-updated.window="updatePayload($event.detail.payload)">
+
+    {{-- Ghost Input & Flash Animation Styles --}}
+    <style>
+        /* Ghost Inputs: transparent by default, visible on hover/focus */
+        .ghost-input {
+            border-color: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            transition: all 0.2s ease;
+        }
+        .ghost-input:hover {
+            border-color: #d1d5db !important;
+            background-color: #fff !important;
+            box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05) !important;
+        }
+        .ghost-input:focus {
+            border-color: #6366f1 !important;
+            background-color: #fff !important;
+            box-shadow: 0 0 0 2px rgba(99,102,241,0.15) !important;
+        }
+
+        /* Flash animation when a cell value changes */
+        @keyframes cellFlash {
+            0%   { background-color: rgba(250, 204, 21, 0.4); }
+            100% { background-color: transparent; }
+        }
+        .cell-flash {
+            animation: cellFlash 0.8s ease-out forwards;
+            border-radius: 6px;
+        }
+
+        /* Active row highlight */
+        tr:has(.ghost-input:focus) {
+            background-color: rgba(99, 102, 241, 0.04) !important;
+        }
+
+        /* Thin column dividers for spreadsheet grid feel */
+        .spreadsheet-grid th:not(:last-child),
+        .spreadsheet-grid td:not(:last-child) {
+            border-right: 1px solid #f3f4f6;
+        }
+        .spreadsheet-grid thead th:not(:last-child) {
+            border-right: 1px solid #e5e7eb;
+        }
+
+        /* Hide number input arrows (spinners) */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        /* Ensure placeholder is clean and not italic */
+        input::placeholder {
+            font-style: normal !important;
+            opacity: 0.4;
+        }
+    </style>
     <!-- Header Actions -->
     <!-- Toolbar Utama -->
     <div class="p-5 bg-white rounded-2xl shadow-sm border border-gray-200 space-y-4">
@@ -30,6 +96,20 @@
                     outlined>
                     {{ $useRecipientNames ? 'Mode: Pakai Nama' : 'Mode: Gabung Qty' }}
                 </x-filament::button>
+
+                {{-- Undo Button --}}
+                @if(count($undoStack) > 0)
+                    <div class="h-8 w-px bg-gray-200 mx-1"></div>
+                    <x-filament::button 
+                        wire:click="undo" 
+                        icon="heroicon-m-arrow-uturn-left" 
+                        color="gray"
+                        outlined
+                        size="sm">
+                        Undo
+                        <span class="ml-1 text-[9px] font-black bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full">{{ count($undoStack) }}</span>
+                    </x-filament::button>
+                @endif
             </div>
 
             <!-- Right Side: Analytics & Quick Actions -->
@@ -105,13 +185,16 @@
     <!-- Table Container -->
     <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden min-h-[400px]">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 table-fixed">
+            <table class="divide-y divide-gray-200 spreadsheet-grid" style="min-width: {{ $useRecipientNames ? '1280px' : '1100px' }}">
                 <thead class="bg-gray-50 border-b border-gray-200">
                     <tr>
                         <th class="w-12 px-3 py-3 text-center">
+                            @php
+                                $allSelected = count($displayIds) > 0 && count(array_intersect($selectedItems, $displayIds)) === count($displayIds);
+                            @endphp
                             <input type="checkbox" 
                                 @click="$wire.toggleSelectAll(JSON.stringify(@js($displayIds)))"
-                                {{ count(array_intersect($selectedItems, $displayIds)) === count($displayIds) && count($displayIds) > 0 ? 'checked' : '' }}
+                                x-bind:checked="{{ $allSelected ? 'true' : 'false' }}"
                                 class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer">
                         </th>
                         @if($useRecipientNames)
@@ -217,7 +300,8 @@
                                             <td class="px-4 py-4">
                                                 <input type="text" wire:model.blur="items.{{ $actualIndex }}.person_name"
                                                     placeholder="Nama Penerima..."
-                                                    class="w-full text-xs font-bold text-gray-950 bg-white border border-gray-200 rounded-md px-2 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors shadow-sm placeholder-gray-300">
+                                                    x-on:change="flashCell($el.parentElement)"
+                                                    class="ghost-input w-full text-xs font-bold text-gray-950 border border-transparent rounded-md px-2 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors placeholder-gray-300">
                                             </td>
                                             @endif
 
@@ -227,7 +311,8 @@
                                                 @else
                                                     <div class="flex items-center gap-2">
                                                         <select wire:model.live="items.{{ $actualIndex }}.size"
-                                                            class="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors shadow-sm cursor-pointer">
+                                                            x-on:change="flashCell($el.parentElement.parentElement)"
+                                                            class="ghost-input w-full text-xs font-semibold text-gray-700 border border-transparent rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors cursor-pointer">
                                                             @foreach($sizeOptions as $val => $label)
                                                                 <option value="{{ $val }}">{{ $label === 'Custom' ? 'Custom' : $label }}</option>
                                                             @endforeach
@@ -256,7 +341,8 @@
                                                                 style="background-color: {{ $selectedMat['color_code'] }};"></div>
                                                         @endif
                                                         <select wire:model.live="items.{{ $actualIndex }}.bahan_baju"
-                                                            class="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors shadow-sm cursor-pointer">
+                                                            x-on:change="flashCell($el.parentElement.parentElement)"
+                                                            class="ghost-input w-full text-xs font-semibold text-gray-700 border border-transparent rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors cursor-pointer">
                                                             <option value="">-- Pilih --</option>
                                                             @foreach($materialOptions as $id => $mat)
                                                                 <option value="{{ $id }}">{{ $mat['name'] }}</option>
@@ -270,7 +356,9 @@
 
                                             <td class="px-3 py-4">
                                                 @if($item['production_category'] === 'produksi')
-                                                    <select wire:model.live="items.{{ $actualIndex }}.gender" class="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors shadow-sm cursor-pointer">
+                                                    <select wire:model.live="items.{{ $actualIndex }}.gender" 
+                                                        x-on:change="flashCell($el.parentElement)"
+                                                        class="ghost-input w-full text-xs font-semibold text-gray-700 border border-transparent rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors cursor-pointer">
                                                         <option value="L">L</option>
                                                         <option value="P">P</option>
                                                     </select>
@@ -280,7 +368,9 @@
                                             </td>
                                             <td class="px-3 py-4">
                                                 @if($item['production_category'] === 'produksi')
-                                                    <select wire:model.live="items.{{ $actualIndex }}.sleeve_model" class="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors shadow-sm cursor-pointer">
+                                                    <select wire:model.live="items.{{ $actualIndex }}.sleeve_model" 
+                                                        x-on:change="flashCell($el.parentElement)"
+                                                        class="ghost-input w-full text-xs font-semibold text-gray-700 border border-transparent rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors cursor-pointer">
                                                         @foreach($sleeveOptions as $val => $label) <option value="{{ $val }}">{{ $label }}</option> @endforeach
                                                     </select>
                                                 @else
@@ -289,7 +379,9 @@
                                             </td>
                                             <td class="px-3 py-4">
                                                 @if($item['production_category'] === 'produksi')
-                                                    <select wire:model.live="items.{{ $actualIndex }}.pocket_model" class="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors shadow-sm cursor-pointer">
+                                                    <select wire:model.live="items.{{ $actualIndex }}.pocket_model" 
+                                                        x-on:change="flashCell($el.parentElement)"
+                                                        class="ghost-input w-full text-xs font-semibold text-gray-700 border border-transparent rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors cursor-pointer">
                                                         @foreach($pocketOptions as $val => $label) <option value="{{ $val }}">{{ $label }}</option> @endforeach
                                                     </select>
                                                 @else
@@ -298,7 +390,9 @@
                                             </td>
                                             <td class="px-3 py-4">
                                                 @if($item['production_category'] === 'produksi')
-                                                    <select wire:model.live="items.{{ $actualIndex }}.button_model" class="w-full text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors shadow-sm cursor-pointer">
+                                                    <select wire:model.live="items.{{ $actualIndex }}.button_model" 
+                                                        x-on:change="flashCell($el.parentElement)"
+                                                        class="ghost-input w-full text-xs font-semibold text-gray-700 border border-transparent rounded-md pl-2 pr-8 py-1.5 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors cursor-pointer">
                                                         @foreach($buttonOptions as $val => $label) <option value="{{ $val }}">{{ $label }}</option> @endforeach
                                                     </select>
                                                 @else
@@ -324,13 +418,14 @@
                                             <td class="px-4 py-4 text-right">
                                                 <div class="flex items-center justify-end">
                                                     <input type="number" wire:model.blur="items.{{ $actualIndex }}.price"
-                                                        class="w-24 text-sm font-bold text-gray-950 bg-white border border-gray-200 rounded-md px-2 py-1.5 text-right focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors shadow-sm">
+                                                        x-on:change="flashCell($el.parentElement)"
+                                                        class="ghost-input w-24 text-sm font-bold text-gray-950 border border-transparent rounded-md px-2 py-1.5 text-right focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors">
                                                 </div>
                                             </td>
 
                                             <td class="px-3 py-4 text-center">
                                                 <button wire:click="removeItem({{ $actualIndex }})" type="button"
-                                                    class="text-gray-300 hover:text-danger-500 p-1 transition-colors opacity-0 group-hover:opacity-100">
+                                                    class="text-danger-400/60 hover:text-danger-600 hover:bg-danger-50 p-1.5 rounded-md transition-all">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                                     </svg>
@@ -535,7 +630,7 @@
                         @foreach($sizeOptions as $val => $label)
                             <div class="flex flex-col border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
                                 <div class="bg-gray-100/50 py-1 text-center border-b border-gray-100">
-                                    <span class="text-[10px] font-bold text-gray-500 uppercase">{{ $label }}</span>
+                                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{{ $label }}</span>
                                 </div>
                                 <input type="number" wire:model="bulkSzQty.{{ $val }}"
                                     class="w-full text-center border-none focus:ring-1 focus:ring-primary-500 text-sm py-2 bg-transparent font-semibold"
@@ -545,8 +640,31 @@
                     </div>
                 </div>
 
+                <!-- HARGA GLOBAL DAN SUMMARY -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Harga Satuan
+                            (Toko)</label>
+                        <x-filament::input.wrapper prefix="Rp" class="shadow-sm">
+                            <x-filament::input type="number" wire:model="bulkPrice" class="font-bold" placeholder="0" />
+                        </x-filament::input.wrapper>
+                        <p class="text-[9px] text-gray-400 mt-1 italic ml-1">*Digunakan jika harga di list orang dikosongkan
+                        </p>
+                    </div>
+
+                    @if($bulkCategory === 'jasa')
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Total
+                                Quantity</label>
+                            <x-filament::input.wrapper suffix="PCS" class="shadow-sm">
+                                <x-filament::input type="number" wire:model="bulkCustomQty" class="font-bold" placeholder="0" />
+                            </x-filament::input.wrapper>
+                        </div>
+                    @endif
+                </div>
+
                 <!-- SEKSI 2: UKUR BADAN / CUSTOM -->
-                <div class="space-y-3 p-4 rounded-xl border border-primary-100 bg-primary-50/10">
+                <div class="space-y-3 p-4 rounded-xl border border-gray-200 bg-gray-50/10">
                     <div class="flex items-center justify-between">
                         <div>
                             <label class="text-xs font-bold text-primary-600 uppercase tracking-widest">Bagian B: Pesanan
@@ -585,34 +703,34 @@
                                     <tbody class="divide-y divide-gray-50">
                                         @foreach($bulkCustomPeople as $index => $person)
                                             <tr class="divide-x divide-gray-50 hover:bg-gray-50/50 transition-colors">
-                                                <td class="px-2 py-1">
+                                                <td class="px-2 py-2">
                                                     <input type="text" wire:model="bulkCustomPeople.{{ $index }}.name"
                                                         placeholder="Nama..."
-                                                        class="w-full text-xs border-0 focus:ring-0 p-1 font-bold bg-transparent">
+                                                        class="w-full text-xs border-transparent bg-transparent focus:border-transparent focus:ring-0 focus:outline-none p-1 font-bold">
                                                 </td>
                                                 <td class="px-1 py-1">
                                                     <input type="number" wire:model="bulkCustomPeople.{{ $index }}.LD"
-                                                        placeholder="0"
-                                                        class="w-full text-xs text-center border-0 focus:ring-0 p-1 bg-transparent">
+                                                        placeholder="cm"
+                                                        class="w-full text-xs text-center border-transparent bg-transparent focus:border-transparent focus:ring-0 focus:outline-none p-1 placeholder-gray-300">
                                                 </td>
                                                 <td class="px-1 py-1">
                                                     <input type="number" wire:model="bulkCustomPeople.{{ $index }}.PB"
-                                                        placeholder="0"
-                                                        class="w-full text-xs text-center border-0 focus:ring-0 p-1 bg-transparent">
+                                                        placeholder="cm"
+                                                        class="w-full text-xs text-center border-transparent bg-transparent focus:border-transparent focus:ring-0 focus:outline-none p-1 placeholder-gray-300">
                                                 </td>
                                                 <td class="px-1 py-1">
                                                     <input type="number" wire:model="bulkCustomPeople.{{ $index }}.PL"
-                                                        placeholder="0"
-                                                        class="w-full text-xs text-center border-0 focus:ring-0 p-1 bg-transparent">
+                                                        placeholder="cm"
+                                                        class="w-full text-xs text-center border-transparent bg-transparent focus:border-transparent focus:ring-0 focus:outline-none p-1 placeholder-gray-300">
                                                 </td>
                                                 <td class="px-1 py-1 text-right">
                                                     <input type="number" wire:model="bulkCustomPeople.{{ $index }}.price"
                                                         placeholder="Default"
-                                                        class="w-full text-xs text-right border-0 focus:ring-0 p-1 font-bold text-primary-600 bg-transparent">
+                                                        class="w-full text-xs text-right border-transparent bg-transparent focus:border-transparent focus:ring-0 focus:outline-none p-1 font-bold text-primary-600 placeholder-gray-300 italic">
                                                 </td>
                                                 <td class="px-1 py-1 text-center">
                                                     <button type="button" wire:click="removeBulkPerson({{ $index }})"
-                                                        class="text-gray-300 hover:text-danger-500">
+                                                        class="text-danger-400/60 hover:text-danger-600 hover:bg-danger-50 p-1 rounded transition-all">
                                                         <x-heroicon-m-x-mark class="w-4 h-4" />
                                                     </button>
                                                 </td>
@@ -632,29 +750,6 @@
                     @endif
                 </div>
             @endif
-
-            <!-- HARGA GLOBAL DAN SUMMARY -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                <div class="space-y-1">
-                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Harga Satuan
-                        (Toko)</label>
-                    <x-filament::input.wrapper prefix="Rp" class="shadow-sm">
-                        <x-filament::input type="number" wire:model="bulkPrice" class="font-bold" />
-                    </x-filament::input.wrapper>
-                    <p class="text-[9px] text-gray-400 mt-1 italic ml-1">*Digunakan jika harga di list orang dikosongkan
-                    </p>
-                </div>
-
-                @if($bulkCategory === 'jasa')
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Total
-                            Quantity</label>
-                        <x-filament::input.wrapper suffix="PCS" class="shadow-sm">
-                            <x-filament::input type="number" wire:model="bulkCustomQty" class="font-bold" />
-                        </x-filament::input.wrapper>
-                    </div>
-                @endif
-            </div>
         </div>
 
         <x-slot name="footer">
@@ -805,39 +900,10 @@
             </div>
         </x-slot>
 
-        <div class="grid grid-cols-1 gap-6 py-4">
-            <!-- Product Name -->
-            <div class="flex items-start gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                <div class="pt-1.5">
-                    <x-filament::input.checkbox wire:model.live="bulkEditData.apply_product_name" />
-                </div>
-                <div class="flex-1 space-y-2">
-                    <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Nama Produk</label>
-                    <x-filament::input.wrapper>
-                        <x-filament::input type="text" wire:model="bulkEditData.product_name" 
-                            :disabled="!$bulkEditData['apply_product_name']" />
-                    </x-filament::input.wrapper>
-                </div>
-            </div>
+        <div class="grid grid-cols-1 gap-5 py-4">
 
-            <!-- Category & Size Group -->
+            <!-- Row 1: Ukuran & Bahan -->
             <div class="grid grid-cols-2 gap-4">
-                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                    <div class="pt-1.5">
-                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_production_category" />
-                    </div>
-                    <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Kategori</label>
-                        <x-filament::input.wrapper>
-                            <x-filament::input.select wire:model="bulkEditData.production_category" :disabled="!$bulkEditData['apply_production_category']">
-                                @foreach($productionCategories as $val => $label)
-                                    <option value="{{ $val }}">{{ $label }}</option>
-                                @endforeach
-                            </x-filament::input.select>
-                        </x-filament::input.wrapper>
-                    </div>
-                </div>
-
                 <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
                     <div class="pt-1.5">
                         <x-filament::input.checkbox wire:model.live="bulkEditData.apply_size" />
@@ -853,10 +919,7 @@
                         </x-filament::input.wrapper>
                     </div>
                 </div>
-            </div>
 
-            <!-- Material -->
-            <div class="grid grid-cols-1 gap-4">
                 <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
                     <div class="pt-1.5">
                         <x-filament::input.checkbox wire:model.live="bulkEditData.apply_bahan_baju" />
@@ -875,28 +938,100 @@
                 </div>
             </div>
 
-            <!-- Price & Quantity -->
-            <div class="grid grid-cols-2 gap-4">
+            <!-- Row 2: Gender & Garment Specs -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
                     <div class="pt-1.5">
-                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_price" />
+                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_gender" />
                     </div>
                     <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Harga Satuan</label>
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Gender</label>
                         <x-filament::input.wrapper>
-                            <x-filament::input type="number" wire:model="bulkEditData.price" :disabled="!$bulkEditData['apply_price']" />
+                            <x-filament::input.select wire:model="bulkEditData.gender" :disabled="!$bulkEditData['apply_gender']">
+                                <option value="L">Laki-laki</option>
+                                <option value="P">Perempuan</option>
+                            </x-filament::input.select>
                         </x-filament::input.wrapper>
                     </div>
                 </div>
 
                 <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
                     <div class="pt-1.5">
-                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_quantity" />
+                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_sleeve_model" />
                     </div>
                     <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Jumlah (Qty)</label>
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Lengan</label>
                         <x-filament::input.wrapper>
-                            <x-filament::input type="number" wire:model="bulkEditData.quantity" :disabled="!$bulkEditData['apply_quantity']" />
+                            <x-filament::input.select wire:model="bulkEditData.sleeve_model" :disabled="!$bulkEditData['apply_sleeve_model']">
+                                @foreach($sleeveOptions as $val => $label)
+                                    <option value="{{ $val }}">{{ $label }}</option>
+                                @endforeach
+                            </x-filament::input.select>
+                        </x-filament::input.wrapper>
+                    </div>
+                </div>
+
+                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
+                    <div class="pt-1.5">
+                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_pocket_model" />
+                    </div>
+                    <div class="flex-1 space-y-2">
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Saku</label>
+                        <x-filament::input.wrapper>
+                            <x-filament::input.select wire:model="bulkEditData.pocket_model" :disabled="!$bulkEditData['apply_pocket_model']">
+                                @foreach($pocketOptions as $val => $label)
+                                    <option value="{{ $val }}">{{ $label }}</option>
+                                @endforeach
+                            </x-filament::input.select>
+                        </x-filament::input.wrapper>
+                    </div>
+                </div>
+
+                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
+                    <div class="pt-1.5">
+                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_button_model" />
+                    </div>
+                    <div class="flex-1 space-y-2">
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Kancing</label>
+                        <x-filament::input.wrapper>
+                            <x-filament::input.select wire:model="bulkEditData.button_model" :disabled="!$bulkEditData['apply_button_model']">
+                                @foreach($buttonOptions as $val => $label)
+                                    <option value="{{ $val }}">{{ $label }}</option>
+                                @endforeach
+                            </x-filament::input.select>
+                        </x-filament::input.wrapper>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 3: Req Tambahan (Tunic) & Harga -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex items-start gap-3 p-4 rounded-xl border border-indigo-100 bg-indigo-50/20">
+                    <div class="pt-1.5">
+                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_is_tunic" />
+                    </div>
+                    <div class="flex-1 space-y-3">
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-indigo-400">Req. Tambahan</label>
+                        <div class="flex items-center gap-3">
+                            <x-filament::input.checkbox wire:model.live="bulkEditData.is_tunic" id="bulkEditIsTunic" :disabled="!$bulkEditData['apply_is_tunic']" />
+                            <label for="bulkEditIsTunic" class="text-xs font-medium text-gray-700">Pakai Tunik?</label>
+                        </div>
+                        @if($bulkEditData['is_tunic'] && $bulkEditData['apply_is_tunic'])
+                            <x-filament::input.wrapper prefix="Rp">
+                                <x-filament::input type="number" wire:model="bulkEditData.tunic_fee" placeholder="Fee Tunik" />
+                            </x-filament::input.wrapper>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
+                    <div class="pt-1.5">
+                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_price" />
+                    </div>
+                    <div class="flex-1 space-y-2">
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Harga Satuan</label>
+                        <x-filament::input.wrapper prefix="Rp">
+                            <x-filament::input type="number" wire:model="bulkEditData.price" :disabled="!$bulkEditData['apply_price']" />
                         </x-filament::input.wrapper>
                     </div>
                 </div>

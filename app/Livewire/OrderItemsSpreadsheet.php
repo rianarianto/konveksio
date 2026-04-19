@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 class OrderItemsSpreadsheet extends Component
 {
     public array $items = [];
+    public array $undoStack = [];
     public ?int $orderId = null;
     
     // Options for selects
@@ -25,8 +26,8 @@ class OrderItemsSpreadsheet extends Component
     public array $baseMaterialOptions = [];
     public array $bulkVariantOptions = [];
     public $bulkCategory = 'produksi';
-    public $bulkPrice = 0;
-    public $bulkCustomQty = 0;
+    public $bulkPrice;
+    public $bulkCustomQty;
     public array $bulkCustomPeople = []; // [ ['name' => '', 'LD' => '', 'PB' => '', 'price' => 0] ]
     public array $bulkSzQty = []; // [ 'S' => 0, 'M' => 0, ... ]
     public array $productOptions = [];
@@ -37,14 +38,14 @@ class OrderItemsSpreadsheet extends Component
     public $bulkPocket = 'tanpa_saku';
     public $bulkButtons = 'biasa';
     public $bulkIsTunic = false;
-    public $bulkTunicFee = 0;
+    public $bulkTunicFee;
 
     // UI States
     public bool $showBulkModal = false;
     public bool $showPriceModal = false;
     public bool $showDetailModal = false;
     public bool $showBulkEditModal = false;
-    public $newBulkPrice = 0;
+    public $newBulkPrice;
     public $editingIndex = null;
     public array $editingItem = [];
 
@@ -55,13 +56,14 @@ class OrderItemsSpreadsheet extends Component
     public $searchQuery = '';
     public $filterCategory = '';
     public array $bulkEditData = [
-        'apply_product_name' => false, 'product_name' => '',
         'apply_size' => false, 'size' => 'M',
-        'apply_production_category' => false, 'production_category' => 'produksi',
         'apply_bahan_baju' => false, 'bahan_baju' => null,
-        'apply_warna' => false, 'warna' => '',
+        'apply_gender' => false, 'gender' => 'L',
+        'apply_sleeve_model' => false, 'sleeve_model' => 'pendek',
+        'apply_pocket_model' => false, 'pocket_model' => 'tanpa_saku',
+        'apply_button_model' => false, 'button_model' => 'biasa',
+        'apply_is_tunic' => false, 'is_tunic' => false, 'tunic_fee' => 0,
         'apply_price' => false, 'price' => 0,
-        'apply_quantity' => false, 'quantity' => 1,
     ];
 
     public array $productionCategories = [
@@ -106,9 +108,8 @@ class OrderItemsSpreadsheet extends Component
         $this->productOptions = \App\Filament\Resources\Orders\OrderResource::getSupplierProductOptions();
         $this->sizeOptions = \App\Filament\Resources\Orders\OrderResource::getStoreSizeOptions();
         
-        // Initialize bulkSzQty
         foreach ($this->sizeOptions as $key => $label) {
-            $this->bulkSzQty[$key] = 0;
+            $this->bulkSzQty[$key] = null;
         }
     }
 
@@ -166,6 +167,7 @@ class OrderItemsSpreadsheet extends Component
 
     public function removeItem($index)
     {
+        $this->pushUndo();
         unset($this->items[$index]);
         $this->items = array_values($this->items);
         $this->updatedItems();
@@ -173,12 +175,14 @@ class OrderItemsSpreadsheet extends Component
 
     public function updateItem($index, $key, $value)
     {
+        $this->pushUndo();
         $this->items[$index][$key] = $value;
         $this->updatedItems();
     }
 
     public function clearAll()
     {
+        $this->pushUndo();
         $this->items = [];
         $this->updatedItems();
     }
@@ -188,6 +192,7 @@ class OrderItemsSpreadsheet extends Component
      */
     public function generateBulk()
     {
+        $this->pushUndo();
         $materialName = $this->baseMaterialOptions[$this->bulkMaterial] ?? '';
         $bahanId = ($this->bulkCategory === 'produksi') ? ($this->bulkVariant ?: null) : null;
         
@@ -297,13 +302,12 @@ class OrderItemsSpreadsheet extends Component
             return;
         }
 
-        // Reset Qty fields and modal
         foreach ($this->sizeOptions as $key => $label) {
-            $this->bulkSzQty[$key] = 0;
+            $this->bulkSzQty[$key] = null;
         }
-        $this->bulkCustomQty = 0;
+        $this->bulkCustomQty = null;
         $this->bulkCustomPeople = [];
-        $this->bulkPrice = 0;
+        $this->bulkPrice = null;
         $this->bulkMaterial = null;
         $this->bulkProduct = null;
         $this->bulkColor = null;
@@ -313,7 +317,7 @@ class OrderItemsSpreadsheet extends Component
         $this->bulkPocket = 'tanpa_saku';
         $this->bulkButtons = 'biasa';
         $this->bulkIsTunic = false;
-        $this->bulkTunicFee = 0;
+        $this->bulkTunicFee = null;
 
         $this->showBulkModal = false;
         $this->updatedItems();
@@ -322,6 +326,7 @@ class OrderItemsSpreadsheet extends Component
 
     public function applyBulkPrice()
     {
+        $this->pushUndo();
         foreach ($this->items as &$item) {
             $item['price'] = $this->newBulkPrice;
         }
@@ -394,6 +399,7 @@ class OrderItemsSpreadsheet extends Component
 
     public function bulkDelete()
     {
+        $this->pushUndo();
         $this->items = collect($this->items)
             ->reject(fn($item) => in_array($item['id'], $this->selectedItems))
             ->values()
@@ -406,15 +412,20 @@ class OrderItemsSpreadsheet extends Component
 
     public function applyBulkEdit()
     {
+        $this->pushUndo();
         foreach ($this->items as &$item) {
             if (in_array($item['id'], $this->selectedItems)) {
-                if ($this->bulkEditData['apply_product_name']) $item['product_name'] = $this->bulkEditData['product_name'];
                 if ($this->bulkEditData['apply_size']) $item['size'] = $this->bulkEditData['size'];
-                if ($this->bulkEditData['apply_production_category']) $item['production_category'] = $this->bulkEditData['production_category'];
                 if ($this->bulkEditData['apply_bahan_baju']) $item['bahan_baju'] = $this->bulkEditData['bahan_baju'];
-                if ($this->bulkEditData['apply_warna']) $item['warna'] = $this->bulkEditData['warna'];
+                if ($this->bulkEditData['apply_gender']) $item['gender'] = $this->bulkEditData['gender'];
+                if ($this->bulkEditData['apply_sleeve_model']) $item['sleeve_model'] = $this->bulkEditData['sleeve_model'];
+                if ($this->bulkEditData['apply_pocket_model']) $item['pocket_model'] = $this->bulkEditData['pocket_model'];
+                if ($this->bulkEditData['apply_button_model']) $item['button_model'] = $this->bulkEditData['button_model'];
+                if ($this->bulkEditData['apply_is_tunic']) {
+                    $item['is_tunic'] = (bool)$this->bulkEditData['is_tunic'];
+                    $item['tunic_fee'] = (int)$this->bulkEditData['tunic_fee'];
+                }
                 if ($this->bulkEditData['apply_price']) $item['price'] = (int)$this->bulkEditData['price'];
-                if ($this->bulkEditData['apply_quantity']) $item['quantity'] = (int)$this->bulkEditData['quantity'];
             }
         }
 
@@ -450,6 +461,30 @@ class OrderItemsSpreadsheet extends Component
         } else {
             $this->collapsedGroups[] = $groupKey;
         }
+    }
+
+    /**
+     * Undo History
+     */
+    protected function pushUndo()
+    {
+        $this->undoStack[] = $this->items;
+        // Keep max 20 snapshots to avoid memory bloat
+        if (count($this->undoStack) > 20) {
+            array_shift($this->undoStack);
+        }
+    }
+
+    public function undo()
+    {
+        if (empty($this->undoStack)) {
+            Notification::make()->title('Tidak ada perubahan untuk di-undo')->warning()->send();
+            return;
+        }
+
+        $this->items = array_pop($this->undoStack);
+        $this->updatedItems();
+        Notification::make()->title('Undo berhasil — perubahan terakhir dibatalkan')->success()->send();
     }
 
     public function render()
