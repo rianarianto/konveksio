@@ -8,8 +8,8 @@
         .r3-container {
             background: white;
             border-radius: 20px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
-            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border: 1.5px solid #f1f5f9;
             font-family: inherit;
         }
 
@@ -130,7 +130,7 @@
 
             <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px;">
                 {{-- Add Button --}}
-                <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('create') }}"
+                <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('index') }}"
                     style="display:inline-flex; align-items:center; gap:8px; background:#7c3aed; color:white; padding:10px 20px; border-radius:12px; font-weight:500; font-size:14px; text-decoration:none; transition:background 0.2s;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -355,47 +355,65 @@
                                 {{-- Tipe Produk & Status --}}
                                 <td style="padding:16px 8px; vertical-align:top;">
                                     <div style="display:flex; flex-direction:column; gap:16px;">
-                                        @foreach($order->orderItems as $item)
+                                        @php
+                                            $groupedItems = $order->orderItems->groupBy('product_name');
+                                        @endphp
+                                        @foreach($groupedItems as $productName => $items)
                                             @php
-                                                $catName = match ($item->production_category) {
-                                                    'produksi' => 'Produksi',
-                                                    'non_produksi' => 'Non-Produksi',
-                                                    'custom' => 'Custom',
-                                                    default => 'Jasa',
-                                                };
+                                                $totalQty = $items->sum('quantity');
+                                                
+                                                // Calculate combined progress and collect status labels
+                                                $totalTasks = 0;
+                                                $doneTasks = 0;
+                                                $statusLabels = [];
+                                                $categories = [];
 
-                                                // Progress calculation for this specific item
-                                                $itemTasks = $item->productionTasks;
-                                                $itemProgress = 0;
-                                                $itemStatusLabel = 'Belum Diproses';
+                                                foreach($items as $item) {
+                                                    $itemTasks = $item->productionTasks;
+                                                    $totalTasks += $itemTasks->count();
+                                                    $doneTasks += $itemTasks->where('status', 'done')->count();
+                                                    
+                                                    $catName = match ($item->production_category) {
+                                                        'produksi' => 'Konveksi',
+                                                        'non_produksi' => 'Baju Jadi',
+                                                        'custom' => 'Konveksi',
+                                                        default => 'Jasa',
+                                                    };
+                                                    $categories[] = $catName;
 
-                                                if ($itemTasks->count() > 0) {
-                                                    $itemDone = $itemTasks->where('status', 'done')->count();
-                                                    $itemProgress = round(($itemDone / $itemTasks->count()) * 100);
-
-                                                    // Get active stage name or finished
-                                                    $activeItemTask = $itemTasks->whereIn('status', ['in_progress', 'pending', 'antrian'])->first();
-                                                    if ($activeItemTask) {
-                                                        $itemStatusLabel = $activeItemTask->stage_name;
-                                                        // Give min progress if not done yet
-                                                        $itemProgress = max(5, $itemProgress);
-                                                    } elseif ($itemProgress == 100) {
-                                                        $itemStatusLabel = 'Selesai';
+                                                    if ($itemTasks->count() > 0) {
+                                                        $activeItemTask = $itemTasks->whereIn('status', ['in_progress', 'pending', 'antrian'])->first();
+                                                        if ($activeItemTask) {
+                                                            $statusLabels[] = $activeItemTask->stage_name;
+                                                        } elseif ($itemTasks->where('status', 'done')->count() == $itemTasks->count()) {
+                                                            $statusLabels[] = 'Selesai';
+                                                        } else {
+                                                            $statusLabels[] = 'Antrian';
+                                                        }
                                                     } else {
-                                                        $itemStatusLabel = 'Antrian';
-                                                    }
-                                                } else {
-                                                    // No tasks assigned yet
-                                                    $itemProgress = 0;
-                                                    if ($order->status === 'batal') {
-                                                        $itemStatusLabel = 'Batal';
-                                                    } else {
-                                                        $itemStatusLabel = 'Belum Diatur';
+                                                        if ($order->status === 'batal') {
+                                                            $statusLabels[] = 'Batal';
+                                                        } else {
+                                                            $statusLabels[] = 'Belum Diatur';
+                                                        }
                                                     }
                                                 }
-                                            @endphp
-                                            @php
-                                                $statusKey = strtolower($itemStatusLabel);
+
+                                                $combinedProgress = $totalTasks > 0 ? round(($doneTasks / $totalTasks) * 100) : 0;
+                                                $uniqueStatusLabels = array_unique($statusLabels);
+                                                $displayStatus = count($uniqueStatusLabels) === 1 ? $uniqueStatusLabels[0] : (count($uniqueStatusLabels) > 1 ? 'Mix Status' : 'Belum Diatur');
+                                                $uniqueCategories = array_unique($categories);
+                                                $displayCategory = implode(', ', $uniqueCategories);
+
+                                                if ($totalTasks > 0 && $combinedProgress < 100 && $displayStatus === 'Selesai') {
+                                                     $displayStatus = 'Sebagian Selesai';
+                                                }
+                                                if ($totalTasks > 0 && $combinedProgress > 0 && $displayStatus === 'Belum Diatur') {
+                                                     $displayStatus = 'Proses';
+                                                }
+
+                                                // Determine color
+                                                $statusKey = strtolower($displayStatus);
                                                 $colorMap = [
                                                     'antrian' => '#818cf8',
                                                     'potong' => '#f87171',
@@ -409,35 +427,35 @@
                                                     'batal' => '#ef4444',
                                                     'diterima' => '#d946ef',
                                                     'dikerjakan' => '#3b82f6',
+                                                    'mix status' => '#6366f1',
                                                 ];
 
-                                                $baseColor = $colorMap[$statusKey] ?? ($itemProgress === 100 ? '#16a34a' : '#a855f7');
-
-                                                // Generate lighter tints for background and border
+                                                $baseColor = $colorMap[$statusKey] ?? ($combinedProgress === 100 ? '#16a34a' : '#a855f7');
                                                 $barColor = $baseColor;
-                                                $bgColor = $baseColor . '15'; // 15 is hex for ~8% opacity
-                                                $borderColor = $baseColor . '30'; // 30 is hex for ~18% opacity
+                                                $bgColor = $baseColor . '15';
+                                                $borderColor = $baseColor . '30';
                                             @endphp
 
-                                            <div style="display:flex; flex-direction:column; gap:2px;">
-                                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                                    <span class="r3-td-text"
-                                                        style="font-size:14px; font-weight:500;">{{ $item->quantity }}x
-                                                        {{ $item->product_name }}</span>
+                                            <div style="display:flex; flex-direction:column; background:white; border:1.5px solid #f1f5f9; border-radius:12px; padding:12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); gap:2px;">
+                                                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; gap:8px;">
+                                                    <div style="font-size:14px; font-weight:700; color:#111827; line-height:1.4;">
+                                                        <span style="color:#6b7280; margin-right:4px;">{{ $totalQty }}x</span>
+                                                        {{ $productName }}
+                                                    </div>
                                                     <span
-                                                        style="padding:2px 8px; border-radius:4px; border:1px solid {{ $borderColor }}; background:{{ $bgColor }}; color:{{ $barColor }}; font-size:11px; font-weight:500;">{{ $catName }}</span>
+                                                        style="padding:2px 8px; border-radius:4px; border:1px solid {{ $borderColor }}; background:{{ $bgColor }}; color:{{ $barColor }}; font-size:11px; font-weight:500;">{{ $displayCategory }}</span>
                                                 </div>
 
-                                                {{-- Individual Progress Bar --}}
+                                                {{-- Grouped Progress Bar --}}
                                                 <div style="display:flex; align-items:center; gap:10px; margin-top:2px;">
                                                     <div
                                                         style="width:70px; height:6px; background:#f1f5f9; border-radius:9999px; overflow:hidden; border:1px solid #e2e8f0;">
                                                         <div
-                                                            style="height:100%; background:{{ $barColor }}; border-radius:9999px; width:{{ $itemProgress }}%;">
+                                                            style="height:100%; background:{{ $barColor }}; border-radius:9999px; width:{{ $combinedProgress }}%;">
                                                         </div>
                                                     </div>
                                                     <span
-                                                        style="font-size:10px; font-weight:600; color:{{ $barColor }};">{{ $itemStatusLabel }}</span>
+                                                        style="font-size:10px; font-weight:600; color:{{ $barColor }};">{{ $displayStatus }}</span>
                                                 </div>
                                             </div>
                                         @endforeach

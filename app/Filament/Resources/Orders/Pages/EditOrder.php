@@ -9,10 +9,31 @@ use Filament\Facades\Filament;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Actions\Action;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Livewire\Attributes\On;
 
 class EditOrder extends EditRecord
 {
     protected static string $resource = OrderResource::class;
+
+    /**
+     * When the IntegratedOrderItemsTable updates the order subtotal in DB,
+     * it dispatches this event so we can refresh the form fields.
+     */
+    #[On('refreshOrderSummary')]
+    public function handleRefreshOrderSummary(int $subtotal): void
+    {
+        $this->data['subtotal'] = $subtotal;
+
+        // Recalculate total price
+        $tax = (int) ($this->data['tax'] ?? 0);
+        $shipping = (int) ($this->data['shipping_cost'] ?? 0);
+        $discount = (int) ($this->data['discount'] ?? 0);
+        $expressFee = 0;
+        if (!empty($this->data['is_express'])) {
+            $expressFee = (int) ($this->data['express_fee'] ?? 0);
+        }
+        $this->data['total_price'] = max(0, $subtotal + $tax + $shipping + $expressFee - $discount);
+    }
 
     protected function getHeaderActions(): array
     {
@@ -90,9 +111,6 @@ class EditOrder extends EditRecord
                 ->first();
 
             if ($firstPayment) {
-                // Jangan override dengan null jika sebelumnya ada gambar dan user tidak mengupload baru
-                // Tapi kalau user klik hapus gambar, $proofImage mungkin string kosong atau null di raw state? 
-                // Di Filament jika dihapus biasanya state di-set null. $data['initial_payment_proof'] bernilai null.
                 $firstPayment->update([
                     'amount' => (int) $data['initial_payment_amount'],
                     'payment_method' => $data['initial_payment_method'] ?? $firstPayment->payment_method,
@@ -107,44 +125,6 @@ class EditOrder extends EditRecord
                     'proof_image' => $proofImage,
                     'recorded_by' => auth()->id(),
                     'note' => 'Pembayaran Awal / DP (Otomatis dari form pesanan)',
-                ]);
-            }
-        }
-
-        // Sync Spreadsheet Items
-        $payload = $data['order_items_payload'] ?? null;
-        if ($payload) {
-            $items = json_decode($payload, true);
-            
-            // Wipe and re-create (simplest stateless sync)
-            $this->record->orderItems()->delete();
-            
-            foreach ($items as $item) {
-                $this->record->orderItems()->create([
-                    'product_name' => $item['product_name'] ?? '',
-                    'recipient_name' => $item['person_name'] ?? null,
-                    'production_category' => $item['production_category'] ?? 'produksi',
-                    'size' => $item['size'] ?? 'M',
-                    'bahan_id' => $item['bahan_baju'] ?? null,
-                    'price' => $item['price'] ?? 0,
-                    'quantity' => $item['quantity'] ?? 1,
-                    'shop_id' => $this->record->shop_id,
-                    'size_and_request_details' => [
-                        'gender' => $item['gender'] ?? 'L',
-                        'sleeve_model' => $item['sleeve_model'] ?? 'pendek',
-                        'pocket_model' => $item['pocket_model'] ?? 'tanpa_saku',
-                        'button_model' => $item['button_model'] ?? 'biasa',
-                        'is_tunic' => $item['is_tunic'] ?? false,
-                        'tunic_fee' => $item['tunic_fee'] ?? 0,
-                        'measurements' => $item['measurements'] ?? [],
-                        'bahan' => $item['bahan_baju'] ?? null, // Duplicated for legacy compatibility
-                        'warna' => $item['warna'] ?? '',
-                        'size' => $item['size'] ?? 'M', // Duplicated for legacy compatibility
-                        'material_details' => [
-                            'bahan' => $item['bahan_baju'] ? (\App\Models\Material::find($item['bahan_baju'])->name ?? '') : '',
-                            'warna' => $item['warna'] ?? '',
-                        ],
-                    ],
                 ]);
             }
         }

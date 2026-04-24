@@ -233,6 +233,7 @@ class OrderResource extends Resource
                                 ->visible(fn(Get $get): bool => (bool) $get('is_express'))
                                 ->helperText('Biaya tambahan untuk layanan express')
                                 ->columnSpan(1),
+                            Hidden::make('status')->default('draft'),
                         ])
                         ->columns(3),
 
@@ -312,27 +313,24 @@ class OrderResource extends Resource
                         ])
                         ->columns(2),
 
-                    // Section 3: Spreadsheet Produk
+                    // Section 3: Item Pesanan
                     Section::make('Daftar Produk / Item Pesanan')
-                        ->description('Input produk pesanan di sini secara fleksibel. Klik "Simpan" di akhir untuk memasukkan ke database.')
+                        ->description(fn (?Order $record) => $record 
+                            ? 'Edit langsung di tabel. Semua perubahan otomatis tersimpan.'
+                            : 'Item pesanan dapat ditambahkan setelah pesanan disimpan.')
                         ->icon('heroicon-o-table-cells')
                         ->schema([
-                            Hidden::make('order_items_payload')
-                                ->id('order_items_payload')
-                                ->live(),
-
-                            \Filament\Schemas\Components\Livewire::make(\App\Livewire\OrderItemsSpreadsheet::class, function (Get $get, ?Order $record) {
-                                $items = [];
-                                if ($record) {
-                                    $items = $record->orderItems()->get()->toArray();
-                                }
-                                
+                            \Filament\Schemas\Components\Livewire::make(\App\Livewire\IntegratedOrderItemsTable::class, function (?Order $record) {
                                 return [
-                                    'items' => $items,
-                                    'orderId' => $record?->id,
+                                    'order' => $record,
                                 ];
                             })
-                            ->key('items-spreadsheet'),
+                            ->key('items-table')
+                            ->visible(fn (?Order $record) => $record !== null),
+
+                            Placeholder::make('items_info')
+                                ->content('Simpan pesanan terlebih dahulu, lalu Anda bisa menambahkan item produk.')
+                                ->visible(fn (?Order $record) => $record === null),
                         ])
                         ->collapsible(),
 
@@ -344,8 +342,10 @@ class OrderResource extends Resource
                                     ->label('Subtotal Biaya')
                                     ->numeric()
                                     ->prefix('Rp')
-                                    ->disabled()
+                                    ->readOnly()
                                     ->dehydrated()
+                                    ->live()
+                                    ->afterStateUpdated(fn(Set $set, Get $get) => static::updateTotalPrice($set, $get))
                                     ->placeholder('0'),
 
                                 TextInput::make('tax')
@@ -379,7 +379,7 @@ class OrderResource extends Resource
                                 ->label('Total Tagihan')
                                 ->numeric()
                                 ->prefix('Rp')
-                                ->disabled()
+                                ->readOnly()
                                 ->extraInputAttributes(['style' => 'font-size: 1.25rem; font-weight: bold; color: #7e22ce;'])
                                 ->dehydrated()
                                 ->placeholder('0')
@@ -473,130 +473,6 @@ class OrderResource extends Resource
 
                         ]),
 
-                    // Section 5: Status & Ringkasan (MOVED FROM SIDEBAR)
-                    Section::make('Status & Ringkasan')
-                        ->schema([
-                            Select::make('status')
-                                ->label('Status Pesanan')
-                                ->options([
-                                    'draft' => 'Draf (Belum Konfirmasi)',
-                                    'diterima' => 'Diterima',
-                                    'antrian' => 'Antrian',
-                                    'diproses' => 'Diproses',
-                                    'selesai' => 'Selesai',
-                                    'siap_diambil' => 'Siap Diambil',
-                                ])
-                                ->required()
-                                ->selectablePlaceholder(false)
-                                ->native(false)
-                                ->prefixIcon('heroicon-o-flag'),
-
-                            Placeholder::make('summary_full')
-                                ->live()
-                                ->label(false)
-                                ->content(function (Get $get, ?Order $record): HtmlString {
-                                    $fmt = fn(int $v) => 'Rp ' . number_format($v, 0, ',', '.');
-                                    $payload = $get('order_items_payload');
-                                    $itemsState = $payload ? json_decode($payload, true) : [];
-                                    $subtotal = 0;
-                                    $itemsHtml = '';
-                                    $hasItems = false;
-                                    foreach ($itemsState as $item) {
-                                        $name = htmlspecialchars($item['product_name'] ?? 'Pilih Produk...');
-                                        $price = (int) ($item['price'] ?? 0);
-                                        $qty = (int) ($item['quantity'] ?? 1);
-                                        $itemTotal = $price * $qty;
-                                        $subtotal += $itemTotal;
-                                        $hasItems = true;
-                                        $cat = $item['production_category'] ?? 'produksi';
-                                        $badgeStyle = 'background:#f3e8ff;color:#7c3aed;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;';
-                                        $badgeLabel = match ($cat) {
-                                            'custom' => 'Custom',
-                                            'non_produksi' => 'Non-Produksi',
-                                            'jasa' => 'Jasa',
-                                            default => 'Produksi',
-                                        };
-                                        $badge = '<span style="' . $badgeStyle . '">' . $badgeLabel . '</span>';
-                                        $sizeLabel = ($item['size'] ?? null) ? ' (' . htmlspecialchars($item['size']) . ')' : '';
-                                        $itemsHtml .= '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e9d5ff;border-radius:10px;background:#faf5ff;margin-bottom:8px;">';
-                                        $itemsHtml .= $badge;
-                                        $itemsHtml .= '<div style="flex:1;min-width:0;">';
-                                        $itemsHtml .= '<div style="font-size:13px;font-weight:500;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' . $qty . 'x ' . $name . $sizeLabel . '</div>';
-                                        $itemsHtml .= '<div style="font-size:12px;color:#7c3aed;">' . $fmt($itemTotal) . '</div>';
-                                        $itemsHtml .= '</div></div>';
-                                    }
-                                    if (!$hasItems) {
-                                        $itemsHtml = '<p style="color:#9ca3af;font-size:13px;">Belum ada produk ditambahkan</p>';
-                                    }
-                                    $shipping = (int) ($get('shipping_cost') ?? 0);
-                                    $tax = (int) ($get('tax') ?? 0);
-                                    $discount = (int) ($get('discount') ?? 0);
-                                    $isExpress = (bool) $get('is_express');
-                                    $expressFeeVal = (int) ($get('express_fee') ?? 0);
-                                    $total = max(0, $subtotal + $tax + $shipping + ($isExpress ? $expressFeeVal : 0) - $discount);
-                                    $totalPaid = 0;
-                                    $paymentsHtml = '';
-                                    if ($record) {
-                                        $payments = $record->payments()->orderBy('payment_date', 'asc')->get();
-                                        $totalPaid = (int) $payments->sum('amount');
-                                        foreach ($payments as $index => $pay) {
-                                            $methodLabel = match ($pay->payment_method) {
-                                                'transfer' => 'TF',
-                                                'qris' => 'QRIS',
-                                                default => 'Cash',
-                                            };
-                                            $paymentsHtml .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">'
-                                                . '<span style="color:#6b7280;font-size:13px;">Bayar #' . ($index + 1) . ' (' . $methodLabel . ')</span>'
-                                                . '<span style="font-size:13px;color:#374151;">' . $fmt($pay->amount) . '</span>'
-                                                . '</div>';
-                                        }
-                                    } else {
-                                        $initial = (int) ($get('initial_payment_amount') ?? 0);
-                                        $totalPaid = $initial;
-                                    }
-                                    $remaining = $total - $totalPaid;
-                                    $row = fn(string $label, string $value, bool $purple = false, bool $bold = false) =>
-                                        '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">'
-                                        . '<span style="color:#6b7280;font-size:14px;">' . $label . '</span>'
-                                        . '<span style="font-size:14px;' . ($purple ? 'color:#7c3aed;' : 'color:#374151;') . ($bold ? 'font-weight:700;' : '') . '">' . $value . '</span>'
-                                        . '</div>';
-                                    $divider = '<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">';
-                                    $remainingLabel = $remaining <= 0
-                                        ? '<span style="background:#22c55e;color:white;font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;">Lunas</span>'
-                                        : '<span style="color:#7c3aed;font-weight:700;font-size:14px;">' . $fmt($remaining) . '</span>';
-
-                                    $html = '<div style="font-family:inherit;">' . $itemsHtml;
-                                    $html .= '<div style="margin-top:12px;">';
-                                    $html .= $row('Subtotal', $fmt($subtotal), true, true);
-                                    if ($isExpress && $expressFeeVal > 0) {
-                                        $html .= $row('Biaya Express', $fmt($expressFeeVal), true);
-                                    }
-                                    $html .= $row('Ongkos Kirim', $fmt($shipping));
-                                    $html .= $row('PPn 11%', $fmt($tax));
-                                    $html .= $row('Diskon', $fmt($discount));
-                                    $html .= $divider;
-                                    $html .= $row('Total', $fmt($total), true, true);
-                                    $html .= $row('Total Bayar', $fmt($totalPaid));
-                                    if ($paymentsHtml) {
-                                        $html .= '<div style="margin-top:10px;border-top:1px dashed #e5e7eb;padding-top:10px;">' . $paymentsHtml . '</div>';
-                                    }
-                                    $html .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">';
-                                    $html .= '<span style="color:#6b7280;font-size:14px;">Sisa</span>';
-                                    $html .= $remainingLabel;
-                                    $html .= '</div>';
-                                    if ($record) {
-                                        $html .= '<div style="margin-top:20px; text-align:center;">'
-                                            . '<a href="' . route('orders.receipt', $record) . '" target="_blank" style="display:block; text-align:center; padding:10px; background:#f3f4f6; color:#4b5563; border-radius:10px; text-decoration:none; font-weight:700; font-size:12px; border:1px solid #e5e7eb; transition:all 0.2s;">'
-                                            . 'Lihat Kuitansi (Tab Baru)'
-                                            . '</a>'
-                                            . '</div>';
-                                    }
-                                    $html .= '</div></div>';
-                                    return new HtmlString($html);
-                                })
-                                ->columnSpanFull(),
-                        ])
-                        ->columns(1),
                 ])
                 ->columnSpanFull(),
             ])
@@ -810,7 +686,8 @@ class OrderResource extends Resource
                     ->state(function (Order $record): string {
                         $expressHtml = '';
                         if ($record->is_express) {
-                            $expressHtml = '<span style="display:inline-flex; align-items:center; background:#fee2e2; color:#ef4444; border:1px solid #fecaca; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; text-transform:uppercase;">'
+                            $expressHtml = '<span style="background:#dc2626; color:#fff; font-size:10px; font-weight:800; padding:2px 8px; border-radius:9999px; letter-spacing:0.02em; display:inline-flex; align-items:center; gap:3px; margin-right:4px;">'
+                                . '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
                                 . 'EXPRESS</span>';
                         }
 
@@ -885,9 +762,17 @@ class OrderResource extends Resource
                             $sisaIconColor = '#16a34a';
                         }
 
+                        $statusBadge = match ($record->status) {
+                            'draft' => '<span style="padding:2px 6px; border-radius:4px; background:#fef3c7; color:#d97706; font-size:10px; font-weight:600;">DRAFT</span>',
+                            'diterima' => '<span style="padding:2px 6px; border-radius:4px; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600;">DITERIMA</span>',
+                            'proses' => '<span style="padding:2px 6px; border-radius:4px; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600;">PROSES</span>',
+                            'selesai' => '<span style="padding:2px 6px; border-radius:4px; background:#f3e8ff; color:#7e22ce; font-size:10px; font-weight:600;">SELESAI</span>',
+                            default => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#9ca3af; font-size:10px; font-weight:600;">' . strtoupper($record->status) . '</span>',
+                        };
+
                         $masukHtml = '<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">'
                             . '<span style="font-size:13px; font-weight:500; color:#9ca3af;">' . $masukStr . '</span>'
-                            . '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#9ca3af; font-size:10px; font-weight:600;">MASUK</span>'
+                            . $statusBadge
                             . '</div>';
 
                         $deadlineHtml = '<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">'
@@ -912,13 +797,25 @@ class OrderResource extends Resource
                         $total = (int) $record->total_price;
                         $paid = (int) $record->payments->sum('amount');
                         $sisa = max(0, $total - $paid);
-                        $lunas = $sisa === 0;
+                        $lunas = ($total > 0 && $sisa === 0);
+                        $isZero = ($total === 0);
 
-                        $sisaColor = $lunas ? '#16a34a' : '#7c3aed';
-                        $sisaBg = $lunas ? '#f0fdf4' : '#f3e8ff';
+                        $label = 'Rp ' . number_format($sisa, 0, ',', '.');
+                        if ($isZero) {
+                            $label = 'MENUNGGU PRODUK';
+                            $sisaColor = '#9ca3af';
+                            $sisaBg = '#f3f4f6';
+                        } elseif ($lunas) {
+                            $label = 'LUNAS';
+                            $sisaColor = '#16a34a';
+                            $sisaBg = '#f0fdf4';
+                        } else {
+                            $sisaColor = '#7c3aed';
+                            $sisaBg = '#f3e8ff';
+                        }
 
                         $sisaHtml = '<div style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:12px; background:' . $sisaBg . '; color:' . $sisaColor . '; font-size:15px; font-weight:700; margin-bottom:8px;">'
-                            . ($lunas ? 'LUNAS' : 'Rp ' . number_format($sisa, 0, ',', '.'))
+                            . $label
                             . '</div>';
 
                         $totalHtml = '<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#6b7280; font-weight:500; margin-bottom:4px;">'
@@ -950,113 +847,75 @@ class OrderResource extends Resource
                             return '<span style="color:#9ca3af;font-size:13px;">-</span>';
                         }
 
-                        $html = '<div style="display:flex; flex-direction:column; gap:16px;">';
-                        foreach ($items as $item) {
-                            $cat = match ($item->production_category) {
-                                'custom' => ['Custom', 'rgba(99,102,241,0.12)', '#6366f1'],
-                                'non_produksi' => ['Baju Jadi', 'rgba(245,158,11,0.12)', '#d97706'],
-                                'jasa' => ['Jasa', 'rgba(16,185,129,0.12)', '#059669'],
-                                default => ['Konveksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
-                            };
-
-                            $catBadge = '<div style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; background:' . $cat[1] . '; color:' . $cat[2] . ';">' . $cat[0] . '</div>';
-
-                            // Calculate Base Qty
-                            $qty = $item->quantity;
-                            if ($item->production_category === 'custom' && !empty($item->size_and_request_details['detail_custom'])) {
-                                $qty = count($item->size_and_request_details['detail_custom']);
+                        $groupedItems = $items->groupBy('product_name');
+                        $html = '<div style="display:flex; flex-direction:column; gap:12px;">';
+                        
+                        foreach ($groupedItems as $productName => $itemsGroup) {
+                            $totalQty = $itemsGroup->sum('quantity');
+                            
+                            // Collect categories
+                            $categories = [];
+                            foreach ($itemsGroup as $item) {
+                                $cat = match ($item->production_category) {
+                                    'custom' => ['Konveksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
+                                    'non_produksi' => ['Baju Jadi', 'rgba(245,158,11,0.12)', '#d97706'],
+                                    'jasa' => ['Jasa', 'rgba(16,185,129,0.12)', '#059669'],
+                                    default => ['Konveksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
+                                };
+                                $categories[$cat[0]] = $cat;
                             }
+                            
+                            // If mixed categories, just use the first one or a generic label
+                            $firstCat = reset($categories);
+                            $catBadge = '<div style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; background:' . $firstCat[1] . '; color:' . $firstCat[2] . ';">' . $firstCat[0] . '</div>';
 
-                            // Construct Material & Sizing Details
-                            $detailsHtml = '';
-                            if ($item->production_category !== 'jasa' && $item->production_category !== 'non_produksi') {
-                                // Bahan & Warna
-                                $matText = '';
-                                if (!empty($item->material_details['bahan'])) {
-                                    $matText .= $item->material_details['bahan'];
-                                }
-                                if (!empty($item->material_details['warna'])) {
-                                    $matText .= $matText ? ' (' . $item->material_details['warna'] . ')' : $item->material_details['warna'];
-                                }
+                            // Combined Progress & Status
+                            $totalTasks = 0;
+                            $doneTasks = 0;
+                            $statusLabels = [];
 
-                                if ($matText) {
-                                    $detailsHtml .= '<div style="margin-top:4px; margin-bottom:4px; display:inline-flex; align-items:center; gap:4px; font-size:12px; color:#6b7280; font-weight:500; background:#f9fafb; border:1px solid #f3f4f6; padding:2px 8px; border-radius:6px;">'
-                                        . '<span>' . htmlspecialchars($matText) . '</span>'
-                                        . '</div>';
-                                }
+                            foreach ($itemsGroup as $item) {
+                                $itemTasks = $item->productionTasks;
+                                $totalTasks += $itemTasks->count();
+                                $doneTasks += $itemTasks->where('status', 'done')->count();
 
-                                // Size Breakdown
-                                if (!empty($item->sizes)) {
-                                    $sizeStrings = [];
-                                    $isMultipleSizes = count($item->sizes) > 1;
-
-                                    foreach ($item->sizes as $sizeObj) {
-                                        if (is_array($sizeObj) && isset($sizeObj['size']) && isset($sizeObj['quantity'])) {
-                                            $sizeStrings[] = htmlspecialchars($sizeObj['size']) . ': <span style="font-weight:700;">' . $sizeObj['quantity'] . '</span>';
-                                        }
+                                if ($itemTasks->count() > 0) {
+                                    $activeItemTask = $itemTasks->whereIn('status', ['in_progress', 'pending', 'antrian'])->first();
+                                    if ($activeItemTask) {
+                                        $statusLabels[] = $activeItemTask->stage_name ?: ($activeItemTask->nama_tugas ?: 'Proses');
+                                    } elseif ($itemTasks->where('status', 'done')->count() == $itemTasks->count()) {
+                                        $statusLabels[] = 'Selesai';
+                                    } else {
+                                        $statusLabels[] = 'Antrian';
                                     }
-
-                                    if (count($sizeStrings) > 0) {
-                                        $detailsHtml .= '<div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:4px;">';
-                                        foreach ($sizeStrings as $szStr) {
-                                            $detailsHtml .= '<div style="font-size:11px; color:#4b5563; font-weight:500; background:#f3f4f6; padding:1px 6px; border-radius:4px; letter-spacing:0.02em;">' . $szStr . '</div>';
-                                        }
-                                        $detailsHtml .= '</div>';
+                                } else {
+                                    if ($record->status === 'batal') {
+                                        $statusLabels[] = 'Batal';
+                                    } else {
+                                        $statusLabels[] = 'Belum Diatur';
                                     }
                                 }
                             }
-
-                            // Progress bar Logic
-                            $tasks = $item->productionTasks;
-                            $totalTasks = $tasks->count();
-                            $doneTasks = $tasks->where('status', 'done')->count();
-                            $inProgressTasks = $tasks->where('status', 'in_progress')->count();
 
                             $pct = $totalTasks > 0 ? round(($doneTasks / $totalTasks) * 100) : 0;
+                            $uniqueStatusLabels = array_unique($statusLabels);
+                            $displayStatusText = count($uniqueStatusLabels) === 1 ? $uniqueStatusLabels[0] : (count($uniqueStatusLabels) > 1 ? 'Mix Status' : 'Belum Diatur');
 
-                            $statusText = '<span style="color:#9ca3af;">Belum Diproses</span>';
+                            if ($totalTasks > 0 && $pct < 100 && $displayStatusText === 'Selesai') {
+                                $displayStatusText = 'Sebagian Selesai';
+                            }
+
                             $progressBarHtml = '';
-
                             if ($totalTasks > 0) {
-                                // Find Current Step Status Text
-                                if ($pct === 100) {
-                                    $statusText = '<span style="color:#10b981; font-weight:700;">Selesai (100%)</span>';
-                                } else {
-                                    $currentTask = null;
-                                    foreach ($tasks as $ti) {
-                                        if ($ti->status === 'in_progress') {
-                                            $currentTask = $ti;
-                                            break;
-                                        }
-                                    }
-                                    if (!$currentTask) {
-                                        foreach ($tasks as $ti) {
-                                            if ($ti->status === 'pending') {
-                                                $currentTask = $ti;
-                                                break;
-                                            }
-                                        }
-                                    }
-
-                                    if ($currentTask) {
-                                        $statusName = $currentTask->nama_tugas ?? 'Tugas';
-
-                                        if ($currentTask->status === 'in_progress') {
-                                            $statusText = '<span style="color:#d97706; font-weight:600;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#d97706;margin-right:4px;animation:pulse 2s infinite;"></span>' . htmlspecialchars($statusName) . ' (' . $pct . '%)</span>';
-                                        } else {
-                                            $statusText = '<span style="color:#6b7280; font-weight:500;">Antrian ' . htmlspecialchars($statusName) . ' (' . $pct . '%)</span>';
-                                        }
-                                    }
-                                }
-
-                                // Build Progress Bar UI
                                 $barColor = $pct === 100 ? '#10b981' : '#7c3aed';
                                 $barBgColor = $pct === 100 ? '#d1fae5' : '#ede9fe';
+
+                                $statusLabelHtml = '<span style="color:' . $barColor . '; font-weight:600;">' . htmlspecialchars($displayStatusText) . ' (' . $pct . '%)</span>';
 
                                 $progressBarHtml = '<div style="margin-top:8px;">'
                                     . '<div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.02em;">'
                                     . '<span>Progress</span>'
-                                    . $statusText
+                                    . $statusLabelHtml
                                     . '</div>'
                                     . '<div style="height:6px; background:' . $barBgColor . '; border-radius:9999px; overflow:hidden;">'
                                     . '<div style="height:100%; width:' . $pct . '%; background:' . $barColor . '; border-radius:9999px; transition:width 0.5s ease;"></div>'
@@ -1066,15 +925,35 @@ class OrderResource extends Resource
                                 $progressBarHtml = '<div style="margin-top:8px; font-size:11px; color:#9ca3af; font-weight:500;">Tidak ada jadwal</div>';
                             }
 
-                            // Container per Item
-                            $html .= '<div style="display:flex; flex-direction:column; background:white; border:1px solid #f3f4f6; border-radius:12px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,0.02);">'
+                            // Sizing details for grouped items (optional: showing unique sizes)
+                            $sizingHtml = '';
+                            $sizeStrings = [];
+                            foreach ($itemsGroup as $item) {
+                                if (!empty($item->sizes)) {
+                                    foreach ($item->sizes as $sizeObj) {
+                                        if (is_array($sizeObj) && isset($sizeObj['size']) && isset($sizeObj['quantity'])) {
+                                            $sizeStrings[] = htmlspecialchars($sizeObj['size']) . ': <span style="font-weight:700;">' . $sizeObj['quantity'] . '</span>';
+                                        }
+                                    }
+                                }
+                            }
+                            if (count($sizeStrings) > 0) {
+                                $sizingHtml = '<div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:4px;">';
+                                foreach (array_unique($sizeStrings) as $szStr) {
+                                    $sizingHtml .= '<div style="font-size:11px; color:#4b5563; font-weight:500; background:#f3f4f6; padding:1px 6px; border-radius:4px; letter-spacing:0.02em;">' . $szStr . '</div>';
+                                }
+                                $sizingHtml .= '</div>';
+                            }
+
+                            // Container per Grouped Item with Soft Border
+                            $html .= '<div style="display:flex; flex-direction:column; background:white; border:1.5px solid #f1f5f9; border-radius:12px; padding:12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);">'
                                 . '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; gap:8px;">'
                                 . '<div style="font-size:14px; font-weight:700; color:#111827; line-height:1.4;">'
-                                . '<span style="color:#6b7280; margin-right:4px;">' . $qty . 'x</span>' . htmlspecialchars($item->product_name)
+                                . '<span style="color:#6b7280; margin-right:4px;">' . $totalQty . 'x</span>' . htmlspecialchars($productName)
                                 . '</div>'
                                 . $catBadge
                                 . '</div>'
-                                . $detailsHtml
+                                . $sizingHtml
                                 . $progressBarHtml
                                 . '</div>';
                         }
@@ -1159,6 +1038,7 @@ class OrderResource extends Resource
     public static function getRelations(): array
     {
         return [
+            \App\Filament\Resources\Orders\RelationManagers\SummaryRelationManager::class,
             \App\Filament\Resources\Orders\RelationManagers\PaymentsRelationManager::class,
             \App\Filament\Resources\Orders\RelationManagers\ReturnsRelationManager::class,
         ];
@@ -1168,7 +1048,6 @@ class OrderResource extends Resource
     {
         return [
             'index' => Pages\ListOrders::route('/'),
-            'create' => Pages\CreateOrder::route('/create'),
             'edit' => Pages\EditOrder::route('/{record}/edit'),
         ];
     }

@@ -111,6 +111,9 @@ class OrderItemsSpreadsheet extends Component
         foreach ($this->sizeOptions as $key => $label) {
             $this->bulkSzQty[$key] = null;
         }
+
+        // Ensure parent form is synced on load
+        $this->updatedItems();
     }
 
     public function updatedBulkMaterial($value)
@@ -357,7 +360,8 @@ class OrderItemsSpreadsheet extends Component
     public function updatedItems()
     {
         // Emit event to sync with Filament hidden field
-        $this->dispatch('spreadsheetUpdated', ['payload' => json_encode($this->items)]);
+        // IMPORTANT: Livewire 3 requires named parameters for $event.detail.key to work
+        $this->dispatch('konveksio-spreadsheet-updated', payload: json_encode($this->items));
         
         // Calculate subtotal for sidebar refresh
         $subtotal = 0;
@@ -365,7 +369,7 @@ class OrderItemsSpreadsheet extends Component
             $subtotal += (float)($item['price'] ?? 0) * (int)($item['quantity'] ?? 0);
         }
         
-        $this->dispatch('refreshOrderSummary', ['subtotal' => $subtotal]);
+        $this->dispatch('konveksio-refresh-summary', subtotal: (int)$subtotal);
     }
 
     /**

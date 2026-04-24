@@ -30,7 +30,7 @@ class DesignTaskResource extends Resource
     protected static ?string $modelLabel = 'Tugas Desain';
     protected static ?string $slug = 'design-tasks';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'PRODUKSI';
+    protected static string|\UnitEnum|null $navigationGroup = 'KONVEKSI';
 
     protected static ?int $navigationSort = 2;
 
@@ -176,7 +176,7 @@ class DesignTaskResource extends Resource
                                 ->downloadable()
                                 ->openable()
                                 ->required()
-                                ->helperText('Setelah disimpan, status desain otomatis berubah menjadi Approved dan masuk antrian produksi.'),
+                                ->helperText('Setelah disimpan, status desain otomatis berubah menjadi Approved dan masuk antrian konveksi.'),
                         ])
                 ])->columnSpan(1),
             ])
@@ -212,8 +212,9 @@ class DesignTaskResource extends Resource
                         600 => '#8000FF',
                     ])
                     ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'non_produksi' => 'Non Produksi',
-                        default => ucfirst($state),
+                        'non_produksi' => 'Baju Jadi',
+                        'jasa' => 'Jasa',
+                        default => 'Konveksi',
                     }),
 
                 TextColumn::make('order.deadline')

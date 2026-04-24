@@ -33,7 +33,7 @@ class ProductionStageResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'PRODUKSI';
+        return 'KONVEKSI';
     }
 
     public static function getNavigationSort(): ?int
@@ -48,12 +48,12 @@ class ProductionStageResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return 'Tahapan Produksi';
+        return 'Tahapan Konveksi';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'Tahapan Produksi';
+        return 'Tahapan Konveksi';
     }
 
     protected static bool $isScopedToTenant = true;
@@ -73,7 +73,7 @@ class ProductionStageResource extends Resource
                     ->placeholder('0')
                     ->prefix('Rp'),
                 Toggle::make('for_produksi_custom')
-                    ->label('Kategori Produksi & Custom')
+                    ->label('Kategori Konveksi')
                     ->default(true)
                     ->helperText('Tahapan ini akan muncul pada produk komplit/custom.'),
                 Toggle::make('for_non_produksi')
@@ -101,7 +101,7 @@ class ProductionStageResource extends Resource
                     ->money('IDR', locale: 'id')
                     ->sortable(),
                 IconColumn::make('for_produksi_custom')
-                    ->label('Produksi / Custom')
+                    ->label('Konveksi')
                     ->boolean(),
                 IconColumn::make('for_non_produksi')
                     ->label('Non Produksi')

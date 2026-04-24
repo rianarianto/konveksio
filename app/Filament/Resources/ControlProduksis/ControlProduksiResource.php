@@ -164,7 +164,7 @@ class ControlProduksiResource extends Resource
 
             ])
 
-            ->defaultGroup(
+            ->groups([
                 TableGroup::make('order.order_number')
                     ->label('Pesanan')
                     ->getTitleFromRecordUsing(function (Model $record): HtmlString {
@@ -174,14 +174,35 @@ class ControlProduksiResource extends Resource
                             : '';
                         return new HtmlString($prefix . $order->order_number . ' — ' . ($order->customer->name ?? 'Tanpa Nama'));
                     })
-                    ->collapsible()
-            )
+                    ->collapsible(),
+
+                TableGroup::make('production_category')
+                    ->label('Kategori Pesanan')
+                    ->getTitleFromRecordUsing(fn(OrderItem $record): string => match ($record->production_category) {
+                        'custom' => '🧵 Custom (Ukur Badan)',
+                        'non_produksi' => '📦 Non-Produksi',
+                        'jasa' => '🔧 Jasa',
+                        default => '🏭 Produksi',
+                    })
+                    ->collapsible(),
+
+                TableGroup::make('gender_group')
+                    ->label('Jenis Kelamin')
+                    ->getTitleFromRecordUsing(fn(OrderItem $record): string => match ($record->gender_group) {
+                        'L' => '👨 Laki-laki',
+                        'P' => '👩 Perempuan',
+                        default => '❓ Tidak Diset',
+                    })
+                    ->collapsible(),
+            ])
+            ->defaultGroup('order.order_number')
             ->modifyQueryUsing(
                 fn($query) => $query
                     ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                    ->select('order_items.*')
+                    ->selectRaw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.gender')), 'L') as gender_group")
                     ->orderByRaw('orders.is_express DESC')
                     ->orderBy('orders.deadline', 'asc')
-                    ->select('order_items.*')
             )
             ->filters([
                 // Filters handled by Tabs in Manage page

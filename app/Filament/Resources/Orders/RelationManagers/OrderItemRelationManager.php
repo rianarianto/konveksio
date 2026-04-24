@@ -48,7 +48,6 @@ class OrderItemRelationManager extends RelationManager
 
         $categoryOptions = [
             'produksi' => 'Konveksi',
-            'custom' => 'Custom',
             'non_produksi' => 'Baju Jadi',
             'jasa' => 'Jasa',
         ];
@@ -212,7 +211,7 @@ class OrderItemRelationManager extends RelationManager
                             $items[] = [
                                 'product_name' => '',
                                 'size' => 'Custom',
-                                'production_category' => 'custom',
+                                'production_category' => $category,
                                 'bahan_id' => $bahanId,
                                 'price' => $price,
                                 'quantity' => 1,
@@ -345,7 +344,6 @@ class OrderItemRelationManager extends RelationManager
                             ->label('Kategori Baru')
                             ->options([
                                 'produksi' => 'Konveksi',
-                                'custom' => 'Custom',
                                 'non_produksi' => 'Baju Jadi',
                                 'jasa' => 'Jasa',
                             ])

@@ -1,16 +1,9 @@
 <div class="space-y-4" x-data="{
-        updatePayload(payload) {
-             const input = document.getElementById('order_items_payload');
-                if (input) {
-                    input.value = payload;
-                    input.dispatchEvent(new Event('input'));
-                }
-        },
         flashCell(el) {
             el.classList.add('cell-flash');
             setTimeout(() => el.classList.remove('cell-flash'), 800);
         }
-    }" @spreadsheet-updated.window="updatePayload($event.detail.payload)">
+    }">
 
     {{-- Ghost Input & Flash Animation Styles --}}
     <style>
@@ -116,7 +109,7 @@
             <div class="flex items-center gap-4">
                 <div class="px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-3">
                     <div class="text-right">
-                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Items</p>
+                        <p class="text-[9px] font-bold text-gray-600 uppercase tracking-widest leading-none mb-1">Items</p>
                         <p class="text-sm font-black text-gray-900 leading-none">{{ count($items) }}</p>
                     </div>
                     @if(count($selectedItems) > 0)
@@ -198,24 +191,24 @@
                                 class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer">
                         </th>
                         @if($useRecipientNames)
-                        <th class="w-40 px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <th class="w-40 px-4 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                             Penerima</th>
                         @endif
-                        <th class="w-32 px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <th class="w-32 px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                             Size</th>
-                        <th class="w-48 px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <th class="w-48 px-4 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                             Bahan</th>
-                        <th class="w-20 px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <th class="w-20 px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                             Gender</th>
-                        <th class="w-28 px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <th class="w-28 px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                             Lengan</th>
-                        <th class="w-28 px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <th class="w-28 px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                             Saku</th>
-                        <th class="w-28 px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <th class="w-28 px-3 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                             Kancing</th>
-                        <th class="w-32 px-3 py-3 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <th class="w-32 px-3 py-3 text-center text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                             Req. Tambahan</th>
-                        <th class="w-28 px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <th class="w-28 px-4 py-3 text-right text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                             Harga Unit</th>
                         <th class="w-12 px-3 py-3"></th>
                     </tr>
@@ -446,7 +439,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
                                         </svg>
                                     </div>
-                                    <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">Tabel Kosong</p>
+                                    <p class="text-sm font-bold text-gray-600 uppercase tracking-widest">Tabel Kosong</p>
                                     <p class="text-xs text-gray-400">Silakan tambah item atau ubah filter pencarian Anda.</p>
                                 </div>
                             </td>
@@ -461,7 +454,7 @@
     @if($items)
         <div class="flex justify-end pt-2">
             <div class="text-right">
-                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Estimasi
+                <span class="text-[10px] font-bold text-gray-600 uppercase tracking-widest block mb-1">Estimasi
                     Subtotal</span>
                 <div class="text-2xl font-bold text-primary-600 tracking-tight">
                     Rp {{ number_format(collect($items)->sum(fn($i) => $i['price'] * $i['quantity']), 0, ',', '.') }}
@@ -490,8 +483,7 @@
         </x-slot>
 
         <div class="space-y-6 py-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
+            <div class="space-y-4">
                 <div class="space-y-2">
                     <label class="text-sm font-medium leading-6 text-gray-950">Kategori Pesanan</label>
                     <x-filament::input.wrapper>
@@ -504,7 +496,7 @@
                 </div>
 
                 @if($bulkCategory === 'produksi')
-                    <div class="space-y-6">
+                    <div class="space-y-4">
                         <!-- Katalog Bahan (Native Filament Select) -->
                         <div class="space-y-2">
                             <label class="text-sm font-medium leading-6 text-gray-950">Katalog Bahan</label>
@@ -519,14 +511,14 @@
                         </div>
 
                         <!-- Pilihan Warna (High Performance Color Pills) -->
-                        <div class="space-y-3">
+                        <div class="space-y-2">
                             <label class="text-sm font-medium leading-6 text-gray-950">
                                 Pilihan Warna dari Katalog
                             </label>
 
                             @if(!$bulkMaterial)
                                 <div
-                                    class="text-[11px] text-gray-400 italic bg-gray-50/50 p-4 rounded-xl border border-dashed border-gray-200 text-center">
+                                    class="text-[11px] text-gray-500 italic bg-gray-50/50 p-4 rounded-xl border border-dashed border-gray-200 text-center">
                                     Pilih bahan terlebih dahulu untuk memunculkan pil warna...
                                 </div>
                             @elseif(count($bulkVariantOptions) === 0)
@@ -622,9 +614,9 @@
             @if($bulkCategory !== 'jasa')
                 <div class="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
                     <div class="flex items-center justify-between mb-2">
-                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">Bagian A: Stok Ukuran
+                        <label class="text-xs font-bold text-gray-600 uppercase tracking-widest">Bagian A: Stok Ukuran
                             Standar</label>
-                        <span class="text-[10px] text-gray-400 italic">Isi qty untuk S, M, L...</span>
+                        <span class="text-[10px] text-gray-500 italic">Isi qty untuk S, M, L...</span>
                     </div>
                     <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                         @foreach($sizeOptions as $val => $label)
@@ -643,7 +635,7 @@
                 <!-- HARGA GLOBAL DAN SUMMARY -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Harga Satuan
+                        <label class="text-[10px] font-bold text-gray-600 uppercase tracking-widest ml-1">Harga Satuan
                             (Toko)</label>
                         <x-filament::input.wrapper prefix="Rp" class="shadow-sm">
                             <x-filament::input type="number" wire:model="bulkPrice" class="font-bold" placeholder="0" />
@@ -654,7 +646,7 @@
 
                     @if($bulkCategory === 'jasa')
                         <div class="space-y-1">
-                            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Total
+                            <label class="text-[10px] font-bold text-gray-600 uppercase tracking-widest ml-1">Total
                                 Quantity</label>
                             <x-filament::input.wrapper suffix="PCS" class="shadow-sm">
                                 <x-filament::input type="number" wire:model="bulkCustomQty" class="font-bold" placeholder="0" />
@@ -667,7 +659,7 @@
                 <div class="space-y-3 p-4 rounded-xl border border-gray-200 bg-gray-50/10">
                     <div class="flex items-center justify-between">
                         <div>
-                            <label class="text-xs font-bold text-primary-600 uppercase tracking-widest">Bagian B: Pesanan
+                            <label class="text-xs font-bold text-gray-600 uppercase tracking-widest">Bagian B: Pesanan
                                 Khusus (Ukur Badan)</label>
                             <p class="text-[10px] text-gray-400 mt-0.5 whitespace-nowrap">Input nama dan ukuran spesifik
                                 orang di sini.</p>
@@ -684,18 +676,18 @@
                                 <table class="min-w-full divide-y divide-gray-100">
                                     <thead class="bg-gray-50 sticky top-0 z-10">
                                         <tr class="divide-x divide-gray-100">
-                                            <th class="px-3 py-2 text-left text-[9px] font-black text-gray-400 uppercase">Nama /
+                                            <th class="px-3 py-2 text-left text-[9px] font-black text-gray-600 uppercase">Nama /
                                                 Penerima</th>
                                             <th
-                                                class="px-2 py-2 text-center text-[9px] font-black text-gray-400 uppercase w-16">
+                                                class="px-2 py-2 text-center text-[9px] font-black text-gray-600 uppercase w-16">
                                                 LD</th>
                                             <th
-                                                class="px-2 py-2 text-center text-[9px] font-black text-gray-400 uppercase w-16">
+                                                class="px-2 py-2 text-center text-[9px] font-black text-gray-600 uppercase w-16">
                                                 PB</th>
                                             <th
-                                                class="px-2 py-2 text-center text-[9px] font-black text-gray-400 uppercase w-16">
+                                                class="px-2 py-2 text-center text-[9px] font-black text-gray-600 uppercase w-16">
                                                 PL</th>
-                                            <th class="px-3 py-2 text-right text-[9px] font-black text-gray-400 uppercase w-28">
+                                            <th class="px-3 py-2 text-right text-[9px] font-black text-gray-600 uppercase w-28">
                                                 Harga</th>
                                             <th class="px-2 py-2 w-8"></th>
                                         </tr>
@@ -900,121 +892,76 @@
             </div>
         </x-slot>
 
-        <div class="grid grid-cols-1 gap-5 py-4">
-
+        <div class="flex flex-col gap-6 py-4">
             <!-- Row 1: Ukuran & Bahan -->
             <div class="grid grid-cols-2 gap-4">
-                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                    <div class="pt-1.5">
+                <div class="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-3">
+                    <div class="flex items-center gap-2">
                         <x-filament::input.checkbox wire:model.live="bulkEditData.apply_size" />
+                        <label class="text-[10px] font-black uppercase tracking-widest text-gray-700">Ukuran</label>
                     </div>
-                    <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Ukuran</label>
-                        <x-filament::input.wrapper>
-                            <x-filament::input.select wire:model="bulkEditData.size" :disabled="!$bulkEditData['apply_size']">
-                                @foreach($sizeOptions as $val => $label)
-                                    <option value="{{ $val }}">{{ $label }}</option>
-                                @endforeach
-                            </x-filament::input.select>
-                        </x-filament::input.wrapper>
-                    </div>
+                    <x-filament::input.wrapper>
+                        <x-filament::input.select wire:model="bulkEditData.size" :disabled="!$bulkEditData['apply_size']">
+                            @foreach($sizeOptions as $val => $label)
+                                <option value="{{ $val }}">{{ $label }}</option>
+                            @endforeach
+                        </x-filament::input.select>
+                    </x-filament::input.wrapper>
                 </div>
 
-                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                    <div class="pt-1.5">
+                <div class="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-3">
+                    <div class="flex items-center gap-2">
                         <x-filament::input.checkbox wire:model.live="bulkEditData.apply_bahan_baju" />
+                        <label class="text-[10px] font-black uppercase tracking-widest text-gray-700">Bahan</label>
                     </div>
-                    <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Bahan</label>
-                        <x-filament::input.wrapper>
-                            <x-filament::input.select wire:model="bulkEditData.bahan_baju" :disabled="!$bulkEditData['apply_bahan_baju']">
-                                <option value="">-- Pilih --</option>
-                                @foreach($materialOptions as $id => $mat)
-                                    <option value="{{ $id }}">{{ $mat['name'] }}</option>
-                                @endforeach
-                            </x-filament::input.select>
-                        </x-filament::input.wrapper>
-                    </div>
+                    <x-filament::input.wrapper>
+                        <x-filament::input.select wire:model="bulkEditData.bahan_baju" :disabled="!$bulkEditData['apply_bahan_baju']">
+                            <option value="">-- Pilih --</option>
+                            @foreach($materialOptions as $id => $mat)
+                                <option value="{{ $id }}">{{ $mat['name'] }}</option>
+                            @endforeach
+                        </x-filament::input.select>
+                    </x-filament::input.wrapper>
                 </div>
             </div>
 
             <!-- Row 2: Gender & Garment Specs -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                    <div class="pt-1.5">
-                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_gender" />
+                @foreach(['apply_gender' => 'Gender', 'apply_sleeve_model' => 'Lengan', 'apply_pocket_model' => 'Saku', 'apply_button_model' => 'Kancing'] as $applyField => $label)
+                <div class="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-3">
+                    <div class="flex items-center gap-2">
+                        <x-filament::input.checkbox wire:model.live="bulkEditData.{{ $applyField }}" />
+                        <label class="text-[10px] font-black uppercase tracking-widest text-gray-700">{{ $label }}</label>
                     </div>
-                    <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Gender</label>
-                        <x-filament::input.wrapper>
-                            <x-filament::input.select wire:model="bulkEditData.gender" :disabled="!$bulkEditData['apply_gender']">
+                    <x-filament::input.wrapper>
+                        <x-filament::input.select 
+                            wire:model="bulkEditData.{{ str_replace('apply_', '', $applyField) }}" 
+                            :disabled="!$bulkEditData[$applyField]">
+                            @if($applyField === 'apply_gender')
                                 <option value="L">Laki-laki</option>
                                 <option value="P">Perempuan</option>
-                            </x-filament::input.select>
-                        </x-filament::input.wrapper>
-                    </div>
-                </div>
-
-                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                    <div class="pt-1.5">
-                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_sleeve_model" />
-                    </div>
-                    <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Lengan</label>
-                        <x-filament::input.wrapper>
-                            <x-filament::input.select wire:model="bulkEditData.sleeve_model" :disabled="!$bulkEditData['apply_sleeve_model']">
-                                @foreach($sleeveOptions as $val => $label)
-                                    <option value="{{ $val }}">{{ $label }}</option>
+                            @else
+                                @foreach(${$applyField === 'apply_sleeve_model' ? 'sleeveOptions' : ($applyField === 'apply_pocket_model' ? 'pocketOptions' : 'buttonOptions')} as $val => $optLabel)
+                                    <option value="{{ $val }}">{{ $optLabel }}</option>
                                 @endforeach
-                            </x-filament::input.select>
-                        </x-filament::input.wrapper>
-                    </div>
+                            @endif
+                        </x-filament::input.select>
+                    </x-filament::input.wrapper>
                 </div>
-
-                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                    <div class="pt-1.5">
-                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_pocket_model" />
-                    </div>
-                    <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Saku</label>
-                        <x-filament::input.wrapper>
-                            <x-filament::input.select wire:model="bulkEditData.pocket_model" :disabled="!$bulkEditData['apply_pocket_model']">
-                                @foreach($pocketOptions as $val => $label)
-                                    <option value="{{ $val }}">{{ $label }}</option>
-                                @endforeach
-                            </x-filament::input.select>
-                        </x-filament::input.wrapper>
-                    </div>
-                </div>
-
-                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                    <div class="pt-1.5">
-                        <x-filament::input.checkbox wire:model.live="bulkEditData.apply_button_model" />
-                    </div>
-                    <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Kancing</label>
-                        <x-filament::input.wrapper>
-                            <x-filament::input.select wire:model="bulkEditData.button_model" :disabled="!$bulkEditData['apply_button_model']">
-                                @foreach($buttonOptions as $val => $label)
-                                    <option value="{{ $val }}">{{ $label }}</option>
-                                @endforeach
-                            </x-filament::input.select>
-                        </x-filament::input.wrapper>
-                    </div>
-                </div>
+                @endforeach
             </div>
 
             <!-- Row 3: Req Tambahan (Tunic) & Harga -->
             <div class="grid grid-cols-2 gap-4">
-                <div class="flex items-start gap-3 p-4 rounded-xl border border-indigo-100 bg-indigo-50/20">
-                    <div class="pt-1.5">
+                <div class="p-4 rounded-xl border border-indigo-200 bg-indigo-50/20 space-y-4">
+                    <div class="flex items-center gap-2">
                         <x-filament::input.checkbox wire:model.live="bulkEditData.apply_is_tunic" />
+                        <label class="text-[10px] font-black uppercase tracking-widest text-indigo-700">Req. Tambahan</label>
                     </div>
                     <div class="flex-1 space-y-3">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-indigo-400">Req. Tambahan</label>
                         <div class="flex items-center gap-3">
                             <x-filament::input.checkbox wire:model.live="bulkEditData.is_tunic" id="bulkEditIsTunic" :disabled="!$bulkEditData['apply_is_tunic']" />
-                            <label for="bulkEditIsTunic" class="text-xs font-medium text-gray-700">Pakai Tunik?</label>
+                            <label for="bulkEditIsTunic" class="text-xs font-bold text-gray-700">Pakai Tunik?</label>
                         </div>
                         @if($bulkEditData['is_tunic'] && $bulkEditData['apply_is_tunic'])
                             <x-filament::input.wrapper prefix="Rp">
@@ -1024,16 +971,14 @@
                     </div>
                 </div>
 
-                <div class="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                    <div class="pt-1.5">
+                <div class="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-3">
+                    <div class="flex items-center gap-2">
                         <x-filament::input.checkbox wire:model.live="bulkEditData.apply_price" />
+                        <label class="text-[10px] font-black uppercase tracking-widest text-gray-700">Harga Satuan</label>
                     </div>
-                    <div class="flex-1 space-y-2">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Harga Satuan</label>
-                        <x-filament::input.wrapper prefix="Rp">
-                            <x-filament::input type="number" wire:model="bulkEditData.price" :disabled="!$bulkEditData['apply_price']" />
-                        </x-filament::input.wrapper>
-                    </div>
+                    <x-filament::input.wrapper prefix="Rp">
+                        <x-filament::input type="number" wire:model="bulkEditData.price" :disabled="!$bulkEditData['apply_price']" placeholder="0" />
+                    </x-filament::input.wrapper>
                 </div>
             </div>
         </div>
