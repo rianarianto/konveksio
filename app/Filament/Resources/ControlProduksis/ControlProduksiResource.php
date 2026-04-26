@@ -36,7 +36,7 @@ class ControlProduksiResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'PRODUKSI';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool
     {
@@ -75,9 +75,14 @@ class ControlProduksiResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('design_status', 'approved')
+            ->where('order_items.design_status', 'approved')
             ->with(['order.customer', 'productionTasks'])
-            ->latest('id');
+            ->whereIn('order_items.id', function (\Illuminate\Database\Query\Builder $query) {
+                $query->selectRaw('MIN(id)')
+                    ->from('order_items')
+                    ->where('design_status', 'approved')
+                    ->groupBy('order_id', 'product_name');
+            });
     }
 
 
@@ -102,19 +107,19 @@ class ControlProduksiResource extends Resource
                         'custom' => '🧵 Custom (Ukur Badan)',
                         'non_produksi' => '📦 Non-Produksi',
                         'jasa' => '🔧 Jasa',
-                        default => '🏭 Produksi',
+                        default => '🏭 Konveksi',
                     }),
 
-                TextColumn::make('recipient_name')
-                    ->label('Penerima')
-                    ->searchable()
-                    ->sortable()
-                    ->placeholder('-'),
-
-                TextColumn::make('quantity')
-                    ->label('Qty')
+                TextColumn::make('total_quantity')
+                    ->label('Total Qty')
+                    ->getStateUsing(
+                        fn(OrderItem $record): int => OrderItem::where('order_id', $record->order_id)
+                            ->where('product_name', $record->product_name)
+                            ->where('design_status', 'approved')
+                            ->sum('quantity')
+                    )
                     ->numeric()
-                    ->sortable(),
+                    ->sortable(['quantity']),
 
                 TextColumn::make('order.deadline')
                     ->label('Deadline')
@@ -133,7 +138,7 @@ class ControlProduksiResource extends Resource
                             return 'Selesai';
                         if ($tasks->where('status', 'in_progress')->count() > 0)
                             return 'Diproses';
-                        return 'Antrian'; // Semua masih pending, belum ada yang start
+                        return 'Antrian';
                     })
                     ->color(fn(string $state): string => match ($state) {
                         'Belum Diatur' => 'gray',
@@ -146,19 +151,14 @@ class ControlProduksiResource extends Resource
                         $tasks = $record->productionTasks;
                         if ($tasks->isEmpty())
                             return null;
-
-                        // Tampilkan tahap yang sedang berjalan
                         $activeTask = $tasks->firstWhere('status', 'in_progress');
                         if ($activeTask) {
                             return '🔨 ' . $activeTask->stage_name . ' — ' . ($activeTask->assignedTo?->name ?? '-');
                         }
-
-                        // Atau tahap pending pertama (antrian)
                         $pendingTask = $tasks->where('status', 'pending')->sortBy('id')->first();
                         if ($pendingTask) {
                             return '⏳ Menunggu: ' . $pendingTask->stage_name;
                         }
-
                         return null;
                     }),
 
@@ -186,21 +186,12 @@ class ControlProduksiResource extends Resource
                     })
                     ->collapsible(),
 
-                TableGroup::make('gender_group')
-                    ->label('Jenis Kelamin')
-                    ->getTitleFromRecordUsing(fn(OrderItem $record): string => match ($record->gender_group) {
-                        'L' => '👨 Laki-laki',
-                        'P' => '👩 Perempuan',
-                        default => '❓ Tidak Diset',
-                    })
-                    ->collapsible(),
             ])
             ->defaultGroup('order.order_number')
             ->modifyQueryUsing(
                 fn($query) => $query
                     ->join('orders', 'order_items.order_id', '=', 'orders.id')
                     ->select('order_items.*')
-                    ->selectRaw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.gender')), 'L') as gender_group")
                     ->orderByRaw('orders.is_express DESC')
                     ->orderBy('orders.deadline', 'asc')
             )
@@ -408,110 +399,143 @@ class ControlProduksiResource extends Resource
                                     if (!$item)
                                         return new HtmlString('');
 
-                                    $details = $item->size_and_request_details ?? [];
-                                    $html = '<div class="space-y-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800">';
-
-                                    // --- Row 1: Header (Product Name & Badges) ---
-                                    $html .= '<div class="flex flex-wrap items-center gap-3">';
-                                    $html .= '<h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 leading-none">' . htmlspecialchars($item->product_name ?? 'Produk Tak Bernama') . '</h3>';
-
-                                    $cat = $item->production_category ?? 'produksi';
-                                    $catLabel = mb_convert_case(str_replace('_', ' ', $cat), MB_CASE_TITLE, "UTF-8");
-                                    $html .= '<span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 border border-primary-100 dark:border-primary-800">' . $catLabel . '</span>';
-
-                                    $bahanArr = [];
-                                    $resolveName = function ($id, $type = 'material') {
-                                        if (!is_numeric($id))
-                                            return $id;
-                                        if ($type === 'material') {
-                                            return \App\Models\Material::find($id)?->name ?? $id;
-                                        }
-                                        return \App\Models\Product::find($id)?->name ?? $id;
+                                    $html = '<div class="text-sm pb-2">';
+                                    $name = htmlspecialchars($item->product_name ?? 'Produk Tak Bernama');
+                                    $cat = match ($item->production_category ?? 'produksi') {
+                                        'non_produksi' => 'Baju Jadi',
+                                        'jasa' => 'Jasa Murni',
+                                        default => 'Konveksi'
                                     };
+                                    $details = $item->size_and_request_details ?? [];
 
-                                    if ($cat === 'non_produksi') {
-                                        if (!empty($details['supplier_product']))
-                                            $bahanArr[] = htmlspecialchars($resolveName($details['supplier_product'], 'product'));
-                                    } elseif ($cat !== 'jasa') {
-                                        if (!empty($details['brand_bahan']))
-                                            $bahanArr[] = htmlspecialchars($details['brand_bahan']);
-                                        if (!empty($details['bahan']))
-                                            $bahanArr[] = htmlspecialchars($resolveName($details['bahan'], 'material'));
-                                        if (!empty($details['warna_bahan']))
-                                            $bahanArr[] = htmlspecialchars($details['warna_bahan']);
-                                    }
+                                    $html .= '<h4 class="mb-3 font-bold text-lg flex flex-col gap-0.5">';
+                                    $html .= '<span class="text-gray-900 dark:text-gray-100">' . $name . '</span>';
+                                    $html .= '<span class="text-[11px] font-bold text-primary-600 dark:text-primary-400 uppercase tracking-widest">[' . strtoupper($cat) . ']</span>';
+                                    $html .= '</h4>';
 
-                                    if (!empty($bahanArr)) {
-                                        $html .= '<span class="px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wide bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 shadow-sm">' . implode(' &nbsp;•&nbsp; ', $bahanArr) . '</span>';
+                                    // Bahan & Sablon Summary
+                                    $bahanName = htmlspecialchars($item->bahan->name ?? $details['bahan'] ?? '-');
+                                    $html .= '<div class="mb-4 text-[13px] space-y-1.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">';
+                                    $html .= '<p><strong class="text-gray-800 dark:text-gray-200">Bahan Utama :</strong> ' . $bahanName . '</p>';
+                                    $sablon = $details['sablon_bordir'] ?? [];
+                                    if (!empty($sablon)) {
+                                        $sbln = [];
+                                        foreach ($sablon as $s) {
+                                            $sbln[] = ($s['jenis'] ?? '') . ' (' . ($s['lokasi'] ?? '') . ')';
+                                        }
+                                        $html .= '<p><strong class="text-gray-800 dark:text-gray-200">Sablon / Bordir:</strong> ' . htmlspecialchars(implode(' | ', $sbln)) . '</p>';
+                                    } elseif (!empty($details['sablon_jenis']) || !empty($details['sablon_lokasi'])) {
+                                        $html .= '<p><strong class="text-gray-800 dark:text-gray-200">Sablon / Bordir:</strong> ' . htmlspecialchars(($details['sablon_jenis'] ?? '') . ' (' . ($details['sablon_lokasi'] ?? '') . ')') . '</p>';
                                     }
                                     $html .= '</div>';
 
-                                    // --- Row 2: Specs (Sablon/Bordir & Additional Request) ---
-                                    $specs = [];
-                                    if (!empty($details['sablon_jenis']))
-                                        $specs[] = '🎨 ' . htmlspecialchars($details['sablon_jenis']) . ' (' . htmlspecialchars($details['sablon_lokasi'] ?? 'Lokasi tidak diset') . ')';
+                                    // Fetch all items for this product group
+                                    $allItems = OrderItem::where('order_id', $item->order_id)
+                                        ->where('product_name', $item->product_name)
+                                        ->where('design_status', 'approved')
+                                        ->get();
 
-                                    $requests = $details['request_tambahan'] ?? [];
-                                    if (!empty($requests)) {
-                                        $reqStr = [];
-                                        foreach ($requests as $r) {
-                                            if (isset($r['jenis'])) {
-                                                $uk = isset($r['ukuran']) ? ($r['ukuran'] === '__semua__' ? 'Semua Ukuran' : $r['ukuran']) : '';
-                                                $reqStr[] = htmlspecialchars($r['jenis']) . ($uk ? " ($uk)" : "");
-                                            }
+                                    // Build gender accordion
+                                    $genders = [];
+                                    foreach ($allItems as $ai) {
+                                        $aiDetails = $ai->size_and_request_details ?? [];
+                                        $g = $aiDetails['gender'] ?? 'L';
+                                        if (!isset($genders[$g])) {
+                                            $genders[$g] = ['qty' => 0, 'variations' => []];
                                         }
-                                        if (!empty($reqStr))
-                                            $specs[] = '🛠️ ' . implode(', ', $reqStr);
+                                        $genders[$g]['qty'] += $ai->quantity;
+
+                                        $parts = [];
+                                        if (isset($aiDetails['sleeve_model']))
+                                            $parts[] = 'Lengan ' . ucfirst($aiDetails['sleeve_model']);
+                                        if (isset($aiDetails['pocket_model']) && $aiDetails['pocket_model'] !== 'tanpa_saku')
+                                            $parts[] = 'Saku ' . ucfirst(str_replace('_', ' ', $aiDetails['pocket_model']));
+                                        if (isset($aiDetails['button_model']) && $aiDetails['button_model'] !== 'biasa')
+                                            $parts[] = 'Kancing ' . ucfirst(str_replace('_', ' ', $aiDetails['button_model']));
+                                        if (!empty($aiDetails['is_tunic']))
+                                            $parts[] = 'Tunik/Gamis';
+                                        $varKey = empty($parts) ? 'Model Standar' : implode(', ', $parts);
+
+                                        if (!isset($genders[$g]['variations'][$varKey])) {
+                                            $genders[$g]['variations'][$varKey] = [
+                                                'qty' => 0,
+                                                'sizes' => [],
+                                                'requests' => [],
+                                                'custom' => [],
+                                                'attributes' => [
+                                                    'Lengan' => isset($aiDetails['sleeve_model']) ? ucfirst($aiDetails['sleeve_model']) : 'Pendek',
+                                                    'Saku' => isset($aiDetails['pocket_model']) && $aiDetails['pocket_model'] !== 'tanpa_saku' ? ucfirst(str_replace('_', ' ', $aiDetails['pocket_model'])) : 'Tanpa Saku',
+                                                    'Kancing' => isset($aiDetails['button_model']) && $aiDetails['button_model'] !== 'biasa' ? ucfirst(str_replace('_', ' ', $aiDetails['button_model'])) : 'Biasa',
+                                                    'Tunik' => !empty($aiDetails['is_tunic']) ? 'Ya' : 'Tidak',
+                                                ]
+                                            ];
+                                        }
+                                        $genders[$g]['variations'][$varKey]['qty'] += $ai->quantity;
+                                        $sz = $ai->size ?? 'Tanpa Ukuran';
+                                        $genders[$g]['variations'][$varKey]['sizes'][$sz] = ($genders[$g]['variations'][$varKey]['sizes'][$sz] ?? 0) + $ai->quantity;
+                                        $req = trim($aiDetails['request_tambahan'] ?? '');
+                                        if (!empty($req))
+                                            $genders[$g]['variations'][$varKey]['requests'][] = $req;
+                                        // Custom measurements
+                                        if ($ai->size === 'Custom' && $ai->recipient_name) {
+                                            $m = [];
+                                            foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
+                                                if (!empty($aiDetails[$mk]))
+                                                    $m[] = $mk . ':' . $aiDetails[$mk];
+                                            }
+                                            $genders[$g]['variations'][$varKey]['custom'][] = $ai->recipient_name . (!empty($m) ? ' (' . implode(' ', $m) . ')' : '');
+                                        }
                                     }
 
-                                    if (!empty($specs)) {
-                                        $html .= '<div class="flex flex-wrap gap-x-6 gap-y-2 text-xs font-medium text-gray-600 dark:text-gray-400">';
-                                        foreach ($specs as $s) {
-                                            $html .= '<span>' . $s . '</span>';
+                                    // Render Accordion
+                                    if (in_array($cat, ['Konveksi'])) {
+                                        $html .= '<p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">BRIEFING PRODUKSI</p>';
+                                        $html .= '<div class="space-y-2">';
+                                        foreach ($genders as $gCode => $gData) {
+                                            $gName = $gCode === 'P' ? 'Perempuan' : 'Laki-laki';
+                                            $html .= '<div x-data="{ expanded: true }" class="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 overflow-hidden shadow-sm">';
+                                            $html .= '<button @click="expanded = !expanded" type="button" class="w-full flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">';
+                                            $html .= '<div class="flex items-center gap-2"><span class="font-bold text-gray-800 dark:text-gray-200">' . $gName . ' :</span><span class="text-xs font-bold bg-gray-800 dark:bg-gray-600 py-0.5 rounded-full ">' . $gData['qty'] . ' pcs</span></div>';
+                                            $html .= '<svg :class="expanded ? \'rotate-180\' : \'\'" class="w-4 h-4 text-gray-500 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';
+                                            $html .= '</button>';
+                                            $html .= '<div x-show="expanded" x-collapse class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 space-y-4">';
+                                            foreach ($gData['variations'] as $vKey => $vData) {
+                                                $html .= '<div>';
+                                                $html .= '<p class="font-semibold text-[13px] text-gray-800 dark:text-gray-200 leading-snug">' . htmlspecialchars($vKey) . ' <span class="text-xs font-normal text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded ml-1">' . $vData['qty'] . ' pcs</span></p>';
+                                                $html .= '<div class="ml-4 mt-1.5 space-y-1">';
+                                                
+                                                // Attributes
+                                                $attrStrs = [];
+                                                foreach ($vData['attributes'] as $attrKey => $attrVal) {
+                                                    $attrStrs[] = '<span class="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-[11px] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700"><strong class="text-gray-700 dark:text-gray-300">' . $attrKey . ':</strong> ' . $attrVal . '</span>';
+                                                }
+                                                $html .= '<div class="flex flex-wrap gap-1.5 mb-1.5">' . implode('', $attrStrs) . '</div>';
+
+                                                $sizeStrs = [];
+                                                foreach ($vData['sizes'] as $szName => $sqty) {
+                                                    $sizeStrs[] = htmlspecialchars($szName) . ' (' . $sqty . ')';
+                                                }
+                                                $html .= '<div class="text-[12px] text-gray-600 dark:text-gray-400"><strong>Size:</strong> ' . implode(', ', $sizeStrs) . '</div>';
+                                                if (!empty($vData['custom'])) {
+                                                    $html .= '<div class="text-[12px] text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded border border-purple-100 dark:border-purple-800/50"><strong class="block mb-0.5">Ukuran Custom:</strong>';
+                                                    foreach ($vData['custom'] as $c) {
+                                                        $html .= '<div>• ' . htmlspecialchars($c) . '</div>';
+                                                    }
+                                                    $html .= '</div>';
+                                                }
+                                                if (!empty($vData['requests'])) {
+                                                    $html .= '<div class="text-[12px] text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded border border-orange-100 dark:border-orange-800/50"><strong class="block mb-0.5">Catatan:</strong>';
+                                                    foreach ($vData['requests'] as $req) {
+                                                        $html .= '<div>• ' . htmlspecialchars($req) . '</div>';
+                                                    }
+                                                    $html .= '</div>';
+                                                }
+                                                $html .= '</div></div>';
+                                            }
+                                            $html .= '</div></div>';
                                         }
                                         $html .= '</div>';
                                     }
-
-                                    // --- Row 3: Measurement Details ---
-                                    $html .= '<div class="pt-3 border-t border-dashed border-gray-200 dark:border-gray-700">';
-
-                                    if ($cat === 'custom' && !empty($details['detail_custom'])) {
-                                        $html .= '<p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Detail Ukuran Custom</p>';
-                                        $customItems = [];
-                                        foreach ($details['detail_custom'] as $u) {
-                                            $person = htmlspecialchars($u['nama'] ?? 'TN');
-                                            $mParts = [];
-                                            if (!empty($u['LD']))
-                                                $mParts[] = "LD:$u[LD]";
-                                            if (!empty($u['PL']))
-                                                $mParts[] = "PL:$u[PL]";
-                                            if (!empty($u['LP']))
-                                                $mParts[] = "LP:$u[LP]";
-                                            if (!empty($u['LB']))
-                                                $mParts[] = "LB:$u[LB]";
-                                            if (!empty($u['LPi']))
-                                                $mParts[] = "LPi:$u[LPi]";
-                                            if (!empty($u['PB']))
-                                                $mParts[] = "PB:$u[PB]";
-
-                                            $mStr = !empty($mParts) ? '<span class="text-gray-500 font-normal"> (' . implode(' ', $mParts) . ')</span>' : '';
-                                            $customItems[] = "<div class='text-xs py-1 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-100 dark:border-gray-800 shadow-sm'><span class='font-bold text-gray-800 dark:text-gray-200'>$person</span>$mStr</div>";
-                                        }
-                                        $html .= '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">' . implode('', $customItems) . '</div>';
-                                    } else {
-                                        $varian = $details['varian_ukuran'] ?? [];
-                                        if (!empty($varian)) {
-                                            $html .= '<p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Daftar Ukuran</p>';
-                                            $vItems = [];
-                                            foreach ($varian as $v) {
-                                                $size = htmlspecialchars($v['ukuran'] ?? '-');
-                                                $qty = htmlspecialchars($v['qty'] ?? 0);
-                                                $vItems[] = "<span class='px-2 py-1 bg-white dark:bg-gray-800 rounded border border-gray-100 dark:border-gray-800 text-xs font-bold text-gray-700 dark:text-gray-300'>Size $size: <span class='text-primary-600'>$qty pcs</span></span>";
-                                            }
-                                            $html .= '<div class="flex flex-wrap gap-2">' . implode('', $vItems) . '</div>';
-                                        }
-                                    }
-                                    $html .= '</div>';
 
                                     $html .= '</div>';
                                     return new HtmlString($html);
@@ -632,19 +656,33 @@ class ControlProduksiResource extends Resource
                                                 $set('quantity', $total > 0 ? $total : 0);
                                             };
 
-                                            // Ekstrak ukuran + stok dari detail order
-                                            $extractSizes = function () use ($details): array {
+                                            // Ekstrak ukuran + stok dari SEMUA items dalam grup produk
+                                            $extractSizes = function () use ($item, $details): array {
+                                                // Aggregate from all items in the product group
+                                                $allGroupItems = OrderItem::where('order_id', $item->order_id)
+                                                    ->where('product_name', $item->product_name)
+                                                    ->where('design_status', 'approved')
+                                                    ->get();
+
                                                 $sizes = [];
-                                                if (isset($details['sizes']) && is_array($details['sizes'])) {
-                                                    foreach ($details['sizes'] as $sz => $qty) {
-                                                        if ((int) $qty > 0)
-                                                            $sizes[strtoupper($sz)] = (int) $qty;
-                                                    }
-                                                } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
-                                                    foreach ($details['varian_ukuran'] as $v) {
-                                                        $sz = strtoupper($v['ukuran'] ?? '');
-                                                        if ($sz && (int) ($v['qty'] ?? 0) > 0) {
-                                                            $sizes[$sz] = (int) $v['qty'];
+                                                foreach ($allGroupItems as $gi) {
+                                                    $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                                                    $sizes[$sz] = ($sizes[$sz] ?? 0) + $gi->quantity;
+                                                }
+
+                                                // Fallback: try old format from details
+                                                if (empty($sizes)) {
+                                                    if (isset($details['sizes']) && is_array($details['sizes'])) {
+                                                        foreach ($details['sizes'] as $sz => $qty) {
+                                                            if ((int) $qty > 0)
+                                                                $sizes[strtoupper($sz)] = (int) $qty;
+                                                        }
+                                                    } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
+                                                        foreach ($details['varian_ukuran'] as $v) {
+                                                            $sz = strtoupper($v['ukuran'] ?? '');
+                                                            if ($sz && (int) ($v['qty'] ?? 0) > 0) {
+                                                                $sizes[$sz] = (int) $v['qty'];
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -815,25 +853,44 @@ class ControlProduksiResource extends Resource
                         // PERSIAPAN DATA KAPASITAS ASLI
                         // ══════════════════════════════════════════════════════════════
                         $originalSizes = []; // ['S' => 20, 'M' => 30, ...]
-                        if (isset($details['sizes']) && is_array($details['sizes'])) {
-                            foreach ($details['sizes'] as $sz => $qty) {
-                                if ((int) $qty > 0)
-                                    $originalSizes[strtoupper($sz)] = (int) $qty;
-                            }
-                        } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
-                            foreach ($details['varian_ukuran'] as $v) {
-                                $sz = strtoupper($v['ukuran'] ?? '');
-                                if ($sz && (int) ($v['qty'] ?? 0) > 0)
-                                    $originalSizes[$sz] = (int) $v['qty'];
-                            }
-                        } elseif ($category === 'custom' && !empty($details['detail_custom'])) {
-                            // Kategori custom: qty = jumlah orang (nama)
-                            foreach ($details['detail_custom'] as $index => $u) {
-                                $person = strtoupper($u['nama'] ?? 'Person ' . ($index + 1));
-                                $originalSizes[$person] = 1;
+                        // Aggregate from all items in the product group
+                        $allGroupItems = OrderItem::where('order_id', $item->order_id)
+                            ->where('product_name', $item->product_name)
+                            ->where('design_status', 'approved')
+                            ->get();
+
+                        foreach ($allGroupItems as $gi) {
+                            $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                            if ($sz !== 'CUSTOM') {
+                                $originalSizes[$sz] = ($originalSizes[$sz] ?? 0) + $gi->quantity;
+                            } else {
+                                // Custom: use recipient name as key
+                                $pName = strtoupper($gi->recipient_name ?? 'CUSTOM_' . $gi->id);
+                                $originalSizes[$pName] = ($originalSizes[$pName] ?? 0) + $gi->quantity;
                             }
                         }
-                        $totalOrderQty = $item->quantity ?? 0;
+
+                        // Fallback: try old format
+                        if (empty($originalSizes)) {
+                            if (isset($details['sizes']) && is_array($details['sizes'])) {
+                                foreach ($details['sizes'] as $sz => $qty) {
+                                    if ((int) $qty > 0)
+                                        $originalSizes[strtoupper($sz)] = (int) $qty;
+                                }
+                            } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
+                                foreach ($details['varian_ukuran'] as $v) {
+                                    $sz = strtoupper($v['ukuran'] ?? '');
+                                    if ($sz && (int) ($v['qty'] ?? 0) > 0)
+                                        $originalSizes[$sz] = (int) $v['qty'];
+                                }
+                            } elseif ($category === 'custom' && !empty($details['detail_custom'])) {
+                                foreach ($details['detail_custom'] as $index => $u) {
+                                    $person = strtoupper($u['nama'] ?? 'Person ' . ($index + 1));
+                                    $originalSizes[$person] = 1;
+                                }
+                            }
+                        }
+                        $totalOrderQty = $allGroupItems->sum('quantity');
 
                         // ══════════════════════════════════════════════════════════════
                         // AGREGASI: Qty & stage dari semua baris tugas
@@ -969,32 +1026,8 @@ class ControlProduksiResource extends Resource
                             // Extract size_quantities which are dynamically generated inputs flattened by Fieldset
                             $sizeQuantities = [];
 
-                            // The keys we want to grab depend on the item category
-                            $sizesToLookFor = [];
-                            if ($item->production_category === 'custom') {
-                                $details = $item->size_and_request_details ?? [];
-                                if (!empty($details['detail_custom']) && is_array($details['detail_custom'])) {
-                                    foreach ($details['detail_custom'] as $index => $u) {
-                                        $person = trim($u['nama'] ?? 'Person ' . ($index + 1));
-                                        $safeKey = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', $person) . '_' . $index);
-                                        $sizesToLookFor[] = $safeKey;
-                                    }
-                                }
-                            } else {
-                                $details = $item->size_and_request_details ?? [];
-                                if (isset($details['sizes']) && is_array($details['sizes'])) {
-                                    foreach ($details['sizes'] as $sz => $qty) {
-                                        if ((int) $qty > 0)
-                                            $sizesToLookFor[] = strtoupper($sz);
-                                    }
-                                } elseif (isset($details['varian_ukuran']) && is_array($details['varian_ukuran'])) {
-                                    foreach ($details['varian_ukuran'] as $v) {
-                                        $sz = strtoupper($v['ukuran'] ?? '');
-                                        if ($sz && (int) ($v['qty'] ?? 0) > 0)
-                                            $sizesToLookFor[] = $sz;
-                                    }
-                                }
-                            }
+                            // The keys we want to grab depend on the aggregated originalSizes (already computed)
+                            $sizesToLookFor = array_keys($originalSizes);
 
                             // Extract these specific keys from $taskItem if they exist and are greater than 0
                             foreach ($sizesToLookFor as $key) {

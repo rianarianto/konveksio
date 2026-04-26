@@ -40,15 +40,15 @@ class ManageControlProduksis extends ManageRecords
             'semua' => Tab::make('Semua')
                 ->badge(fn() => ControlProduksiResource::getEloquentQuery()->count()),
             'siap_potong' => Tab::make('Siap Potong')
-                ->modifyQueryUsing(fn(Builder $query) => $query->whereHas('orderItems.productionTasks', function ($q) {
+                ->modifyQueryUsing(fn(Builder $query) => $query->whereHas('productionTasks', function ($q) {
                     $q->where('stage_name', 'Potong')->where('status', 'pending');
                 })),
             'sedang_jahit' => Tab::make('Sedang Jahit')
-                ->modifyQueryUsing(fn(Builder $query) => $query->whereHas('orderItems.productionTasks', function ($q) {
+                ->modifyQueryUsing(fn(Builder $query) => $query->whereHas('productionTasks', function ($q) {
                     $q->where('stage_name', 'Jahit')->whereIn('status', ['pending', 'in_progress']);
                 })),
             'siap_qc' => Tab::make('Siap QC')
-                ->modifyQueryUsing(fn(Builder $query) => $query->whereHas('orderItems.productionTasks', function ($q) {
+                ->modifyQueryUsing(fn(Builder $query) => $query->whereHas('productionTasks', function ($q) {
                     $q->where('stage_name', 'QC')->where('status', 'pending');
                 })),
         ];

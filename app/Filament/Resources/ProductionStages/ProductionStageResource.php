@@ -33,12 +33,12 @@ class ProductionStageResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'KONVEKSI';
+        return 'PRODUKSI';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 4;
+        return 3;
     }
 
     public static function canAccess(): bool
@@ -48,12 +48,12 @@ class ProductionStageResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return 'Tahapan Konveksi';
+        return 'Tahapan Produksi';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'Tahapan Konveksi';
+        return 'Tahapan Produksi';
     }
 
     protected static bool $isScopedToTenant = true;

@@ -54,7 +54,7 @@ class AdminPanelProvider extends PanelProvider
                 \Filament\Navigation\NavigationGroup::make()
                     ->label('KEUANGAN'),
                 \Filament\Navigation\NavigationGroup::make()
-                    ->label('KONVEKSI'),
+                    ->label('PRODUKSI'),
                 \Filament\Navigation\NavigationGroup::make()
                     ->label('INVENTORI & MASTER'),
                 \Filament\Navigation\NavigationGroup::make()
