@@ -29,6 +29,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -126,6 +127,31 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Bahan')
                     ->options($bahanOptions)
                     ->sortable(),
+
+                TextColumn::make('specs_summary')
+                    ->label('Spek & Aplikasi')
+                    ->wrap()
+                    ->size('xs')
+                    ->getStateUsing(function (OrderItem $record) {
+                        $d = $record->size_and_request_details ?? [];
+                        $specs = [];
+                        
+                        if (isset($d['gender'])) $specs[] = $d['gender'];
+                        if (isset($d['sleeve_model'])) $specs[] = substr($d['sleeve_model'], 0, 3) . '.';
+                        
+                        $sb = $d['sablon_bordir'] ?? [];
+                        $sbList = [];
+                        foreach ($sb as $item) {
+                            $sbList[] = ($item['jenis'] ?? '') . ' (' . ($item['lokasi'] ?? '') . ')';
+                        }
+                        
+                        $summary = implode(', ', $specs);
+                        if (!empty($sbList)) {
+                            $summary .= " | " . implode('; ', $sbList);
+                        }
+                        
+                        return $summary ?: '-';
+                    }),
 
                 TextInputColumn::make('price')
                     ->label('Harga')
@@ -312,6 +338,17 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ->inline(false)
                                         ->extraAttributes(['class' => 'mt-2']),
                                 ]),
+                                Grid::make(2)->schema([
+                                    Select::make('bulk_sablon_teknik')
+                                        ->label('Teknik Sablon / Bordir')
+                                        ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
+                                        ->searchable(),
+                                    Select::make('bulk_sablon_lokasi')
+                                        ->label('Posisi / Lokasi (Bisa pilih banyak)')
+                                        ->options(\App\Models\PrintType::where('category', 'lokasi')->pluck('name', 'name'))
+                                        ->multiple()
+                                        ->searchable(),
+                                ]),
                             ])
                             ->visible(fn (Get $get) => $get('bulk_category') === 'produksi'),
 
@@ -399,6 +436,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     'pocket_model' => $data['bulk_pocket'] ?? 'tanpa_saku',
                                     'button_model' => $data['bulk_button'] ?? 'biasa',
                                     'is_tunic' => (bool) ($data['bulk_is_tunic'] ?? false),
+                                    'sablon_bordir' => !empty($data['bulk_sablon_teknik']) ? [[
+                                        'jenis' => $data['bulk_sablon_teknik'],
+                                        'lokasi' => !empty($data['bulk_sablon_lokasi']) ? implode(', ', $data['bulk_sablon_lokasi']) : '-',
+                                    ]] : [],
                                 ];
                             }
 
@@ -508,6 +549,17 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 ->inline(false)
                                 ->extraAttributes(['class' => 'mt-2']),
                         ]),
+                        Grid::make(2)->schema([
+                            Select::make('sablon_teknik')
+                                ->label('Teknik Sablon / Bordir')
+                                ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
+                                ->searchable(),
+                            Select::make('sablon_lokasi')
+                                ->label('Posisi / Lokasi (Multi)')
+                                ->options(\App\Models\PrintType::where('category', 'lokasi')->pluck('name', 'name'))
+                                ->multiple()
+                                ->searchable(),
+                        ]),
                         Section::make('Ukuran Badan (cm)')->schema([
                             Grid::make(3)->schema([
                                 TextInput::make('LD')->label('LD (L. Dada)')->numeric()->suffix('cm'),
@@ -526,12 +578,27 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         $data = $record->size_and_request_details ?? [];
                         $data['bahan_id'] = $record->bahan_id;
                         $data['price'] = $record->price;
+                        
+                        // Map back for form
+                        $sb = $data['sablon_bordir'][0] ?? null;
+                        if ($sb) {
+                            $data['sablon_teknik'] = $sb['jenis'] ?? null;
+                            $data['sablon_lokasi'] = !empty($sb['lokasi']) ? explode(', ', $sb['lokasi']) : [];
+                        }
+                        
                         return $data;
                     })
                     ->action(function (OrderItem $record, array $data): void {
                         $bahanId = $data['bahan_id'] ?? null;
                         $price = $data['price'] ?? 0;
-                        unset($data['bahan_id'], $data['price']);
+                        
+                        // Map to JSON structure
+                        $data['sablon_bordir'] = !empty($data['sablon_teknik']) ? [[
+                            'jenis' => $data['sablon_teknik'],
+                            'lokasi' => !empty($data['sablon_lokasi']) ? implode(', ', $data['sablon_lokasi']) : '-',
+                        ]] : [];
+                        
+                        unset($data['bahan_id'], $data['price'], $data['sablon_teknik'], $data['sablon_lokasi']);
 
                         $record->update([
                             'bahan_id' => $bahanId,
@@ -620,6 +687,17 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     ])
                                     ->placeholder('Biarkan aslinya...'),
                             ]),
+                            Grid::make(2)->schema([
+                                Select::make('sablon_teknik')
+                                    ->label('Teknik Sablon / Bordir (Massal)')
+                                    ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
+                                    ->searchable(),
+                                Select::make('sablon_lokasi')
+                                    ->label('Posisi / Lokasi (Massal)')
+                                    ->options(\App\Models\PrintType::where('category', 'lokasi')->pluck('name', 'name'))
+                                    ->multiple()
+                                    ->searchable(),
+                            ]),
                         ];
                     })
                     ->action(function (Collection $records, array $data): void {
@@ -639,6 +717,14 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 if (filled($data[$field])) {
                                     $details[$field] = $data[$field];
                                 }
+                            }
+
+                            // Handle sablon/bordir specially
+                            if (filled($data['sablon_teknik'])) {
+                                $details['sablon_bordir'] = [[
+                                    'jenis' => $data['sablon_teknik'],
+                                    'lokasi' => filled($data['sablon_lokasi']) ? implode(', ', $data['sablon_lokasi']) : '-',
+                                ]];
                             }
 
                             if (filled($data['is_tunic'])) {
