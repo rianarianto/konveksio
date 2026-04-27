@@ -23,7 +23,11 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 2. Data Migration: Move existing data to variants
+        // 2. Data Migration & Schema Update
+        Schema::table('order_items', function (Blueprint $table) {
+            $table->dropForeign(['bahan_id']);
+        });
+
         DB::transaction(function () {
             $materials = DB::table('materials')->get();
 
@@ -55,6 +59,10 @@ return new class extends Migration
             }
         });
 
+        Schema::table('order_items', function (Blueprint $table) {
+            $table->foreign('bahan_id')->references('id')->on('material_variants')->nullOnDelete();
+        });
+
         // 3. Remove columns from materials table
         Schema::table('materials', function (Blueprint $table) {
             $table->dropColumn(['color_code', 'current_stock', 'min_stock']);
@@ -73,7 +81,11 @@ return new class extends Migration
             $table->decimal('min_stock', 15, 2)->default(0);
         });
 
-        // 2. Data Migration: Move data back to materials
+        // 2. Data Migration & Schema Revert
+        Schema::table('order_items', function (Blueprint $table) {
+            $table->dropForeign(['bahan_id']);
+        });
+
         DB::transaction(function () {
             $variants = DB::table('material_variants')->get();
 
@@ -100,6 +112,10 @@ return new class extends Migration
                         'stockable_id' => $variant->material_id
                     ]);
             }
+        });
+
+        Schema::table('order_items', function (Blueprint $table) {
+            $table->foreign('bahan_id')->references('id')->on('materials')->nullOnDelete();
         });
 
         // 3. Drop material_variants table

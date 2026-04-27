@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use App\Models\Material;
+use App\Models\MaterialVariant;
 use App\Models\ProductVariant;
 
 class OrderItem extends Model
@@ -71,11 +72,11 @@ class OrderItem extends Model
             if ($oldBahanId !== $newBahanId || $oldBahanUsage !== $newBahanUsage) {
                 // Refund data lama jika ada
                 if ($oldBahanId && $oldBahanUsage > 0) {
-                    Material::where('id', $oldBahanId)->increment('current_stock', $oldBahanUsage);
+                    MaterialVariant::where('id', $oldBahanId)->increment('current_stock', $oldBahanUsage);
                 }
                 // Potong data baru jika ada
                 if ($newBahanId && $newBahanUsage > 0) {
-                    Material::where('id', $newBahanId)->decrement('current_stock', $newBahanUsage);
+                    MaterialVariant::where('id', $newBahanId)->decrement('current_stock', $newBahanUsage);
                 }
             }
 
@@ -232,7 +233,7 @@ class OrderItem extends Model
 
     public function bahan(): BelongsTo
     {
-        return $this->belongsTo(Material::class, 'bahan_id');
+        return $this->belongsTo(MaterialVariant::class, 'bahan_id');
     }
 
     public function productionTasks(): HasMany
