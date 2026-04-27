@@ -92,6 +92,17 @@ class EditOrder extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        // Jika pesanan masih draft, dan sudah ada item pesanan atau ada nominal DP yang diinput,
+        // maka otomatis ubah statusnya menjadi 'diterima' agar masuk ke meja desain/produksi.
+        if ($this->record->status === 'draft') {
+            $hasItems = $this->record->orderItems()->exists();
+            $hasInitialPayment = (int) ($data['initial_payment_amount'] ?? 0) > 0;
+
+            if ($hasItems || $hasInitialPayment) {
+                $data['status'] = 'diterima';
+            }
+        }
+
         return $data;
     }
 

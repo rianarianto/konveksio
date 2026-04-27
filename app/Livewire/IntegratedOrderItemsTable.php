@@ -223,6 +223,35 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         })
                                         ->required()
                                         ->placeholder('Pilih atau ketik nama baru...')
+                                        ->live(onBlur: true)
+                                        ->afterStateUpdated(function ($state, Set $set) {
+                                            if (!$state) return;
+
+                                            // Cari item terakhir dengan nama produk yang sama di pesanan ini
+                                            $existing = OrderItem::where('order_id', $this->order->id)
+                                                ->where('product_name', $state)
+                                                ->latest('id')
+                                                ->first();
+
+                                            if ($existing) {
+                                                $details = $existing->size_and_request_details ?? [];
+
+                                                $set('bulk_category', $existing->production_category === 'custom' ? 'produksi' : ($existing->production_category ?? 'produksi'));
+                                                $set('bulk_bahan', $existing->bahan_id);
+                                                $set('bulk_material_variant_id', $details['material_variant_id'] ?? null);
+                                                $set('bulk_price', $existing->price ?? 0);
+                                                $set('bulk_gender', $details['gender'] ?? 'L');
+                                                $set('bulk_sleeve', $details['sleeve_model'] ?? 'pendek');
+                                                $set('bulk_pocket', $details['pocket_model'] ?? 'tanpa_saku');
+                                                $set('bulk_button', $details['button_model'] ?? 'biasa');
+                                                $set('bulk_is_tunic', (bool) ($details['is_tunic'] ?? false));
+
+                                                Notification::make()
+                                                    ->title("Spesifikasi '{$state}' berhasil disalin!")
+                                                    ->success()
+                                                    ->send();
+                                            }
+                                        })
                                         ->columnSpan(2),
                                 ]),
                             ]),

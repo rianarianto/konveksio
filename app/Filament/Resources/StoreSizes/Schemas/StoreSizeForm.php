@@ -23,6 +23,7 @@ class StoreSizeForm
                         \Filament\Forms\Components\TextInput::make('sort_order')
                             ->label('Urutan Sorting')
                             ->numeric()
+                            ->default(0)
                             ->placeholder('0')
                             ->helperText('Angka yang lebih kecil tampil lebih dulu (0, 1, 2, dst)'),
                         \Filament\Forms\Components\Toggle::make('is_active')

@@ -13,10 +13,11 @@
     $hasItems = $items->isNotEmpty();
 @endphp
 
-<div class="p-10 bg-white dark:bg-gray-900 rounded-xl">
-    <div class="max-w-full space-y-8">
+<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
+    <div class="max-w-full space-y-10" style="padding: 30px 30px;">
         <!-- List Produk -->
-        <div class="space-y-3">
+        <div class="space-y-4">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2 px-2">Item Pesanan</h3>
             @foreach ($items as $item)
                 @php
                     $name = htmlspecialchars($item->product_name ?: 'Produk');
@@ -44,25 +45,25 @@
                     };
                 @endphp
 
-                <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border:1.5px solid #e9d5ff;border-radius:12px;background:#faf5ff;width:100%;">
+                <div style="display:flex;align-items:center;gap:12px;padding:16px 24px;border:1.5px solid #e9d5ff;border-radius:14px;background:#faf5ff;width:100%;transition:all 0.2s;">
                     <span style="{{ $badgeStyle }} border: 1px solid #d8b4fe;">{{ $badgeLabel }}</span>
                     <div style="flex:1;min-width:0;">
-                        <div style="font-size:14px;font-weight:600;color:#1f2937;">
+                        <div style="font-size:15px;font-weight:600;color:#1f2937;">
                             {{ $totalQty }}x {{ $name }} 
-                            <span style="font-size:12px;font-weight:400;color:#6b7280;margin-left:4px;">({{ $sizes }})</span>
+                            <span style="font-size:13px;font-weight:400;color:#6b7280;margin-left:4px;">({{ $sizes }})</span>
                         </div>
-                        <div style="font-size:13px;font-weight:700;color:#7c3aed;margin-top:2px;">{{ $fmt($totalPrice) }}</div>
+                        <div style="font-size:14px;font-weight:700;color:#7c3aed;margin-top:2px;">{{ $fmt($totalPrice) }}</div>
                     </div>
                 </div>
             @endforeach
 
             @if (!$hasItems)
-                <p style="color:#9ca3af;font-size:14px;font-style:italic;">Belum ada produk ditambahkan</p>
+                <p style="color:#9ca3af;font-size:14px;font-style:italic;" class="px-2">Belum ada produk ditambahkan</p>
             @endif
         </div>
 
         <!-- Rincian Biaya -->
-        <div style="margin-top:24px;border-top:2px solid #f3f4f6;padding-top:20px;max-width:100%;">
+        <div style="margin-top:32px;border-top:2px solid #f3f4f6;padding-top:24px;max-width:100%;" class="px-2">
             @php
                 $shipping = (int) ($record->shipping_cost ?? 0);
                 $tax = (int) ($record->tax ?? 0);
@@ -90,25 +91,25 @@
             {!! $row('PPn 11%', $fmt($tax)) !!}
             {!! $row('Potongan Diskon', '- ' . $fmt($discount), false, false) !!}
 
-            <hr style="border:none;border-top:1.5px dashed #e5e7eb;margin:12px 0;">
+            <hr style="border:none;border-top:1.5px dashed #e5e7eb;margin:16px 0;">
 
-            {!! $row('Total Tagihan', $fmt($total), true, true, '18px') !!}
-            {!! $row('Total Telah Dibayar', $fmt($totalPaid), false, false, '14px') !!}
+            {!! $row('Total Tagihan', $fmt($total), true, true, '20px') !!}
+            {!! $row('Total Telah Dibayar', $fmt($totalPaid), false, false, '15px') !!}
 
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:16px;background:#f3e8ff;border-radius:12px;border:1px solid #e9d5ff;">
-                <span style="color:#6b7280;font-size:15px;font-weight:700;">Sisa Tagihan</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:20px 24px;background:#f3e8ff;border-radius:14px;border:1px solid #e9d5ff;">
+                <span style="color:#333333;font-size:16px;font-weight:700;">Sisa Tagihan</span>
                 @if ($remaining <= 0)
-                    <span style="background:#22c55e;color:white;font-size:12px;font-weight:800;padding:4px 14px;border-radius:20px;text-transform:uppercase;letter-spacing:0.05em;box-shadow:0 2px 4px rgba(34,197,94,0.2);">Lunas</span>
+                    <span style="background:#22c55e;color:white;font-size:13px;font-weight:800;padding:6px 16px;border-radius:20px;text-transform:uppercase;letter-spacing:0.05em;box-shadow:0 2px 4px rgba(34,197,94,0.2);">Lunas</span>
                 @else
-                    <span style="color:#7c3aed;font-weight:900;font-size:22px;letter-spacing:-0.02em;">{{ $fmt($remaining) }}</span>
+                    <span style="color:#7c3aed;font-weight:900;font-size:26px;letter-spacing:-0.02em;">{{ $fmt($remaining) }}</span>
                 @endif
             </div>
 
             <!-- Tombol Kuitansi -->
-            <div style="margin-top:24px;">
+            <div style="margin-top:32px;">
                 <a href="{{ route('orders.receipt', $record) }}" target="_blank" 
-                   style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:#f9fafb;color:#4b5563;border:1.5px solid #e5e7eb;border-radius:12px;text-decoration:none;font-weight:700;font-size:13px;transition:all 0.2s;">
-                    <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 012-2H5a2 2 0 012 2v4a2 2 0 002 2m8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v7h10z"></path></svg>
+                   style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px;background:#f9fafb;color:#4b5563;border:1.5px solid #e5e7eb;border-radius:14px;text-decoration:none;font-weight:700;font-size:14px;transition:all 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                    <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 012-2H5a2 2 0 012 2v4a2 2 0 002 2m8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v7h10z"></path></svg>
                     CETAK KUITANSI RESMI
                 </a>
             </div>

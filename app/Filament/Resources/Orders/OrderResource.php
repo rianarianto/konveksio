@@ -1039,7 +1039,6 @@ class OrderResource extends Resource
     {
         return [
             \App\Filament\Resources\Orders\RelationManagers\SummaryRelationManager::class,
-            \App\Filament\Resources\Orders\RelationManagers\ProductionControlRelationManager::class,
             \App\Filament\Resources\Orders\RelationManagers\PaymentsRelationManager::class,
             \App\Filament\Resources\Orders\RelationManagers\ReturnsRelationManager::class,
         ];

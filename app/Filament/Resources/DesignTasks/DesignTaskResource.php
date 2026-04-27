@@ -39,7 +39,6 @@ class DesignTaskResource extends Resource
 
     public static function canAccess(): bool
     {
-        // Akses untuk Designer dan Owner
         return in_array(auth()->user()->role, ['designer', 'owner']);
     }
 
@@ -52,16 +51,13 @@ class DesignTaskResource extends Resource
 
     public static function observeTenancyModelCreation(\Filament\Panel $panel): void
     {
-        // Override and do nothing.
-        // This prevents Filament from attempting to auto-save the `orderShop`
-        // HasOneThrough relation whenever an OrderItem is created globally,
-        // which would cause a "Call to undefined method HasOneThrough::save()" error.
     }
 
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['order.customer'])
+            ->with(['order.customer', 'bahan.material'])
+            ->whereHas('order', fn($q) => $q->where('status', '!=', 'draft'))
             ->whereIn('design_status', ['pending', 'uploaded'])
             ->whereIn('id', function (\Illuminate\Database\Query\Builder $query) {
                 $query->selectRaw('MIN(id)')
@@ -76,7 +72,7 @@ class DesignTaskResource extends Resource
         return $schema
             ->components([
                 Group::make([
-                    Section::make('Rincian Teknis Produk')
+                    Section::make('SPESIFIKASI TEKNIS')
                         ->schema([
                             Placeholder::make('technical_specs')
                                 ->label(false)
@@ -84,162 +80,161 @@ class DesignTaskResource extends Resource
                                     if (!$record)
                                         return new HtmlString('');
 
-                                    $html = '<div class="text-sm pb-2">';
-
-                                    $name = htmlspecialchars($record->product_name ?? 'Produk Tak Bernama');
-                                    $cat = match ($record->production_category ?? 'produksi') {
-                                        'non_produksi' => 'Baju Jadi',
-                                        'jasa' => 'Jasa Murni',
-                                        default => 'Konveksi'
-                                    };
+                                    $name = htmlspecialchars($record->product_name ?? 'Produk');
+                                    $cat = $record->production_category ?? 'produksi';
                                     $details = $record->size_and_request_details ?? [];
+                                    $bahan = $record->bahan;
+                                    $allOrderItems = OrderItem::where('order_id', $record->order_id)->where('product_name', $record->product_name)->get();
 
-                                    $html .= '<h4 class="mb-4 font-bold text-lg flex flex-col gap-0.5">';
-                                    $html .= '<span class="text-gray-900 dark:text-gray-100">' . $name . '</span>';
-                                    $html .= '<span class="text-[11px] font-bold text-primary-600 dark:text-primary-400 uppercase tracking-widest">[' . strtoupper($cat) . ']</span>';
-                                    $html .= '</h4>';
+                                    $catLabel = match ($cat) {
+                                        'non_produksi' => 'BAJU JADI',
+                                        'jasa' => 'JASA',
+                                        default => 'KONVEKSI',
+                                    };
 
-                                    // Bahan & Sablon Summary
-                                    $bahanName = htmlspecialchars($record->bahan->name ?? $details['bahan'] ?? '-');
-                                    $html .= '<div class="mb-2 text-[13px] space-y-1.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">';
-                                    $html .= '<p><strong class="text-gray-800 dark:text-gray-200">Bahan Utama :</strong> ' . $bahanName . '</p>';
+                                    // STYLE CONSTANTS FROM ORDERRESOURCE
+                                    $primaryColor = '#7c3aed';
+                                    $html = '<div style="font-family:inherit; color:#1f2937;">';
 
-                                    $sablon = $details['sablon_bordir'] ?? [];
-                                    if (!empty($sablon)) {
-                                        $sbln = [];
-                                        foreach ($sablon as $s) {
-                                            $sbln[] = ($s['jenis'] ?? '') . ' (' . ($s['lokasi'] ?? '') . ')';
-                                        }
-                                        $html .= '<p><strong class="text-gray-800 dark:text-gray-200">Sablon / Bordir:</strong> ' . htmlspecialchars(implode(' | ', $sbln)) . '</p>';
-                                    } elseif (!empty($details['sablon_jenis']) || !empty($details['sablon_lokasi'])) {
-                                        $html .= '<p><strong class="text-gray-800 dark:text-gray-200">Sablon / Bordir:</strong> ' . htmlspecialchars(($details['sablon_jenis'] ?? '') . ' (' . ($details['sablon_lokasi'] ?? '') . ')') . '</p>';
-                                    }
+                                    // HEADER (Standard Title Style)
+                                    $html .= '<div style="margin-bottom:20px; border-bottom:1px solid #e5e7eb; padding-bottom:12px;">';
+                                    $html .= '<div style="display:flex; align-items:center; gap:8px;">';
+                                    $html .= '<span style="font-size:20px; font-weight:800; letter-spacing:-0.01em;">' . strtoupper($name) . '</span>';
+                                    $html .= '<small style="background:#f3e8ff; color:' . $primaryColor . '; font-weight:800; padding:2px 8px; border-radius:4px; font-size:10px; border:1px solid #ddd6fe;">' . $catLabel . '</small>';
+                                    $html .= '</div>';
                                     $html .= '</div>';
 
-                                    // Fetch all items for this product group
-                                    $allItems = OrderItem::where('order_id', $record->order_id)
-                                        ->where('product_name', $record->product_name)
-                                        ->get();
+                                    // MATERIAL SECTION (Standard Color Swatch Style)
+                                    $hex = $bahan?->color_code ?: '#e5e7eb';
+                                    $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
 
-                                    $genders = []; // e.g. ['P' => ['qty' => 20, 'variations' => [...]], 'L' => [...]]
-                                    foreach ($allItems as $item) {
-                                        $itemDetails = $item->size_and_request_details ?? [];
-                                        $g = $itemDetails['gender'] ?? 'L';
+                                    $html .= '<div style="margin-bottom:24px;">';
+                                    $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">INFORMASI BAHAN</div>';
+                                    $html .= '<div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
+                                    $html .= '<span style="width:16px; height:16px; border-radius:50%; background:' . $hex . '; border:1px solid rgba(0,0,0,0.15); flex-shrink:0;"></span>';
+                                    $html .= '<div style="flex:1;">';
+                                    $html .= '<div style="font-size:13px; font-weight:700; color:#111827;">' . htmlspecialchars($bahanLabel) . '</div>';
 
-                                        if (!isset($genders[$g])) {
-                                            $genders[$g] = ['qty' => 0, 'variations' => []];
+                                    // Sablon Info inside Material Info
+                                    $sablon = $details['sablon_bordir'] ?? [];
+                                    if (!empty($sablon)) {
+                                        $sblnTexts = [];
+                                        foreach ($sablon as $s) {
+                                            $sblnTexts[] = ($s['jenis'] ?? '') . ' (' . ($s['lokasi'] ?? '') . ')';
                                         }
+                                        $html .= '<div style="font-size:11px; font-weight:600; color:' . $primaryColor . '; margin-top:2px;">SABLON/BORDIR: ' . htmlspecialchars(implode(', ', $sblnTexts)) . '</div>';
+                                    }
+                                    $html .= '</div>';
+                                    $html .= '</div>';
+                                    $html .= '</div>';
 
+                                    // VARIATION SECTION
+                                    $genders = [];
+                                    foreach ($allOrderItems as $item) {
+                                        $idtl = $item->size_and_request_details ?? [];
+                                        $g = $idtl['gender'] ?? 'L';
+                                        if (!isset($genders[$g]))
+                                            $genders[$g] = ['qty' => 0, 'models' => []];
                                         $genders[$g]['qty'] += $item->quantity;
 
-                                        // Build variation key
-                                        $parts = [];
-                                        if (isset($itemDetails['sleeve_model']))
-                                            $parts[] = 'Lengan ' . ucfirst($itemDetails['sleeve_model']);
-                                        if (isset($itemDetails['pocket_model']) && $itemDetails['pocket_model'] !== 'tanpa_saku')
-                                            $parts[] = 'Saku ' . ucfirst(str_replace('_', ' ', $itemDetails['pocket_model']));
-                                        if (isset($itemDetails['button_model']) && $itemDetails['button_model'] !== 'biasa')
-                                            $parts[] = 'Kancing ' . ucfirst(str_replace('_', ' ', $itemDetails['button_model']));
-                                        if (!empty($itemDetails['is_tunic']))
-                                            $parts[] = 'Tunik/Gamis';
+                                        $mParts = [];
+                                        if (isset($idtl['sleeve_model']))
+                                            $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
+                                        if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku')
+                                            $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
+                                        if (!empty($idtl['is_tunic']))
+                                            $mParts[] = 'Tunik';
+                                        $mKey = empty($mParts) ? 'Model Standar' : implode(', ', $mParts);
 
-                                        $varKey = empty($parts) ? 'Model Standar' : implode(', ', $parts);
-
-                                        if (!isset($genders[$g]['variations'][$varKey])) {
-                                            $genders[$g]['variations'][$varKey] = [
-                                                'qty' => 0, 
-                                                'sizes' => [], 
-                                                'requests' => [],
-                                                'attributes' => [
-                                                    'Lengan' => isset($itemDetails['sleeve_model']) ? ucfirst($itemDetails['sleeve_model']) : 'Pendek',
-                                                    'Saku' => isset($itemDetails['pocket_model']) && $itemDetails['pocket_model'] !== 'tanpa_saku' ? ucfirst(str_replace('_', ' ', $itemDetails['pocket_model'])) : 'Tanpa Saku',
-                                                    'Kancing' => isset($itemDetails['button_model']) && $itemDetails['button_model'] !== 'biasa' ? ucfirst(str_replace('_', ' ', $itemDetails['button_model'])) : 'Biasa',
-                                                    'Tunik' => !empty($itemDetails['is_tunic']) ? 'Ya' : 'Tidak',
+                                        if (!isset($genders[$g]['models'][$mKey])) {
+                                            $genders[$g]['models'][$mKey] = [
+                                                'qty' => 0,
+                                                'sizes' => [],
+                                                'notes' => [],
+                                                'attrs' => [
+                                                    'LENGAN' => isset($idtl['sleeve_model']) ? strtoupper($idtl['sleeve_model']) : 'PENDEK',
+                                                    'SAKU' => isset($idtl['pocket_model']) ? strtoupper(str_replace('_', ' ', $idtl['pocket_model'])) : 'TANPA SAKU',
+                                                    'KANCING' => isset($idtl['button_model']) ? strtoupper($idtl['button_model']) : 'BIASA',
                                                 ]
                                             ];
                                         }
-
-                                        $genders[$g]['variations'][$varKey]['qty'] += $item->quantity;
-
-                                        // Track sizes
-                                        $sz = $item->size ?? 'Tanpa Ukuran';
-                                        if (!isset($genders[$g]['variations'][$varKey]['sizes'][$sz])) {
-                                            $genders[$g]['variations'][$varKey]['sizes'][$sz] = 0;
-                                        }
-                                        $genders[$g]['variations'][$varKey]['sizes'][$sz] += $item->quantity;
-
-                                        // Track requests
-                                        $req = trim($itemDetails['request_tambahan'] ?? '');
-                                        if (!empty($req)) {
-                                            $genders[$g]['variations'][$varKey]['requests'][] = $req;
-                                        }
+                                        $genders[$g]['models'][$mKey]['qty'] += $item->quantity;
+                                        $sz = $item->size ?? '-';
+                                        $genders[$g]['models'][$mKey]['sizes'][$sz] = ($genders[$g]['models'][$mKey]['sizes'][$sz] ?? 0) + $item->quantity;
+                                        if (!empty($idtl['request_tambahan']))
+                                            $genders[$g]['models'][$mKey]['notes'][] = $idtl['request_tambahan'];
                                     }
 
-                                    // Render Accordions
-                                    if (in_array($cat, ['Konveksi'])) {
-                                        $html .= '<div class="space-y-2">';
-                                        foreach ($genders as $gCode => $gData) {
-                                            $gName = $gCode === 'P' ? 'Perempuan' : 'Laki-laki';
-                                            $gIcon = $gCode === 'P' ? '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-pink-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21h-7.5M12 12.75a5.25 5.25 0 110-10.5 5.25 5.25 0 010 10.5z" /></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-blue-500"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" /></svg>';
+                                    $html .= '<div>';
+                                    $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">RINCIAN PRODUKSI</div>';
+                                    $html .= '<div style="display:flex; flex-direction:column; gap:8px;">';
 
-                                            $html .= '<div x-data="{ expanded: false }" class="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 overflow-hidden shadow-sm">';
-                                            $html .= '<button @click="expanded = !expanded" type="button" class="w-full flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">';
-                                            $html .= '<div class="flex items-center gap-2"><span class="font-bold text-gray-800 dark:text-gray-200">' . $gName . ' :</span><span class="text-xs font-bold bg-gray-800 dark:bg-gray-600 py-0.5 rounded-full">' . $gData['qty'] . ' pcs</span></div>';
-                                            $html .= '<svg :class="expanded ? \'rotate-180\' : \'\'" class="w-4 h-4 text-gray-500 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';
-                                            $html .= '</button>';
+                                    foreach ($genders as $gCode => $gData) {
+                                        $gName = $gCode === 'P' ? 'PEREMPUAN' : 'LAKI-LAKI';
+                                        $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
+                                        $html .= '<div @click="open = !open" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:#f9fafb;">';
+                                        $html .= '<div style="display:flex; align-items:center; gap:8px;">';
+                                        $html .= '<span style="font-size:12px; font-weight:800; color:#374151;">' . $gName . '</span>';
+                                        $html .= '<span style="font-size:12px; font-weight:900; color:' . $primaryColor . ';">' . $gData['qty'] . ' pcs</span>';
+                                        $html .= '</div>';
+                                        $html .= '<svg :class="open ? \'rotate-180\' : \'\'" style="width:14px; height:14px; transition:0.2s;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';
+                                        $html .= '</div>';
 
-                                            $html .= '<div x-show="expanded" x-collapse class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 space-y-4">';
+                                        $html .= '<div x-show="open" style="padding:16px; border-top:1px solid #f1f5f9; display:flex; flex-direction:column; gap:16px;">';
+                                        $hasMultipleModels = count($gData['models']) > 1;
+                                        foreach ($gData['models'] as $mKey => $mData) {
+                                            $html .= '<div>';
 
-                                            foreach ($gData['variations'] as $vKey => $vData) {
-                                                $html .= '<div>';
-                                                $html .= '<p class="font-semibold text-[13px] text-gray-800 dark:text-gray-200 leading-snug flex items-start gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-primary-500 mt-0.5 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> <span>' . htmlspecialchars($vKey) . ' <span class="text-xs font-normal text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded ml-1">' . $vData['qty'] . ' pcs</span></span></p>';
-
-                                                $html .= '<div class="ml-5 mt-2 space-y-1.5">';
-                                                
-                                                // Attributes
-                                                $attrStrs = [];
-                                                foreach ($vData['attributes'] as $attrKey => $attrVal) {
-                                                    $attrStrs[] = '<span class="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-[11px] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700"><strong class="text-gray-700 dark:text-gray-300">' . $attrKey . ':</strong> ' . $attrVal . '</span>';
-                                                }
-                                                $html .= '<div class="flex flex-wrap gap-1.5 mb-2">' . implode('', $attrStrs) . '</div>';
-
-                                                // Sizes string
-                                                $sizeStrs = [];
-                                                foreach ($vData['sizes'] as $sz => $sqty) {
-                                                    $sizeStrs[] = htmlspecialchars($sz) . ' (' . $sqty . ')';
-                                                }
-                                                $html .= '<div class="text-[12px] text-gray-600 dark:text-gray-400"><strong class="text-gray-700 dark:text-gray-300">Size:</strong> ' . implode(', ', $sizeStrs) . '</div>';
-
-                                                // Requests
-                                                if (!empty($vData['requests'])) {
-                                                    $html .= '<div class="text-[12px] text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 px-2 py-1.5 rounded border border-orange-100 dark:border-orange-800/50 mt-1">';
-                                                    $html .= '<strong class="block mb-0.5">Catatan/Request Tambahan:</strong>';
-                                                    $html .= '<ul class="list-disc pl-4 space-y-0.5">';
-                                                    foreach ($vData['requests'] as $req) {
-                                                        $html .= '<li>' . htmlspecialchars($req) . '</li>';
-                                                    }
-                                                    $html .= '</ul></div>';
-                                                }
-                                                $html .= '</div>';
+                                            // Hanya tampilkan sub-header model jika ada lebih dari 1 varian
+                                            if ($hasMultipleModels) {
+                                                $html .= '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:6px 10px; background:#f3e8ff; border-radius:6px;">';
+                                                $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . '; text-transform:uppercase;">' . $mKey . '</span>';
+                                                $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . ';">' . $mData['qty'] . ' pcs</span>';
                                                 $html .= '</div>';
                                             }
 
-                                            $html .= '</div>'; // End expanded content
-                                            $html .= '</div>'; // End accordion
-                                        }
-                                        $html .= '</div>';
-                                    }
+                                            // Attributes (Compact style)
+                                            $atxt = [];
+                                            foreach ($mData['attrs'] as $ak => $av) {
+                                                $atxt[] = '<span style="color:#9ca3af; font-size:10px;">' . $ak . ':</span><span style="color:#4b5563; margin-left:2px;">' . $av . '</span>';
+                                            }
+                                            $html .= '<div style="display:flex; gap:12px; font-size:11px; font-weight:700; margin-bottom:8px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
 
-                                    // Button Lihat Detail
+                                            // Sizes (Pill style)
+                                            $stxt = [];
+                                            foreach ($mData['sizes'] as $sz => $sqty) {
+                                                $stxt[] = '<div style="padding:4px 8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:4px; font-size:12px; font-weight:800; color:#1e293b;">' . $sz . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
+                                            }
+                                            $html .= '<div style="display:flex; flex-wrap:wrap; gap:6px;">' . implode('', $stxt) . '</div>';
+
+                                            // Notes
+                                            if (!empty($mData['notes'])) {
+                                                $html .= '<div style="margin-top:8px; padding:8px 12px; background:#fffcf0; border:1px solid #fef3c7; border-radius:6px;">';
+                                                $html .= '<div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; margin-bottom:4px;">CATATAN:</div>';
+                                                foreach ($mData['notes'] as $n) {
+                                                    $html .= '<div style="font-size:12px; font-weight:700; color:#92400e;">- ' . htmlspecialchars($n) . '</div>';
+                                                }
+                                                $html .= '</div>';
+                                            }
+                                            $html .= '</div>';
+                                            if ($hasMultipleModels && next($gData['models']))
+                                                $html .= '<hr style="border:none; border-top:1px dashed #e2e8f0; margin:4px 0;">';
+                                        }
+                                        $html .= '</div></div>';
+                                    }
+                                    $html .= '</div>';
+                                    $html .= '</div>';
+
+                                    // Action Link
                                     try {
                                         $url = route('filament.admin.resources.orders.edit', ['tenant' => filament()->getTenant()->id, 'record' => $record->order_id]);
                                     } catch (\Exception $e) {
-                                        $url = '#'; // Fallback
+                                        $url = '#';
                                     }
-                                    $html .= '<div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">';
-                                    $html .= '<a href="' . $url . '" target="_blank" class="inline-flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700 transition-colors w-full shadow-sm">';
-                                    $html .= '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>';
-                                    $html .= 'Lihat Detail Pesanan Asli';
+                                    $html .= '<div style="margin-top:24px;">';
+                                    $html .= '<a href="' . $url . '" target="_blank" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:10px; background:#ffffff; color:#374151; border:1px solid #d1d5db; border-radius:6px; text-decoration:none; font-size:11px; font-weight:800; transition:0.1s;">';
+                                    $html .= '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>';
+                                    $html .= 'LIHAT DETAIL PESANAN';
                                     $html .= '</a>';
                                     $html .= '</div>';
 
@@ -250,11 +245,11 @@ class DesignTaskResource extends Resource
                 ])->columnSpan(1),
 
                 Group::make([
-                    Section::make('Upload File Final Desain')
-                        ->description('Silakan unggah file referensi atau panduan desain akhir untuk produk ini saja.')
+                    Section::make('UPLOAD DESAIN FINAL')
+                        ->description('Pastikan artwork sudah sesuai dengan rincian teknis di samping.')
                         ->schema([
                             FileUpload::make('design_image')
-                                ->label('Artwork / Desain Final')
+                                ->label('Pilih File Artwork')
                                 ->image()
                                 ->imageEditor()
                                 ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
@@ -262,8 +257,7 @@ class DesignTaskResource extends Resource
                                 ->directory('designs')
                                 ->downloadable()
                                 ->openable()
-                                ->required()
-                                ->helperText('Setelah disimpan, status desain otomatis berubah menjadi Approved dan masuk antrian konveksi.'),
+                                ->required(),
                         ])
                 ])->columnSpan(1),
             ])
@@ -274,84 +268,32 @@ class DesignTaskResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('order.order_number')
-                    ->label('No. Pesanan')
-                    ->searchable()
-                    ->sortable()
-                    ->weight('bold'),
-
-                TextColumn::make('product_name')
-                    ->label('Nama Produk')
-                    ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('total_quantity')
-                    ->label('Total Qty')
-                    ->getStateUsing(
-                        fn(OrderItem $record): int => OrderItem::where('order_id', $record->order_id)
-                            ->where('product_name', $record->product_name)
-                            ->sum('quantity')
-                    )
+                TextColumn::make('order.order_number')->label('No. Pesanan')->searchable()->sortable()->weight('bold'),
+                TextColumn::make('product_name')->label('Nama Produk')->searchable()->sortable(),
+                TextColumn::make('total_quantity')->label('Total Qty')
+                    ->getStateUsing(fn(OrderItem $record): int => OrderItem::where('order_id', $record->order_id)->where('product_name', $record->product_name)->sum('quantity'))
                     ->sortable(['quantity']),
-
-                TextColumn::make('production_category')
-                    ->label('Kategori')
-                    ->badge()
-                    ->color(fn(string $state) => [
-                        50 => '#F2E6FF',
-                        500 => '#8000FF',
-                        600 => '#8000FF',
-                    ])
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'non_produksi' => 'Baju Jadi',
-                        'jasa' => 'Jasa',
-                        default => 'Konveksi',
-                    }),
-
-                TextColumn::make('order.deadline')
-                    ->label('Deadline')
-                    ->date('d M Y')
-                    ->sortable()
-                    ->color('danger'),
-
-                TextColumn::make('design_status')
-                    ->label('Status Desain')
-                    ->badge()
-                    ->color(fn(string $state): string => match ($state) {
-                        'pending' => 'warning',
-                        'uploaded' => 'info',
-                        'approved' => 'success',
-                        default => 'gray',
-                    }),
-
-                \Filament\Tables\Columns\ImageColumn::make('design_image')
-                    ->label('Desain')
-                    ->disk('public')
-                    ->visibility('public')
-                    ->square()
-                    ->size(40)
-                    ->toggleable(),
+                TextColumn::make('production_category')->label('Kategori')->badge()
+                    ->color(fn($state) => match ($state) { 'non_produksi' => 'info', 'jasa' => 'success', default => 'primary', })
+                    ->formatStateUsing(fn($state) => match ($state) { 'non_produksi' => 'Baju Jadi', 'jasa' => 'Jasa', default => 'Konveksi', }),
+                TextColumn::make('order.deadline')->label('Deadline')->date('d M Y')->sortable()->color('danger')->weight('bold'),
+                TextColumn::make('design_status')->label('Status Desain')->badge()
+                    ->color(fn($state) => match ($state) { 'pending' => 'warning', 'uploaded' => 'info', 'approved' => 'success', default => 'gray', }),
+                \Filament\Tables\Columns\ImageColumn::make('design_image')->label('Desain')->disk('public')->square()->size(40)->toggleable(),
             ])
-            ->filters([
-                //
-            ])
+            ->filters([])
             ->actions([
-                EditAction::make()
-                    ->label('Rincian')
-                    ->icon('heroicon-o-eye')
+                EditAction::make()->label('Edit Desain')->icon('heroicon-m-paint-brush')->modalWidth('6xl')
                     ->using(function (OrderItem $record, array $data): OrderItem {
-                        // Perbarui seluruh item dengan nama produk dan pesanan yang sama
-                        $data['design_status'] = 'approved';
-
-                        OrderItem::where('order_id', $record->order_id)
-                            ->where('product_name', $record->product_name)
-                            ->update([
-                                'design_status' => 'approved',
-                                'design_image' => $data['design_image'] ?? null,
-                            ]);
-
+                        OrderItem::where('order_id', $record->order_id)->where('product_name', $record->product_name)->update([
+                            'design_status' => 'approved',
+                            'design_image' => $data['design_image'] ?? null,
+                        ]);
                         $record->refresh();
                         return $record;
+                    })
+                    ->after(function (\Livewire\Component $livewire) {
+                        $livewire->dispatch('designTaskCompleted');
                     }),
             ])
             ->defaultGroup(
@@ -365,20 +307,15 @@ class DesignTaskResource extends Resource
 
     public static function getPages(): array
     {
-        return [
-            'index' => ManageDesignTasks::route('/'),
-        ];
+        return ['index' => ManageDesignTasks::route('/'),];
     }
 
-    // Blokir fungsi tambah & hapus karena Desainer hanya mengunggah file
     public static function canCreate(): bool
     {
         return false;
     }
-
-    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canDelete(Model $record): bool
     {
         return false;
     }
 }
-

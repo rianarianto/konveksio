@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class DesignHistoryTableWidget extends BaseWidget
 {
+    protected $listeners = ['designTaskCompleted' => '$refresh'];
     protected static ?int $sort = 2;
     protected int|string|array $columnSpan = 'full';
 
@@ -115,149 +116,169 @@ class DesignHistoryTableWidget extends BaseWidget
                                 if (!$record)
                                     return new \Illuminate\Support\HtmlString('');
 
-                                $html = '<div class="text-sm pb-2">';
-
-                                $name = htmlspecialchars($record->product_name ?? 'Produk Tak Bernama');
-                                $cat = match ($record->production_category ?? 'produksi') {
-                                    'non_produksi' => 'Baju Jadi',
-                                    'jasa' => 'Jasa Murni',
-                                    default => 'Konveksi'
-                                };
+                                $name = htmlspecialchars($record->product_name ?? 'Produk');
+                                $cat = $record->production_category ?? 'produksi';
                                 $details = $record->size_and_request_details ?? [];
+                                $bahan = $record->bahan;
+                                $allOrderItems = OrderItem::where('order_id', $record->order_id)->where('product_name', $record->product_name)->get();
 
-                                $html .= '<h4 class="mb-4 font-bold text-lg flex flex-col gap-0.5">';
-                                $html .= '<span class="text-gray-900 dark:text-gray-100">' . $name . '</span>';
-                                $html .= '<span class="text-[11px] font-bold text-primary-600 dark:text-primary-400 uppercase tracking-widest">[' . strtoupper($cat) . ']</span>';
-                                $html .= '</h4>';
+                                $catLabel = match ($cat) {
+                                    'non_produksi' => 'BAJU JADI',
+                                    'jasa' => 'JASA',
+                                    default => 'KONVEKSI',
+                                };
 
-                                $bahanName = htmlspecialchars($record->bahan->name ?? $details['bahan'] ?? '-');
-                                $html .= '<div class="mb-2 text-[13px] space-y-1.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">';
-                                $html .= '<p><strong class="text-gray-800 dark:text-gray-200">Bahan Utama :</strong> ' . $bahanName . '</p>';
+                                // STYLE CONSTANTS
+                                $primaryColor = '#7c3aed';
+                                $html = '<div style="font-family:inherit; color:#1f2937;">';
 
-                                $sablon = $details['sablon_bordir'] ?? [];
-                                if (!empty($sablon)) {
-                                    $sbln = [];
-                                    foreach ($sablon as $s) {
-                                        $sbln[] = ($s['jenis'] ?? '') . ' (' . ($s['lokasi'] ?? '') . ')';
-                                    }
-                                    $html .= '<p><strong class="text-gray-800 dark:text-gray-200">Sablon / Bordir:</strong> ' . htmlspecialchars(implode(' | ', $sbln)) . '</p>';
-                                } elseif (!empty($details['sablon_jenis']) || !empty($details['sablon_lokasi'])) {
-                                    $html .= '<p><strong class="text-gray-800 dark:text-gray-200">Sablon / Bordir:</strong> ' . htmlspecialchars(($details['sablon_jenis'] ?? '') . ' (' . ($details['sablon_lokasi'] ?? '') . ')') . '</p>';
-                                }
+                                // HEADER (Standard Title Style)
+                                $html .= '<div style="margin-bottom:20px; border-bottom:1px solid #e5e7eb; padding-bottom:12px;">';
+                                $html .= '<div style="display:flex; align-items:center; gap:8px;">';
+                                $html .= '<span style="font-size:20px; font-weight:800; letter-spacing:-0.01em;">' . strtoupper($name) . '</span>';
+                                $html .= '<small style="background:#f3e8ff; color:' . $primaryColor . '; font-weight:800; padding:2px 8px; border-radius:4px; font-size:10px; border:1px solid #ddd6fe;">' . $catLabel . '</small>';
+                                $html .= '</div>';
                                 $html .= '</div>';
 
-                                $allItems = OrderItem::where('order_id', $record->order_id)
-                                    ->where('product_name', $record->product_name)
-                                    ->get();
+                                // MATERIAL SECTION (Standard Color Swatch Style)
+                                $hex = $bahan?->color_code ?: '#e5e7eb';
+                                $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
 
-                                $genders = [];
-                                foreach ($allItems as $item) {
-                                    $itemDetails = $item->size_and_request_details ?? [];
-                                    $g = $itemDetails['gender'] ?? 'L';
+                                $html .= '<div style="margin-bottom:24px;">';
+                                $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">INFORMASI BAHAN</div>';
+                                $html .= '<div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
+                                $html .= '<span style="width:16px; height:16px; border-radius:50%; background:' . $hex . '; border:1px solid rgba(0,0,0,0.15); flex-shrink:0;"></span>';
+                                $html .= '<div style="flex:1;">';
+                                $html .= '<div style="font-size:13px; font-weight:700; color:#111827;">' . htmlspecialchars($bahanLabel) . '</div>';
 
-                                    if (!isset($genders[$g])) {
-                                        $genders[$g] = ['qty' => 0, 'variations' => []];
+                                // Sablon Info inside Material Info
+                                $sablon = $details['sablon_bordir'] ?? [];
+                                if (!empty($sablon)) {
+                                    $sblnTexts = [];
+                                    foreach ($sablon as $s) {
+                                        $sblnTexts[] = ($s['jenis'] ?? '') . ' (' . ($s['lokasi'] ?? '') . ')';
                                     }
+                                    $html .= '<div style="font-size:11px; font-weight:600; color:' . $primaryColor . '; margin-top:2px;">SABLON/BORDIR: ' . htmlspecialchars(implode(', ', $sblnTexts)) . '</div>';
+                                }
+                                $html .= '</div>';
+                                $html .= '</div>';
+                                $html .= '</div>';
 
+                                // VARIATION SECTION
+                                $genders = [];
+                                foreach ($allOrderItems as $item) {
+                                    $idtl = $item->size_and_request_details ?? [];
+                                    $g = $idtl['gender'] ?? 'L';
+                                    if (!isset($genders[$g]))
+                                        $genders[$g] = ['qty' => 0, 'models' => []];
                                     $genders[$g]['qty'] += $item->quantity;
 
-                                    $parts = [];
-                                    if (isset($itemDetails['sleeve_model']))
-                                        $parts[] = 'Lengan ' . ucfirst($itemDetails['sleeve_model']);
-                                    if (isset($itemDetails['pocket_model']) && $itemDetails['pocket_model'] !== 'tanpa_saku')
-                                        $parts[] = 'Saku ' . ucfirst(str_replace('_', ' ', $itemDetails['pocket_model']));
-                                    if (isset($itemDetails['button_model']) && $itemDetails['button_model'] !== 'biasa')
-                                        $parts[] = 'Kancing ' . ucfirst(str_replace('_', ' ', $itemDetails['button_model']));
-                                    if (!empty($itemDetails['is_tunic']))
-                                        $parts[] = 'Tunik/Gamis';
+                                    $mParts = [];
+                                    if (isset($idtl['sleeve_model']))
+                                        $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
+                                    if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku')
+                                        $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
+                                    if (!empty($idtl['is_tunic']))
+                                        $mParts[] = 'Tunik';
+                                    $mKey = empty($mParts) ? 'Model Standar' : implode(', ', $mParts);
 
-                                    $varKey = empty($parts) ? 'Model Standar' : implode(', ', $parts);
-
-                                    if (!isset($genders[$g]['variations'][$varKey])) {
-                                        $genders[$g]['variations'][$varKey] = [
+                                    if (!isset($genders[$g]['models'][$mKey])) {
+                                        $genders[$g]['models'][$mKey] = [
                                             'qty' => 0,
                                             'sizes' => [],
-                                            'requests' => [],
-                                            'attributes' => [
-                                                'Lengan' => isset($itemDetails['sleeve_model']) ? ucfirst($itemDetails['sleeve_model']) : 'Pendek',
-                                                'Saku' => isset($itemDetails['pocket_model']) && $itemDetails['pocket_model'] !== 'tanpa_saku' ? ucfirst(str_replace('_', ' ', $itemDetails['pocket_model'])) : 'Tanpa Saku',
-                                                'Kancing' => isset($itemDetails['button_model']) && $itemDetails['button_model'] !== 'biasa' ? ucfirst(str_replace('_', ' ', $itemDetails['button_model'])) : 'Biasa',
-                                                'Tunik' => !empty($itemDetails['is_tunic']) ? 'Ya' : 'Tidak',
+                                            'notes' => [],
+                                            'attrs' => [
+                                                'LENGAN' => isset($idtl['sleeve_model']) ? strtoupper($idtl['sleeve_model']) : 'PENDEK',
+                                                'SAKU' => isset($idtl['pocket_model']) ? strtoupper(str_replace('_', ' ', $idtl['pocket_model'])) : 'TANPA SAKU',
+                                                'KANCING' => isset($idtl['button_model']) ? strtoupper($idtl['button_model']) : 'BIASA',
                                             ]
                                         ];
                                     }
-
-                                    $genders[$g]['variations'][$varKey]['qty'] += $item->quantity;
-
-                                    $sz = $item->size ?? 'Tanpa Ukuran';
-                                    if (!isset($genders[$g]['variations'][$varKey]['sizes'][$sz])) {
-                                        $genders[$g]['variations'][$varKey]['sizes'][$sz] = 0;
-                                    }
-                                    $genders[$g]['variations'][$varKey]['sizes'][$sz] += $item->quantity;
-
-                                    $req = trim($itemDetails['request_tambahan'] ?? '');
-                                    if (!empty($req)) {
-                                        $genders[$g]['variations'][$varKey]['requests'][] = $req;
-                                    }
+                                    $genders[$g]['models'][$mKey]['qty'] += $item->quantity;
+                                    $sz = $item->size ?? '-';
+                                    $genders[$g]['models'][$mKey]['sizes'][$sz] = ($genders[$g]['models'][$mKey]['sizes'][$sz] ?? 0) + $item->quantity;
+                                    if (!empty($idtl['request_tambahan']))
+                                        $genders[$g]['models'][$mKey]['notes'][] = $idtl['request_tambahan'];
                                 }
 
-                                if (in_array($cat, ['Konveksi'])) {
-                                    $html .= '<div class="space-y-2 mt-4">';
+                                $html .= '<div>';
+                                $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">RINCIAN PRODUKSI</div>';
+                                $html .= '<div style="display:flex; flex-direction:column; gap:8px;">';
+
+                                $hasKonveksiItems = count($genders) > 0 && in_array($cat, ['produksi', 'custom']);
+
+                                if ($hasKonveksiItems) {
                                     foreach ($genders as $gCode => $gData) {
-                                        $gName = $gCode === 'P' ? 'Perempuan' : 'Laki-laki';
+                                        $gName = $gCode === 'P' ? 'PEREMPUAN' : 'LAKI-LAKI';
+                                        $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
+                                        $html .= '<div @click="open = !open" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:#f9fafb;">';
+                                        $html .= '<div style="display:flex; align-items:center; gap:8px;">';
+                                        $html .= '<span style="font-size:12px; font-weight:800; color:#374151;">' . $gName . '</span>';
+                                        $html .= '<span style="font-size:12px; font-weight:900; color:' . $primaryColor . ';">' . $gData['qty'] . ' pcs</span>';
+                                        $html .= '</div>';
+                                        $html .= '<svg :class="open ? \'rotate-180\' : \'\'" style="width:14px; height:14px; transition:0.2s;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';
+                                        $html .= '</div>';
 
-                                        $html .= '<div x-data="{ expanded: false }" class="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 overflow-hidden shadow-sm">';
-                                        $html .= '<button @click="expanded = !expanded" type="button" class="w-full flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">';
-                                        $html .= '<div class="flex items-center gap-2"><span class="font-bold text-gray-800 dark:text-gray-200">' . $gName . ' :</span><span class="text-xs font-bold bg-gray-800 dark:bg-gray-600 py-0.5 rounded-full">' . $gData['qty'] . ' pcs</span></div>';
-                                        $html .= '<svg :class="expanded ? \'rotate-180\' : \'\'" class="w-4 h-4 text-gray-500 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';
-                                        $html .= '</button>';
-
-                                        $html .= '<div x-show="expanded" x-collapse class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 space-y-4">';
-
-                                        foreach ($gData['variations'] as $vKey => $vData) {
+                                        $html .= '<div x-show="open" style="padding:16px; border-top:1px solid #f1f5f9; display:flex; flex-direction:column; gap:16px;">';
+                                        $hasMultipleModels = count($gData['models']) > 1;
+                                        foreach ($gData['models'] as $mKey => $mData) {
                                             $html .= '<div>';
-                                            $html .= '<p class="font-semibold text-[13px] text-gray-800 dark:text-gray-200 leading-snug flex items-start gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-primary-500 mt-0.5 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> <span>' . htmlspecialchars($vKey) . ' <span class="text-xs font-normal text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded ml-1">' . $vData['qty'] . ' pcs</span></span></p>';
 
-                                            $html .= '<div class="ml-5 mt-2 space-y-1.5">';
-
-                                            // Attributes
-                                            $attrStrs = [];
-                                            foreach ($vData['attributes'] as $attrKey => $attrVal) {
-                                                $attrStrs[] = '<span class="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-[11px] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700"><strong class="text-gray-700 dark:text-gray-300">' . $attrKey . ':</strong> ' . $attrVal . '</span>';
+                                            // Hanya tampilkan sub-header model jika ada lebih dari 1 varian
+                                            if ($hasMultipleModels) {
+                                                $html .= '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:6px 10px; background:#f3e8ff; border-radius:6px;">';
+                                                $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . '; text-transform:uppercase;">' . $mKey . '</span>';
+                                                $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . ';">' . $mData['qty'] . ' pcs</span>';
+                                                $html .= '</div>';
                                             }
-                                            $html .= '<div class="flex flex-wrap gap-1.5 mb-2">' . implode('', $attrStrs) . '</div>';
 
-                                            $sizeStrs = [];
-                                            foreach ($vData['sizes'] as $sz => $sqty) {
-                                                $sizeStrs[] = htmlspecialchars($sz) . ' (' . $sqty . ')';
+                                            // Attributes (Compact style)
+                                            $atxt = [];
+                                            foreach ($mData['attrs'] as $ak => $av) {
+                                                $atxt[] = '<span style="color:#9ca3af; font-size:10px;">' . $ak . ':</span><span style="color:#4b5563; margin-left:2px;">' . $av . '</span>';
                                             }
-                                            $html .= '<div class="text-[12px] text-gray-600 dark:text-gray-400"><strong class="text-gray-700 dark:text-gray-300">Size:</strong> ' . implode(', ', $sizeStrs) . '</div>';
+                                            $html .= '<div style="display:flex; gap:12px; font-size:11px; font-weight:700; margin-bottom:8px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
 
-                                            if (!empty($vData['requests'])) {
-                                                $html .= '<div class="text-[12px] text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 px-2 py-1.5 rounded border border-orange-100 dark:border-orange-800/50 mt-1">';
-                                                $html .= '<strong class="block mb-0.5">Catatan/Request Tambahan:</strong>';
-                                                $html .= '<ul class="list-disc pl-4 space-y-0.5">';
-                                                foreach ($vData['requests'] as $req) {
-                                                    $html .= '<li>' . htmlspecialchars($req) . '</li>';
+                                            // Sizes (Pill style)
+                                            $stxt = [];
+                                            foreach ($mData['sizes'] as $sz => $sqty) {
+                                                $stxt[] = '<div style="padding:4px 8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:4px; font-size:12px; font-weight:800; color:#1e293b;">' . $sz . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
+                                            }
+                                            $html .= '<div style="display:flex; flex-wrap:wrap; gap:6px;">' . implode('', $stxt) . '</div>';
+
+                                            // Notes
+                                            if (!empty($mData['notes'])) {
+                                                $html .= '<div style="margin-top:8px; padding:8px 12px; background:#fffcf0; border:1px solid #fef3c7; border-radius:6px;">';
+                                                $html .= '<div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; margin-bottom:4px;">CATATAN:</div>';
+                                                foreach ($mData['notes'] as $n) {
+                                                    $html .= '<div style="font-size:12px; font-weight:700; color:#92400e;">- ' . htmlspecialchars($n) . '</div>';
                                                 }
-                                                $html .= '</ul></div>';
+                                                $html .= '</div>';
                                             }
-                                            $html .= '</div></div>';
+                                            $html .= '</div>';
+                                            if ($hasMultipleModels && next($gData['models']))
+                                                $html .= '<hr style="border:none; border-top:1px dashed #e2e8f0; margin:4px 0;">';
                                         }
                                         $html .= '</div></div>';
                                     }
-                                    $html .= '</div>';
+                                } else {
+                                     $html .= '<div style="padding:16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; text-align:center; font-size:12px; color:#6b7280; font-weight:600;">Tidak ada rincian produksi untuk varian ini.</div>';
                                 }
+                                $html .= '</div>';
+                                $html .= '</div>';
 
+                                // Action Link
                                 try {
                                     $url = route('filament.admin.resources.orders.edit', ['tenant' => filament()->getTenant()->id, 'record' => $record->order_id]);
-                                    $html .= '<div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">';
-                                    $html .= '<a href="' . $url . '" target="_blank" class="inline-flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors w-full shadow-sm">';
-                                    $html .= '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>';
-                                    $html .= 'Lihat Detail Pesanan Asli';
-                                    $html .= '</a></div>';
                                 } catch (\Exception $e) {
+                                    $url = '#';
                                 }
+                                $html .= '<div style="margin-top:24px;">';
+                                $html .= '<a href="' . $url . '" target="_blank" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:10px; background:#ffffff; color:#374151; border:1px solid #d1d5db; border-radius:6px; text-decoration:none; font-size:11px; font-weight:800; transition:0.1s;">';
+                                $html .= '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>';
+                                $html .= 'LIHAT DETAIL PESANAN';
+                                $html .= '</a>';
+                                $html .= '</div>';
 
                                 $html .= '</div>';
                                 return new \Illuminate\Support\HtmlString($html);
