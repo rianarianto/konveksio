@@ -168,7 +168,7 @@ class OrderResource extends Resource
     }
 
     // Lokasi sablon/bordir
-    protected static array $lokasiSablonOptions = [
+    public static array $lokasiSablonOptions = [
         'Dada Kiri' => 'Dada Kiri',
         'Dada Kanan' => 'Dada Kanan',
         'Dada Kiri + Dada Kanan' => 'Dada Kiri + Dada Kanan',

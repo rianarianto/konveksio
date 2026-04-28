@@ -15,6 +15,17 @@
         .fi-ta-table td {
             vertical-align: baseline !important;
         }
+        /* Style for inputs in modals to make them stand out */
+        .fi-modal .fi-input-wrp {
+            background-color: #f8faff !important; /* Extremely light Indigo */
+            border: 1px solid #c7d2fe !important; /* Thin Indigo 200 border */
+            box-shadow: none !important;
+        }
+        .fi-modal .fi-input-wrp:focus-within {
+            background-color: #ffffff !important;
+            border: 1px solid #6366f1 !important; /* Indigo 500 */
+            ring: 1px #6366f1 !important;
+        }
     </style>
 
     {{ $this->table }}

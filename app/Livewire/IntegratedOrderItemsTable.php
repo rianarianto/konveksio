@@ -118,6 +118,13 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->options($sizeOptions + ['Custom' => 'Ukur Badan'])
                     ->sortable(),
 
+                TextColumn::make('measurement_status')
+                    ->label('Status Ukur')
+                    ->badge()
+                    ->color(fn(OrderItem $record) => $record->size === 'Custom' ? (filled($record->size_and_request_details['LD'] ?? null) ? 'success' : 'danger') : 'gray')
+                    ->getStateUsing(fn(OrderItem $record) => $record->size === 'Custom' ? (filled($record->size_and_request_details['LD'] ?? null) ? 'Terukur' : 'Belum Ukur') : 'Standar')
+                    ->visible(fn() => in_array('size', $this->selectedGroups)),
+
                 SelectColumn::make('production_category')
                     ->label('Kategori')
                     ->options($categoryOptions)
@@ -128,30 +135,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->options($bahanOptions)
                     ->sortable(),
 
-                TextColumn::make('specs_summary')
-                    ->label('Spek & Aplikasi')
-                    ->wrap()
-                    ->size('xs')
-                    ->getStateUsing(function (OrderItem $record) {
-                        $d = $record->size_and_request_details ?? [];
-                        $specs = [];
-                        
-                        if (isset($d['gender'])) $specs[] = $d['gender'];
-                        if (isset($d['sleeve_model'])) $specs[] = substr($d['sleeve_model'], 0, 3) . '.';
-                        
-                        $sb = $d['sablon_bordir'] ?? [];
-                        $sbList = [];
-                        foreach ($sb as $item) {
-                            $sbList[] = ($item['jenis'] ?? '') . ' (' . ($item['lokasi'] ?? '') . ')';
-                        }
-                        
-                        $summary = implode(', ', $specs);
-                        if (!empty($sbList)) {
-                            $summary .= " | " . implode('; ', $sbList);
-                        }
-                        
-                        return $summary ?: '-';
-                    }),
 
                 TextInputColumn::make('price')
                     ->label('Harga')
@@ -167,7 +150,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->column('dynamic_group')
                     ->getTitleFromRecordUsing(function (OrderItem $record): string {
                         $labels = [];
-                        
+
                         if (in_array('product_name', $this->selectedGroups)) {
                             $labels[] = "📦 " . ($record->product_name ?: 'Produk');
                         }
@@ -241,7 +224,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ->live(),
                                     TextInput::make('bulk_product_name')
                                         ->label('Nama Produk/Jasa')
-                                        ->datalist(function() use ($tenantId) {
+                                        ->datalist(function () use ($tenantId) {
                                             return OrderItem::whereHas('order', fn($q) => $q->where('shop_id', $tenantId))
                                                 ->distinct()
                                                 ->pluck('product_name')
@@ -251,7 +234,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ->placeholder('Pilih atau ketik nama baru...')
                                         ->live(onBlur: true)
                                         ->afterStateUpdated(function ($state, Set $set) {
-                                            if (!$state) return;
+                                            if (!$state)
+                                                return;
 
                                             // Cari item terakhir dengan nama produk yang sama di pesanan ini
                                             $existing = OrderItem::where('order_id', $this->order->id)
@@ -272,6 +256,13 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 $set('bulk_button', $details['button_model'] ?? 'biasa');
                                                 $set('bulk_is_tunic', (bool) ($details['is_tunic'] ?? false));
 
+                                                // Salin Sablon/Bordir
+                                                $sb = $details['sablon_bordir'][0] ?? null;
+                                                if ($sb) {
+                                                    $set('bulk_sablon_teknik', $sb['jenis'] ?? null);
+                                                    $set('bulk_sablon_lokasi', $sb['lokasi'] ?? null);
+                                                }
+
                                                 Notification::make()
                                                     ->title("Spesifikasi '{$state}' berhasil disalin!")
                                                     ->success()
@@ -290,67 +281,75 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ->options($bahanOptions)
                                         ->searchable()
                                         ->live()
-                                        ->afterStateUpdated(fn (Set $set) => $set('bulk_material_variant_id', null)),
+                                        ->afterStateUpdated(fn(Set $set) => $set('bulk_material_variant_id', null)),
                                     Select::make('bulk_material_variant_id')
                                         ->id('bulk_material_variant_id')
                                         ->label('Warna / Varian')
                                         ->allowHtml()
                                         ->options(function (Get $get) {
                                             $bahanId = $get('bulk_bahan');
-                                            if (!$bahanId) return [];
+                                            if (!$bahanId)
+                                                return [];
                                             return \App\Models\MaterialVariant::where('material_id', $bahanId)
                                                 ->get()
-                                                ->mapWithKeys(fn ($v) => [
+                                                ->mapWithKeys(fn($v) => [
                                                     $v->id => "<div class='flex items-center gap-2'><div class='w-4 h-4 rounded-full border border-gray-300' style='background-color: {$v->color_code}'></div> {$v->color_name}</div>"
                                                 ]);
                                         })
                                         ->searchable()
                                         ->placeholder('Pilih warna...')
-                                        ->visible(fn (Get $get) => filled($get('bulk_bahan'))),
+                                        ->visible(fn(Get $get) => filled($get('bulk_bahan'))),
                                 ]),
-                                Grid::make(3)->schema([
-                                    TextInput::make('bulk_price')
-                                        ->label('Harga Satuan')
-                                        ->numeric()
-                                        ->prefix('Rp')
-                                        ->default(0),
-                                    Select::make('bulk_gender')
-                                        ->label('Gender')
-                                        ->options($genderOptions)
-                                        ->default('L'),
-                                    Select::make('bulk_sleeve')
-                                        ->label('Model Lengan')
-                                        ->options($sleeveOptions)
-                                        ->default('pendek'),
-                                ]),
-                                Grid::make(3)->schema([
-                                    Select::make('bulk_pocket')
-                                        ->label('Model Saku')
-                                        ->options($pocketOptions)
-                                        ->default('tanpa_saku'),
-                                    Select::make('bulk_button')
-                                        ->label('Model Kancing')
-                                        ->options($buttonOptions)
-                                        ->default('biasa'),
-                                    Toggle::make('bulk_is_tunic')
-                                        ->label('Tunik / Gamis?')
-                                        ->default(false)
-                                        ->inline(false)
-                                        ->extraAttributes(['class' => 'mt-2']),
-                                ]),
-                                Grid::make(2)->schema([
-                                    Select::make('bulk_sablon_teknik')
-                                        ->label('Teknik Sablon / Bordir')
-                                        ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
-                                        ->searchable(),
-                                    Select::make('bulk_sablon_lokasi')
-                                        ->label('Posisi / Lokasi (Bisa pilih banyak)')
-                                        ->options(\App\Models\PrintType::where('category', 'lokasi')->pluck('name', 'name'))
-                                        ->multiple()
-                                        ->searchable(),
-                                ]),
+                                Group::make([
+                                    Grid::make(2)->schema([
+                                        Select::make('bulk_sablon_teknik')
+                                            ->label('Teknik Sablon / Bordir')
+                                            ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
+                                            ->searchable(),
+                                        Select::make('bulk_sablon_lokasi')
+                                            ->label('Posisi / Lokasi')
+                                            ->options(\App\Filament\Resources\Orders\OrderResource::$lokasiSablonOptions)
+                                            ->searchable(),
+                                    ]),
+                                ])
+                                    ->extraAttributes([
+                                        'class' => 'p-4 bg-indigo-50/40 rounded-xl',
+                                        'style' => 'border: 1px solid #e2e8f0'
+                                    ]),
+
+                                Group::make([
+                                    Grid::make(3)->schema([
+                                        Select::make('bulk_gender')
+                                            ->label('Gender')
+                                            ->options($genderOptions)
+                                            ->default('L'),
+                                        Select::make('bulk_sleeve')
+                                            ->label('Model Lengan')
+                                            ->options($sleeveOptions)
+                                            ->default('pendek'),
+                                        Select::make('bulk_pocket')
+                                            ->label('Model Saku')
+                                            ->options($pocketOptions)
+                                            ->default('tanpa_saku'),
+                                    ]),
+                                    Grid::make(3)->schema([
+                                        Select::make('bulk_button')
+                                            ->label('Model Kancing')
+                                            ->options($buttonOptions)
+                                            ->default('biasa'),
+                                        Toggle::make('bulk_is_tunic')
+                                            ->label('Tunik / Gamis?')
+                                            ->default(false)
+                                            ->inline(false)
+                                    ]),
+                                ])
+                                    ->extraAttributes([
+                                        'class' => 'p-4 bg-amber-50/40 rounded-xl',
+                                        'style' => 'border: 1px solid #e2e8f0'
+                                    ]),
+
                             ])
-                            ->visible(fn (Get $get) => $get('bulk_category') === 'produksi'),
+                                ->visible(fn(Get $get) => $get('bulk_category') === 'produksi'),
 
                             // MODE 2: BAJU JADI
                             Section::make('Detail Baju Jadi')->schema([
@@ -363,7 +362,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ->live()
                                         ->afterStateUpdated(function ($state, Set $set) {
                                             $product = Product::find($state);
-                                            if ($product) $set('bulk_product_name', $product->name);
+                                            if ($product)
+                                                $set('bulk_product_name', $product->name);
                                         }),
                                     TextInput::make('bulk_price_non')
                                         ->label('Harga Jual')
@@ -372,7 +372,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ->default(0),
                                 ]),
                             ])
-                            ->visible(fn (Get $get) => $get('bulk_category') === 'non_produksi'),
+                                ->visible(fn(Get $get) => $get('bulk_category') === 'non_produksi'),
 
                             // MODE 3: JASA
                             Section::make('Detail Jasa')->schema([
@@ -388,11 +388,11 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ->default(1),
                                 ]),
                             ])
-                            ->visible(fn (Get $get) => $get('bulk_category') === 'jasa'),
+                                ->visible(fn(Get $get) => $get('bulk_category') === 'jasa'),
 
                             // QUANTITIES (For Produksi & Baju Jadi)
                             Section::make('Jumlah per Ukuran')->schema([
-                                Grid::make(6)->schema(function() use ($sizeOptions) {
+                                Grid::make(6)->schema(function () use ($sizeOptions) {
                                     $sizeFields = [];
                                     foreach ($sizeOptions as $key => $label) {
                                         $sizeFields[] = TextInput::make("qty_{$key}")
@@ -403,11 +403,33 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     $sizeFields[] = TextInput::make('qty_custom')
                                         ->label('Custom')
                                         ->numeric()
-                                        ->default(0);
+                                        ->default(0)
+                                        ->live();
                                     return $sizeFields;
                                 }),
                             ])
-                            ->visible(fn (Get $get) => in_array($get('bulk_category'), ['produksi', 'non_produksi'])),
+                                ->visible(fn(Get $get) => in_array($get('bulk_category'), ['produksi', 'non_produksi'])),
+
+                            Section::make('Harga Satuan')->schema([
+                                Grid::make(2)->schema([
+                                    TextInput::make('bulk_price')
+                                        ->label('Harga per Pcs')
+                                        ->numeric()
+                                        ->prefix('Rp')
+                                        ->default(0),
+                                    TextInput::make('bulk_price_custom')
+                                        ->label('Harga Custom per Pcs')
+                                        ->numeric()
+                                        ->prefix('Rp')
+                                        ->default(0)
+                                        ->visible(fn(Get $get) => (int) $get('qty_custom') > 0),
+                                ]),
+                            ])
+                                ->extraAttributes([
+                                    'class' => 'bg-emerald-50/40 rounded-xl',
+                                    'style' => 'border: 1px solid #e2e8f0'
+                                ])
+                                ->visible(fn(Get $get) => $get('bulk_category') === 'produksi'),
                         ];
                     })
                     ->modalWidth('5xl')
@@ -415,7 +437,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->action(function (array $data) use ($sizeOptions) {
                         $category = $data['bulk_category'];
                         $productName = $data['bulk_product_name'];
-                        
+
                         if ($category === 'jasa') {
                             $this->order->orderItems()->create([
                                 'product_name' => $productName,
@@ -427,7 +449,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             $price = (int) ($category === 'produksi' ? ($data['bulk_price'] ?? 0) : ($data['bulk_price_non'] ?? 0));
                             $bahanId = $data['bulk_bahan'] ?? null;
                             $productId = $data['bulk_product_id'] ?? null;
-                            
+
                             $details = [];
                             if ($category === 'produksi') {
                                 $details = [
@@ -436,10 +458,12 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     'pocket_model' => $data['bulk_pocket'] ?? 'tanpa_saku',
                                     'button_model' => $data['bulk_button'] ?? 'biasa',
                                     'is_tunic' => (bool) ($data['bulk_is_tunic'] ?? false),
-                                    'sablon_bordir' => !empty($data['bulk_sablon_teknik']) ? [[
-                                        'jenis' => $data['bulk_sablon_teknik'],
-                                        'lokasi' => !empty($data['bulk_sablon_lokasi']) ? implode(', ', $data['bulk_sablon_lokasi']) : '-',
-                                    ]] : [],
+                                    'sablon_bordir' => !empty($data['bulk_sablon_teknik']) ? [
+                                        [
+                                            'jenis' => $data['bulk_sablon_teknik'],
+                                            'lokasi' => $data['bulk_sablon_lokasi'] ?? '-',
+                                        ]
+                                    ] : [],
                                 ];
                             }
 
@@ -447,6 +471,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             foreach ($sizeOptions as $key => $label) {
                                 $qty = (int) ($data["qty_{$key}"] ?? 0);
                                 if ($qty > 0) {
+                                    $itemPrice = ($category === 'produksi' ? (int) ($data['bulk_price'] ?? 0) : (int) ($data['bulk_price_non'] ?? 0));
                                     for ($i = 0; $i < $qty; $i++) {
                                         $items[] = [
                                             'product_name' => $productName,
@@ -454,7 +479,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             'production_category' => $category,
                                             'bahan_id' => $bahanId,
                                             'product_id' => $productId,
-                                            'price' => $price,
+                                            'price' => $itemPrice,
                                             'quantity' => 1,
                                             'size_and_request_details' => array_merge($details, [
                                                 'material_variant_id' => $data['bulk_material_variant_id'] ?? null,
@@ -466,6 +491,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                             $customQty = (int) ($data['qty_custom'] ?? 0);
                             if ($customQty > 0) {
+                                $customPrice = ($category === 'produksi' ? (int) ($data['bulk_price_custom'] ?? $data['bulk_price'] ?? 0) : (int) ($data['bulk_price_non'] ?? 0));
                                 for ($i = 0; $i < $customQty; $i++) {
                                     $items[] = [
                                         'product_name' => $productName,
@@ -473,7 +499,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         'production_category' => $category,
                                         'bahan_id' => $bahanId,
                                         'product_id' => $productId,
-                                        'price' => $price,
+                                        'price' => $customPrice,
                                         'quantity' => 1,
                                         'size_and_request_details' => array_merge($details, [
                                             'material_variant_id' => $data['bulk_material_variant_id'] ?? null,
@@ -503,7 +529,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 ->options($bahanOptions)
                                 ->searchable()
                                 ->live()
-                                ->afterStateUpdated(fn (Set $set) => $set('material_variant_id', null)),
+                                ->afterStateUpdated(fn(Set $set) => $set('material_variant_id', null)),
 
                             Select::make('material_variant_id')
                                 ->id('material_variant_id')
@@ -511,106 +537,140 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 ->allowHtml()
                                 ->options(function (Get $get) {
                                     $bahanId = $get('bahan_id');
-                                    if (!$bahanId) return [];
+                                    if (!$bahanId)
+                                        return [];
                                     return \App\Models\MaterialVariant::where('material_id', $bahanId)
                                         ->get()
-                                        ->mapWithKeys(fn ($v) => [
+                                        ->mapWithKeys(fn($v) => [
                                             $v->id => "<div class='flex items-center gap-2'><div class='w-4 h-4 rounded-full border border-gray-300' style='background-color: {$v->color_code}'></div> {$v->color_name}</div>"
                                         ]);
                                 })
                                 ->searchable()
                                 ->placeholder('Pilih warna...')
-                                ->visible(fn (Get $get) => filled($get('bahan_id'))),
+                                ->visible(fn(Get $get) => filled($get('bahan_id'))),
                         ]),
 
-                        Grid::make(3)->schema([
+                        Group::make([
+                            Grid::make(2)->schema([
+                                Select::make('sablon_teknik')
+                                    ->label('Teknik Sablon / Bordir')
+                                    ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
+                                    ->searchable(),
+                                Select::make('sablon_lokasi')
+                                    ->label('Posisi / Lokasi')
+                                    ->options(\App\Filament\Resources\Orders\OrderResource::$lokasiSablonOptions)
+                                    ->searchable(),
+                            ]),
+                        ])
+                            ->extraAttributes([
+                                'class' => 'p-4 bg-indigo-50/40 rounded-xl',
+                                'style' => 'border: 1px solid #e2e8f0'
+                            ]),
+
+                        Group::make([
+                            Grid::make(3)->schema([
+                                Select::make('gender')
+                                    ->label('Gender')
+                                    ->options($genderOptions),
+                                Select::make('sleeve_model')
+                                    ->label('Model Lengan')
+                                    ->options($sleeveOptions),
+                                Select::make('pocket_model')
+                                    ->label('Model Saku')
+                                    ->options($pocketOptions),
+                            ]),
+                            Grid::make(3)->schema([
+                                Select::make('button_model')
+                                    ->label('Model Kancing')
+                                    ->options($buttonOptions),
+                                Toggle::make('is_tunic')
+                                    ->label('Tunik / Gamis?')
+                                    ->inline(false)
+                            ]),
+                        ])
+                            ->extraAttributes([
+                                'class' => 'p-4 bg-amber-50/40 rounded-xl',
+                                'style' => 'border: 1px solid #e2e8f0'
+                            ]),
+
+                        Section::make('Harga Satuan')->schema([
                             TextInput::make('price')
                                 ->label('Harga Satuan')
                                 ->numeric()
                                 ->prefix('Rp')
                                 ->required(),
-                            Select::make('gender')
-                                ->label('Gender')
-                                ->options($genderOptions),
-                            Select::make('sleeve_model')
-                                ->label('Model Lengan')
-                                ->options($sleeveOptions),
-                        ]),
-
-                        Grid::make(3)->schema([
-                            Select::make('pocket_model')
-                                ->label('Model Saku')
-                                ->options($pocketOptions),
-                            Select::make('button_model')
-                                ->label('Model Kancing')
-                                ->options($buttonOptions),
-                            Toggle::make('is_tunic')
-                                ->label('Tunik / Gamis?')
-                                ->inline(false)
-                                ->extraAttributes(['class' => 'mt-2']),
-                        ]),
-                        Grid::make(2)->schema([
-                            Select::make('sablon_teknik')
-                                ->label('Teknik Sablon / Bordir')
-                                ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
-                                ->searchable(),
-                            Select::make('sablon_lokasi')
-                                ->label('Posisi / Lokasi (Multi)')
-                                ->options(\App\Models\PrintType::where('category', 'lokasi')->pluck('name', 'name'))
-                                ->multiple()
-                                ->searchable(),
-                        ]),
-                        Section::make('Ukuran Badan (cm)')->schema([
-                            Grid::make(3)->schema([
-                                TextInput::make('LD')->label('LD (L. Dada)')->numeric()->suffix('cm'),
-                                TextInput::make('PB')->label('PB (P. Baju)')->numeric()->suffix('cm'),
-                                TextInput::make('PL')->label('PL (P. Lengan)')->numeric()->suffix('cm'),
-                                TextInput::make('LB')->label('LB (L. Bahu)')->numeric()->suffix('cm'),
-                                TextInput::make('LP')->label('LP (L. Perut)')->numeric()->suffix('cm'),
-                                TextInput::make('LPh')->label('LPh (L. Paha)')->numeric()->suffix('cm'),
-                            ]),
                         ])
-                        ->compact()
-                        ->collapsible()
-                        ->visible(fn (OrderItem $record) => $record->size === 'Custom'),
+                            ->extraAttributes([
+                                'class' => 'bg-emerald-50/40 rounded-xl',
+                                'style' => 'border: 1px solid #e2e8f0'
+                            ]),
                     ])
-                    ->fillForm(function(OrderItem $record) {
+                    ->fillForm(function (OrderItem $record) {
                         $data = $record->size_and_request_details ?? [];
                         $data['bahan_id'] = $record->bahan_id;
                         $data['price'] = $record->price;
-                        
+
                         // Map back for form
                         $sb = $data['sablon_bordir'][0] ?? null;
                         if ($sb) {
                             $data['sablon_teknik'] = $sb['jenis'] ?? null;
-                            $data['sablon_lokasi'] = !empty($sb['lokasi']) ? explode(', ', $sb['lokasi']) : [];
+                            $data['sablon_lokasi'] = $sb['lokasi'] ?? null;
                         }
-                        
+
                         return $data;
                     })
                     ->action(function (OrderItem $record, array $data): void {
                         $bahanId = $data['bahan_id'] ?? null;
                         $price = $data['price'] ?? 0;
-                        
+
                         // Map to JSON structure
-                        $data['sablon_bordir'] = !empty($data['sablon_teknik']) ? [[
-                            'jenis' => $data['sablon_teknik'],
-                            'lokasi' => !empty($data['sablon_lokasi']) ? implode(', ', $data['sablon_lokasi']) : '-',
-                        ]] : [];
-                        
+                        $data['sablon_bordir'] = !empty($data['sablon_teknik']) ? [
+                            [
+                                'jenis' => $data['sablon_teknik'],
+                                'lokasi' => $data['sablon_lokasi'] ?? '-',
+                            ]
+                        ] : [];
+
                         unset($data['bahan_id'], $data['price'], $data['sablon_teknik'], $data['sablon_lokasi']);
+
+                        $existingDetails = $record->size_and_request_details ?? [];
 
                         $record->update([
                             'bahan_id' => $bahanId,
                             'price' => $price,
-                            'size_and_request_details' => $data,
+                            'size_and_request_details' => array_merge($existingDetails, $data),
                         ]);
 
                         Notification::make()->success()->title('Spesifikasi diperbarui')->send();
                         $this->refreshOrderData();
                     }),
+                Action::make('edit_measurements')
+                    ->label('Ukur')
+                    ->icon('heroicon-m-viewfinder-circle')
+                    ->color('warning')
+                    ->modalHeading('Rekam Ukuran Badan (cm)')
+                    ->modalWidth('2xl')
+                    ->visible(fn(OrderItem $record) => $record->size === 'Custom')
+                    ->form([
+                        Grid::make(3)->schema([
+                            TextInput::make('LD')->label('LD (L. Dada)')->numeric()->suffix('cm'),
+                            TextInput::make('PB')->label('PB (P. Baju)')->numeric()->suffix('cm'),
+                            TextInput::make('PL')->label('PL (P. Lengan)')->numeric()->suffix('cm'),
+                            TextInput::make('LB')->label('LB (L. Bahu)')->numeric()->suffix('cm'),
+                            TextInput::make('LP')->label('LP (L. Perut)')->numeric()->suffix('cm'),
+                            TextInput::make('LPh')->label('LPh (L. Paha)')->numeric()->suffix('cm'),
+                        ]),
+                    ])
+                    ->fillForm(fn(OrderItem $record) => $record->size_and_request_details ?? [])
+                    ->action(function (OrderItem $record, array $data): void {
+                        $details = $record->size_and_request_details ?? [];
+                        $record->update([
+                            'size_and_request_details' => array_merge($details, $data),
+                        ]);
+                        Notification::make()->success()->title('Ukuran badan berhasil disimpan')->send();
+                    }),
                 DeleteAction::make()
-                    ->after(fn () => $this->refreshOrderData()),
+                    ->after(fn() => $this->refreshOrderData()),
             ])
             ->bulkActions([
                 BulkAction::make('bulk_edit_price')
@@ -639,7 +699,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     ->options($bahanOptions)
                                     ->searchable()
                                     ->live()
-                                    ->afterStateUpdated(fn (Set $set) => $set('material_variant_id', null)),
+                                    ->afterStateUpdated(fn(Set $set) => $set('material_variant_id', null)),
 
                                 Select::make('material_variant_id')
                                     ->id('bulk_edit_material_variant_id')
@@ -647,87 +707,99 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     ->allowHtml()
                                     ->options(function (Get $get) {
                                         $bahanId = $get('bahan_id');
-                                        if (!$bahanId) return [];
+                                        if (!$bahanId)
+                                            return [];
                                         return \App\Models\MaterialVariant::where('material_id', $bahanId)
                                             ->get()
-                                            ->mapWithKeys(fn ($v) => [
+                                            ->mapWithKeys(fn($v) => [
                                                 $v->id => "<div class='flex items-center gap-2'><div class='w-4 h-4 rounded-full border border-gray-300' style='background-color: {$v->color_code}'></div> {$v->color_name}</div>"
                                             ]);
                                     })
                                     ->searchable()
                                     ->placeholder('Pilih warna...')
-                                    ->visible(fn (Get $get) => filled($get('bahan_id'))),
+                                    ->visible(fn(Get $get) => filled($get('bahan_id'))),
                             ]),
 
-                            Grid::make(3)->schema([
-                                Select::make('gender')
-                                    ->label('Gender')
-                                    ->options($genderOptions)
-                                    ->placeholder('Pilih...'),
-                                Select::make('sleeve_model')
-                                    ->label('Model Lengan')
-                                    ->options($sleeveOptions)
-                                    ->placeholder('Pilih...'),
-                                Select::make('pocket_model')
-                                    ->label('Model Saku')
-                                    ->options($pocketOptions)
-                                    ->placeholder('Pilih...'),
-                            ]),
+                            Group::make([
+                                Grid::make(2)->schema([
+                                    Select::make('sablon_teknik')
+                                        ->label('Teknik Sablon / Bordir (Massal)')
+                                        ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
+                                        ->searchable(),
+                                    Select::make('sablon_lokasi')
+                                        ->label('Posisi / Lokasi (Massal)')
+                                        ->options(\App\Filament\Resources\Orders\OrderResource::$lokasiSablonOptions)
+                                        ->searchable(),
+                                ]),
+                            ])
+                                ->extraAttributes([
+                                    'class' => 'p-4 bg-indigo-50/40 rounded-xl',
+                                    'style' => 'border: 1px solid #e2e8f0'
+                                ]),
 
-                            Grid::make(2)->schema([
-                                Select::make('button_model')
-                                    ->label('Model Kancing')
-                                    ->options($buttonOptions)
-                                    ->placeholder('Pilih...'),
-                                Select::make('is_tunic')
-                                    ->label('Tunik / Gamis?')
-                                    ->options([
-                                        '1' => 'Ya (Tunik)',
-                                        '0' => 'Bukan',
-                                    ])
-                                    ->placeholder('Biarkan aslinya...'),
-                            ]),
-                            Grid::make(2)->schema([
-                                Select::make('sablon_teknik')
-                                    ->label('Teknik Sablon / Bordir (Massal)')
-                                    ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
-                                    ->searchable(),
-                                Select::make('sablon_lokasi')
-                                    ->label('Posisi / Lokasi (Massal)')
-                                    ->options(\App\Models\PrintType::where('category', 'lokasi')->pluck('name', 'name'))
-                                    ->multiple()
-                                    ->searchable(),
-                            ]),
+                            Group::make([
+                                Grid::make(3)->schema([
+                                    Select::make('gender')
+                                        ->label('Gender')
+                                        ->options($genderOptions)
+                                        ->placeholder('Pilih...'),
+                                    Select::make('sleeve_model')
+                                        ->label('Model Lengan')
+                                        ->options($sleeveOptions)
+                                        ->placeholder('Pilih...'),
+                                    Select::make('pocket_model')
+                                        ->label('Model Saku')
+                                        ->options($pocketOptions)
+                                        ->placeholder('Pilih...'),
+                                ]),
+
+                                Grid::make(2)->schema([
+                                    Select::make('button_model')
+                                        ->label('Model Kancing')
+                                        ->options($buttonOptions)
+                                        ->placeholder('Pilih...'),
+                                    Select::make('is_tunic')
+                                        ->label('Tunik / Gamis?')
+                                        ->options([
+                                            '1' => 'Ya (Tunik)',
+                                            '0' => 'Bukan',
+                                        ])
+                                        ->placeholder('Biarkan aslinya...'),
+                                ]),
+                            ])
+                                ->extraAttributes([
+                                    'class' => 'p-4 bg-amber-50/40 rounded-xl',
+                                    'style' => 'border: 1px solid #e2e8f0'
+                                ]),
                         ];
                     })
                     ->action(function (Collection $records, array $data): void {
                         foreach ($records as $record) {
                             $updateData = [];
-                            
-                            // Handle top-level columns
-                            if (filled($data['bahan_id'])) {
+
+                            if (isset($data['bahan_id']) && filled($data['bahan_id'])) {
                                 $updateData['bahan_id'] = $data['bahan_id'];
                             }
 
-                            // Handle JSON details
                             $details = $record->size_and_request_details ?? [];
-                            
+
                             $fieldsToSync = ['material_variant_id', 'gender', 'sleeve_model', 'pocket_model', 'button_model'];
                             foreach ($fieldsToSync as $field) {
-                                if (filled($data[$field])) {
+                                if (isset($data[$field]) && filled($data[$field])) {
                                     $details[$field] = $data[$field];
                                 }
                             }
 
-                            // Handle sablon/bordir specially
-                            if (filled($data['sablon_teknik'])) {
-                                $details['sablon_bordir'] = [[
-                                    'jenis' => $data['sablon_teknik'],
-                                    'lokasi' => filled($data['sablon_lokasi']) ? implode(', ', $data['sablon_lokasi']) : '-',
-                                ]];
+                            if (isset($data['sablon_teknik']) && filled($data['sablon_teknik'])) {
+                                $details['sablon_bordir'] = [
+                                    [
+                                        'jenis' => $data['sablon_teknik'],
+                                        'lokasi' => $data['sablon_lokasi'] ?? '-',
+                                    ]
+                                ];
                             }
 
-                            if (filled($data['is_tunic'])) {
+                            if (isset($data['is_tunic']) && filled($data['is_tunic'])) {
                                 $details['is_tunic'] = (bool) $data['is_tunic'];
                             }
 
@@ -739,7 +811,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         $this->refreshOrderData();
                     }),
                 DeleteBulkAction::make()
-                    ->after(fn () => $this->refreshOrderData()),
+                    ->after(fn() => $this->refreshOrderData()),
             ])
             ->paginated(false);
     }
