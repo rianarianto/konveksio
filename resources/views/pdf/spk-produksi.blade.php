@@ -258,44 +258,76 @@
         </table>
     </div>
 
-    @if($record->production_category === 'custom' || collect($allGroupItems)->contains(fn($i) => !empty($i->size_and_request_details['detail_custom'])))
-    <div class="section">
-        <div class="section-title">3. DETAIL UKURAN BADAN & NAMA (KHUSUS CUSTOM)</div>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width: 25px;">No</th>
-                    <th>Nama Penerima / Nama di Baju</th>
-                    <th style="width: 45px;">Size</th>
-                    <th style="width: 200px;">Rincian Ukuran (LD / PB / PL / LB / LP / LPh)</th>
-                    <th>Instruksi Tambahan</th>
-                </tr>
-            </thead>
-            <tbody>
-                @php $customIdx = 1; @endphp
-                @foreach($allGroupItems as $gi)
-                    @php $customs = $gi->size_and_request_details['detail_custom'] ?? []; @endphp
-                    @foreach($customs as $u)
-                        <tr>
-                            <td>{{ $customIdx++ }}</td>
-                            <td class="text-bold">{{ $u['nama'] ?? '-' }}</td>
-                            <td style="text-align: center;">{{ $u['ukuran'] ?? $gi->size }}</td>
-                            <td>
-                                @if(!empty($u['LD']) || !empty($u['PB']))
-                                    LD:{{ $u['LD'] ?? '-' }} | PB:{{ $u['PB'] ?? '-' }} | PL:{{ $u['PL'] ?? '-' }} | LB:{{ $u['LB'] ?? '-' }}
-                                    @if(!empty($u['LP'])) | LP:{{ $u['LP'] }} @endif
-                                    @if(!empty($u['LPh'])) | LPh:{{ $u['LPh'] }} @endif
-                                @else - @endif
-                            </td>
-                            <td>{{ $u['keterangan'] ?? '-' }}</td>
-                        </tr>
+    @php
+        $hasNamesOrCustom = collect($allGroupItems)->contains(function($i) {
+            $details = $i->size_and_request_details ?? [];
+            return !empty($i->recipient_name) || strtoupper($i->size) === 'CUSTOM' || !empty($details['detail_custom']);
+        });
+    @endphp
+
+    @php
+        $standardNames = [];
+        $customEntries = [];
+        
+        foreach($allGroupItems as $gi) {
+            $details = $gi->size_and_request_details ?? [];
+            $size = strtoupper($gi->size ?? 'S');
+            
+            // 1. United Custom
+            if (!empty($details['detail_custom'])) {
+                foreach($details['detail_custom'] as $u) {
+                    $customEntries[] = [
+                        'nama' => $u['nama'] ?? '-',
+                        'size' => $u['ukuran'] ?? 'Custom',
+                        'desc' => !empty($u['LD']) ? "LD:{$u['LD']} PB:{$u['PB']} PL:{$u['PL']} LB:{$u['LB']}" : ""
+                    ];
+                }
+            } 
+            // 2. Individual Custom
+            elseif ($size === 'CUSTOM') {
+                 $customEntries[] = [
+                        'nama' => $gi->recipient_name ?? '-',
+                        'size' => 'Custom',
+                        'desc' => !empty($details['LD']) ? "LD:{$details['LD']} PB:{$details['PB']} PL:{$details['PL']} LB:{$details['LB']}" : ""
+                    ];
+            }
+            // 3. Individual Standard with Name
+            elseif (!empty($gi->recipient_name)) {
+                $standardNames[$size][] = $gi->recipient_name;
+            }
+        }
+        $hasAnyNames = !empty($standardNames) || !empty($customEntries);
+    @endphp
+
+    @if($hasAnyNames)
+    <div class="section" style="border: 1px solid #7c3aed; padding: 6px; border-radius: 4px; background: #fafafa;">
+        <div style="font-size: 8.5pt; font-weight: bold; color: #7c3aed; border-bottom: 1px solid #7c3aed; margin-bottom: 4px; padding-bottom: 2px;">
+            3. DAFTAR NAMA PENERIMA & DETAIL CUSTOM
+        </div>
+        
+        {{-- Render Standard Sizes with Names --}}
+        @foreach($standardNames as $sz => $names)
+            <div style="font-size: 8pt; margin-bottom: 2px;">
+                <strong style="background: #f3e8ff; padding: 0 4px; border-radius: 2px;">{{ $sz }}</strong>: {{ implode(', ', $names) }}
+            </div>
+        @endforeach
+
+        {{-- Render Custom Measurements --}}
+        @if(!empty($customEntries))
+            <div style="margin-top: 5px; font-size: 8pt; border-top: 1px dashed #ddd; padding-top: 4px;">
+                <strong>DETAIL CUSTOM:</strong>
+                <ul style="margin: 0; padding-left: 15px; list-style-type: square;">
+                    @foreach($customEntries as $ce)
+                        <li style="margin-bottom: 1px;">
+                            <span class="text-bold">{{ $ce['nama'] }}</span> ({{ $ce['size'] }}) 
+                            @if($ce['desc']) — <span style="color: #444; font-style: italic;">{{ $ce['desc'] }}</span> @endif
+                        </li>
                     @endforeach
-                @endforeach
-            </tbody>
-        </table>
+                </ul>
+            </div>
+        @endif
     </div>
     @endif
-
     <div class="section">
         <div class="section-title">4. DAFTAR PEMBAGIAN TUGAS PRODUKSI</div>
         <table class="data-table">

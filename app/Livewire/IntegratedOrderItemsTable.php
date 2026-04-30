@@ -661,6 +661,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             TextInput::make('LP')->label('LP (L. Perut)')->numeric()->suffix('cm'),
                             TextInput::make('LPh')->label('LPh (L. Paha)')->numeric()->suffix('cm'),
                         ]),
+                        \Filament\Forms\Components\Textarea::make('note')
+                            ->label('Catatan/Instruksi Khusus (Per-Orang)')
+                            ->placeholder('Contoh: Celana pakai karet, Lengan pakai kancing bungkus, dll.')
+                            ->rows(2),
                     ])
                     ->fillForm(fn(OrderItem $record) => $record->size_and_request_details ?? [])
                     ->action(function (OrderItem $record, array $data): void {

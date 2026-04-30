@@ -452,20 +452,15 @@ class ControlProduksiResource extends Resource
                         $maxSizes = [];
                         foreach ($allGroupItems as $gi) {
                             $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-                            if ($sz === 'CUSTOM') {
-                                $maxSizes['PERSON_' . $gi->id] = $gi->quantity;
-                            } else {
-                                $maxSizes[$sz] = ($maxSizes[$sz] ?? 0) + $gi->quantity;
-                            }
+                            $maxSizes[$sz] = ($maxSizes[$sz] ?? 0) + $gi->quantity;
                         }
 
-                        // Also include united custom people if any
+                        // For unified 'custom' category, add to 'CUSTOM' size total
                         if ($item->production_category === 'custom') {
                             $details = $item->size_and_request_details ?? [];
-                            foreach ($details['detail_custom'] ?? [] as $index => $u) {
-                                $person = trim($u['nama'] ?? 'Person ' . ($index + 1));
-                                $key = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', $person) . '_' . $index);
-                                $maxSizes[$key] = 1;
+                            $count = count($details['detail_custom'] ?? []);
+                            if ($count > 0) {
+                                $maxSizes['CUSTOM'] = ($maxSizes['CUSTOM'] ?? 0) + $count;
                             }
                         }
 
@@ -484,7 +479,13 @@ class ControlProduksiResource extends Resource
                             // Unpack size_quantities into the flat row state
                             if (is_array($task->size_quantities)) {
                                 foreach ($task->size_quantities as $sz => $qty) {
-                                    $taskRow[strtoupper($sz)] = $qty;
+                                    $upperSz = strtoupper($sz);
+                                    // Migration logic: If the saved key is person-based but our new form uses 'CUSTOM', map it.
+                                    if ((str_starts_with($upperSz, 'PERSON_') || !isset($maxSizes[$upperSz])) && isset($maxSizes['CUSTOM'])) {
+                                        $taskRow['CUSTOM'] = ($taskRow['CUSTOM'] ?? 0) + $qty;
+                                    } else {
+                                        $taskRow[$upperSz] = $qty;
+                                    }
                                 }
                             }
 
@@ -837,32 +838,15 @@ class ControlProduksiResource extends Resource
                                             $sizes = [];
                                             $customPeople = [];
 
+                                            $sizes = [];
                                             foreach ($allGroupItems as $gi) {
                                                 $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-                                                if ($sz === 'CUSTOM') {
-                                                    $person = trim($gi->recipient_name ?? 'Orang ' . $gi->id);
-                                                    $customPeople[] = [
-                                                        'key' => 'PERSON_' . $gi->id,
-                                                        'label' => $person,
-                                                        'max' => $gi->quantity,
-                                                        'sz_label' => $gi->size_and_request_details['LD'] ? "Terukur" : "Belum Ukur"
-                                                    ];
-                                                } else {
-                                                    $sizes[$sz] = ($sizes[$sz] ?? 0) + $gi->quantity;
-                                                }
+                                                $sizes[$sz] = ($sizes[$sz] ?? 0) + $gi->quantity;
                                             }
 
-                                            // Logic for unified 'custom' category (multiple people in one item)
+                                            // United custom category adds to the 'CUSTOM' count
                                             if ($cat === 'custom' && !empty($details['detail_custom'])) {
-                                                foreach ($details['detail_custom'] as $index => $u) {
-                                                    $person = trim($u['nama'] ?? 'Person ' . ($index + 1));
-                                                    $customPeople[] = [
-                                                        'key' => strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', $person) . '_' . $index),
-                                                        'label' => $person,
-                                                        'max' => 1,
-                                                        'sz_label' => $u['ukuran'] ?? 'Custom'
-                                                    ];
-                                                }
+                                                $sizes['CUSTOM'] = ($sizes['CUSTOM'] ?? 0) + count($details['detail_custom']);
                                             }
 
                                             // Recalculate Total Qty
@@ -880,21 +864,18 @@ class ControlProduksiResource extends Resource
                                                 $set('quantity', $total > 0 ? $total : 0);
                                             };
 
-                                            $allKeys = array_merge(array_keys($sizes), array_column($customPeople, 'key'));
+                                            $allKeys = array_keys($sizes);
                                             
                                             // Toggle Kerjakan Semua
-                                            $totalStok = array_sum($sizes) + array_sum(array_column($customPeople, 'max'));
+                                            $totalStok = array_sum($sizes);
                                             if ($totalStok > 0) {
                                                 $fields[] = \Filament\Forms\Components\Toggle::make('_fill_all')
                                                     ->label('✓ Kerjakan semua (' . $totalStok . ' pcs)')
                                                     ->dehydrated(false)
                                                     ->live()
-                                                    ->afterStateUpdated(function (bool $state, Set $set, Get $get) use ($sizes, $customPeople, $recalcQty) {
+                                                    ->afterStateUpdated(function (bool $state, Set $set, Get $get) use ($sizes, $recalcQty) {
                                                         foreach ($sizes as $sz => $max) {
                                                             $set($sz, $state ? $max : 0);
-                                                        }
-                                                        foreach ($customPeople as $p) {
-                                                            $set($p['key'], $state ? $p['max'] : 0);
                                                         }
                                                         $recalcQty($get, $set);
                                                     })
@@ -914,23 +895,6 @@ class ControlProduksiResource extends Resource
                                                     ->live(debounce: 300)
                                                     ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcQty, $maxQty, $sizeName) {
                                                         if ((int) $state > $maxQty) $set($sizeName, $maxQty);
-                                                        $recalcQty($get, $set);
-                                                    });
-                                            }
-
-                                            // Custom People
-                                            foreach ($customPeople as $p) {
-                                                $fields[] = \Filament\Forms\Components\TextInput::make($p['key'])
-                                                    ->label($p['label'])
-                                                    ->placeholder($p['sz_label'])
-                                                    ->numeric()
-                                                    ->minValue(0)
-                                                    ->maxValue($p['max'])
-                                                    ->readOnly(fn(Get $get) => (bool) $get('_fill_all'))
-                                                    ->extraInputAttributes(['style' => 'text-align:center; background-color:#fdf2f8; border-color:#fbcfe8;'])
-                                                    ->live(debounce: 300)
-                                                    ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcQty, $p) {
-                                                        if ((int) $state > $p['max']) $set($p['key'], $p['max']);
                                                         $recalcQty($get, $set);
                                                     });
                                             }
@@ -978,20 +942,12 @@ class ControlProduksiResource extends Resource
                         $originalSizes = [];
                         foreach ($allGroupItems as $gi) {
                             $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-                            if ($sz === 'CUSTOM') {
-                                $originalSizes['PERSON_' . $gi->id] = $gi->quantity;
-                            } else {
-                                $originalSizes[$sz] = ($originalSizes[$sz] ?? 0) + $gi->quantity;
-                            }
+                            $originalSizes[$sz] = ($originalSizes[$sz] ?? 0) + $gi->quantity;
                         }
 
                         // Fallback logic for united 'custom' category
                         if ($category === 'custom') {
-                            foreach ($details['detail_custom'] ?? [] as $index => $u) {
-                                $person = strtoupper(trim($u['nama'] ?? 'Person ' . ($index + 1)));
-                                $key = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', $person) . '_' . $index);
-                                $originalSizes[$key] = 1;
-                            }
+                            $originalSizes['CUSTOM'] = ($originalSizes['CUSTOM'] ?? 0) + count($details['detail_custom'] ?? []);
                         }
                         $totalOrderQty = array_sum($originalSizes);
 
