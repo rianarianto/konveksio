@@ -250,14 +250,41 @@ class DesignTaskResource extends Resource
                         ->schema([
                             FileUpload::make('design_image')
                                 ->label('Pilih File Artwork')
-                                ->image()
-                                ->imageEditor()
                                 ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                                ->maxSize(5120) // 5MB Limit
                                 ->disk('public')
                                 ->directory('designs')
                                 ->downloadable()
                                 ->openable()
-                                ->required(),
+                                ->required()
+                                ->saveUploadedFileUsing(function (\Livewire\Features\SupportFileUploads\TemporaryUploadedFile $file): string {
+                                    $mimeType = $file->getMimeType();
+                                    
+                                    // Jika PDF, simpan apa adanya
+                                    if ($mimeType === 'application/pdf') {
+                                        $filename = \Illuminate\Support\Str::uuid() . '.pdf';
+                                        $path = 'designs/' . $filename;
+                                        \Illuminate\Support\Facades\Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
+                                        return $path;
+                                    }
+
+                                    // Jika Gambar, Resize & Kompres
+                                    $img = \Intervention\Image\Laravel\Facades\Image::read($file->getRealPath());
+                                    
+                                    // Resize ke lebar max 1600px jika lebih besar
+                                    if ($img->width() > 1600) {
+                                        $img->scaleDown(width: 1600);
+                                    }
+
+                                    // Simpan sebagai JPG dengan kualitas 75% agar ringan
+                                    $encoded = $img->toJpeg(quality: 75);
+                                    $filename = \Illuminate\Support\Str::uuid() . '.jpg';
+                                    $path = 'designs/' . $filename;
+                                    
+                                    \Illuminate\Support\Facades\Storage::disk('public')->put($path, (string) $encoded);
+                                    
+                                    return $path;
+                                }),
                         ])
                 ])->columnSpan(1),
             ])

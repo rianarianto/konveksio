@@ -249,7 +249,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 $set('bulk_category', $existing->production_category === 'custom' ? 'produksi' : ($existing->production_category ?? 'produksi'));
                                                 $set('bulk_bahan', $existing->bahan_id);
                                                 $set('bulk_material_variant_id', $details['material_variant_id'] ?? null);
-                                                $set('bulk_price', $existing->price ?? 0);
+
                                                 $set('bulk_gender', $details['gender'] ?? 'L');
                                                 $set('bulk_sleeve', $details['sleeve_model'] ?? 'pendek');
                                                 $set('bulk_pocket', $details['pocket_model'] ?? 'tanpa_saku');
@@ -648,6 +648,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Ukur')
                     ->icon('heroicon-m-viewfinder-circle')
                     ->color('warning')
+                    ->modalSubmitAction(fn ($action) => $action->color('primary'))
                     ->modalHeading('Rekam Ukuran Badan (cm)')
                     ->modalWidth('2xl')
                     ->visible(fn(OrderItem $record) => $record->size === 'Custom')

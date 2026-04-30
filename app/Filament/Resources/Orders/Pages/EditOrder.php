@@ -22,6 +22,7 @@ class EditOrder extends EditRecord
     #[On('refreshOrderSummary')]
     public function handleRefreshOrderSummary(int $subtotal): void
     {
+        $this->record->refresh();
         $this->data['subtotal'] = $subtotal;
 
         // Recalculate total price
