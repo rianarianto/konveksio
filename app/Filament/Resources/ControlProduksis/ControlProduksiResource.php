@@ -942,6 +942,8 @@ class ControlProduksiResource extends Resource
                                                     ->minValue(0)
                                                     ->placeholder('0')
                                                     ->live(debounce: 300)
+                                                    ->afterStateUpdated(fn($state, Set $set, Get $get) => $recalcQty($get, $set));
+                                            }
                                             return $fields;
                                         })
                                         ->columns(6)
