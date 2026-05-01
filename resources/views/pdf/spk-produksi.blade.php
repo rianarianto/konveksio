@@ -177,8 +177,8 @@
                     <div style="font-size: 13pt; font-weight: bold;">{{ strtoupper($record->product_name) }}</div>
                     <div class="badge badge-primary">
                         {{ match($record->production_category) {
-                            'custom' => 'CUSTOM (UKUR BADAN)',
-                            'non_produksi' => 'NON-PRODUKSI',
+                            'custom' => 'KONVEKSI',
+                            'non_produksi' => 'BAJU JADI',
                             'jasa' => 'JASA',
                             default => 'KONVEKSI'
                         } }}

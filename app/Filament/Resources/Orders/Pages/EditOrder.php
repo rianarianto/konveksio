@@ -140,5 +140,8 @@ class EditOrder extends EditRecord
                 ]);
             }
         }
+
+        // Refresh Summary Relation Manager
+        $this->dispatch('refreshOrderSummary', subtotal: (int) ($data['subtotal'] ?? 0));
     }
 }

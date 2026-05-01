@@ -52,6 +52,7 @@ class PaymentsRelationManager extends RelationManager
                     'qris' => '📱 QRIS',
                 ])
                 ->required()
+                ->selectablePlaceholder(false)
                 ->default('cash'),
 
             TextInput::make('note')
@@ -164,11 +165,20 @@ class PaymentsRelationManager extends RelationManager
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['recorded_by'] = auth()->id();
                         return $data;
+                    })
+                    ->after(function () {
+                        $this->dispatch('refreshOrderSummary');
                     }),
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->after(function () {
+                        $this->dispatch('refreshOrderSummary');
+                    }),
+                DeleteAction::make()
+                    ->after(function () {
+                        $this->dispatch('refreshOrderSummary');
+                    }),
             ])
             ->defaultSort('payment_date', 'asc');
     }

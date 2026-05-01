@@ -29,8 +29,8 @@ class ProductionControlRelationManager extends RelationManager
                     ->label('Produk')
                     ->weight('bold')
                     ->description(fn(OrderItem $record): string => match ($record->production_category) {
-                        'custom' => '🧵 Custom (Ukur Badan)',
-                        'non_produksi' => '📦 Non-Produksi',
+                        'custom' => '🧵 Konveksi (Ukur Badan)',
+                        'non_produksi' => '📦 Baju Jadi',
                         'jasa' => '🔧 Jasa',
                         default => '🏭 Konveksi',
                     }),

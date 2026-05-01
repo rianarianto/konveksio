@@ -167,6 +167,42 @@ class OrderItem extends Model
         return (bool) ($this->size_and_request_details['is_tunic'] ?? false);
     }
 
+    // --- Virtual Setters ---
+    public function setGenderAttribute($value)
+    {
+        $details = $this->size_and_request_details ?? [];
+        $details['gender'] = $value;
+        $this->size_and_request_details = $details;
+    }
+
+    public function setSleeveModelAttribute($value)
+    {
+        $details = $this->size_and_request_details ?? [];
+        $details['sleeve_model'] = $value;
+        $this->size_and_request_details = $details;
+    }
+
+    public function setPocketModelAttribute($value)
+    {
+        $details = $this->size_and_request_details ?? [];
+        $details['pocket_model'] = $value;
+        $this->size_and_request_details = $details;
+    }
+
+    public function setButtonModelAttribute($value)
+    {
+        $details = $this->size_and_request_details ?? [];
+        $details['button_model'] = $value;
+        $this->size_and_request_details = $details;
+    }
+
+    public function setIsTunicAttribute($value)
+    {
+        $details = $this->size_and_request_details ?? [];
+        $details['is_tunic'] = (bool) $value;
+        $this->size_and_request_details = $details;
+    }
+
     public function getTunicFeeAttribute()
     {
         return (int) ($this->size_and_request_details['tunic_fee'] ?? 0);

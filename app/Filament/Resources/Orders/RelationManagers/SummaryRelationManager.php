@@ -14,6 +14,15 @@ class SummaryRelationManager extends RelationManager
     protected static string|\BackedEnum|null $icon = null;
 
     /**
+     * Listen to the refresh event from IntegratedOrderItemsTable
+     */
+    #[\Livewire\Attributes\On('refreshOrderSummary')]
+    public function refreshSummary(): void
+    {
+        $this->getOwnerRecord()->refresh();
+    }
+
+    /**
      * Override render method to show a custom view instead of a table.
      * This prevents the "repeating" issue.
      */

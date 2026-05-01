@@ -191,7 +191,12 @@
             </div>
             <div class="title-box">
                 <div class="receipt-title">Kuitansi</div>
-                <div class="info-value" style="color: #7F00FF; font-size: 16px;">{{ $order->order_number }}</div>
+                <div class="info-value" style="color: #7F00FF; font-size: 16px;">
+                    @if($order->is_express)
+                        <span style="color: #d12; font-weight: 900; font-size: 14px;">⚡ EXPRESS</span>
+                    @endif
+                    {{ $order->order_number }}
+                </div>
             </div>
         </div>
 
@@ -316,10 +321,10 @@
                         <td class="totals-label">Subtotal</td>
                         <td class="totals-value">Rp {{ number_format($order->subtotal, 0, ',', '.') }}</td>
                     </tr>
-                    @if($order->is_express && $order->express_fee > 0)
+                    @if($order->is_express)
                         <tr>
-                            <td class="totals-label" style="color: #7F00FF;">Biaya Express ⚡</td>
-                            <td class="totals-value" style="color: #7F00FF;">Rp {{ number_format($order->express_fee, 0, ',', '.') }}</td>
+                            <td class="totals-label" style="color: #d12;">Layanan Express ⚡</td>
+                            <td class="totals-value" style="color: #d12;">{{ $order->express_fee > 0 ? 'Rp ' . number_format($order->express_fee, 0, ',', '.') : 'GRATIS' }}</td>
                         </tr>
                     @endif
                     @if($order->shipping_cost > 0)
