@@ -316,14 +316,19 @@
         @if(!empty($customEntries))
             <div style="margin-top: 5px; font-size: 8pt; border-top: 1px dashed #ddd; padding-top: 4px;">
                 <strong>DETAIL CUSTOM:</strong>
-                <ul style="margin: 0; padding-left: 15px; list-style-type: square;">
-                    @foreach($customEntries as $ce)
-                        <li style="margin-bottom: 1px;">
-                            <span class="text-bold">{{ $ce['nama'] }}</span> ({{ $ce['size'] }}) 
-                            @if($ce['desc']) — <span style="color: #444; font-style: italic;">{{ $ce['desc'] }}</span> @endif
-                        </li>
+                <table style="width: 100%; border: none; border-collapse: collapse; margin-top: 2px;">
+                    @foreach(array_chunk($customEntries, 2) as $row)
+                        <tr>
+                            @foreach($row as $ce)
+                                <td style="width: 50%; border: none; padding: 2px 0; vertical-align: top;">
+                                    <span class="text-bold">• {{ $ce['nama'] }}</span> ({{ $ce['size'] }}) 
+                                    @if($ce['desc']) <br><span style="color: #444; font-size: 7pt; font-style: italic; margin-left: 10px;">{{ $ce['desc'] }}</span> @endif
+                                </td>
+                            @endforeach
+                            @if(count($row) < 2) <td style="width: 50%; border: none;"></td> @endif
+                        </tr>
                     @endforeach
-                </ul>
+                </table>
             </div>
         @endif
     </div>

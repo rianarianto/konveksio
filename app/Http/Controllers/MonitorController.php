@@ -10,34 +10,27 @@ class MonitorController extends Controller
 {
     public function produksi(Shop $shop)
     {
-        // Items yang sedang DIPROSES (ada task in_progress)
-        $inProgress = OrderItem::with([
-            'order.customer',
-            'productionTasks.assignedTo',
-        ])
+        // 1. Items yang sedang DIPROSES (Sudah ada yang dimulai/selesai, tapi belum selesai semua)
+        $inProgress = OrderItem::with(['order.customer', 'productionTasks.assignedTo'])
             ->whereHas('order', fn($q) => $q->where('shop_id', $shop->id))
-            ->whereHas('productionTasks', fn($q) => $q->where('status', 'in_progress'))
+            ->whereHas('productionTasks', fn($q) => $q->whereIn('status', ['in_progress', 'done']))
+            ->whereHas('productionTasks', fn($q) => $q->where('status', '!=', 'done'))
             ->get()
-            ->sortByDesc(fn($item) => $item->order->is_express)
-            ->sortBy(fn($item) => $item->order->deadline);
+            ->sortBy(function($item) {
+                // Urutkan: Express dulu (0), baru deadline terdekat
+                return ($item->order->is_express ? '0' : '1') . '_' . $item->order->deadline;
+            });
 
-        // Items yang dalam ANTRIAN (ada tasks tapi semua masih pending)
-        $antrian = OrderItem::with([
-            'order.customer',
-            'productionTasks',
-        ])
+        // 2. Items yang dalam ANTRIAN (BELUM ada tugas yang dimulai sama sekali)
+        $antrian = OrderItem::with(['order.customer', 'productionTasks'])
             ->whereHas('order', fn($q) => $q->where('shop_id', $shop->id))
-            ->whereHas('productionTasks')
-            ->whereDoesntHave('productionTasks', fn($q) => $q->where('status', 'in_progress'))
-            ->whereDoesntHave('productionTasks', fn($q) => $q->whereNot('status', 'done'))
-            ->orWhereHas('productionTasks', fn($q) => $q->where('status', 'pending'))
+            ->whereHas('productionTasks') // Pastikan sudah diatur tugasnya
+            ->whereDoesntHave('productionTasks', fn($q) => $q->whereIn('status', ['in_progress', 'done']))
             ->get()
-            ->filter(fn($item) => $item->order->shop_id === $shop->id)
-            ->filter(fn($item) => $item->productionTasks->where('status', 'in_progress')->count() === 0)
-            ->filter(fn($item) => $item->productionTasks->where('status', 'done')->count() < $item->productionTasks->count())
-            ->sortByDesc(fn($item) => $item->order->is_express)
-            ->sortBy(fn($item) => $item->order->deadline)
-            ->take(10);
+            ->sortBy(function($item) {
+                return ($item->order->is_express ? '0' : '1') . '_' . $item->order->deadline;
+            })
+            ->take(15);
 
         return view('monitor.produksi', compact('shop', 'inProgress', 'antrian'));
     }

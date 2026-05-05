@@ -67,6 +67,20 @@ class DesignTaskResource extends Resource
             });
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        $count = static::getEloquentQuery()
+            ->where('design_status', 'pending')
+            ->count();
+            
+        return $count > 0 ? (string)$count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'primary';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema

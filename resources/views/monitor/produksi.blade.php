@@ -1,29 +1,35 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="refresh" content="30">
     <title>Monitor Produksi — {{ $shop->name }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
         :root {
             --bg: #0f1117;
             --surface: #1a1d27;
             --surface2: #22263a;
-            --border: rgba(255,255,255,0.07);
+            --border: rgba(255, 255, 255, 0.07);
             --text: #f1f5f9;
             --muted: #94a3b8;
             --green: #10b981;
-            --green-bg: rgba(16,185,129,0.15);
-            --yellow: #f59e0b;
-            --yellow-bg: rgba(245,158,11,0.15);
-            --red: #ef4444;
-            --red-bg: rgba(239,68,68,0.12);
-            --blue: #3b82f6;
+            --green-bg: rgba(16, 185, 129, 0.25);
+            --yellow: #fbbf24;
+            --yellow-bg: rgba(251, 191, 36, 0.25);
+            --red: #f87171;
+            --red-bg: rgba(248, 113, 113, 0.2);
+            --blue: #60a5fa;
         }
 
         body {
@@ -90,7 +96,7 @@
 
         /* ── SIDEBAR ── */
         .sidebar {
-            width: 280px;
+            width: 380px;
             flex-shrink: 0;
             background: var(--surface);
             border-right: 1px solid var(--border);
@@ -130,9 +136,18 @@
             padding: 12px;
         }
 
-        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
-        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-        .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: var(--surface2);
+            border-radius: 4px;
+        }
 
         .queue-card {
             background: var(--surface2);
@@ -160,7 +175,7 @@
             font-weight: 700;
             padding: 2px 8px;
             border-radius: 999px;
-            background: rgba(124,58,237,0.2);
+            background: rgba(124, 58, 237, 0.2);
             color: #a78bfa;
         }
 
@@ -181,27 +196,36 @@
         }
 
         .queue-product {
-            font-size: 15px;
-            font-weight: 700;
+            font-size: 22px;
+            font-weight: 800;
             color: var(--text);
-            margin-bottom: 4px;
-            line-height: 1.3;
+            margin-bottom: 8px;
+            line-height: 1.2;
         }
 
         .queue-details {
-            font-size: 11px;
-            color: var(--muted);
-            margin-bottom: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 10px;
         }
 
         .queue-deadline {
-            font-size: 12px;
+            font-size: 16px;
             font-weight: 700;
         }
 
-        .queue-deadline.urgent { color: var(--red); }
-        .queue-deadline.soon { color: var(--yellow); }
-        .queue-deadline.ok { color: var(--green); }
+        .queue-deadline.urgent {
+            color: var(--red);
+        }
+
+        .queue-deadline.soon {
+            color: var(--yellow);
+        }
+
+        .queue-deadline.ok {
+            color: var(--green);
+        }
 
         /* ── MAIN AREA ── */
         .main {
@@ -213,13 +237,23 @@
             padding: 16px;
         }
 
-        .main::-webkit-scrollbar { height: 6px; }
-        .main::-webkit-scrollbar-track { background: transparent; }
-        .main::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
+        .main::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .main::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .main::-webkit-scrollbar-thumb {
+            background: var(--surface2);
+            border-radius: 4px;
+        }
 
         /* ── ITEM CARD ── */
         .item-card {
-            width: 340px;
+            width: 550px;
+            height: 100%;
             flex-shrink: 0;
             background: var(--surface);
             border: 1px solid var(--border);
@@ -232,7 +266,7 @@
         .item-card.is-express {
             border-color: var(--red);
             border-width: 2px;
-            box-shadow: 0 0 20px rgba(239,68,68,0.15);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
         }
 
         .item-card-header {
@@ -243,13 +277,15 @@
         .item-card-meta {
             display: flex;
             align-items: center;
-            gap: 6px;
-            margin-bottom: 8px;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 10px;
         }
 
         .customer-name {
-            font-size: 11px;
-            color: var(--muted);
+            font-size: 16px;
+            font-weight: 600;
+            color: #cbd5e1;
         }
 
         .express-banner {
@@ -267,23 +303,32 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.75; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.75;
+            }
         }
 
         .item-qty {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--muted);
+            font-size: 24px;
+            font-weight: 800;
+            color: #94a3b8;
+            line-height: 1;
+            margin-bottom: 4px;
         }
 
         .item-name {
-            font-size: 26px;
+            font-size: 38px;
             font-weight: 800;
-            color: var(--text);
+            color: #fff;
             letter-spacing: -0.03em;
-            line-height: 1.15;
-            margin-bottom: 8px;
+            line-height: 1.1;
+            margin-bottom: 12px;
         }
 
         .item-info {
@@ -294,12 +339,12 @@
         }
 
         .info-badge {
-            font-size: 11px;
-            font-weight: 600;
-            padding: 2px 10px;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 4px 12px;
             border-radius: 6px;
-            background: rgba(59,130,246,0.15);
-            color: #93c5fd;
+            background: rgba(59, 130, 246, 0.25);
+            color: #bfdbfe;
         }
 
         .item-sizes {
@@ -309,9 +354,10 @@
         }
 
         .item-sablon {
-            font-size: 12px;
-            color: var(--muted);
-            font-style: italic;
+            font-size: 16px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-top: 4px;
         }
 
         /* ── DEADLINE ── */
@@ -324,23 +370,43 @@
         }
 
         .deadline-text {
-            font-size: 13px;
-            font-weight: 700;
+            font-size: 18px;
+            font-weight: 800;
         }
-        .deadline-text.urgent { color: var(--red); }
-        .deadline-text.soon { color: var(--yellow); }
-        .deadline-text.ok { color: var(--green); }
+
+        .deadline-text.urgent {
+            color: var(--red);
+        }
+
+        .deadline-text.soon {
+            color: var(--yellow);
+        }
+
+        .deadline-text.ok {
+            color: var(--green);
+        }
 
         .hari-badge {
-            font-size: 12px;
-            font-weight: 800;
-            padding: 3px 10px;
-            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 900;
+            padding: 6px 16px;
+            border-radius: 8px;
         }
 
-        .hari-badge.urgent { background: var(--red-bg); color: var(--red); }
-        .hari-badge.soon { background: var(--yellow-bg); color: var(--yellow); }
-        .hari-badge.ok { background: var(--green-bg); color: var(--green); }
+        .hari-badge.urgent {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        .hari-badge.soon {
+            background: var(--yellow-bg);
+            color: var(--yellow);
+        }
+
+        .hari-badge.ok {
+            background: var(--green-bg);
+            color: var(--green);
+        }
 
         /* ── PROGRESS ── */
         .progress-row {
@@ -351,9 +417,10 @@
         .progress-label {
             display: flex;
             justify-content: space-between;
-            font-size: 11px;
-            color: var(--muted);
-            margin-bottom: 6px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #cbd5e1;
+            margin-bottom: 8px;
         }
 
         .progress-bar-bg {
@@ -377,13 +444,20 @@
             padding: 8px;
         }
 
-        .tasks-scroll::-webkit-scrollbar { width: 4px; }
-        .tasks-scroll::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
+        .tasks-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .tasks-scroll::-webkit-scrollbar-thumb {
+            background: var(--surface2);
+            border-radius: 4px;
+        }
 
         .task-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 20px;
             padding: 10px 12px;
             border-radius: 8px;
             margin-bottom: 6px;
@@ -406,33 +480,45 @@
         }
 
         .task-stage {
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--text);
-            line-height: 1;
+            font-size: 20px;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.3;
+            word-break: break-word;
         }
 
         .task-worker {
-            font-size: 12px;
-            color: var(--muted);
-            margin-top: 3px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-top: 4px;
         }
 
         .task-sizes {
-            font-size: 11px;
-            color: var(--muted);
+            font-size: 14px;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-top: 4px;
         }
 
         .task-status {
-            font-size: 12px;
-            font-weight: 700;
+            font-size: 16px;
+            font-weight: 800;
             text-align: right;
             white-space: nowrap;
         }
 
-        .task-status.done { color: var(--green); }
-        .task-status.in-progress { color: var(--yellow); }
-        .task-status.pending { color: var(--muted); }
+        .task-status.done {
+            color: var(--green);
+        }
+
+        .task-status.in-progress {
+            color: var(--yellow);
+        }
+
+        .task-status.pending {
+            color: var(--muted);
+        }
 
         /* ── EMPTY STATE ── */
         .empty-main {
@@ -445,9 +531,18 @@
             color: var(--muted);
         }
 
-        .empty-icon { font-size: 64px; }
-        .empty-text { font-size: 20px; font-weight: 600; }
-        .empty-sub { font-size: 14px; }
+        .empty-icon {
+            font-size: 64px;
+        }
+
+        .empty-text {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .empty-sub {
+            font-size: 14px;
+        }
 
         /* ── REFRESH INDICATOR ── */
         .refresh-dot {
@@ -459,11 +554,19 @@
         }
 
         @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.2; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
         }
     </style>
 </head>
+
 <body>
 
     {{-- ─ HEADER ─ --}}
@@ -496,15 +599,15 @@
             <div class="sidebar-scroll">
                 @forelse($antrian as $item)
                     @php
-                        $order    = $item->order;
+                        $order = $item->order;
                         $daysLeft = now()->startOfDay()->diffInDays($order->deadline, false);
-                        $dlClass  = $daysLeft <= 1 ? 'urgent' : ($daysLeft <= 3 ? 'soon' : 'ok');
+                        $dlClass = $daysLeft <= 1 ? 'urgent' : ($daysLeft <= 3 ? 'soon' : 'ok');
 
-                        $cat = match($item->production_category) {
-                            'custom'       => '🧵 Konveksi',
+                        $cat = match ($item->production_category) {
+                            'custom' => '🧵 Konveksi',
                             'non_produksi' => '📦 Baju Jadi',
-                            'jasa'         => '🔧 Jasa',
-                            default        => '🏭 Konveksi',
+                            'jasa' => '🔧 Jasa',
+                            default => '🏭 Konveksi',
                         };
 
                         $details = $item->size_and_request_details ?? [];
@@ -512,8 +615,9 @@
                         if (!empty($details['varian_ukuran'])) {
                             foreach ($details['varian_ukuran'] as $v) {
                                 $sz = strtoupper($v['ukuran'] ?? '');
-                                $q  = (int)($v['qty'] ?? 0);
-                                if ($sz && $q > 0) $sizeParts[] = "{$sz}:{$q}";
+                                $q = (int) ($v['qty'] ?? 0);
+                                if ($sz && $q > 0)
+                                    $sizeParts[] = "{$sz}:{$q}";
                             }
                         }
                         $sizeStr = implode(', ', $sizeParts);
@@ -549,21 +653,22 @@
         <div class="main">
             @forelse($inProgress as $item)
                 @php
-                    $order    = $item->order;
-                    $tasks    = $item->productionTasks->sortBy('id');
-                    $total    = $tasks->count();
-                    $done     = $tasks->where('status', 'done')->count();
+                    $order = $item->order;
+                    $tasks = $item->productionTasks->sortBy('id');
+                    $total = $tasks->count();
+                    $done = $tasks->where('status', 'done')->count();
                     $progress = $total > 0 ? round(($done / $total) * 100) : 0;
                     $daysLeft = now()->startOfDay()->diffInDays($order->deadline, false);
-                    $dlClass  = $daysLeft < 0 ? 'urgent' : ($daysLeft <= 1 ? 'urgent' : ($daysLeft <= 3 ? 'soon' : 'ok'));
+                    $dlClass = $daysLeft < 0 ? 'urgent' : ($daysLeft <= 1 ? 'urgent' : ($daysLeft <= 3 ? 'soon' : 'ok'));
 
-                    $details  = $item->size_and_request_details ?? [];
+                    $details = $item->size_and_request_details ?? [];
                     $sizeParts = [];
                     if (!empty($details['varian_ukuran'])) {
                         foreach ($details['varian_ukuran'] as $v) {
                             $sz = strtoupper($v['ukuran'] ?? '');
-                            $q  = (int)($v['qty'] ?? 0);
-                            if ($sz && $q > 0) $sizeParts[] = "{$sz}:{$q}";
+                            $q = (int) ($v['qty'] ?? 0);
+                            if ($sz && $q > 0)
+                                $sizeParts[] = "{$sz}:{$q}";
                         }
                     }
                     $sizeStr = implode(', ', $sizeParts);
@@ -573,21 +678,27 @@
 
                     // Sablon/bordir
                     $sablonParts = [];
-                    if (!empty($details['sablon_jenis'])) $sablonParts[] = $details['sablon_jenis'];
-                    if (!empty($details['sablon_lokasi'])) $sablonParts[] = $details['sablon_lokasi'];
+                    if (!empty($details['sablon_jenis']))
+                        $sablonParts[] = $details['sablon_jenis'];
+                    if (!empty($details['sablon_lokasi']))
+                        $sablonParts[] = $details['sablon_lokasi'];
                     if (!empty($details['sablon_bordir'])) {
                         foreach ($details['sablon_bordir'] as $sb) {
                             $j = $sb['jenis'] ?? '';
                             $l = $sb['lokasi'] ?? '';
-                            if ($j || $l) $sablonParts[] = trim("$j $l");
+                            if ($j || $l)
+                                $sablonParts[] = trim("$j $l");
                         }
                     }
                     $sablonStr = implode(', ', $sablonParts);
 
                     // H-X label
-                    if ($daysLeft < 0) $hLabel = 'TERLAMBAT';
-                    elseif ($daysLeft == 0) $hLabel = 'HARI INI';
-                    else $hLabel = 'H-' . $daysLeft;
+                    if ($daysLeft < 0)
+                        $hLabel = 'TERLAMBAT';
+                    elseif ($daysLeft == 0)
+                        $hLabel = 'HARI INI';
+                    else
+                        $hLabel = 'H-' . $daysLeft;
                 @endphp
 
                 <div class="item-card {{ $order->is_express ? 'is-express' : '' }}">
@@ -595,7 +706,8 @@
                     {{-- Header --}}
                     <div class="item-card-header">
                         <div class="item-card-meta">
-                            <span class="customer-name">{{ $order->customer->name ?? 'Tanpa Nama' }} &bull; {{ $order->order_number }}</span>
+                            <span class="customer-name">{{ $order->customer->name ?? 'Tanpa Nama' }} &bull;
+                                {{ $order->order_number }}</span>
                             @if($order->is_express)
                                 <span class="express-banner">⚡ EXPRESS</span>
                             @endif
@@ -638,14 +750,15 @@
                     <div class="tasks-scroll">
                         @foreach($tasks as $task)
                             @php
-                                $rowClass    = match($task->status) { 'done' => 'done', 'in_progress' => 'in-progress', default => 'pending' };
-                                $statusLabel = match($task->status) { 'done' => '✅ Selesai', 'in_progress' => '🔨 Proses', default => 'Belum Mulai' };
+                                $rowClass = match ($task->status) { 'done' => 'done', 'in_progress' => 'in-progress', default => 'pending'};
+                                $statusLabel = match ($task->status) { 'done' => '✅ Selesai', 'in_progress' => '🔨 Proses', default => 'Belum Mulai'};
 
                                 // Size quantities untuk task ini
                                 $sizeQtyParts = [];
                                 if (!empty($task->size_quantities) && is_array($task->size_quantities)) {
                                     foreach ($task->size_quantities as $sz => $q) {
-                                        if ((int)$q > 0) $sizeQtyParts[] = strtoupper($sz) . ':' . $q;
+                                        if ((int) $q > 0)
+                                            $sizeQtyParts[] = strtoupper($sz) . ':' . $q;
                                     }
                                 }
                                 $taskSizes = implode(', ', $sizeQtyParts);
@@ -654,7 +767,8 @@
                                 <div class="task-left">
                                     <div class="task-stage">
                                         {{ $task->stage_name }}
-                                        <span style="font-weight:500;font-size:12px;color:var(--muted);"> | {{ $task->assignedTo?->name ?? '—' }}</span>
+                                        <span style="font-weight:600;font-size:16px;color:#d1dbea;margin-left:6px;">&mdash;
+                                            {{ $task->assignedTo?->name ?? '—' }}</span>
                                     </div>
                                     @if($taskSizes)
                                         <div class="task-sizes">{{ $taskSizes }}</div>
@@ -681,17 +795,52 @@
         // Live clock
         function updateClock() {
             const now = new Date();
-            const h   = String(now.getHours()).padStart(2,'0');
-            const m   = String(now.getMinutes()).padStart(2,'0');
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
             document.getElementById('clock').textContent = h + ':' + m + ' WIB';
 
-            const days  = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-            const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
             document.getElementById('clockdate').textContent =
                 days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
         }
         updateClock();
         setInterval(updateClock, 1000);
+
+        // Auto-scroll tasks
+        function initAutoScroll() {
+            const containers = document.querySelectorAll('.tasks-scroll');
+            containers.forEach(el => {
+                let scrollAmount = 0;
+                let step = 1;
+                let isPaused = false;
+
+                setInterval(() => {
+                    if (isPaused) return;
+
+                    // Only scroll if content is longer than container
+                    if (el.scrollHeight > el.clientHeight) {
+                        el.scrollTop += step;
+
+                        // If reached bottom
+                        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
+                            isPaused = true;
+                            setTimeout(() => {
+                                el.scrollTo({
+                                    top: 0,
+                                    behavior: 'smooth'
+                                });
+                                setTimeout(() => {
+                                    isPaused = false;
+                                }, 3000); // Pause at top
+                            }, 3000); // Pause at bottom
+                        }
+                    }
+                }, 50); // Speed of scroll
+            });
+        }
+        initAutoScroll();
     </script>
 </body>
+
 </html>

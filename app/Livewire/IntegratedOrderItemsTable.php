@@ -111,7 +111,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                 TextInputColumn::make('recipient_name')
                     ->label('Penerima')
                     ->placeholder('Nama...')
-                    ->width('150px'),
+                    ->width('150px')
+                    ->searchable(),
 
                 SelectColumn::make('size')
                     ->label('Size')

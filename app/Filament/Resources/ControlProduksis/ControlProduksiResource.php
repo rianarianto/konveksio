@@ -87,6 +87,20 @@ class ControlProduksiResource extends Resource
             });
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        $count = static::getEloquentQuery()
+            ->doesntHave('productionTasks')
+            ->count();
+            
+        return $count > 0 ? (string)$count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'primary';
+    }
+
 
     public static function form(Schema $schema): Schema
     {
@@ -224,126 +238,12 @@ class ControlProduksiResource extends Resource
                         return ['item_id' => $record->id];
                     })
                     ->form(function (OrderItem $record) {
-                        // Load tugas dan group berdasarkan urutan stage
-                        $tasks = $record->productionTasks()
-                            ->with(['assignedTo'])
-                            ->get();
-
-                        // Ambil semua stage yang ada beserta order_sequence-nya
-                        $stageOrder = \App\Models\ProductionStage::pluck('order_sequence', 'name');
-
-                        // Sort tugas berdasarkan order_sequence tahap, kemudian by id
-                        $sortedTasks = $tasks->sortBy(function ($task) use ($stageOrder) {
-                            return [$stageOrder[$task->stage_name] ?? 999, $task->id];
-                        });
-
-                        // Tentukan stage yang sedang "aktif" (bisa dimulai):
-                        // Tahap pertama selalu bisa, tahap berikutnya hanya jika SEMUA tasks di tahap sebelumnya = done
-                        $groupedByStage = $sortedTasks->groupBy('stage_name');
-                        $stagesInOrder = $groupedByStage->keys()->sortBy(fn($s) => $stageOrder[$s] ?? 999);
-
-                        $unlockedStages = [];
-                        foreach ($stagesInOrder as $i => $stageName) {
-                            if ($i === 0) {
-                                $unlockedStages[] = $stageName;
-                                continue;
-                            }
-                            // Stage ini bisa dibuka jika semua task di stage sebelumnya = done
-                            $prevStage = $stagesInOrder[$i - 1];
-                            $prevDone = $groupedByStage[$prevStage]->every(fn($t) => $t->status === 'done');
-                            if ($prevDone) {
-                                $unlockedStages[] = $stageName;
-                            } else {
-                                break; // Tahap berikutnya tetap terkunci
-                            }
-                        }
-
-                        // Render HTML tabel tugas
-                        $rows = '';
-                        $prevStageName = null;
-                        foreach ($sortedTasks as $task) {
-                            $isUnlocked = in_array($task->stage_name, $unlockedStages);
-                            $workerName = $task->assignedTo?->name ?? 'Tidak Diketahui';
-                            $stageName = htmlspecialchars($task->stage_name);
-                            $qty = $task->quantity . ' pcs';
-                            $showStageLabel = $task->stage_name !== $prevStageName;
-                            $prevStageName = $task->stage_name;
-
-                            $statusBadge = match ($task->status) {
-                                'pending' => '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">⏳ Antrian</span>',
-                                'in_progress' => '<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">🔨 Dikerjakan</span>',
-                                'done' => '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">✅ Selesai</span>',
-                                default => '',
-                            };
-
-                            if (!$isUnlocked) {
-                                $actionBtn = '<span style="color:#9ca3af;font-size:12px">🔒 Menunggu tahap sebelumnya</span>';
-                            } elseif ($task->status === 'pending') {
-                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'start', 'item' => $record->id]) . '" style="background:#2563eb;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">▶ Mulai</a>';
-                            } elseif ($task->status === 'in_progress') {
-                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'done', 'item' => $record->id]) . '" style="background:#059669;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✓ Tandai Selesai</a>';
-                            } else {
-                                $actionBtn = '<span style="color:#6b7280;font-size:12px">Selesai</span>';
-                            }
-
-                            $stageCell = $showStageLabel
-                                ? '<td style="padding:10px 14px;font-weight:700;color:#374151;font-size:13px;border-bottom:1px solid #e5e7eb;">' . $stageName . '</td>'
-                                : '<td style="padding:10px 14px;color:#9ca3af;font-size:13px;border-bottom:1px solid #e5e7eb;">↳</td>';
-
-                            $rows .= '
-                                <tr>
-                                    ' . $stageCell . '
-                                    <td style="padding:10px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb;">' . htmlspecialchars($workerName) . '</td>
-                                    <td style="padding:10px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb;">' . $qty . '</td>
-                                    <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;">' . $statusBadge . '</td>
-                                    <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:right;">' . $actionBtn . '</td>
-                                </tr>';
-                        }
-
-                        // ─── Banner desain ───────────────────────────────────────
-                        $designHtml = '';
-                        if ($record->design_image) {
-                            $designUrl = asset('storage/' . $record->design_image);
-                            $designHtml = '
-                                <div style="margin-bottom:16px;border:1.5px solid #c4b5fd;border-radius:12px;overflow:hidden;background:#faf5ff;">
-                                    <div style="padding:8px 14px;background:#ede9fe;display:flex;align-items:center;gap:8px;">
-                                        <span style="font-size:16px;">🎨</span>
-                                        <span style="font-size:13px;font-weight:600;color:#5b21b6;">Referensi Desain</span>
-                                        <a href="' . $designUrl . '" target="_blank" style="margin-left:auto;font-size:11px;color:#7c3aed;text-decoration:underline;">Buka full ↗</a>
-                                    </div>
-                                    <div style="padding:12px;text-align:center;">
-                                        <a href="' . $designUrl . '" target="_blank">
-                                            <img src="' . $designUrl . '" style="max-height:200px;max-width:100%;object-fit:contain;border-radius:8px;cursor:zoom-in;" alt="Desain">
-                                        </a>
-                                    </div>
-                                </div>';
-                        } else {
-                            $designHtml = '
-                                <div style="margin-bottom:16px;border:1.5px dashed #d1d5db;border-radius:12px;padding:16px;text-align:center;background:#f9fafb;">
-                                    <span style="font-size:13px;color:#9ca3af;">🖼️ Belum ada file desain yang diupload untuk item ini</span>
-                                </div>';
-                        }
-
-                        $html = $designHtml . '
-                            <div style="border-radius:10px;overflow-x:auto;border:1px solid #e5e7eb;-webkit-overflow-scrolling:touch;">
-                                <table style="width:100%;min-width:600px;border-collapse:collapse;">
-                                    <thead>
-                                        <tr style="background:#f9fafb;">
-                                            <th style="padding:10px 14px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;white-space:nowrap;">TAHAP</th>
-                                            <th style="padding:10px 14px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;white-space:nowrap;">KARYAWAN</th>
-                                            <th style="padding:10px 14px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;white-space:nowrap;">QTY</th>
-                                            <th style="padding:10px 14px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;white-space:nowrap;">STATUS</th>
-                                            <th style="padding:10px 14px;text-align:right;font-size:12px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;white-space:nowrap;">AKSI</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>' . $rows . '</tbody>
-                                </table>
-                            </div>';
-
                         return [
-                            Placeholder::make('task_table')
+                            Placeholder::make('task_manager')
                                 ->hiddenLabel()
-                                ->content(new \Illuminate\Support\HtmlString($html)),
+                                ->content(fn () => new \Illuminate\Support\HtmlString(
+                                    \Illuminate\Support\Facades\Blade::render("@livewire('task-status-manager', ['orderItemId' => {$record->id}])")
+                                )),
                         ];
                     })
                     ->action(function (array $data, OrderItem $record) {
@@ -390,6 +290,12 @@ class ControlProduksiResource extends Resource
                                     $sbList[] = strtoupper($sb['jenis'] ?? '') . " (" . strtoupper($sb['lokasi'] ?? '') . ")";
                                 }
                             }
+                            // Also check for individual fields if sablon_bordir is empty or just as additional
+                            if (!empty($d['sablon_jenis'])) {
+                                $sbList[] = strtoupper($d['sablon_jenis']) . (!empty($d['sablon_lokasi']) ? " (" . strtoupper($d['sablon_lokasi']) . ")" : "");
+                            }
+                            
+                            $sbList = array_unique($sbList);
                             sort($sbList);
                             $sbStr = implode(' | ', $sbList);
                             
