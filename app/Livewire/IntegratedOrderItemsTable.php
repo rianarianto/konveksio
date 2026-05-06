@@ -37,6 +37,7 @@ use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Support\Str;
 
 class IntegratedOrderItemsTable extends Component implements HasForms, HasTable, HasActions
 {
@@ -111,8 +112,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                 TextInputColumn::make('recipient_name')
                     ->label('Penerima')
                     ->placeholder('Nama...')
-                    ->width('150px')
-                    ->searchable(),
+                    ->width('150px'),
 
                 SelectColumn::make('size')
                     ->label('Size')
@@ -140,6 +140,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                 TextInputColumn::make('price')
                     ->label('Harga')
                     ->placeholder('Rp 0')
+                    ->width('120px')
                     ->rules(['required', 'numeric', 'min:0'])
                     ->afterStateUpdated(function () {
                         $this->refreshOrderData();
@@ -158,132 +159,143 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Tambahkan ke Pesanan'))
                     ->form(function () use ($sizeOptions, $bahanOptions, $categoryOptions, $genderOptions, $sleeveOptions, $pocketOptions, $buttonOptions, $tenantId) {
                         return [
-                            Section::make('Kategori & Dasar')->schema([
-                                Grid::make(3)->schema([
-                                    Select::make('bulk_category')
-                                        ->label('Pilih Kategori')
-                                        ->options($categoryOptions)
-                                        ->default('produksi')
-                                        ->required()
-                                        ->live(),
-                                    TextInput::make('bulk_product_name')
-                                        ->label('Nama Produk/Jasa')
-                                        ->datalist(function () use ($tenantId) {
-                                            return OrderItem::whereHas('order', fn($q) => $q->where('shop_id', $tenantId))
-                                                ->distinct()
-                                                ->pluck('product_name')
-                                                ->toArray();
-                                        })
-                                        ->required()
-                                        ->placeholder('Pilih atau ketik nama baru...')
-                                        ->live(onBlur: true)
-                                        ->afterStateUpdated(function ($state, Set $set) {
-                                            if (!$state) return;
-                                            $existing = OrderItem::where('order_id', $this->order->id)
-                                                ->where('product_name', $state)
-                                                ->latest('id')
-                                                ->first();
-                                            if ($existing) {
-                                                $details = $existing->size_and_request_details ?? [];
-                                                $set('bulk_category', $existing->production_category === 'custom' ? 'produksi' : ($existing->production_category ?? 'produksi'));
-                                                $set('bulk_bahan', $existing->bahan_id);
-                                                $set('bulk_material_variant_id', $details['material_variant_id'] ?? null);
-                                                $set('bulk_gender', $details['gender'] ?? 'L');
-                                                $set('bulk_sleeve', $details['sleeve_model'] ?? 'pendek');
-                                                $set('bulk_pocket', $details['pocket_model'] ?? 'tanpa_saku');
-                                                $set('bulk_button', $details['button_model'] ?? 'biasa');
-                                                $set('bulk_is_tunic', (bool) ($details['is_tunic'] ?? false));
-                                                $set('bulk_sablon_teknik', $details['sablon_jenis'] ?? null);
-                                                $set('bulk_sablon_lokasi', $details['sablon_lokasi'] ?? null);
-                                                Notification::make()->title("Spesifikasi '{$state}' disalin!")->success()->send();
-                                            }
-                                        })
-                                        ->columnSpan(2),
-                                ]),
-                            ]),
-                            Section::make('Detail Konveksi')->schema([
-                                Grid::make(2)->schema([
-                                    Select::make('bulk_bahan')
-                                        ->label('Bahan')
-                                        ->options($bahanOptions)
-                                        ->searchable()
-                                        ->live()
-                                        ->afterStateUpdated(fn(Set $set) => $set('bulk_material_variant_id', null)),
-                                    Select::make('bulk_material_variant_id')
-                                        ->label('Warna / Varian')
-                                        ->allowHtml()
-                                        ->options(function (Get $get) {
-                                            $bahanId = $get('bulk_bahan');
-                                            if (!$bahanId) return [];
-                                            return \App\Models\MaterialVariant::where('material_id', $bahanId)
-                                                ->get()
-                                                ->mapWithKeys(fn($v) => [
-                                                    $v->id => "<div class='flex items-center gap-2'><div class='w-4 h-4 rounded-full border border-gray-300' style='background-color: {$v->color_code}'></div> {$v->color_name}</div>"
-                                                ]);
-                                        })
-                                        ->searchable()
-                                        ->visible(fn(Get $get) => filled($get('bulk_bahan'))),
-                                ]),
-                                Grid::make(2)->schema([
-                                    Select::make('bulk_sablon_teknik')
-                                        ->label('Teknik Sablon / Bordir')
-                                        ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
-                                        ->searchable(),
-                                    Select::make('bulk_sablon_lokasi')
-                                        ->label('Posisi / Lokasi')
-                                        ->options(\App\Filament\Resources\Orders\OrderResource::$lokasiSablonOptions)
-                                        ->searchable(),
-                                ]),
-                                Grid::make(3)->schema([
-                                    Select::make('bulk_gender')->label('Gender')->options($genderOptions)->default('L'),
-                                    Select::make('bulk_sleeve')->label('Model Lengan')->options($sleeveOptions)->default('pendek'),
-                                    Select::make('bulk_pocket')->label('Model Saku')->options($pocketOptions)->default('tanpa_saku'),
-                                ]),
-                                Grid::make(2)->schema([
-                                    Select::make('bulk_button')->label('Model Kancing')->options($buttonOptions)->default('biasa'),
-                                    Toggle::make('bulk_is_tunic')->label('Tunik / Gamis?')->default(false)->inline(false)
-                                ]),
-                            ])->visible(fn(Get $get) => $get('bulk_category') === 'produksi'),
-                            Section::make('Detail Baju Jadi')->schema([
-                                Grid::make(2)->schema([
-                                    Select::make('bulk_product_id')
-                                        ->label('Pilih Produk Supplier')
-                                        ->options(Product::where('shop_id', $tenantId)->pluck('name', 'id'))
-                                        ->searchable()->live()
-                                        ->afterStateUpdated(fn($state, Set $set) => $set('bulk_product_name', Product::find($state)?->name)),
-                                    TextInput::make('bulk_price_non')->label('Harga Jual')->numeric()->prefix('Rp'),
-                                ]),
-                            ])->visible(fn(Get $get) => $get('bulk_category') === 'non_produksi'),
-                            Section::make('Detail Jasa')->schema([
-                                Grid::make(2)->schema([
-                                    TextInput::make('bulk_price_jasa')->label('Harga Jasa')->numeric()->prefix('Rp'),
-                                    TextInput::make('bulk_qty_jasa')->label('Jumlah (Qty)')->numeric()->default(1),
-                                ]),
-                            ])->visible(fn(Get $get) => $get('bulk_category') === 'jasa'),
-                            Section::make('Jumlah per Ukuran')->schema([
-                                Grid::make(6)->schema(function () use ($sizeOptions) {
-                                    $fields = [];
-                                    foreach ($sizeOptions as $key => $label) {
-                                        $fields[] = TextInput::make("qty_{$key}")->label($label)->numeric()->placeholder('0');
-                                    }
-                                    $fields[] = TextInput::make('qty_custom')
-                                        ->label('Custom')
-                                        ->numeric()
-                                        ->placeholder('0')
-                                        ->live();
-                                    return $fields;
-                                }),
-                            ])->visible(fn(Get $get) => in_array($get('bulk_category'), ['produksi', 'non_produksi'])),
-                            Section::make('Harga Satuan')->schema([
-                                Grid::make(2)->schema([
-                                    TextInput::make('bulk_price')->label('Harga per Pcs')->numeric()->prefix('Rp')->default(0),
-                                    TextInput::make('bulk_price_custom')->label('Harga Custom per Pcs')->numeric()->prefix('Rp')->default(0)
-                                        ->visible(fn(Get $get) => (int) $get('qty_custom') > 0),
-                                ]),
-                            ])->visible(fn(Get $get) => $get('bulk_category') === 'produksi'),
+                            Section::make('Kategori & Dasar')
+                                ->schema([
+                                    Grid::make(3)->schema([
+                                        Select::make('bulk_category')
+                                            ->label('Pilih Kategori')
+                                            ->options($categoryOptions)
+                                            ->default('produksi')
+                                            ->required()
+                                            ->live(),
+                                        TextInput::make('bulk_product_name')
+                                            ->label('Nama Produk/Jasa')
+                                            ->datalist(function () use ($tenantId) {
+                                                return OrderItem::whereHas('order', fn($q) => $q->where('shop_id', $tenantId))
+                                                    ->distinct()
+                                                    ->pluck('product_name')
+                                                    ->toArray();
+                                            })
+                                            ->required()
+                                            ->placeholder('Pilih atau ketik nama baru...')
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(function ($state, Set $set) {
+                                                if (!$state) return;
+                                                $existing = OrderItem::where('order_id', $this->order->id)
+                                                    ->where('product_name', $state)
+                                                    ->latest('id')
+                                                    ->first();
+                                                if ($existing) {
+                                                    $details = $existing->size_and_request_details ?? [];
+                                                    $set('bulk_category', $existing->production_category === 'custom' ? 'produksi' : ($existing->production_category ?? 'produksi'));
+                                                    $set('bulk_bahan', $existing->bahan_id);
+                                                    $set('bulk_material_variant_id', $details['material_variant_id'] ?? null);
+                                                    $set('bulk_gender', $details['gender'] ?? 'L');
+                                                    $set('bulk_sleeve', $details['sleeve_model'] ?? 'pendek');
+                                                    $set('bulk_pocket', $details['pocket_model'] ?? 'tanpa_saku');
+                                                    $set('bulk_button', $details['button_model'] ?? 'biasa');
+                                                    $set('bulk_is_tunic', (bool) ($details['is_tunic'] ?? false));
+                                                    $set('bulk_sablon_teknik', $details['sablon_jenis'] ?? null);
+                                                    $set('bulk_sablon_lokasi', $details['sablon_lokasi'] ?? null);
+                                                    Notification::make()->title("Spesifikasi '{$state}' disalin!")->success()->send();
+                                                }
+                                            })
+                                            ->columnSpan(2),
+                                    ]),
+                                ])->compact(),
+                            
+                            Section::make('Detail Produksi')
+                                ->schema([
+                                    Grid::make(2)->schema([
+                                        Select::make('bulk_bahan')
+                                            ->label('Bahan')
+                                            ->options($bahanOptions)
+                                            ->searchable()
+                                            ->live()
+                                            ->afterStateUpdated(fn(Set $set) => $set('bulk_material_variant_id', null)),
+                                        Select::make('bulk_material_variant_id')
+                                            ->label('Warna / Varian')
+                                            ->allowHtml()
+                                            ->options(function (Get $get) {
+                                                $bahanId = $get('bulk_bahan');
+                                                if (!$bahanId) return [];
+                                                return \App\Models\MaterialVariant::where('material_id', $bahanId)
+                                                    ->get()
+                                                    ->mapWithKeys(fn($v) => [
+                                                        $v->id => "<div class='flex items-center gap-2'><div class='w-4 h-4 rounded-full border border-gray-300' style='background-color: {$v->color_code}'></div> {$v->color_name}</div>"
+                                                    ]);
+                                            })
+                                            ->searchable()
+                                            ->visible(fn(Get $get) => filled($get('bulk_bahan'))),
+                                    ]),
+                                    Grid::make(2)->schema([
+                                        Select::make('bulk_sablon_teknik')
+                                            ->label('Teknik Sablon / Bordir')
+                                            ->options(\App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
+                                            ->searchable(),
+                                        Select::make('bulk_sablon_lokasi')
+                                            ->label('Posisi / Lokasi')
+                                            ->options(\App\Filament\Resources\Orders\OrderResource::$lokasiSablonOptions)
+                                            ->searchable(),
+                                    ]),
+                                    Grid::make(4)->schema([
+                                        Select::make('bulk_gender')->label('Gender')->options($genderOptions)->default('L'),
+                                        Select::make('bulk_sleeve')->label('Lengan')->options($sleeveOptions)->default('pendek'),
+                                        Select::make('bulk_pocket')->label('Saku')->options($pocketOptions)->default('tanpa_saku'),
+                                        Select::make('bulk_button')->label('Kancing')->options($buttonOptions)->default('biasa'),
+                                    ]),
+                                    Toggle::make('bulk_is_tunic')->label('Tunik / Gamis?')->default(false)
+                                ])->visible(fn(Get $get) => $get('bulk_category') === 'produksi')->compact(),
+
+                            Section::make('Detail Baju Jadi / Jasa')
+                                ->schema([
+                                    Grid::make(2)->schema([
+                                        Select::make('bulk_product_id')
+                                            ->label('Pilih Produk Supplier')
+                                            ->options(Product::where('shop_id', $tenantId)->pluck('name', 'id'))
+                                            ->searchable()->live()
+                                            ->afterStateUpdated(fn($state, Set $set) => $set('bulk_product_name', Product::find($state)?->name))
+                                            ->visible(fn(Get $get) => $get('bulk_category') === 'non_produksi'),
+                                        TextInput::make('bulk_price_non')->label('Harga Jual')->numeric()->prefix('Rp')
+                                            ->visible(fn(Get $get) => $get('bulk_category') === 'non_produksi'),
+                                        TextInput::make('bulk_price_jasa')->label('Harga Jasa')->numeric()->prefix('Rp')
+                                            ->visible(fn(Get $get) => $get('bulk_category') === 'jasa'),
+                                        TextInput::make('bulk_qty_jasa')->label('Jumlah (Qty)')->numeric()->default(1)
+                                            ->visible(fn(Get $get) => $get('bulk_category') === 'jasa'),
+                                    ]),
+                                ])->visible(fn(Get $get) => in_array($get('bulk_category'), ['non_produksi', 'jasa']))->compact(),
+
+                            Section::make('Jumlah per Ukuran')
+                                ->schema([
+                                    Grid::make(4)->schema(function () use ($sizeOptions) {
+                                        return [
+                                            ...collect($sizeOptions)->map(function ($label, $key) {
+                                                return TextInput::make("qty_{$key}")
+                                                    ->label($label)
+                                                    ->numeric()
+                                                    ->placeholder('0')
+                                                    ->extraInputAttributes(['onclick' => 'this.select()']);
+                                            })->values()->toArray(),
+                                            TextInput::make('qty_custom')
+                                                ->label('Custom')
+                                                ->numeric()
+                                                ->placeholder('0')
+                                                ->extraInputAttributes(['onclick' => 'this.select()']),
+                                        ];
+                                    }),
+                                ])->visible(fn(Get $get) => in_array($get('bulk_category'), ['produksi', 'non_produksi']))->compact(),
+
+                            Section::make('Harga Satuan')
+                                ->schema([
+                                    Grid::make(2)->schema([
+                                        TextInput::make('bulk_price')->label('Harga Standar (Rp)')->numeric()->prefix('Rp')->default(0),
+                                        TextInput::make('bulk_price_custom')->label('Harga Custom (Rp)')->numeric()->prefix('Rp')->default(0)
+                                            ->visible(fn(Get $get) => (int) $get('qty_custom') > 0),
+                                    ]),
+                                ])->visible(fn(Get $get) => $get('bulk_category') === 'produksi')->compact(),
                         ];
                     })
-                    ->modalWidth('5xl')
+                    ->modalWidth('4xl')
                     ->action(function (array $data) use ($sizeOptions) {
                         $category = $data['bulk_category'];
                         $productName = $data['bulk_product_name'];

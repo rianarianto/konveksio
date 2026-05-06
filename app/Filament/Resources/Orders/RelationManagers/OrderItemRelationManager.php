@@ -56,28 +56,35 @@ class OrderItemRelationManager extends RelationManager
             ->columns([
                 TextInputColumn::make('product_name')
                     ->label('Nama / Item')
-                    ->sortable()
+                    ->placeholder('Nama produk...')
                     ->searchable()
                     ->rules(['required', 'max:255']),
 
+                TextInputColumn::make('recipient_name')
+                    ->label('Penerima')
+                    ->placeholder('Nama penerima...')
+                    ->searchable(),
+
                 SelectColumn::make('size')
                     ->label('Size')
-                    ->options($sizeOptions)
+                    ->options(array_merge($sizeOptions, ['Custom' => 'Custom']))
                     ->sortable(),
 
-                SelectColumn::make('production_category')
-                    ->label('Kategori')
-                    ->options($categoryOptions)
-                    ->sortable(),
-
-                SelectColumn::make('bahan_id')
-                    ->label('Bahan')
-                    ->options($bahanOptions)
-                    ->sortable(),
+                TextColumn::make('specs')
+                    ->label('JK / Lengan / Saku')
+                    ->state(function (OrderItem $record) {
+                        $gender = $record->gender === 'L' ? '♂️ L' : '♀️ P';
+                        $lengan = Str::title($record->sleeve_model);
+                        $saku = $record->pocket_model === 'tanpa_saku' ? '❌ Saku' : '✅ ' . Str::title($record->pocket_model);
+                        return "{$gender} | {$lengan} | {$saku}";
+                    })
+                    ->description(fn(OrderItem $record) => $record->production_category === 'produksi' ? '🧵 ' . ($record->bahan?->name ?? 'Bahan Belum Diatur') : '📦 Baju Jadi / Jasa')
+                    ->color('gray')
+                    ->fontFamily('mono')
+                    ->size('xs'),
 
                 TextInputColumn::make('price')
                     ->label('Harga')
-                    ->sortable()
                     ->rules(['required', 'numeric', 'min:0'])
                     ->afterStateUpdated(function () {
                         $this->updateOrderSubtotal();
@@ -85,7 +92,6 @@ class OrderItemRelationManager extends RelationManager
 
                 TextInputColumn::make('quantity')
                     ->label('Qty')
-                    ->sortable()
                     ->rules(['required', 'numeric', 'min:1'])
                     ->afterStateUpdated(function () {
                         $this->updateOrderSubtotal();
@@ -93,9 +99,6 @@ class OrderItemRelationManager extends RelationManager
 
                 TextColumn::make('subtotal')
                     ->label('Total')
-                    ->sortable(query: function ($query, string $direction) {
-                        return $query->orderByRaw('price * quantity ' . $direction);
-                    })
                     ->state(fn(OrderItem $record) => $record->price * $record->quantity)
                     ->money('IDR')
                     ->color('primary')
@@ -108,33 +111,37 @@ class OrderItemRelationManager extends RelationManager
                     ->label('Tambah Item')
                     ->icon('heroicon-o-plus')
                     ->form([
-                        TextInput::make('product_name')
-                            ->label('Nama Item')
-                            ->required(),
-                        Select::make('size')
-                            ->label('Ukuran')
-                            ->options($sizeOptions)
-                            ->searchable(),
-                        Select::make('production_category')
-                            ->label('Kategori')
-                            ->options($categoryOptions)
-                            ->required()
-                            ->default('produksi'),
-                        Select::make('bahan_id')
-                            ->label('Bahan')
-                            ->options($bahanOptions)
-                            ->searchable(),
-                        TextInput::make('price')
-                            ->label('Harga Satuan')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->required()
-                            ->default(0),
-                        TextInput::make('quantity')
-                            ->label('Quantity')
-                            ->numeric()
-                            ->required()
-                            ->default(1),
+                        \Filament\Forms\Components\Grid::make(2)
+                            ->schema([
+                                TextInput::make('product_name')
+                                    ->label('Nama Item')
+                                    ->required()
+                                    ->columnSpanFull(),
+                                Select::make('size')
+                                    ->label('Ukuran')
+                                    ->options(array_merge($sizeOptions, ['Custom' => 'Custom']))
+                                    ->searchable(),
+                                Select::make('production_category')
+                                    ->label('Kategori')
+                                    ->options($categoryOptions)
+                                    ->required()
+                                    ->default('produksi'),
+                                Select::make('bahan_id')
+                                    ->label('Bahan')
+                                    ->options($bahanOptions)
+                                    ->searchable(),
+                                TextInput::make('price')
+                                    ->label('Harga Satuan')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->required()
+                                    ->default(0),
+                                TextInput::make('quantity')
+                                    ->label('Quantity')
+                                    ->numeric()
+                                    ->required()
+                                    ->default(1),
+                            ])
                     ])
                     ->after(function () {
                         $this->updateOrderSubtotal();
@@ -146,42 +153,47 @@ class OrderItemRelationManager extends RelationManager
                     ->icon('heroicon-o-squares-plus')
                     ->color('primary')
                     ->form(function () use ($sizeOptions, $bahanOptions, $categoryOptions) {
-                        $fields = [
-                            Select::make('bulk_category')
-                                ->label('Kategori')
-                                ->options($categoryOptions)
-                                ->default('produksi')
-                                ->required()
-                                ->columnSpan(1),
-                            Select::make('bulk_bahan')
-                                ->label('Bahan')
-                                ->options($bahanOptions)
-                                ->searchable()
-                                ->columnSpan(1),
-                            TextInput::make('bulk_price')
-                                ->label('Harga Default')
-                                ->numeric()
-                                ->prefix('Rp')
-                                ->default(0)
-                                ->columnSpan(1),
+                        return [
+                            \Filament\Forms\Components\Grid::make(3)
+                                ->schema([
+                                    Select::make('bulk_category')
+                                        ->label('Kategori')
+                                        ->options($categoryOptions)
+                                        ->default('produksi')
+                                        ->required(),
+                                    Select::make('bulk_bahan')
+                                        ->label('Bahan')
+                                        ->options($bahanOptions)
+                                        ->searchable(),
+                                    TextInput::make('bulk_price')
+                                        ->label('Harga Default')
+                                        ->numeric()
+                                        ->prefix('Rp')
+                                        ->default(0),
+                                ]),
+                            
+                            \Filament\Forms\Components\Section::make('Jumlah per Ukuran')
+                                ->description('Masukkan jumlah pesanan untuk setiap ukuran.')
+                                ->schema([
+                                    \Filament\Forms\Components\Grid::make(4)
+                                        ->schema([
+                                            ...collect($sizeOptions)->map(function ($label, $key) {
+                                                return TextInput::make("qty_{$key}")
+                                                    ->label($label)
+                                                    ->numeric()
+                                                    ->default(0)
+                                                    ->extraInputAttributes(['onclick' => 'this.select()']);
+                                            })->values()->toArray(),
+                                            
+                                            TextInput::make('qty_custom')
+                                                ->label('Custom')
+                                                ->numeric()
+                                                ->default(0)
+                                                ->extraInputAttributes(['onclick' => 'this.select()']),
+                                        ])
+                                ])
+                                ->compact()
                         ];
-
-                        // Size-based qty fields
-                        foreach ($sizeOptions as $key => $label) {
-                            $fields[] = TextInput::make("qty_{$key}")
-                                ->label("Qty {$label}")
-                                ->numeric()
-                                ->default(0)
-                                ->columnSpan(1);
-                        }
-
-                        $fields[] = TextInput::make('qty_custom')
-                            ->label('Qty Custom (Ukur Badan)')
-                            ->numeric()
-                            ->default(0)
-                            ->columnSpan(1);
-
-                        return $fields;
                     })
                     ->modalWidth('lg')
                     ->modalHeading('Bulk Generate Items')

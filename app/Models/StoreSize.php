@@ -17,6 +17,14 @@ class StoreSize extends Model
         'is_active',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'sort_order' => 'integer',
+            'is_active' => 'boolean',
+        ];
+    }
+
     public function shop()
     {
         return $this->belongsTo(Shop::class);
