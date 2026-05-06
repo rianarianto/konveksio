@@ -921,25 +921,13 @@ class OrderResource extends Resource
                                 $displayStatusText = 'Sebagian Selesai';
                             }
 
-                            $progressBarHtml = '';
-                            if ($totalTasks > 0) {
-                                $barColor = $pct === 100 ? '#10b981' : '#7c3aed';
-                                $barBgColor = $pct === 100 ? '#d1fae5' : '#ede9fe';
-
-                                $statusLabelHtml = '<span style="color:' . $barColor . '; font-weight:600;">' . htmlspecialchars($displayStatusText) . ' (' . $pct . '%)</span>';
-
-                                $progressBarHtml = '<div style="margin-top:8px;">'
-                                    . '<div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.02em;">'
-                                    . '<span>Progress</span>'
-                                    . $statusLabelHtml
-                                    . '</div>'
-                                    . '<div style="height:6px; background:' . $barBgColor . '; border-radius:9999px; overflow:hidden;">'
-                                    . '<div style="height:100%; width:' . $pct . '%; background:' . $barColor . '; border-radius:9999px; transition:width 0.5s ease;"></div>'
-                                    . '</div>'
-                                    . '</div>';
-                            } else {
-                                $progressBarHtml = '<div style="margin-top:8px; font-size:11px; color:#9ca3af; font-weight:500;">Tidak ada jadwal</div>';
-                            }
+                            $statusBadge = match ($displayStatusText) {
+                                'Selesai' => '<span style="padding:2px 6px; border-radius:4px; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600;">SELESAI</span>',
+                                'Proses' => '<span style="padding:2px 6px; border-radius:4px; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600;">PROSES</span>',
+                                'Belum Diatur' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">BELUM DIATUR</span>',
+                                default => '<span style="padding:2px 6px; border-radius:4px; background:#fef3c7; color:#d97706; font-size:10px; font-weight:600;">'.strtoupper($displayStatusText).'</span>',
+                            };
+                            $progressBarHtml = '<div style="margin-top:4px;">' . $statusBadge . '</div>';
 
                             // Sizing details for grouped items (optional: showing unique sizes)
                             $sizingHtml = '';

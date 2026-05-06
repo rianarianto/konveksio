@@ -125,34 +125,17 @@ class PiutangTableWidget extends BaseWidget
                         if ($record->orderItems && $record->orderItems->count() > 0) {
                             $html .= '<div class="flex flex-wrap gap-2 mt-1">';
                             
-                            // Group items by name and status
+                            // Group items by name
                             $groupedItems = $record->orderItems->groupBy(function ($item) {
-                                $tasks = $item->productionTasks;
-                                $status = 'Antrian';
-                                
-                                if ($tasks->count() > 0) {
-                                    $doneCount = $tasks->where('status', 'done')->count();
-                                    if ($doneCount === $tasks->count()) {
-                                        $status = 'Selesai';
-                                    } elseif ($tasks->where('status', 'in_progress')->count() > 0) {
-                                        $status = 'Proses';
-                                    }
-                                } elseif (in_array($item->production_category, ['non_produksi', 'jasa'])) {
-                                    $status = 'Selesai';
-                                }
-                                
-                                $name = $item->custom_name ?: $item->product?->name ?: 'Item';
-                                return $name . '|||' . $status;
+                                return ($item->product_name ?: 'Item');
                             });
-
+                            
                             foreach ($groupedItems as $key => $items) {
-                                [$itemName, $itemStatus] = explode('|||', $key);
-                                $totalQty = $items->sum('quantity') . 'x';
+                                $totalQty = $items->sum('quantity');
 
-                                $html .= '<div class="inline-flex items-stretch bg-white border border-gray-200 rounded-md overflow-hidden text-xs h-8 shadow-sm">';
-                                $html .= '<div class="px-2.5 text-gray-500 border-r border-gray-100 flex items-center">' . $totalQty . ' ' . $itemName . '</div>';
-                                $html .= '<div class="px-2.5 font-bold text-gray-800 flex items-center justify-center bg-gray-50">' . $itemStatus . '</div>';
-                                $html .= '</div>';
+                                $html .= '<div style="padding:2px 8px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:700; border:1px solid #e5e7eb;">'
+                                    . $totalQty . 'x ' . $key 
+                                    . '</div>';
                             }
                             $html .= '</div>';
                         }
