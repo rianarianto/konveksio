@@ -7,7 +7,7 @@ use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Actions\Action;
+use Filament\Actions\Action;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
