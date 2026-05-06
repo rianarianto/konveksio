@@ -303,7 +303,8 @@ class AturTugasProduksi extends Page
                                             if (!$stage) return null;
                                             $colors = \App\Models\ProductionStage::getThemeColor($stage);
                                             return new \Illuminate\Support\HtmlString('
-                                                <span style="background: '.$colors['bg'].'; color: '.$colors['text'].'; padding: 2px 12px; border-radius: 9999px; font-size: 11px; font-weight: 800; border: 1px solid '.$colors['border'].'; text-transform: uppercase; letter-spacing: 0.05em;">
+                                                <span x-effect="$el.parentElement.parentElement.style.setProperty(\'background-color\', \''.$colors['bg'].'\', \'important\'); $el.parentElement.parentElement.style.setProperty(\'border-bottom\', \'2px solid '.$colors['border'].'\', \'important\'); $el.parentElement.parentElement.style.setProperty(\'border-top-left-radius\', \'12px\', \'important\'); $el.parentElement.parentElement.style.setProperty(\'border-top-right-radius\', \'12px\', \'important\');" 
+                                                      style="font-weight: 900; color: '.$colors['text'].'; text-transform: uppercase; letter-spacing: 0.05em;">
                                                     ' . $stage . '
                                                 </span>
                                             ');
