@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\ProductionStage;
 use App\Models\ProductionTask;
 use App\Models\User;
+use App\Models\Worker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -321,7 +322,15 @@ class AturTugasProduksi extends Page
                                                         }),
                                                     Select::make('assigned_to')
                                                         ->label('Karyawan')
-                                                        ->options(User::all()->pluck('name', 'id'))
+                                                        ->options(function() {
+                                                            return Worker::where('is_active', true)
+                                                                ->get()
+                                                                ->mapWithKeys(function ($worker) {
+                                                                    $queue = $worker->active_queue_count;
+                                                                    $label = $worker->name . ($queue > 0 ? " (Antrian: {$queue} pcs)" : " (Kosong)");
+                                                                    return [$worker->id => $label];
+                                                                });
+                                                        })
                                                         ->searchable()
                                                         ->required(),
                                                 ]),
@@ -388,7 +397,12 @@ class AturTugasProduksi extends Page
                                                             ->maxValue($max)
                                                             ->placeholder('0')
                                                             ->live(debounce: 300)
-                                                            ->afterStateUpdated(fn($state, Set $set, Get $get) => $recalcQty($get, $set))
+                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) use ($sz, $max, $recalcQty) {
+                                                                if ((int) $state > $max) {
+                                                                    $set($sz, $max);
+                                                                }
+                                                                $recalcQty($get, $set);
+                                                            })
                                                             ->extraAttributes(['style' => 'align-self: end;']);
                                                     }
 
