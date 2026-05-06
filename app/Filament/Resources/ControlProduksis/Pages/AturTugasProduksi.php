@@ -388,7 +388,8 @@ class AturTugasProduksi extends Page
                                                             ->maxValue($max)
                                                             ->placeholder('0')
                                                             ->live(debounce: 300)
-                                                            ->afterStateUpdated(fn($state, Set $set, Get $get) => $recalcQty($get, $set));
+                                                            ->afterStateUpdated(fn($state, Set $set, Get $get) => $recalcQty($get, $set))
+                                                            ->extraAttributes(['style' => 'align-self: end;']);
                                                     }
 
                                                     if (!empty($requestPerSize)) {
@@ -405,7 +406,8 @@ class AturTugasProduksi extends Page
                                                             ->minValue(0)
                                                             ->placeholder('0')
                                                             ->live(debounce: 300)
-                                                            ->afterStateUpdated(fn($state, Set $set, Get $get) => $recalcQty($get, $set));
+                                                            ->afterStateUpdated(fn($state, Set $set, Get $get) => $recalcQty($get, $set))
+                                                            ->extraAttributes(['style' => 'align-self: end;']);
                                                     }
 
                                                     return $fields;
