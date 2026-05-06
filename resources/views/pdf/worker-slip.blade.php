@@ -138,26 +138,29 @@
             </tbody>
         </table>
 
-        <div class="totals">
-            <table class="totals-table">
-                <tr>
-                    <td class="label">Total Upah Kotor</td>
-                    <td class="value">Rp {{ number_format($payroll->total_wage, 0, ',', '.') }}</td>
-                </tr>
-                @if($payroll->kasbon_deduction > 0)
-                <tr>
-                    <td class="label">Potongan Kasbon</td>
-                    <td class="value">- Rp {{ number_format($payroll->kasbon_deduction, 0, ',', '.') }}</td>
-                </tr>
-                @endif
-                <tr class="grand-total">
-                    <td class="label"><strong>TOTAL BERSIH</strong></td>
-                    <td class="value" style="color: #000;"><strong>Rp {{ number_format($payroll->net_amount, 0, ',', '.') }}</strong></td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="clear"></div>
+        <table width="100%">
+            <tr>
+                <td width="60%"></td>
+                <td width="40%">
+                    <table class="totals-table">
+                        <tr>
+                            <td class="label">Total Upah Kotor</td>
+                            <td class="value">Rp {{ number_format($payroll->total_wage, 0, ',', '.') }}</td>
+                        </tr>
+                        @if($payroll->kasbon_deduction > 0)
+                        <tr>
+                            <td class="label">Potongan Kasbon</td>
+                            <td class="value">- Rp {{ number_format($payroll->kasbon_deduction, 0, ',', '.') }}</td>
+                        </tr>
+                        @endif
+                        <tr class="grand-total">
+                            <td class="label"><strong>TOTAL BERSIH</strong></td>
+                            <td class="value" style="color: #000;"><strong>Rp {{ number_format($payroll->net_amount, 0, ',', '.') }}</strong></td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
 
         <div class="footer">
             <table width="100%">
