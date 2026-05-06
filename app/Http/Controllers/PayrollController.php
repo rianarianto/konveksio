@@ -16,11 +16,11 @@ class PayrollController extends Controller
             abort(403);
         }
 
-        $pdf = Pdf::loadView('pdf.worker-slip', compact('payroll'));
+        // DEBUG: Return view directly to check if data is ok
+        return view('pdf.worker-slip', compact('payroll'));
         
-        // A5 format is 148 x 210 mm
-        $pdf->setPaper('a5', 'portrait');
-
-        return $pdf->stream("slip-upah-{$payroll->id}.pdf");
+        // $pdf = Pdf::loadView('pdf.worker-slip', compact('payroll'));
+        // $pdf->setPaper('a5', 'portrait');
+        // return $pdf->stream("slip-upah-{$payroll->id}.pdf");
     }
 }
