@@ -50,6 +50,11 @@
         margin-right: auto !important;
         /* Pushes logo away from button in reverse layout */
     }
+
+    /* Force Bottom Alignment for Size Distribution Inputs */
+    .distribusi-qty-grid > div {
+        align-items: flex-end !important;
+    }
 </style>
 
 <div class="flex items-center gap-2 mt-1">

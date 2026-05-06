@@ -413,6 +413,7 @@ class AturTugasProduksi extends Page
                                                     return $fields;
                                                 })
                                                 ->columns(6)
+                                                ->extraAttributes(['class' => 'distribusi-qty-grid'])
                                                 ->columnSpanFull(),
 
                                             Grid::make(2)
