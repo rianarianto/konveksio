@@ -57,8 +57,6 @@
     <div x-show="$store.sidebar.isOpen" class="flex flex-col text-left leading-none transition-all duration-300"
         style="margin-top: 2px;">
         <span class="text-[16px] font-bold text-gray-800 dark:text-gray-100 tracking-tight whitespace-nowrap"
-            style="line-height: 1;">Dunia Bordir</span>
-        <span class="text-[16px] font-bold text-gray-800 dark:text-gray-100 tracking-tight whitespace-nowrap"
-            style="line-height: 1;">Komputer</span>
+            style="line-height: 1;">{{ \Filament\Facades\Filament::getTenant()?->name ?? 'Konveksio' }}</span>
     </div>
 </div>

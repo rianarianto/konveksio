@@ -383,7 +383,7 @@
         </tr>
     </table>
 
-    <div class="footer">Dicetak via Sistem Konveksio. Dokumen ini adalah instruksi resmi.</div>
+    <div class="footer">Dicetak via Sistem {{ $record->order->shop->name ?? 'Konveksio' }}. Dokumen ini adalah instruksi resmi.</div>
 
     @if($record->design_image)
         <div class="page-break"></div>

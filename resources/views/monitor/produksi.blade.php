@@ -572,7 +572,7 @@
     {{-- ─ HEADER ─ --}}
     <div class="header">
         <div>
-            <div class="header-shop">{{ $shop->name }}</div>
+            <div class="header-shop">Dunia Bordir Komputer</div>
             <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
                 <div class="refresh-dot"></div>
                 <span style="font-size:11px;color:#64748b;">Auto-refresh setiap 30 detik</span>

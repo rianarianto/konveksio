@@ -171,7 +171,8 @@ class PengeluaranResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('expense_date', 'desc');
     }
 
     public static function getRelations(): array

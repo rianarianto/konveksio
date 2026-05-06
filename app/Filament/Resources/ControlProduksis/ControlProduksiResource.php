@@ -227,7 +227,6 @@ class ControlProduksiResource extends Resource
             ->actions([
                 ActionGroup::make([
                 Action::make('update_progress')
-                    ->hidden(fn(OrderItem $record) => $record->productionTasks()->where('status', '!=', 'done')->count() === 0)
                     ->label('Update Progress')
                     ->icon('heroicon-o-arrow-path')
                     ->color('info')
@@ -348,7 +347,6 @@ class ControlProduksiResource extends Resource
 
 
                 Action::make('atur_tugas')
-                    ->hidden(fn(OrderItem $record) => $record->productionTasks()->exists() && $record->productionTasks()->where('status', '!=', 'done')->count() === 0)
                     ->label(fn(OrderItem $record) => $record->productionTasks()->exists() ? 'Edit Tugas' : 'Atur Tugas')
                     ->icon('heroicon-o-clipboard-document-list')
                     ->color('primary')

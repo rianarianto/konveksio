@@ -70,7 +70,10 @@
                             @elseif($task->status === 'in_progress')
                                 <button type="button" wire:click="updateTaskStatus({{ $task->id }}, 'done')" style="background:#059669; color:#fff; padding:4px 14px; border-radius:6px; font-size:12px; font-weight:600; border:none; cursor:pointer;">✓ Tandai Selesai</button>
                             @else
-                                <span style="color:#6b7280; font-size:12px">Selesai</span>
+                                <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+                                    <span style="color:#6b7280; font-size:12px">Selesai</span>
+                                    <button type="button" wire:click="updateTaskStatus({{ $task->id }}, 'undo')" style="background:#f3f4f6; color:#4b5563; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:600; border:1px solid #d1d5db; cursor:pointer;" title="Kembalikan ke proses">↺ Undo</button>
+                                </div>
                             @endif
                         </td>
                     </tr>

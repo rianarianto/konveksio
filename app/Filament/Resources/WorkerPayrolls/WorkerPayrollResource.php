@@ -17,8 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use App\Models\WorkerPayroll;
 use App\Filament\Resources\WorkerPayrolls\Pages\ManageWorkerPayrolls;
-use Illuminate\Support\HtmlString; 
-use Filament\Notifications\Actions\Action as NotificationAction;
+use Illuminate\Support\HtmlString;
 
 class WorkerPayrollResource extends Resource
 {
@@ -210,6 +209,7 @@ class WorkerPayrollResource extends Resource
                         'shop_id' => $record->shop_id,
                         'amount' => $deduction,
                         'type' => 'repayment',
+                        'date' => now(),
                         'description' => "Potong dari upah borongan (#{$payroll->id})",
                         'recorded_by' => auth()->id(),
                     ]);
@@ -220,7 +220,7 @@ class WorkerPayrollResource extends Resource
                     ->title('Pembayaran Selesai')
                     ->body("Upah Rp " . number_format($totalWage, 0, ',', '.') . " diproses.")
                     ->actions([
-                        NotificationAction::make('print_slip')
+                        \Filament\Notifications\Actions\Action::make('print_slip')
                             ->label('Cetak Slip')
                             ->color('success')
                             ->icon('heroicon-o-printer')

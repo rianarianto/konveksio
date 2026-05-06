@@ -18,10 +18,44 @@ class TaskStatusManager extends \Livewire\Component
 
         if ($action === 'start') {
             $task->update(['status' => 'in_progress', 'started_at' => now()]);
+            
+            // Auto-update Order status to 'diproses'
+            $order = $task->orderItem->order;
+            if (in_array($order->status, ['diterima', 'antrian'])) {
+                $order->update(['status' => 'diproses']);
+            }
+            
             \Filament\Notifications\Notification::make()->title('Tugas Dimulai')->success()->send();
         } elseif ($action === 'done') {
             $task->update(['status' => 'done', 'completed_at' => now()]);
-            \Filament\Notifications\Notification::make()->title('Tugas Selesai')->success()->send();
+            
+            // Check if ALL production tasks for the entire order are finished
+            $order = $task->orderItem->order->load('orderItems.productionTasks');
+            $allTasks = $order->orderItems->flatMap->productionTasks;
+            
+            $allTasksDone = $allTasks->isNotEmpty() && $allTasks->every(fn($t) => $t->status === 'done');
+            
+            if ($allTasksDone) {
+                $order->update(['status' => 'selesai']);
+                \Filament\Notifications\Notification::make()
+                    ->title('Produksi Selesai!')
+                    ->body('Seluruh tahapan untuk pesanan ini telah selesai. Status pesanan otomatis diubah menjadi SELESAI.')
+                    ->success()
+                    ->persistent()
+                    ->send();
+            } else {
+                \Filament\Notifications\Notification::make()->title('Tugas Selesai')->success()->send();
+            }
+        } elseif ($action === 'undo') {
+            $task->update(['status' => 'in_progress', 'completed_at' => null]);
+            
+            // Revert Order status to 'diproses' if it was 'selesai'
+            $order = $task->orderItem->order;
+            if ($order->status === 'selesai') {
+                $order->update(['status' => 'diproses']);
+            }
+            
+            \Filament\Notifications\Notification::make()->title('Tugas Dikembalikan ke Proses')->info()->send();
         }
     }
 

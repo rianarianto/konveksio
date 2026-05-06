@@ -762,13 +762,29 @@ class OrderResource extends Resource
                             $sisaIconColor = '#16a34a';
                         }
 
-                        $statusBadge = match ($record->status) {
-                            'draft' => '<span style="padding:2px 6px; border-radius:4px; background:#fef3c7; color:#d97706; font-size:10px; font-weight:600;">DRAFT</span>',
-                            'diterima' => '<span style="padding:2px 6px; border-radius:4px; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600;">DITERIMA</span>',
-                            'proses' => '<span style="padding:2px 6px; border-radius:4px; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600;">PROSES</span>',
-                            'selesai' => '<span style="padding:2px 6px; border-radius:4px; background:#f3e8ff; color:#7e22ce; font-size:10px; font-weight:600;">SELESAI</span>',
-                            default => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#9ca3af; font-size:10px; font-weight:600;">' . strtoupper($record->status) . '</span>',
+                        // Proactive check for display status
+                        $displayStatus = $record->status;
+                        if ($displayStatus === 'diproses') {
+                            $allTasks = $record->orderItems->flatMap->productionTasks;
+                            if ($allTasks->isNotEmpty() && $allTasks->every(fn($t) => $t->status === 'done')) {
+                                $displayStatus = 'selesai';
+                            }
+                        }
+
+                        // Style mapping for OrderResource premium badge
+                        $badgeStyles = match ($displayStatus) {
+                            'draft' => ['bg' => '#fef3c7', 'text' => '#d97706', 'border' => '#fde68a', 'indicator' => '#d97706', 'label' => 'DRAFT'],
+                            'diterima' => ['bg' => '#f3e8ff', 'text' => '#7e22ce', 'border' => '#ddd6fe', 'indicator' => '#7e22ce', 'label' => 'DITERIMA'],
+                            'diproses' => ['bg' => '#dbeafe', 'text' => '#2563eb', 'border' => '#bfdbfe', 'indicator' => '#2563eb', 'label' => 'PROSES'],
+                            'selesai' => ['bg' => '#dcfce7', 'text' => '#16a34a', 'border' => '#bbf7d0', 'indicator' => '#16a34a', 'label' => 'SELESAI'],
+                            'siap_diambil' => ['bg' => '#dcfce7', 'text' => '#16a34a', 'border' => '#bbf7d0', 'indicator' => '#16a34a', 'label' => 'SIAP DIAMBIL'],
+                            default => ['bg' => '#f3f4f6', 'text' => '#4b5563', 'border' => '#e5e7eb', 'indicator' => '#6b7280', 'label' => strtoupper($displayStatus)],
                         };
+
+                        $statusBadge = '<div style="display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:6px; font-size:10px; font-weight:800; border:1px solid ' . $badgeStyles['border'] . '; background:' . $badgeStyles['bg'] . '; color:' . $badgeStyles['text'] . '; line-height:1; vertical-align:middle;">'
+                            . '<div style="width:3.5px; height:12px; background-color:' . $badgeStyles['indicator'] . '; border-radius:2px; flex-shrink:0;"></div>'
+                            . '<span>' . $badgeStyles['label'] . '</span>'
+                            . '</div>';
 
                         $masukHtml = '<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">'
                             . '<span style="font-size:13px; font-weight:500; color:#9ca3af;">' . $masukStr . '</span>'

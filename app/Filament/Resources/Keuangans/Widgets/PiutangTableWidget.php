@@ -69,7 +69,14 @@ class PiutangTableWidget extends BaseWidget
                         $bgClass = 'bg-gray-100';
                         $textClass = 'text-gray-700';
                         $borderClass = 'border-gray-200';
-                        switch (strtolower($record->status)) {
+                        // Proactive check for display: if it looks finished, show it as finished
+                        $allTasks = $record->orderItems->flatMap->productionTasks;
+                        $displayStatus = $record->status;
+                        if ($displayStatus === 'diproses' && $allTasks->isNotEmpty() && $allTasks->every(fn($t) => $t->status === 'done')) {
+                            $displayStatus = 'selesai';
+                        }
+
+                        switch (strtolower($displayStatus)) {
                             case 'pending':
                                 $bgClass = 'bg-gray-100';
                                 $textClass = 'text-gray-700';
@@ -80,16 +87,18 @@ class PiutangTableWidget extends BaseWidget
                                 $textClass = 'text-purple-700';
                                 $borderClass = 'border-purple-200';
                                 break;
-                            case 'dikerjakan':
+                            case 'diproses':
                                 $bgClass = 'bg-blue-100';
                                 $textClass = 'text-blue-700';
                                 $borderClass = 'border-blue-200';
+                                $statusText = 'Proses';
                                 break;
                             case 'selesai':
-                            case 'diambil':
+                            case 'siap_diambil':
                                 $bgClass = 'bg-green-100';
                                 $textClass = 'text-green-700';
                                 $borderClass = 'border-green-200';
+                                $statusText = $displayStatus == 'selesai' ? 'Selesai' : 'Siap Diambil';
                                 break;
                             case 'batal':
                                 $bgClass = 'bg-red-100';
@@ -100,23 +109,48 @@ class PiutangTableWidget extends BaseWidget
 
                         $html = '<div class="flex flex-col gap-2">';
 
+                        $indicatorHex = match(strtolower($displayStatus)) {
+                            'selesai', 'siap_diambil' => '#22c55e', // Green 500
+                            'diproses' => '#3b82f6', // Blue 500
+                            'diterima' => '#a855f7', // Purple 500
+                            'batal' => '#ef4444', // Red 500
+                            default => '#6b7280', // Gray 500
+                        };
+
                         $html .= '<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold w-max border ' . $bgClass . ' ' . $textClass . ' ' . $borderClass . '">';
-                        $html .= '<div class="w-1.5 h-4 bg-purple-500 rounded-sm"></div>';
+                        $html .= '<div style="width: 5px; height: 14px; background-color: ' . $indicatorHex . '; border-radius: 2px; flex-shrink: 0;"></div>';
                         $html .= '<span>' . $statusText . '</span>';
                         $html .= '</div>';
 
                         if ($record->orderItems && $record->orderItems->count() > 0) {
                             $html .= '<div class="flex flex-wrap gap-2 mt-1">';
-                            foreach ($record->orderItems as $item) {
-                                $itemStatus = 'Antrian';
-                                if (in_array($record->status, ['dikerjakan', 'selesai', 'diambil'])) {
-                                    $itemStatus = ($record->status == 'dikerjakan') ? 'Proses' : 'Siap Diambil';
+                            
+                            // Group items by name and status
+                            $groupedItems = $record->orderItems->groupBy(function ($item) {
+                                $tasks = $item->productionTasks;
+                                $status = 'Antrian';
+                                
+                                if ($tasks->count() > 0) {
+                                    $doneCount = $tasks->where('status', 'done')->count();
+                                    if ($doneCount === $tasks->count()) {
+                                        $status = 'Selesai';
+                                    } elseif ($tasks->where('status', 'in_progress')->count() > 0) {
+                                        $status = 'Proses';
+                                    }
+                                } elseif (in_array($item->production_category, ['non_produksi', 'jasa'])) {
+                                    $status = 'Selesai';
                                 }
-                                $itemName = $item->custom_name ?: $item->product?->name ?: 'Item';
-                                $qty = $item->quantity . 'x';
+                                
+                                $name = $item->custom_name ?: $item->product?->name ?: 'Item';
+                                return $name . '|||' . $status;
+                            });
 
-                                $html .= '<div class="inline-flex items-stretch bg-white border border-gray-200 rounded-md overflow-hidden text-xs h-8">';
-                                $html .= '<div class="px-2.5 text-gray-500 border-r border-gray-100 flex items-center">' . $qty . ' ' . $itemName . '</div>';
+                            foreach ($groupedItems as $key => $items) {
+                                [$itemName, $itemStatus] = explode('|||', $key);
+                                $totalQty = $items->sum('quantity') . 'x';
+
+                                $html .= '<div class="inline-flex items-stretch bg-white border border-gray-200 rounded-md overflow-hidden text-xs h-8 shadow-sm">';
+                                $html .= '<div class="px-2.5 text-gray-500 border-r border-gray-100 flex items-center">' . $totalQty . ' ' . $itemName . '</div>';
                                 $html .= '<div class="px-2.5 font-bold text-gray-800 flex items-center justify-center bg-gray-50">' . $itemStatus . '</div>';
                                 $html .= '</div>';
                             }
@@ -284,8 +318,9 @@ class PiutangTableWidget extends BaseWidget
                             $phone = preg_replace('/^0/', '62', $phone);
                             $phone = preg_replace('/[^\d]/', '', $phone);
                             $sisa = number_format($record->remaining_balance, 0, ',', '.');
+                            $businessName = 'Dunia Bordir Komputer';
                             $msg = "Halo Kak " . ($record->customer->name ?? '') . ",\n\n"
-                                . "Ini konfirmasi dari Konveksio untuk pesanan *" . $record->order_number . "*.\n"
+                                . "Ini konfirmasi dari " . $businessName . " untuk pesanan *" . $record->order_number . "*.\n"
                                 . "Saat ini masih ada sisa pembayaran sebesar *Rp " . $sisa . "*.\n"
                                 . "Mohon konfirmasinya ya Kak jika sudah bisa dilunasi. Terima kasih banyak! \n"
                                 . "https://konveksio.id"; // Atau dummy url
@@ -300,6 +335,7 @@ class PiutangTableWidget extends BaseWidget
             ])
             ->actionsColumnLabel('Aksi (Action)')
             ->emptyStateHeading('Tidak Ada Piutang')
-            ->emptyStateDescription('Semua pesanan sudah lunas.');
+            ->emptyStateDescription('Semua pesanan sudah lunas.')
+            ->defaultSort('created_at', 'desc');
     }
 }
