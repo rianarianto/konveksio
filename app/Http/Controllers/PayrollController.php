@@ -10,8 +10,9 @@ class PayrollController extends Controller
 {
     public function print(WorkerPayroll $payroll)
     {
-        // Security check (handled by multi-tenancy scope usually, but safe to check here)
-        if ($payroll->shop_id !== filament()->getTenant()?->id) {
+        // Security check
+        $user = auth()->user();
+        if ($user->role !== 'owner' && $payroll->shop_id !== $user->shop_id) {
             abort(403);
         }
 
