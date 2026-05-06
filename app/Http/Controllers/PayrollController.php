@@ -17,10 +17,15 @@ class PayrollController extends Controller
         }
 
         $pdf = Pdf::loadView('pdf.worker-slip', compact('payroll'));
-        
-        // Use A4 format as requested
         $pdf->setPaper('a4', 'portrait');
 
-        return $pdf->stream("slip-upah-{$payroll->id}.pdf");
+        $pdfOutput = $pdf->output();
+        $base64 = base64_encode($pdfOutput);
+        
+        return response()->make(
+            '<html><head><title>Slip Upah '.$payroll->worker->name.'</title></head><body style="margin:0;padding:0;"><iframe src="data:application/pdf;base64,'.$base64.'" width="100%" height="100%" style="border:none;"></iframe></body></html>',
+            200,
+            ['Content-Type' => 'text/html']
+        );
     }
 }
