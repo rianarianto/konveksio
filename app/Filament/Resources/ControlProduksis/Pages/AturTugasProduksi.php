@@ -84,9 +84,13 @@ class AturTugasProduksi extends Page
                     if ((str_starts_with($upperSz, 'PERSON_') || !isset($maxSizes[$upperSz])) && isset($maxSizes['CUSTOM'])) {
                         $taskRow['CUSTOM'] = ($taskRow['CUSTOM'] ?? 0) + $qty;
                     } else {
-                        $taskRow[$upperSz] = $qty;
+                        $taskRow[$upperSz] = $qty ?: null;
                     }
                 }
+            }
+            
+            if (isset($taskRow['CUSTOM']) && $taskRow['CUSTOM'] === 0) {
+                $taskRow['CUSTOM'] = null;
             }
 
             $isAllFilled = !empty($maxSizes);
@@ -294,6 +298,16 @@ class AturTugasProduksi extends Page
                                     Repeater::make('productionTasks')
                                         ->label(false)
                                         ->collapsible()
+                                        ->itemLabel(function (array $state) {
+                                            $stage = $state['stage_name'] ?? null;
+                                            if (!$stage) return null;
+                                            $colors = \App\Models\ProductionStage::getThemeColor($stage);
+                                            return new \Illuminate\Support\HtmlString('
+                                                <span style="background: '.$colors['bg'].'; color: '.$colors['text'].'; padding: 2px 12px; border-radius: 9999px; font-size: 11px; font-weight: 800; border: 1px solid '.$colors['border'].'; text-transform: uppercase; letter-spacing: 0.05em;">
+                                                    ' . $stage . '
+                                                </span>
+                                            ');
+                                        })
                                         ->schema([
                                             Hidden::make('id'),
                                             Grid::make(2)
@@ -396,6 +410,7 @@ class AturTugasProduksi extends Page
                                                             ->minValue(0)
                                                             ->maxValue($max)
                                                             ->placeholder('0')
+                                                            ->default(null)
                                                             ->live(debounce: 300)
                                                             ->afterStateUpdated(function ($state, Set $set, Get $get) use ($sz, $max, $recalcQty) {
                                                                 if ((int) $state > $max) {
@@ -454,7 +469,6 @@ class AturTugasProduksi extends Page
                                                 ->columnSpanFull(),
                                         ])
                                         ->columnSpanFull()
-                                        ->itemLabel(fn(array $state): ?string => $state['stage_name'] ?? null)
                                         ->addActionLabel('+ Tambah Tugas Baru')
                                         ->addAction(fn($action) => $action->color('primary')),
                                 ])
