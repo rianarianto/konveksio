@@ -250,7 +250,7 @@ class AturTugasProduksi extends Page
                                                         }
                                                         $html .= '<div style="display:flex; gap:12px; font-size:11px; font-weight:700; margin-bottom:8px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
                                                         $stxt = [];
-                                                        foreach ($mData['sizes'] as $sz => $sqty) {
+                                                        foreach ($mData['sizes'] as $sqty) {
                                                             $stxt[] = '<div style="padding:4px 8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:4px; font-size:12px; font-weight:800; color:#1e293b;">' . $sz . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
                                                         }
                                                         $html .= '<div style="display:flex; flex-wrap:wrap; gap:6px;">' . implode('', $stxt) . '</div>';
@@ -332,7 +332,13 @@ class AturTugasProduksi extends Page
                                                         ->afterStateUpdated(function ($state, Set $set) {
                                                             if ($state) {
                                                                 $stage = ProductionStage::where('name', $state)->first();
-                                                                if ($stage) $set('wage_per_pcs', $stage->default_wage);
+                                                                if ($stage) {
+                                                                    $set('wage_per_pcs', $stage->base_wage);
+                                                                    // If it's the 'Potong' stage, also set the custom wage default
+                                                                    if (str_contains(strtolower($state), 'potong')) {
+                                                                        $set('wage_custom_per_pcs', $stage->base_wage);
+                                                                    }
+                                                                }
                                                             }
                                                         }),
                                                     Select::make('assigned_to')
@@ -397,7 +403,7 @@ class AturTugasProduksi extends Page
                                                             ->label('Kerjakan Semua')
                                                             ->live()
                                                             ->afterStateUpdated(function ($state, Set $set) use ($standardSizes) {
-                                                                foreach ($standardSizes as $sz => $max) $set($sz, $state ? $max : 0);
+                                                                foreach ($standardSizes as $sz => $max) $set($sz, $state ? $max : null);
                                                                 $total = $state ? array_sum($standardSizes) : 0;
                                                                 $set('quantity', $total);
                                                             })
