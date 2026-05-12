@@ -231,11 +231,14 @@
                             <span class="spec-tag">KANCING: {{ $group['button'] }}</span>
                             @if($group['tunic'] === 'TUNIK') <span class="spec-tag">MODEL: TUNIK</span> @endif
                         </div>
-                        @if(!empty($group['requests']))
-                            <div style="font-size: 7.5pt; color: #555; margin-top: 3px; border-top: 1px dashed #ccc; padding-top: 2px;">
-                                <strong>REQ:</strong> {{ implode(' | ', $group['requests']) }}
-                            </div>
-                        @endif
+                            @if($group['use_stock'] ?? false)
+                                <div style="color: #d97706; font-size: 8pt; font-weight: bold; margin-top: 2px;">(AMBIL DARI STOK)</div>
+                            @endif
+                            @if(!empty($group['requests']))
+                                <div style="font-size: 7.5pt; color: #555; margin-top: 3px; border-top: 1px dashed #ccc; padding-top: 2px;">
+                                    <strong>REQ:</strong> {{ implode(' | ', $group['requests']) }}
+                                </div>
+                            @endif
                     </td>
                     <td>
                         @if(!empty($group['sablon_bordir']))
@@ -285,10 +288,14 @@
             } 
             // 2. Individual Custom
             elseif ($size === 'CUSTOM') {
+                 $m = [];
+                 foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
+                     if (!empty($details[$mk])) $m[] = "$mk:{$details[$mk]}";
+                 }
                  $customEntries[] = [
                         'nama' => $gi->recipient_name ?? '-',
                         'size' => 'Custom',
-                        'desc' => !empty($details['LD']) ? "LD:{$details['LD']} PB:{$details['PB']} PL:{$details['PL']} LB:{$details['LB']}" : ""
+                        'desc' => implode(' ', $m)
                     ];
             }
             // 3. Individual Standard with Name
@@ -354,7 +361,7 @@
                             <div style="font-size: 7.5pt; color: #444; margin-top: 2px;">
                                 @if(!empty($task->size_quantities))
                                     @foreach($task->size_quantities as $sz => $q)
-                                        @if($q > 0) {{ $sz }}:{{ $q }}{{ !$loop->last ? ',' : '' }} @endif
+                                        @if(!str_starts_with($sz, '_') && $q > 0) {{ $sz }}:{{ $q }}{{ !$loop->last ? ',' : '' }} @endif
                                     @endforeach
                                 @else - @endif
                             </div>

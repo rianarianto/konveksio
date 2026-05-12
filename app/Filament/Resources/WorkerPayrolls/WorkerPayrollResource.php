@@ -25,8 +25,8 @@ class WorkerPayrollResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
-    protected static ?string $navigationLabel = 'Rekap Upah';
-    protected static ?string $modelLabel = 'Rekap Upah';
+    protected static ?string $navigationLabel = 'Pembayaran Upah';
+    protected static ?string $modelLabel = 'Pembayaran Upah';
     protected static ?string $slug = 'worker-payroll';
     protected static string|\UnitEnum|null $navigationGroup = 'KARYAWAN';
     protected static ?int $navigationSort = 2;
@@ -220,7 +220,7 @@ class WorkerPayrollResource extends Resource
                     ->title('Pembayaran Selesai')
                     ->body("Upah Rp " . number_format($totalWage, 0, ',', '.') . " diproses.")
                     ->actions([
-                        \Filament\Notifications\Actions\Action::make('print_slip')
+                        Action::make('print_slip')
                             ->label('Cetak Slip')
                             ->color('success')
                             ->icon('heroicon-o-printer')

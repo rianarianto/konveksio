@@ -16,6 +16,8 @@ class PayrollController extends Controller
             abort(403);
         }
 
+        $payroll->load(['worker', 'recorder', 'productionTasks.orderItem.order.customer']);
+
         $pdf = Pdf::loadView('pdf.worker-slip', compact('payroll'));
         $pdf->setPaper('a4', 'portrait');
 

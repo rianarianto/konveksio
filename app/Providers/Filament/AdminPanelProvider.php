@@ -30,6 +30,7 @@ class AdminPanelProvider extends PanelProvider
             ->tenant(\App\Models\Shop::class)
             ->tenantRegistration(\App\Filament\Pages\Tenancy\RegisterShop::class)
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
+            ->databaseNotifications()
             ->colors([
                 'primary' => [
                     50 => '#F2E6FF',
@@ -172,6 +173,8 @@ class AdminPanelProvider extends PanelProvider
                     ->visible(fn(): bool => auth()->check() && auth()->user()->role === 'owner' && filament()->getTenant() !== null),
             ])
             ->brandLogo(fn() => view('filament.brand-logo'))
-            ->brandLogoHeight('2.5rem');
+            ->brandLogoHeight('2.5rem')
+            ->brandName('Dunia Bordir Komputer')
+            ->favicon(asset('images/logo.jpeg'));
     }
 }

@@ -16,7 +16,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Support\HtmlString;
-use Filament\Facades\Filament;
+use Filament\Facades\Filament; 
 
 class PiutangTableWidget extends BaseWidget
 {
@@ -133,7 +133,7 @@ class PiutangTableWidget extends BaseWidget
                             foreach ($groupedItems as $key => $items) {
                                 $totalQty = $items->sum('quantity');
 
-                                $html .= '<div style="padding:2px 8px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:700; border:1px solid #e5e7eb;">'
+                                $html .= '<div style="padding:2px 8px; border-radius:8px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:700; border:1px solid #e5e7eb;">'
                                     . $totalQty . 'x ' . $key 
                                     . '</div>';
                             }
@@ -302,11 +302,14 @@ class PiutangTableWidget extends BaseWidget
                             $phone = preg_replace('/[^\d]/', '', $phone);
                             $sisa = number_format($record->remaining_balance, 0, ',', '.');
                             $businessName = 'Dunia Bordir Komputer';
+                            $productNames = $record->orderItems->pluck('product_name')->unique()->filter()->implode(', ');
+                            $orderTitle = $productNames ?: $record->order_number;
+
                             $msg = "Halo Kak " . ($record->customer->name ?? '') . ",\n\n"
-                                . "Ini konfirmasi dari " . $businessName . " untuk pesanan *" . $record->order_number . "*.\n"
+                                . "Ini konfirmasi dari " . $businessName . " untuk pesanan *" . $orderTitle . "*.\n"
                                 . "Saat ini masih ada sisa pembayaran sebesar *Rp " . $sisa . "*.\n"
                                 . "Mohon konfirmasinya ya Kak jika sudah bisa dilunasi. Terima kasih banyak! \n"
-                                . "https://konveksio.id"; // Atau dummy url
+                                . "https://konveksio.id";
                             return "https://wa.me/" . $phone . "?text=" . urlencode($msg);
                         })
                         ->openUrlInNewTab(),

@@ -126,14 +126,79 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($payroll->productionTasks as $task)
-                <tr>
-                    <td>{{ $task->orderItem->product->name ?? 'Custom Order' }} ({{ $task->orderItem->order->order_number }})</td>
-                    <td>{{ $task->stage_name }}</td>
-                    <td style="text-align: center;">{{ $task->quantity }}</td>
-                    <td style="text-align: right;">Rp {{ number_format($task->wage_amount / ($task->quantity ?: 1), 0, ',', '.') }}</td>
-                    <td style="text-align: right;">Rp {{ number_format($task->wage_amount, 0, ',', '.') }}</td>
+                @php
+                    $tasksByOrder = [];
+                    foreach($payroll->productionTasks as $task) {
+                        $sizeQuantities = $task->size_quantities ?? [];
+                        $customQty = $sizeQuantities['CUSTOM'] ?? 0;
+                        $totalQty = $task->quantity;
+                        $standardQty = $totalQty - $customQty;
+                        $totalWage = $task->wage_amount;
+                        $customWage = $sizeQuantities['_wage_custom'] ?? 0;
+                        
+                        // Hitung upah standar
+                        $standardWage = ($standardQty > 0) 
+                            ? ($totalWage - ($customQty * $customWage)) / $standardQty 
+                            : 0;
+
+                        $customerName = $task->orderItem->order->customer->name ?? '-';
+                        $productName = $task->orderItem->product_name ?? 'Custom Order';
+                        $orderId = $task->orderItem->order_id;
+                        $orderNumber = $task->orderItem->order->order_number;
+                        $stageName = $task->stage_name;
+
+                        // Tambahkan ke grup Standar per Order
+                        if ($standardQty > 0) {
+                            $key = "std_{$productName}_{$stageName}_" . round($standardWage);
+                            if (!isset($tasksByOrder[$orderId]['items'][$key])) {
+                                $tasksByOrder[$orderId]['info'] = ['customer' => $customerName, 'number' => $orderNumber];
+                                $tasksByOrder[$orderId]['items'][$key] = [
+                                    'product' => $productName,
+                                    'stage' => $stageName,
+                                    'qty' => 0,
+                                    'wage' => $standardWage,
+                                    'is_custom' => false
+                                ];
+                            }
+                            $tasksByOrder[$orderId]['items'][$key]['qty'] += $standardQty;
+                        }
+
+                        // Tambahkan ke grup Custom per Order
+                        if ($customQty > 0) {
+                            $key = "cus_{$productName}_{$stageName}_" . round($customWage);
+                            if (!isset($tasksByOrder[$orderId]['items'][$key])) {
+                                $tasksByOrder[$orderId]['info'] = ['customer' => $customerName, 'number' => $orderNumber];
+                                $tasksByOrder[$orderId]['items'][$key] = [
+                                    'product' => $productName,
+                                    'stage' => $stageName,
+                                    'qty' => 0,
+                                    'wage' => $customWage,
+                                    'is_custom' => true
+                                ];
+                            }
+                            $tasksByOrder[$orderId]['items'][$key]['qty'] += $customQty;
+                        }
+                    }
+                @endphp
+
+                @foreach($tasksByOrder as $orderId => $group)
+                <tr style="background-color: #f8fafc;">
+                    <td colspan="5" style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">
+                        <span style="font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">PESANAN:</span>
+                        <span style="font-size: 12px; font-weight: 800; color: #1e293b; margin-left: 4px;">{{ $group['info']['customer'] }} ({{ $group['info']['number'] }})</span>
+                    </td>
                 </tr>
+                @foreach($group['items'] as $item)
+                <tr>
+                    <td style="padding-left: 20px;">
+                        {{ $item['product'] }} {{ $item['is_custom'] ? '[Custom]' : '' }}
+                    </td>
+                    <td>{{ $item['stage'] }}</td>
+                    <td style="text-align: center;">{{ $item['qty'] }}</td>
+                    <td style="text-align: right;">Rp {{ number_format($item['wage'], 0, ',', '.') }}</td>
+                    <td style="text-align: right;">Rp {{ number_format($item['qty'] * $item['wage'], 0, ',', '.') }}</td>
+                </tr>
+                @endforeach
                 @endforeach
             </tbody>
         </table>

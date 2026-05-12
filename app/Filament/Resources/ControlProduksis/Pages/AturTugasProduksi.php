@@ -81,6 +81,9 @@ class AturTugasProduksi extends Page
             if (is_array($task->size_quantities)) {
                 foreach ($task->size_quantities as $sz => $qty) {
                     $upperSz = strtoupper($sz);
+                    if (str_starts_with($sz, '_')) {
+                        continue;
+                    }
                     if ((str_starts_with($upperSz, 'PERSON_') || !isset($maxSizes[$upperSz])) && isset($maxSizes['CUSTOM'])) {
                         $taskRow['CUSTOM'] = ($taskRow['CUSTOM'] ?? 0) + $qty;
                     } else {
@@ -168,6 +171,10 @@ class AturTugasProduksi extends Page
                                             $html .= '<div style="font-size:13px; font-weight:700; color:#111827;">' . htmlspecialchars($bahanLabel) . '</div>';
 
                                             $sablon = $details['sablon_bordir'] ?? [];
+                                            if (empty($sablon) && !empty($details['sablon_jenis'])) {
+                                                $sablon = [['jenis' => $details['sablon_jenis'], 'lokasi' => $details['sablon_lokasi'] ?? '-']];
+                                            }
+
                                             if (!empty($sablon)) {
                                                 $sblnTexts = [];
                                                 foreach ($sablon as $s) {
@@ -207,12 +214,24 @@ class AturTugasProduksi extends Page
                                                 $genders[$g]['models'][$mKey]['sizes'][$sz] = ($genders[$g]['models'][$mKey]['sizes'][$sz] ?? 0) + $ai->quantity;
                                                 if (!empty($idtl['request_tambahan'])) $genders[$g]['models'][$mKey]['notes'][] = $idtl['request_tambahan'];
 
-                                                if ($ai->size === 'Custom' && $ai->recipient_name) {
+                                                if ($ai->size === 'Custom') {
                                                     $m = [];
                                                     foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
                                                         if (!empty($idtl[$mk])) $m[] = $mk . ':' . $idtl[$mk];
                                                     }
-                                                    $genders[$g]['models'][$mKey]['custom'][] = $ai->recipient_name . (!empty($m) ? ' (' . implode(' ', $m) . ')' : '');
+                                                    if (!empty($m) || $ai->recipient_name) {
+                                                        $genders[$g]['models'][$mKey]['custom'][] = ($ai->recipient_name ?: '-') . (!empty($m) ? ' (' . implode(' ', $m) . ')' : '');
+                                                    }
+                                                }
+
+                                                if (!empty($idtl['detail_custom'])) {
+                                                    foreach ($idtl['detail_custom'] as $u) {
+                                                        $m = [];
+                                                        foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
+                                                            if (!empty($u[$mk])) $m[] = $mk . ':' . $u[$mk];
+                                                        }
+                                                        $genders[$g]['models'][$mKey]['custom'][] = ($u['nama'] ?? '-') . (!empty($m) ? ' (' . implode(' ', $m) . ')' : '');
+                                                    }
                                                 }
                                             }
 
@@ -302,8 +321,19 @@ class AturTugasProduksi extends Page
                                             $stage = $state['stage_name'] ?? null;
                                             if (!$stage) return null;
                                             $colors = \App\Models\ProductionStage::getThemeColor($stage);
+                                            
+                                            $stageId = str($stage)->slug();
+                                            
                                             return new \Illuminate\Support\HtmlString('
-                                                <span x-effect="$el.parentElement.parentElement.style.setProperty(\'background-color\', \''.$colors['bg'].'\', \'important\'); $el.parentElement.parentElement.style.setProperty(\'border-bottom\', \'2px solid '.$colors['border'].'\', \'important\'); $el.parentElement.parentElement.style.setProperty(\'border-top-left-radius\', \'12px\', \'important\'); $el.parentElement.parentElement.style.setProperty(\'border-top-right-radius\', \'12px\', \'important\');" 
+                                                <style>
+                                                    .fi-fo-repeater-item-header:has(.stage-label-'.$stageId.') {
+                                                        background-color: '.$colors['bg'].' !important;
+                                                        border-bottom: 2px solid '.$colors['border'].' !important;
+                                                        border-top-left-radius: 12px !important;
+                                                        border-top-right-radius: 12px !important;
+                                                    }
+                                                </style>
+                                                <span class="stage-label-'.$stageId.'"
                                                       style="font-weight: 900; color: '.$colors['text'].'; text-transform: uppercase; letter-spacing: 0.05em;">
                                                     ' . $stage . '
                                                 </span>
@@ -334,8 +364,8 @@ class AturTugasProduksi extends Page
                                                                 $stage = ProductionStage::where('name', $state)->first();
                                                                 if ($stage) {
                                                                     $set('wage_per_pcs', $stage->base_wage);
-                                                                    // If it's the 'Potong' stage, also set the custom wage default
-                                                                    if (str_contains(strtolower($state), 'potong')) {
+                                                                    // If it's the 'Potong' or 'Jahit' stage, also set the custom wage default
+                                                                    if (str_contains(strtolower($state), 'potong') || str_contains(strtolower($state), 'jahit')) {
                                                                         $set('wage_custom_per_pcs', $stage->base_wage);
                                                                     }
                                                                 }
@@ -362,14 +392,7 @@ class AturTugasProduksi extends Page
                                                         ->where('product_name', $item->product_name)
                                                         ->where('bahan_id', $item->bahan_id)
                                                         ->where('design_status', 'approved')
-                                                        ->get()
-                                                        ->filter(function($gi) use ($item) {
-                                                            $d1 = $item->size_and_request_details ?? [];
-                                                            $d2 = $gi->size_and_request_details ?? [];
-                                                            $keys = ['gender', 'sleeve_model', 'pocket_model', 'button_model', 'is_tunic', 'sablon_jenis', 'sablon_lokasi'];
-                                                            foreach ($keys as $k) { if (($d1[$k] ?? null) !== ($d2[$k] ?? null)) return false; }
-                                                            return true;
-                                                        });
+                                                        ->get();
 
                                                     $standardSizes = [];
                                                     $requestPerSize = [];
@@ -467,7 +490,7 @@ class AturTugasProduksi extends Page
                                                         ->label('Upah Custom per Pcs')
                                                         ->numeric()
                                                         ->prefix('Rp')
-                                                        ->visible(fn (Get $get) => $get('stage_name') === 'Potong' && (int) ($get('CUSTOM') ?? 0) > 0),
+                                                        ->visible(fn (Get $get) => (str_contains(strtolower($get('stage_name')), 'potong') || str_contains(strtolower($get('stage_name')), 'jahit')) && (int) ($get('CUSTOM') ?? 0) > 0),
                                                 ]),
 
                                             Textarea::make('description')
@@ -511,14 +534,7 @@ class AturTugasProduksi extends Page
             ->where('product_name', $item->product_name)
             ->where('bahan_id', $item->bahan_id)
             ->where('design_status', 'approved')
-            ->get()
-            ->filter(function($gi) use ($item) {
-                $d1 = $item->size_and_request_details ?? [];
-                $d2 = $gi->size_and_request_details ?? [];
-                $keys = ['gender', 'sleeve_model', 'pocket_model', 'button_model', 'is_tunic', 'sablon_jenis', 'sablon_lokasi'];
-                foreach ($keys as $k) { if (($d1[$k] ?? null) !== ($d2[$k] ?? null)) return false; }
-                return true;
-            });
+            ->get();
 
         $originalSizes = [];
         foreach ($allGroupItems as $gi) {
@@ -538,7 +554,7 @@ class AturTugasProduksi extends Page
             $stage = $taskItem['stage_name'] ?? null;
             $calculatedQty = 0;
             $sqs = [];
-            $excludeKeys = ['id', 'stage_name', 'assigned_to', 'wage_per_pcs', 'quantity', 'description', '_fill_all', 'qty'];
+            $excludeKeys = ['id', 'stage_name', 'assigned_to', 'wage_per_pcs', 'wage_custom_per_pcs', 'quantity', 'description', '_fill_all', 'qty'];
             foreach ($taskItem as $k => $v) {
                 if (!in_array($k, $excludeKeys) && is_numeric($v) && (int) $v > 0) {
                     $calculatedQty += (int) $v;

@@ -10,6 +10,7 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Grid;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -41,7 +42,27 @@ class ProductResource extends Resource
 
     public static function canAccess(): bool
     {
+        return in_array(auth()->user()->role, ['owner', 'admin', 'designer']);
+    }
+
+    public static function canCreate(): bool
+    {
         return in_array(auth()->user()->role, ['owner', 'admin']);
+    }
+
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return in_array(auth()->user()->role, ['owner', 'admin']);
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return auth()->user()->role === 'owner';
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()->role === 'owner';
     }
 
     public static function form(Schema $schema): Schema
@@ -59,8 +80,7 @@ class ProductResource extends Resource
                     ->placeholder('Contoh: Kaos, Polo, Hoodie')
                     ->maxLength(255),
 
-                ColorPicker::make('color_code')
-                    ->label('Warna'),
+
 
                 Select::make('supplier_id')
                     ->label('Supplier')
@@ -93,45 +113,79 @@ class ProductResource extends Resource
                     })
                     ->nullable(),
 
-                Repeater::make('variants')
-                    ->label('Varian Ukuran')
-                    ->relationship()
+                Repeater::make('color_matrix')
+                    ->label('Matrix Stok Baju (Warna x Ukuran)')
                     ->schema([
-                        Select::make('size')
-                            ->label('Ukuran')
-                            ->options([
-                                'XS' => 'XS',
-                                'S' => 'S',
-                                'M' => 'M',
-                                'L' => 'L',
-                                'XL' => 'XL',
-                                'XXL' => 'XXL',
-                                'XXXL' => 'XXXL',
-                                'All Size' => 'All Size',
-                            ])
-                            ->required()
-                            ->distinct()
-                            ->disableOptionsWhenSelectedInSiblingRepeaterItems(),
-                        TextInput::make('purchase_price')
-                            ->label('Harga Beli (Modal)')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->required(),
-                        TextInput::make('selling_price')
-                            ->label('Harga Jual')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->required(),
-                        TextInput::make('stock')
-                            ->label('Stok')
-                            ->numeric()
-                            ->placeholder('0')
-                            ->required(),
+                        Grid::make(9)->schema([
+                            TextInput::make('color_name')
+                                ->label('Nama Warna')
+                                ->placeholder('Hitam, Merah...')
+                                ->required()
+                                ->columnSpan(2),
+                            
+                            ColorPicker::make('color_code')
+                                ->label('Warna')
+                                ->columnSpan(1),
+                            
+                            TextInput::make('qty_xs')->label('XS')->numeric()->placeholder('0')->columnSpan(1),
+                            TextInput::make('qty_s')->label('S')->numeric()->placeholder('0')->columnSpan(1),
+                            TextInput::make('qty_m')->label('M')->numeric()->placeholder('0')->columnSpan(1),
+                            TextInput::make('qty_l')->label('L')->numeric()->placeholder('0')->columnSpan(1),
+                            TextInput::make('qty_xl')->label('XL')->numeric()->placeholder('0')->columnSpan(1),
+                            TextInput::make('qty_xxl')->label('2XL')->numeric()->placeholder('0')->columnSpan(1),
+                        ]),
                     ])
-                    ->columns(4)
                     ->defaultItems(1)
-                    ->addActionLabel('+ Tambah Varian Ukuran')
-                    ->columnSpanFull(),
+                    ->addActionLabel('+ Tambah Warna Baru')
+                    ->columnSpanFull()
+                    ->afterStateHydrated(function (Repeater $component, ?\App\Models\Product $record) {
+                        if (!$record) return;
+                        
+                        $variants = $record->variants;
+                        $matrix = [];
+                        
+                        $groupedByColor = $variants->groupBy('color_name');
+                        
+                        foreach ($groupedByColor as $color => $items) {
+                            $row = [
+                                'color_name' => $color,
+                                'color_code' => $items->first()->color_code ?? null,
+                            ];
+                            
+                            foreach ($items as $item) {
+                                $row['qty_' . strtolower($item->size)] = $item->stock;
+                            }
+                            
+                            $matrix[] = $row;
+                        }
+                        
+                        $component->state($matrix);
+                    })
+                    ->saveRelationshipsUsing(function (\App\Models\Product $record, array $state) {
+                        $record->variants()->delete();
+                        
+                        foreach ($state as $row) {
+                            $color = $row['color_name'] ?? 'Default';
+                            $code = $row['color_code'] ?? null;
+                            
+                            $sizes = ['xs', 's', 'm', 'l', 'xl', 'xxl'];
+                            
+                            foreach ($sizes as $size) {
+                                $qty = (int) ($row['qty_' . $size] ?? 0);
+                                
+                                if ($qty > 0) {
+                                    $record->variants()->create([
+                                        'color_name' => $color,
+                                        'color_code' => $code,
+                                        'size' => strtoupper($size),
+                                        'selling_price' => 0,
+                                        'purchase_price' => 0,
+                                        'stock' => $qty,
+                                    ]);
+                                }
+                            }
+                        }
+                    }),
             ]);
     }
 
@@ -147,8 +201,14 @@ class ProductResource extends Resource
                 TextColumn::make('type')
                     ->label('Jenis')
                     ->searchable(),
-                ColorColumn::make('color_code')
-                    ->label('Warna'),
+                TextColumn::make('variants.color_name')
+                    ->label('Warna Tersedia')
+                    ->badge()
+                    ->separator(', ')
+                    ->distinct(),
+                ColorColumn::make('variants.color_code')
+                    ->label('Swatch')
+                    ->circular(),
                 TextColumn::make('variants_count')
                     ->label('Varian')
                     ->counts('variants')

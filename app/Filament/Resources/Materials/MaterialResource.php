@@ -43,7 +43,27 @@ class MaterialResource extends Resource
 
     public static function canAccess(): bool
     {
+        return in_array(auth()->user()->role, ['owner', 'admin', 'designer']);
+    }
+
+    public static function canCreate(): bool
+    {
         return in_array(auth()->user()->role, ['owner', 'admin']);
+    }
+
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return in_array(auth()->user()->role, ['owner', 'admin']);
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return auth()->user()->role === 'owner';
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()->role === 'owner';
     }
 
     public static function form(Schema $schema): Schema

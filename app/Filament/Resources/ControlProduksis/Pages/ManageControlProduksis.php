@@ -57,7 +57,12 @@ class ManageControlProduksis extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            // Action telah dipindah ke ControlProduksiResource sebagai Table Action
+            Action::make('open_monitor')
+                ->label('Buka Monitor TV')
+                ->icon('heroicon-o-presentation-chart-line')
+                ->color('gray')
+                ->url(fn() => route('monitor.produksi', ['shop' => \Filament\Facades\Filament::getTenant()]))
+                ->openUrlInNewTab(),
         ];
     }
 }

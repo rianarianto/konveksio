@@ -42,8 +42,30 @@ class TaskActionController extends Controller
                 } else {
                     $newStatus = 'antrian';
                 }
+
                 if ($order->status !== $newStatus) {
+                    $oldStatus = $order->status;
                     $order->update(['status' => $newStatus]);
+
+                    // Jika baru saja jadi 'selesai', kirim notifikasi ke Admin/Owner
+                    if ($newStatus === 'selesai' && $oldStatus !== 'selesai') {
+                        $recipients = \App\Models\User::where('shop_id', $order->shop_id)
+                            ->whereIn('role', ['owner', 'admin'])
+                            ->get();
+
+                        Notification::make()
+                            ->title('Produksi Selesai! 🏁')
+                            ->body("Pesanan **{$order->order_number}** atas nama **{$order->customer->name}** telah selesai diproduksi dan siap diproses lebih lanjut.")
+                            ->success()
+                            ->icon('heroicon-o-check-badge')
+                            ->iconColor('success')
+                            ->actions([
+                                \Filament\Actions\Action::make('lihat')
+                                    ->label('Lihat Pesanan')
+                                    ->url(\App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order->id])),
+                            ])
+                            ->sendToDatabase($recipients);
+                    }
                 }
             }
         }

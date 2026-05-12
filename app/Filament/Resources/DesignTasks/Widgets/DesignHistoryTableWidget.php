@@ -288,11 +288,13 @@ class DesignHistoryTableWidget extends BaseWidget
             ->recordAction('view')
             ->recordUrl(null)
             ->defaultGroup(
-                TableGroup::make('order.order_number')
+                TableGroup::make('order_id')
                     ->label('Pesanan')
                     ->getTitleFromRecordUsing(fn(Model $record): string => $record->order->order_number . ' - ' . ($record->order->customer->name ?? 'Tanpa Nama'))
                     ->collapsible()
+                    ->orderQueryUsing(fn ($query) => $query->orderBy('order_id', 'desc'))
             )
+            ->defaultSort('order_id', 'desc')
             ->heading('Riwayat Desain (Selesai)');
     }
 }

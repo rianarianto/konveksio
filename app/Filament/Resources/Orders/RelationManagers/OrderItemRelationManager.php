@@ -189,7 +189,16 @@ class OrderItemRelationManager extends RelationManager
                                                 ->label('Custom')
                                                 ->numeric()
                                                 ->default(0)
+                                                ->live()
                                                 ->extraInputAttributes(['onclick' => 'this.select()']),
+
+                                            TextInput::make('bulk_price_custom')
+                                                ->label('Harga Khusus Custom')
+                                                ->numeric()
+                                                ->prefix('Rp')
+                                                ->placeholder(fn ($get) => $get('bulk_price') ?: '0')
+                                                ->helperText('Harga khusus untuk item ukuran Custom')
+                                                ->visible(fn ($get) => (int) ($get('qty_custom') ?? 0) > 0),
                                         ])
                                 ])
                                 ->compact()
@@ -219,13 +228,15 @@ class OrderItemRelationManager extends RelationManager
                         }
 
                         $customQty = (int) ($data['qty_custom'] ?? 0);
+                        $customPrice = (int) ($data['bulk_price_custom'] ?? $price); // Use custom price if set, otherwise fallback to default price
+
                         for ($i = 0; $i < $customQty; $i++) {
                             $items[] = [
                                 'product_name' => '',
                                 'size' => 'Custom',
                                 'production_category' => $category,
                                 'bahan_id' => $bahanId,
-                                'price' => $price,
+                                'price' => $customPrice,
                                 'quantity' => 1,
                             ];
                         }

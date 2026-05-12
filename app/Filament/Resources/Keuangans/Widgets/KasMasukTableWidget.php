@@ -36,10 +36,31 @@ class KasMasukTableWidget extends BaseWidget
 
                 TextColumn::make('order.order_number')
                     ->label('Pesanan & Pelanggan')
-                    ->formatStateUsing(fn($record) => new HtmlString(
-                        '<div style="font-weight:bold;">' . ($record->order->order_number ?? '-') . '</div>' .
-                        '<div style="color:gray; font-size:0.875rem;">' . ($record->order->customer->name ?? '-') . '</div>'
-                    ))
+                    ->formatStateUsing(function ($record) {
+                        $order = $record->order;
+                        if (!$order) return '-';
+
+                        $html = '<div class="flex flex-col">';
+                        $html .= '<div style="font-weight:bold; font-size:14px;">' . $order->order_number . '</div>';
+                        $html .= '<div style="color:gray; font-size:12px;">' . ($order->customer->name ?? '-') . '</div>';
+
+                        // Tampilkan item produk dengan gaya yang dicari
+                        if ($order->orderItems && $order->orderItems->count() > 0) {
+                            $html .= '<div class="flex flex-wrap gap-1 mt-1">';
+                            $groupedItems = $order->orderItems->groupBy(fn($item) => ($item->product_name ?: 'Item'));
+                            
+                            foreach ($groupedItems as $name => $items) {
+                                $qty = $items->sum('quantity');
+                                $html .= '<div style="padding:2px 8px; border-radius:8px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:700; border:1px solid #e5e7eb;">'
+                                    . $qty . 'x ' . $name 
+                                    . '</div>';
+                            }
+                            $html .= '</div>';
+                        }
+
+                        $html .= '</div>';
+                        return new HtmlString($html);
+                    })
                     ->searchable()
                     ->extraCellAttributes(['style' => 'vertical-align: top;']),
 

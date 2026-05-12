@@ -50,13 +50,15 @@
         }
 
         .pgl-chip {
-            padding: 6px 14px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
             background: #f3f4f6;
-            color: #374151;
+            color: #6b7280;
             border: 1px solid #e5e7eb;
+            display: inline-flex;
+            align-items: center;
         }
 
         .dark .pgl-card {
@@ -82,17 +84,60 @@
     <div class="space-y-6">
         {{-- Section 1: Statistik & Ringkasan --}}
         <div>
-            {{-- Period Selector --}}
-            <div
-                class="flex items-center gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-white/5 mb-4">
-                <span class="text-sm font-semibold text-gray-500">Periode Statistik:</span>
-                <select wire:model.live="periodo"
-                    class="text-sm border-none bg-transparent focus:ring-0 font-bold text-primary-600">
-                    <option value="hari_ini">Hari Ini</option>
-                    <option value="minggu_ini">Minggu Ini</option>
-                    <option value="bulan_ini">Bulan Ini</option>
-                    <option value="bulan_lalu">Bulan Lalu</option>
-                </select>
+            {{-- Period Selector & Custom Range (Left-aligned & Correct Colors) --}}
+            <div class="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-white/5 mb-4 shadow-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-start gap-6">
+                    {{-- Judul Periode --}}
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-primary-50 dark:bg-primary-500/10 rounded-lg">
+                            <svg class="w-4 h-4 text-primary-600" style="color: #8000FF;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        </div>
+                        <div class="min-w-[120px]">
+                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Periode</div>
+                            <div class="text-sm font-bold text-gray-800 dark:text-white leading-tight">{{ $periodoLabel }}</div>
+                        </div>
+                    </div>
+                    
+                    {{-- Button Group (Rata Kiri) --}}
+                    <div class="flex flex-wrap items-center bg-gray-50 dark:bg-white/5 p-1 rounded-xl gap-1">
+                        @foreach([
+                            'hari_ini' => 'Hari Ini',
+                            'minggu_ini' => 'Minggu Ini',
+                            'bulan_ini' => 'Bulan Ini',
+                            'bulan_lalu' => 'Bulan Lalu',
+                            'custom' => 'Custom'
+                        ] as $val => $label)
+                            <button 
+                                wire:click="$set('periodo', '{{ $val }}')"
+                                @class([
+                                    'px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all duration-200',
+                                    'text-white' => $periodo === $val,
+                                    'text-gray-500 hover:text-gray-700 dark:hover:bg-white/5' => $periodo !== $val,
+                                ])
+                                @if($periodo === $val) 
+                                    style="background-color: #8000FF !important; box-shadow: 0 4px 10px rgba(128, 0, 255, 0.3);" 
+                                @endif
+                            >
+                                {{ $label }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                @if($periodo === 'custom')
+                    <div class="mt-2 pt-2 border-gray-100 dark:border-white/5 flex flex-wrap items-center justify-start gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold text-gray-400 uppercase">Dari:</span>
+                            <input type="date" wire:model.live="dari_tgl" 
+                                class="bg-gray-50 dark:bg-gray-800 border-none rounded-lg text-xs font-semibold py-1.5 px-3 focus:ring-1 focus:ring-primary-200 transition-all">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold text-gray-400 uppercase">Sampai:</span>
+                            <input type="date" wire:model.live="sampai_tgl" 
+                                class="bg-gray-50 dark:bg-gray-800 border-none rounded-lg text-xs font-semibold py-1.5 px-3 focus:ring-1 focus:ring-primary-200 transition-all">
+                        </div>
+                    </div>
+                @endif
             </div>
 
             {{-- Stat Cards --}}
@@ -151,6 +196,7 @@
             <div class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Catatan Pengeluaran (Jurnal)
             </div>
             {{ $this->table }}
+        </div>
         </div>
     </div>
 </x-filament-panels::page>

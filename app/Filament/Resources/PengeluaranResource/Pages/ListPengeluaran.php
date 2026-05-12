@@ -18,6 +18,8 @@ class ListPengeluaran extends ListRecords
     protected string $view = 'filament.resources.pengeluaran.pages.list-pengeluaran';
 
     public string $periodo = 'bulan_ini';
+    public ?string $dari_tgl = null;
+    public ?string $sampai_tgl = null;
 
     public function getViewData(): array
     {
@@ -26,10 +28,14 @@ class ListPengeluaran extends ListRecords
 
         // Determine date range
         [$dari, $sampai] = match ($this->periodo) {
-            'hari_ini' => [Carbon::today(), Carbon::today()],
+            'hari_ini' => [Carbon::today()->startOfDay(), Carbon::today()->endOfDay()],
             'minggu_ini' => [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()],
             'bulan_ini' => [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()],
             'bulan_lalu' => [$now->copy()->subMonth()->startOfMonth(), $now->copy()->subMonth()->endOfMonth()],
+            'custom' => [
+                $this->dari_tgl ? Carbon::parse($this->dari_tgl)->startOfDay() : Carbon::now()->startOfMonth(),
+                $this->sampai_tgl ? Carbon::parse($this->sampai_tgl)->endOfDay() : Carbon::now()->endOfDay(),
+            ],
             default => [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()],
         };
 
@@ -40,9 +46,9 @@ class ListPengeluaran extends ListRecords
             ->get();
 
         $totalOperasional = $expenses->where('note', '!=', 'Kasbon Karyawan')
-            ->where('note', '!=', 'Gaji/Upah')->sum('amount');
+            ->where('note', '!=', 'Gaji / Upah')->sum('amount');
         $totalKasbonExpense = $expenses->where('note', 'Kasbon Karyawan')->sum('amount');
-        $totalGajiExpense = $expenses->where('note', 'Gaji/Upah')->sum('amount');
+        $totalGajiExpense = $expenses->where('note', 'Gaji / Upah')->sum('amount');
         $totalAllExpenses = $expenses->sum('amount');
 
         // ── 2. Upah Tukang Borongan (dari production_tasks yang done) ──
@@ -76,9 +82,12 @@ class ListPengeluaran extends ListRecords
             'breakdown' => $breakdown,
             'periodoLabel' => match ($this->periodo) {
                 'hari_ini' => 'Hari Ini (' . Carbon::today()->translatedFormat('d M Y') . ')',
-                'minggu_ini' => 'Minggu Ini',
+                'minggu_ini' => 'Minggu Ini (' . $dari->translatedFormat('d M') . ' - ' . $sampai->translatedFormat('d M Y') . ')',
                 'bulan_ini' => Carbon::now()->translatedFormat('F Y'),
                 'bulan_lalu' => Carbon::now()->subMonth()->translatedFormat('F Y'),
+                'custom' => ($this->dari_tgl && $this->sampai_tgl) 
+                    ? Carbon::parse($this->dari_tgl)->translatedFormat('d M Y') . ' - ' . Carbon::parse($this->sampai_tgl)->translatedFormat('d M Y')
+                    : 'Pilih Rentang Tanggal',
                 default => Carbon::now()->translatedFormat('F Y'),
             },
         ];

@@ -121,11 +121,6 @@ class ControlProduksiResource extends Resource
                                 ->where('product_name', $record->product_name)
                                 ->where('bahan_id', $record->bahan_id)
                                 ->where('design_status', 'approved');
-                                
-                            $keys = ['gender', 'sleeve_model', 'pocket_model', 'button_model', 'is_tunic', 'sablon_jenis', 'sablon_lokasi'];
-                            foreach ($keys as $k) {
-                                $query->where('size_and_request_details->' . $k, $details[$k] ?? null);
-                            }
                             
                             return $query->sum('quantity');
                         })()
@@ -212,7 +207,7 @@ class ControlProduksiResource extends Resource
             ])
             ->actions([
                 ActionGroup::make([
-                Action::make('update_progress')
+                    Action::make('update_progress')
                     ->hidden(fn(OrderItem $record) => $record->productionTasks()->where('status', '!=', 'done')->count() === 0)
                     ->label('Update Progress')
                     ->icon('heroicon-o-arrow-path')
@@ -383,6 +378,7 @@ class ControlProduksiResource extends Resource
                             $pck = strtoupper(str_replace('_', ' ', $d['pocket_model'] ?? 'TANPA SAKU'));
                             $btn = strtoupper($d['button_model'] ?? 'BIASA');
                             $tun = !empty($d['is_tunic']) ? 'TUNIK' : 'STANDAR';
+                            $stk = !empty($d['use_stock']) ? 'YES' : 'NO';
                             
                             // Detailed Sablon/Bordir info
                             $sbList = [];
@@ -390,6 +386,8 @@ class ControlProduksiResource extends Resource
                                 foreach ($d['sablon_bordir'] as $sb) {
                                     $sbList[] = strtoupper($sb['jenis'] ?? '') . " (" . strtoupper($sb['lokasi'] ?? '') . ")";
                                 }
+                            } elseif (!empty($d['sablon_jenis'])) {
+                                $sbList[] = strtoupper($d['sablon_jenis']) . " (" . strtoupper($d['sablon_lokasi'] ?? '-') . ")";
                             }
                             sort($sbList);
                             $sbStr = implode(' | ', $sbList);
@@ -404,7 +402,7 @@ class ControlProduksiResource extends Resource
                             sort($reqList);
                             $reqStr = implode(' | ', $reqList);
 
-                            $groupKey = "{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$sbStr}|{$reqStr}";
+                            $groupKey = "{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$sbStr}|{$reqStr}|{$stk}";
                             
                             if (!isset($specGroups[$groupKey])) {
                                 $specGroups[$groupKey] = [
@@ -413,6 +411,7 @@ class ControlProduksiResource extends Resource
                                     'pocket' => $pck,
                                     'button' => $btn,
                                     'tunic' => $tun,
+                                    'use_stock' => ($stk === 'YES'),
                                     'sablon_bordir' => $sbList,
                                     'requests' => $reqList,
                                     'total_qty' => 0,
