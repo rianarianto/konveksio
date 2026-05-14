@@ -677,9 +677,13 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             if ($cQty > 0) {
                                 $customVariantId = ($category === 'produksi') ? ($data['bulk_material_variant_id'] ?? null) : null;
                                 $customUseStock = ($category === 'produksi' && filled($data['bulk_stock_qty'] ?? null));
-                                $customStockUsed = $customUseStock ? ($data['bulk_stock_qty'] / $totalToGenerate) : 0;
 
                                 for ($i = 0; $i < $cQty; $i++) {
+                                    // Gunakan $isFirstItem & $remainingStockToStore yang sama dari loop utama
+                                    $customStockUsed = ($isFirstItem && $customUseStock) ? $remainingStockToStore : 0;
+                                    $isFirstItem = false;
+                                    $remainingStockToStore = 0;
+
                                     $this->order->orderItems()->create([
                                         'product_name' => $productName,
                                         'production_category' => $category,
