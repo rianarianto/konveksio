@@ -269,8 +269,8 @@ class AturTugasProduksi extends Page
                                                         }
                                                         $html .= '<div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; font-weight:700; margin-bottom:8px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
                                                         $stxt = [];
-                                                        foreach ($mData['sizes'] as $sqty) {
-                                                            $stxt[] = '<div style="padding:4px 8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:4px; font-size:12px; font-weight:800; color:#1e293b;">' . $sz . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
+                                                        foreach ($mData['sizes'] as $szKey => $sqty) {
+                                                            $stxt[] = '<div style="padding:4px 8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:4px; font-size:12px; font-weight:800; color:#1e293b;">' . htmlspecialchars($szKey) . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
                                                         }
                                                         $html .= '<div style="display:flex; flex-wrap:wrap; gap:6px;">' . implode('', $stxt) . '</div>';
                                                         if (!empty($mData['custom'])) {
