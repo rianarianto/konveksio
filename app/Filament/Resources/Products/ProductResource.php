@@ -11,6 +11,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -68,76 +69,91 @@ class ProductResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
+            ->columns(1)
             ->components([
-                TextInput::make('name')
-                    ->label('Nama Barang')
-                    ->placeholder('Contoh: Kaos Polos Premium')
-                    ->required()
-                    ->maxLength(255),
-
-                TextInput::make('type')
-                    ->label('Jenis Barang')
-                    ->placeholder('Contoh: Kaos, Polo, Hoodie')
-                    ->maxLength(255),
-
-
-
-                Select::make('supplier_id')
-                    ->label('Supplier')
-                    ->relationship('supplier', 'name')
-                    ->searchable()
-                    ->preload()
-                    ->createOptionForm([
-                        TextInput::make('name')
-                            ->label('Nama Supplier')
-                            ->required(),
-                        TextInput::make('phone')
-                            ->label('No. HP')
-                            ->tel(),
-                        Select::make('type')
-                            ->label('Kategori')
-                            ->options([
-                                'Kain' => '🧵 Kain',
-                                'Aksesoris' => '🪡 Aksesoris',
-                                'Baju Jadi' => '👕 Baju Jadi',
-                                'Lainnya' => '📦 Lainnya',
-                            ]),
-                    ])
-                    ->createOptionUsing(function (array $data): int {
-                        return Supplier::create([
-                            'shop_id' => Filament::getTenant()->id,
-                            'name' => $data['name'],
-                            'phone' => $data['phone'] ?? null,
-                            'type' => $data['type'] ?? null,
-                        ])->getKey();
-                    })
-                    ->nullable(),
-
-                Repeater::make('color_matrix')
-                    ->label('Matrix Stok Baju (Warna x Ukuran)')
+                Section::make('Informasi Dasar Baju')
+                    ->columns(3)
                     ->schema([
-                        Grid::make(9)->schema([
-                            TextInput::make('color_name')
-                                ->label('Nama Warna')
-                                ->placeholder('Hitam, Merah...')
-                                ->required()
-                                ->columnSpan(2),
-                            
-                            ColorPicker::make('color_code')
-                                ->label('Warna')
-                                ->columnSpan(1),
-                            
-                            TextInput::make('qty_xs')->label('XS')->numeric()->placeholder('0')->columnSpan(1),
-                            TextInput::make('qty_s')->label('S')->numeric()->placeholder('0')->columnSpan(1),
-                            TextInput::make('qty_m')->label('M')->numeric()->placeholder('0')->columnSpan(1),
-                            TextInput::make('qty_l')->label('L')->numeric()->placeholder('0')->columnSpan(1),
-                            TextInput::make('qty_xl')->label('XL')->numeric()->placeholder('0')->columnSpan(1),
-                            TextInput::make('qty_xxl')->label('2XL')->numeric()->placeholder('0')->columnSpan(1),
-                        ]),
-                    ])
-                    ->defaultItems(1)
-                    ->addActionLabel('+ Tambah Warna Baru')
-                    ->columnSpanFull()
+                        TextInput::make('name')
+                            ->label('Nama Baju')
+                            ->placeholder('Contoh: Kaos Polos Premium')
+                            ->required()
+                            ->maxLength(255),
+
+                        TextInput::make('type')
+                            ->label('Jenis Baju')
+                            ->placeholder('Contoh: Kaos, Polo, Hoodie')
+                            ->maxLength(255),
+
+                        Select::make('supplier_id')
+                            ->label('Supplier')
+                            ->relationship('supplier', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->createOptionForm([
+                                TextInput::make('name')
+                                    ->label('Nama Supplier')
+                                    ->required(),
+                                TextInput::make('phone')
+                                    ->label('No. HP')
+                                    ->tel(),
+                                Select::make('type')
+                                    ->label('Kategori')
+                                    ->options([
+                                        'Kain' => '🧵 Kain',
+                                        'Aksesoris' => '🪡 Aksesoris',
+                                        'Baju Jadi' => '👕 Baju Jadi',
+                                        'Lainnya' => '📦 Lainnya',
+                                    ]),
+                            ])
+                            ->createOptionUsing(function (array $data): int {
+                                return \App\Models\Supplier::create([
+                                    'shop_id' => Filament::getTenant()->id,
+                                    'name' => $data['name'],
+                                    'phone' => $data['phone'] ?? null,
+                                    'type' => $data['type'] ?? null,
+                                ])->getKey();
+                            })
+                            ->nullable(),
+                    ]),
+
+                Section::make('Varian Warna & Stok')
+                    ->schema([
+                        Repeater::make('color_matrix')
+                            ->label('Matrix Stok Baju (Warna x Ukuran)')
+                            ->schema(function () {
+                                $storeSizes = \App\Models\StoreSize::where('shop_id', Filament::getTenant()->id)
+                                    ->where('is_active', true)
+                                    ->orderBy('sort_order')
+                                    ->get();
+
+                                return [
+                                    Grid::make(3)->schema([
+                                        TextInput::make('color_name')
+                                            ->label('Nama Warna')
+                                            ->placeholder('Hitam, Merah...')
+                                            ->required(),
+                                        
+                                        ColorPicker::make('color_code')
+                                            ->label('Warna'),
+                                    ]),
+
+                                    Grid::make($storeSizes->count() ?: 1)->schema(
+                                        $storeSizes->map(function ($size) {
+                                            return TextInput::make('qty_' . strtolower($size->name))
+                                                ->label($size->name)
+                                                ->numeric()
+                                                ->placeholder('0');
+                                        })->toArray()
+                                    ),
+                                ];
+                            })
+                            ->collapsible()
+                            ->collapsed()
+                            ->itemLabel(fn (array $state): ?string => $state['color_name'] ?? null)
+                            ->defaultItems(1)
+                            ->addActionLabel('+ Tambah Warna Baru')
+                            ->columnSpanFull()
                     ->afterStateHydrated(function (Repeater $component, ?\App\Models\Product $record) {
                         if (!$record) return;
                         
@@ -164,20 +180,23 @@ class ProductResource extends Resource
                     ->saveRelationshipsUsing(function (\App\Models\Product $record, array $state) {
                         $record->variants()->delete();
                         
+                        $storeSizes = \App\Models\StoreSize::where('shop_id', Filament::getTenant()->id)
+                            ->where('is_active', true)
+                            ->pluck('name')
+                            ->toArray();
+
                         foreach ($state as $row) {
                             $color = $row['color_name'] ?? 'Default';
                             $code = $row['color_code'] ?? null;
                             
-                            $sizes = ['xs', 's', 'm', 'l', 'xl', 'xxl'];
-                            
-                            foreach ($sizes as $size) {
-                                $qty = (int) ($row['qty_' . $size] ?? 0);
+                            foreach ($storeSizes as $sizeName) {
+                                $qty = (int) ($row['qty_' . strtolower($sizeName)] ?? 0);
                                 
                                 if ($qty > 0) {
                                     $record->variants()->create([
                                         'color_name' => $color,
                                         'color_code' => $code,
-                                        'size' => strtoupper($size),
+                                        'size' => $sizeName,
                                         'selling_price' => 0,
                                         'purchase_price' => 0,
                                         'stock' => $qty,
@@ -186,7 +205,8 @@ class ProductResource extends Resource
                             }
                         }
                     }),
-            ]);
+            ]),
+        ]);
     }
 
     public static function table(Table $table): Table
@@ -195,7 +215,7 @@ class ProductResource extends Resource
             ->modifyQueryUsing(fn(\Illuminate\Database\Eloquent\Builder $query) => $query->with('supplier'))
             ->columns([
                 TextColumn::make('name')
-                    ->label('Nama Barang')
+                    ->label('Nama Baju')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('type')
@@ -205,10 +225,10 @@ class ProductResource extends Resource
                     ->label('Warna Tersedia')
                     ->badge()
                     ->separator(', ')
-                    ->distinct(),
+                    ->getStateUsing(fn ($record) => $record->variants->pluck('color_name')->unique()->toArray()),
                 ColorColumn::make('variants.color_code')
                     ->label('Swatch')
-                    ->circular(),
+                    ->getStateUsing(fn ($record) => $record->variants->pluck('color_code')->unique()->toArray()),
                 TextColumn::make('variants_count')
                     ->label('Varian')
                     ->counts('variants')

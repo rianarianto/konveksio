@@ -62,14 +62,15 @@ class OrderItem extends Model
     {
         DB::transaction(function () use ($oldDetails, $newDetails) {
             // --- A. PENANGANAN BAHAN BAKU (PRODUKSI/CUSTOM) ---
-            $oldBahanId = $oldDetails['bahan'] ?? null;
-            $oldBahanUsage = (float) ($oldDetails['bahan_usage'] ?? 0);
+            // Support both old keys ('bahan', 'bahan_usage') and new keys ('material_variant_id', 'stock_qty_used')
+            $oldBahanId = $oldDetails['material_variant_id'] ?? $oldDetails['bahan'] ?? $this->getOriginal('bahan_id');
+            $oldBahanUsage = (float) ($oldDetails['stock_qty_used'] ?? $oldDetails['bahan_usage'] ?? 0);
             
-            $newBahanId = $newDetails['bahan'] ?? null;
-            $newBahanUsage = (float) ($newDetails['bahan_usage'] ?? 0);
+            $newBahanId = $newDetails['material_variant_id'] ?? $newDetails['bahan'] ?? $this->bahan_id;
+            $newBahanUsage = (float) ($newDetails['stock_qty_used'] ?? $newDetails['bahan_usage'] ?? 0);
 
             // Jika ada perubahan bahan atau jumlah pemakaian
-            if ($oldBahanId !== $newBahanId || $oldBahanUsage !== $newBahanUsage) {
+            if ($oldBahanId != $newBahanId || $oldBahanUsage != $newBahanUsage) {
                 // Refund data lama jika ada
                 if ($oldBahanId && $oldBahanUsage > 0) {
                     MaterialVariant::where('id', $oldBahanId)->increment('current_stock', $oldBahanUsage);
@@ -81,14 +82,27 @@ class OrderItem extends Model
             }
 
             // --- B. PENANGANAN BAJU JADI (NON-PRODUKSI) ---
+            // 1. Handle New Format (One Variant per Row via product_variant_id)
+            $oldVariantId = $oldDetails['product_variant_id'] ?? null;
+            $newVariantId = $newDetails['product_variant_id'] ?? null;
+            $qty = $this->quantity ?: 1;
+
+            if ($oldVariantId !== $newVariantId) {
+                if ($oldVariantId) {
+                    ProductVariant::where('id', $oldVariantId)->increment('stock', $qty);
+                }
+                if ($newVariantId) {
+                    ProductVariant::where('id', $newVariantId)->decrement('stock', $qty);
+                }
+            }
+
+            // 2. Handle Old/Legacy Format (Bulk Variants in 'varian_ukuran')
             $oldProduct = $oldDetails['supplier_product'] ?? null;
             $oldVariants = $oldDetails['varian_ukuran'] ?? [];
-            
             $newProduct = $newDetails['supplier_product'] ?? null;
             $newVariants = $newDetails['varian_ukuran'] ?? [];
 
-            // 1. Refund semua stok varian lama
-            if ($oldProduct) {
+            if ($oldProduct && count($oldVariants) > 0) {
                 foreach ($oldVariants as $ov) {
                     $sz = $ov['ukuran'] ?? null;
                     $usage = (int) ($ov['stok_digunakan'] ?? 0);
@@ -100,8 +114,7 @@ class OrderItem extends Model
                 }
             }
 
-            // 2. Potong stok varian baru
-            if ($newProduct) {
+            if ($newProduct && count($newVariants) > 0) {
                 foreach ($newVariants as $nv) {
                     $sz = $nv['ukuran'] ?? null;
                     $usage = (int) ($nv['stok_digunakan'] ?? 0);

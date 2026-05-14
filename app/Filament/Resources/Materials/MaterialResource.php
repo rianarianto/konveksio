@@ -69,6 +69,7 @@ class MaterialResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
+            ->columns(1)
             ->components([
                 Section::make('Informasi Dasar Bahan')
                     ->columns(2)
@@ -148,14 +149,10 @@ class MaterialResource extends Resource
                                             ->numeric()
                                             ->default(0)
                                             ->required(),
-                                        TextInput::make('min_stock')
-                                            ->label('Stok Min.')
-                                            ->numeric()
-                                            ->default(0)
-                                            ->required(),
                                     ]),
                             ])
                             ->collapsible()
+                            ->collapsed()
                             ->defaultItems(1)
                             ->itemLabel(fn(array $state): ?string => $state['color_name'] ?? null),
                     ]),

@@ -109,13 +109,18 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     CASE 
                                         WHEN production_category = 'non_produksi' THEN COALESCE(product_variants.color_name, 'Tanpa Warna')
                                         ELSE COALESCE(materials.name, 'Tanpa Bahan')
-                                    END, ' | ',
+                                    END,
                                     CASE 
                                         WHEN production_category = 'non_produksi' THEN ''
-                                        ELSE COALESCE(material_variants.color_name, 'Tanpa Warna')
-                                    END, ' | ',
-                                    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_jenis')), 'Tanpa Sablon/Bordir'), ' - ',
-                                    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_lokasi')), '-')
+                                        ELSE CONCAT(' | ', COALESCE(material_variants.color_name, 'Tanpa Warna'))
+                                    END,
+                                    CASE 
+                                        WHEN production_category = 'non_produksi' OR JSON_EXTRACT(size_and_request_details, '$.sablon_jenis') IS NULL THEN ''
+                                        ELSE CONCAT(' | ', 
+                                            COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_jenis')), 'Tanpa Sablon/Bordir'), ' - ',
+                                            COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_lokasi')), '-')
+                                        )
+                                    END
                                 ) as item_group_identity
                             "),
                         'order_items'
@@ -246,15 +251,27 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                                                     if ($category === 'non_produksi') {
                                                         // Restore Baju Jadi specs
-                                                        $set('bulk_product_id', $existing->product_id);
-                                                        // Get color from the product_variant_id stored in details
                                                         $variantId = $details['product_variant_id'] ?? null;
+                                                        $productId = $details['supplier_product'] ?? null;
+                                                        
+                                                        // Fallback for older items that only stored variant_id
+                                                        if (!$productId && $variantId) {
+                                                            $productId = \App\Models\ProductVariant::find($variantId)?->product_id;
+                                                        }
+
+                                                        $set('bulk_product_id', (string) $productId);
+                                                        $set('bulk_price_non', $existing->price);
+                                                        
                                                         if ($variantId) {
                                                             $colorName = \App\Models\ProductVariant::find($variantId)?->color_name;
                                                             $set('bulk_product_color', $colorName);
                                                         }
+                                                    } elseif ($category === 'jasa') {
+                                                        $set('bulk_price_jasa', $existing->price);
+                                                        $set('bulk_qty_jasa', $existing->quantity);
                                                     } else {
                                                         // Restore Konveksi specs
+                                                        $set('bulk_price', $existing->price);
                                                         $set('bulk_bahan', $existing->bahan_id);
                                                         $set('bulk_material_variant_id', $details['material_variant_id'] ?? null);
                                                         $set('bulk_gender', $details['gender'] ?? 'L');
@@ -412,21 +429,37 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                                         // For Baju Jadi: only show sizes that exist for selected product+color
                                         if ($category === 'non_produksi' && $productId && $colorName) {
-                                            $availableVariants = \App\Models\ProductVariant::where('product_id', $productId)
+                                            $variants = \App\Models\ProductVariant::where('product_id', $productId)
                                                 ->where('color_name', $colorName)
                                                 ->get()
                                                 ->keyBy('size');
 
-                                            if ($availableVariants->isNotEmpty()) {
-                                                return $availableVariants->map(function ($variant) {
-                                                    return TextInput::make("qty_{$variant->size}")
-                                                        ->label($variant->size)
-                                                        ->numeric()
-                                                        ->placeholder('0')
-                                                        ->helperText("Stok: {$variant->stock} pcs")
-                                                        ->extraInputAttributes(['onclick' => 'this.select()']);
-                                                })->values()->toArray();
-                                            }
+                                            return collect($sizeOptions)->map(function ($label, $key) use ($variants, $productId) {
+                                                $variant = $variants->get($key);
+                                                if (!$variant) return null;
+
+                                                // Calculate stock used in current order for this variant
+                                                $usedInOrder = OrderItem::where('order_id', $this->order->id)
+                                                    ->where('production_category', 'non_produksi')
+                                                    ->get()
+                                                    ->filter(fn($item) => ($item->size_and_request_details['product_variant_id'] ?? null) == $variant->id)
+                                                    ->count();
+                                                
+                                                $available = max(0, $variant->stock - $usedInOrder);
+
+                                                return TextInput::make("qty_{$key}")
+                                                    ->label($label)
+                                                    ->numeric()
+                                                    ->placeholder('0')
+                                                    ->helperText(function() use ($available, $usedInOrder) {
+                                                        $text = "Tersedia: {$available} pcs";
+                                                        if ($usedInOrder > 0) {
+                                                            $text .= " (Terpakai {$usedInOrder} di pesanan ini)";
+                                                        }
+                                                        return $text;
+                                                    })
+                                                    ->extraInputAttributes(['onclick' => 'this.select()']);
+                                            })->filter()->values()->toArray();
                                         }
 
                                         // For Konveksi: show all standard sizes + custom
@@ -499,6 +532,25 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     $variantId = $v?->id;
                                     $useStock = (bool) $variantId;
                                     $stockQtyUsed = $useStock ? 1 : 0;
+
+                                    if ($useStock) {
+                                        // Real-time stock validation
+                                        $usedInOrder = OrderItem::where('order_id', $this->order->id)
+                                            ->get()
+                                            ->filter(fn($item) => ($item->size_and_request_details['product_variant_id'] ?? null) == $variantId)
+                                            ->count();
+                                        
+                                        $available = max(0, $v->stock - $usedInOrder);
+
+                                        if ($qty > $available) {
+                                            Notification::make()
+                                                ->title("Stok tidak cukup untuk {$v->color_name} - {$v->size}!")
+                                                ->body("Tersedia: {$available} pcs. Anda mencoba menambah {$qty} pcs.")
+                                                ->danger()
+                                                ->send();
+                                            return; // Halt the whole bulk process for safety
+                                        }
+                                    }
                                 }
 
                                 for ($i = 0; $i < $qty; $i++) {
@@ -506,7 +558,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         'product_name' => $productName,
                                         'production_category' => $category,
                                         'bahan_id' => ($category === 'produksi') ? ($data['bulk_bahan'] ?? null) : null,
-                                        'product_id' => ($category === 'non_produksi') ? ($data['bulk_product_id'] ?? null) : null,
                                         'size' => $key,
                                         'price' => (int) ($category === 'produksi' ? ($data['bulk_price'] ?? 0) : ($data['bulk_price_non'] ?? 0)),
                                         'quantity' => 1,
@@ -520,6 +571,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
                                             'material_variant_id' => ($category === 'produksi') ? $variantId : null,
                                             'product_variant_id' => ($category === 'non_produksi') ? $variantId : null,
+                                            'supplier_product' => ($category === 'non_produksi') ? ($data['bulk_product_id'] ?? null) : null,
                                             'use_stock' => $useStock,
                                             'stock_qty_used' => $stockQtyUsed,
                                         ],
