@@ -91,6 +91,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             ->leftJoin('product_variants', function($join) {
                                 $join->on(\Illuminate\Support\Facades\DB::raw("JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.product_variant_id'))"), '=', 'product_variants.id');
                             })
+                            ->leftJoin('products', 'product_variants.product_id', '=', 'products.id')
                             ->select('order_items.*')
                             ->selectRaw('materials.name as bahan_name')
                             ->selectRaw('COALESCE(material_variants.color_name, product_variants.color_name) as varian_warna')
@@ -107,13 +108,11 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ELSE 'Konveksi' 
                                     END, ' | ',
                                     CASE 
-                                        WHEN production_category = 'non_produksi' THEN COALESCE(product_variants.color_name, 'Tanpa Warna')
+                                        WHEN production_category = 'non_produksi' THEN COALESCE(products.name, 'Tanpa Katalog')
                                         ELSE COALESCE(materials.name, 'Tanpa Bahan')
                                     END,
-                                    CASE 
-                                        WHEN production_category = 'non_produksi' THEN ''
-                                        ELSE CONCAT(' | ', COALESCE(material_variants.color_name, 'Tanpa Warna'))
-                                    END,
+                                    ' | ',
+                                    COALESCE(material_variants.color_name, product_variants.color_name, 'Tanpa Warna'),
                                     CASE 
                                         WHEN production_category = 'non_produksi' OR JSON_EXTRACT(size_and_request_details, '$.sablon_jenis') IS NULL THEN ''
                                         ELSE CONCAT(' | ', 
@@ -179,15 +178,14 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->collapsible()
                     ->getTitleFromRecordUsing(function (OrderItem $record) {
                         $title = $record->item_group_identity;
-                        $useStock = $record->size_and_request_details['use_stock'] ?? false;
                         
-                        if ($useStock) {
-                            $totalStockUsed = OrderItem::where('order_id', $this->order->id)
-                                ->where('product_name', $record->product_name)
-                                ->where('production_category', $record->production_category)
-                                ->get()
-                                ->sum(fn($item) => (float) ($item->size_and_request_details['stock_qty_used'] ?? 0));
+                        // Hitung total stok yang terpakai untuk SELURUH grup ini
+                        $totalStockUsed = OrderItem::where('order_id', $this->order->id)
+                            ->get()
+                            ->filter(fn($item) => $item->item_group_identity === $record->item_group_identity)
+                            ->sum(fn($item) => (float) ($item->size_and_request_details['stock_qty_used'] ?? 0));
 
+                        if ($totalStockUsed > 0) {
                             $unit = 'pcs';
                             if ($record->production_category === 'produksi' && $record->bahan_id) {
                                 $unit = \App\Models\Material::find($record->bahan_id)?->unit ?? 'm';
@@ -203,11 +201,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 $parts[count($parts) - 1] .= ' ' . $stockIndicator;
                             }
                             
-                            $newTitle = implode(' | ', $parts);
-                            return new \Illuminate\Support\HtmlString("<span class='flex items-center gap-1.5'>{$newTitle}</span>");
+                            $title = implode(' | ', $parts);
                         }
                         
-                        return $title;
+                        return new \Illuminate\Support\HtmlString("<span class='flex items-center gap-1.5'>{$title}</span>");
                     })
             )
             ->headerActions([
@@ -393,7 +390,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->label('Pilih Produk Katalog')
                                             ->options(Product::where('shop_id', $tenantId)->pluck('name', 'id'))
                                             ->searchable()->live()
-                                            ->afterStateUpdated(fn($state, Set $set) => $set('bulk_product_name', Product::find($state)?->name))
                                             ->visible(fn(Get $get) => $get('bulk_category') === 'non_produksi'),
                                         
                                         Select::make('bulk_product_color')
