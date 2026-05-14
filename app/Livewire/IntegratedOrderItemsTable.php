@@ -138,6 +138,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                 SelectColumn::make('size')
                     ->label('Size')
                     ->options($sizeOptions + ['Custom' => 'Ukur Badan'])
+                    ->disabled(fn(OrderItem $record) => $record->production_category === 'jasa')
+                    ->placeholder(fn(OrderItem $record) => $record->production_category === 'jasa' ? '-' : 'Pilih')
+                    ->selectablePlaceholder(false)
                     ->sortable(),
 
                 SelectColumn::make('gender')
