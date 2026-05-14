@@ -193,7 +193,7 @@
                 <div class="receipt-title">Kuitansi</div>
                 <div class="info-value" style="color: #7F00FF; font-size: 16px;">
                     @if($order->is_express)
-                        <span style="color: #d12; font-weight: 900; font-size: 14px;">⚡ EXPRESS</span>
+                        <span style="color: #d12; font-weight: 900; font-size: 14px;">EXPRESS</span>
                     @endif
                     {{ $order->order_number }}
                 </div>
@@ -241,6 +241,8 @@
                         // Collect all sizes in this group
                         $sizeBreakdown = [];
                         $materials = [];
+                        $catalogProducts = [];
+                        $colors = [];
                         $categories = [];
 
                         foreach ($itemsGroup as $item) {
@@ -248,11 +250,29 @@
                             if ($sz === 'Custom') {
                                 $sz = 'Ukur Badan';
                             }
-                            $sizeBreakdown[$sz] = ($sizeBreakdown[$sz] ?? 0) + $item->quantity;
+                            
+                            // Hanya masukkan ke breakdown jika bukan Jasa atau jika ada ukuran nyata
+                            if ($item->production_category !== 'jasa' || ($sz !== '-' && $sz !== '')) {
+                                $sizeBreakdown[$sz] = ($sizeBreakdown[$sz] ?? 0) + $item->quantity;
+                            }
                             
                             if ($item->bahan_id) {
                                 $bahanName = \App\Models\Material::find($item->bahan_id)?->name ?? 'Bahan';
                                 $materials[$bahanName] = true;
+                            }
+
+                            // Ambil data Katalog & Warna (untuk Baju Jadi/Konveksi)
+                            $details = $item->size_and_request_details ?? [];
+                            $variantId = $details['product_variant_id'] ?? $details['material_variant_id'] ?? null;
+                            if ($variantId) {
+                                if ($item->production_category === 'non_produksi') {
+                                    $v = \App\Models\ProductVariant::with('product')->find($variantId);
+                                    if ($v?->product) $catalogProducts[$v->product->name] = true;
+                                    if ($v?->color_name) $colors[$v->color_name] = true;
+                                } else {
+                                    $v = \App\Models\MaterialVariant::find($variantId);
+                                    if ($v?->color_name) $colors[$v->color_name] = true;
+                                }
                             }
 
                             $cat = match ($item->production_category) {
@@ -270,9 +290,10 @@
                         }
                         $sizeSummary = implode(', ', $sizeStrings);
                         $materialSummary = implode(', ', array_keys($materials));
+                        $catalogSummary = implode(', ', array_keys($catalogProducts));
+                        $colorSummary = implode(', ', array_keys($colors));
                         $categorySummary = implode(', ', array_keys($categories));
                         
-                        // Assume unit price is the same if it's the same product name
                         $unitPrice = $itemsGroup->first()->price;
                     @endphp
                     <tr>
@@ -281,10 +302,18 @@
                             <div class="item-name">{{ $productName }}</div>
                             <div class="item-badge">{{ $categorySummary }}</div>
                             <div class="item-details">
+                                @if($catalogSummary)
+                                    <div>Produk: {{ $catalogSummary }}</div>
+                                @endif
                                 @if($materialSummary)
                                     <div>Bahan: {{ $materialSummary }}</div>
                                 @endif
-                                <div>Ukuran: {{ $sizeSummary }}</div>
+                                @if($colorSummary)
+                                    <div>Warna: {{ $colorSummary }}</div>
+                                @endif
+                                @if($sizeSummary)
+                                    <div>Ukuran: {{ $sizeSummary }}</div>
+                                @endif
                             </div>
                         </td>
                         <td style="text-align: center; font-weight: bold;">{{ $totalQty }}</td>

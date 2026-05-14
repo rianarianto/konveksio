@@ -105,10 +105,12 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     CASE 
                                         WHEN production_category = 'custom' THEN 'Konveksi (Ukur)' 
                                         WHEN production_category = 'non_produksi' THEN 'Baju Jadi'
+                                        WHEN production_category = 'jasa' THEN 'Jasa'
                                         ELSE 'Konveksi' 
                                     END, ' | ',
                                     CASE 
                                         WHEN production_category = 'non_produksi' THEN COALESCE(products.name, 'Tanpa Katalog')
+                                        WHEN production_category = 'jasa' THEN 'Layanan Jasa'
                                         ELSE COALESCE(materials.name, 'Tanpa Bahan')
                                     END,
                                     ' | ',

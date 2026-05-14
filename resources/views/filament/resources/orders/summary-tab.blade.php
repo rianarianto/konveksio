@@ -65,7 +65,9 @@
                     <div style="flex:1;min-width:0;">
                         <div style="font-size:15px;font-weight:600;color:#1f2937;">
                             {{ $totalQty }}x {{ $name }} 
+                            @if($sizes && $cat !== 'jasa')
                             <span style="font-size:13px;font-weight:400;color:#6b7280;margin-left:4px;">({{ $sizes }})</span>
+                            @endif
                         </div>
                         <div style="font-size:14px;font-weight:700;color:#7c3aed;margin-top:2px;">{{ $fmt($totalPrice) }}</div>
                     </div>
