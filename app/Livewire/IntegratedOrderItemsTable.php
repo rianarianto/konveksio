@@ -553,12 +553,15 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         $category = $data['bulk_category'];
                         $productName = $data['bulk_product_name'];
                         if ($category === 'jasa') {
-                            $this->order->orderItems()->create([
-                                'product_name' => $productName,
-                                'production_category' => 'jasa',
-                                'price' => (int) ($data['bulk_price_jasa'] ?? 0),
-                                'quantity' => (int) ($data['bulk_qty_jasa'] ?? 1),
-                            ]);
+                            $jasaQty = (int) ($data['bulk_qty_jasa'] ?? 1);
+                            for ($i = 0; $i < $jasaQty; $i++) {
+                                $this->order->orderItems()->create([
+                                    'product_name' => $productName,
+                                    'production_category' => 'jasa',
+                                    'price' => (int) ($data['bulk_price_jasa'] ?? 0),
+                                    'quantity' => 1,
+                                ]);
+                            }
                         } else {
                             $totalToGenerate = 0;
                             foreach ($sizeOptions as $key => $label) {
