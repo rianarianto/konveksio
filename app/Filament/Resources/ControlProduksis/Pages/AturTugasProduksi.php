@@ -189,24 +189,33 @@ class AturTugasProduksi extends Page
                                             $genders = [];
                                             foreach ($allOrderItems as $ai) {
                                                 $idtl = $ai->size_and_request_details ?? [];
-                                                $g = $idtl['gender'] ?? 'L';
+                                                $isKonveksi = in_array($cat, ['produksi', 'custom']);
+                                                $g = $isKonveksi ? ($idtl['gender'] ?? 'L') : 'UMUM';
+                                                
                                                 if (!isset($genders[$g])) $genders[$g] = ['qty' => 0, 'models' => []];
                                                 $genders[$g]['qty'] += $ai->quantity;
 
                                                 $mParts = [];
-                                                if (isset($idtl['sleeve_model'])) $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
-                                                if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku') $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
-                                                if (!empty($idtl['is_tunic'])) $mParts[] = 'Tunik';
+                                                $attrs = [];
+                                                
+                                                if ($isKonveksi) {
+                                                    if (isset($idtl['sleeve_model'])) $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
+                                                    if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku') $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
+                                                    if (!empty($idtl['is_tunic'])) $mParts[] = 'Tunik';
+                                                    
+                                                    $attrs = [
+                                                        'LENGAN' => isset($idtl['sleeve_model']) ? strtoupper($idtl['sleeve_model']) : 'PENDEK',
+                                                        'SAKU' => isset($idtl['pocket_model']) ? strtoupper(str_replace('_', ' ', $idtl['pocket_model'])) : 'TANPA SAKU',
+                                                        'KANCING' => isset($idtl['button_model']) ? strtoupper($idtl['button_model']) : 'BIASA',
+                                                    ];
+                                                }
+                                                
                                                 $mKey = empty($mParts) ? 'Model Standar' : implode(', ', $mParts);
 
                                                 if (!isset($genders[$g]['models'][$mKey])) {
                                                     $genders[$g]['models'][$mKey] = [
                                                         'qty' => 0, 'sizes' => [], 'notes' => [], 'custom' => [],
-                                                        'attrs' => [
-                                                            'LENGAN' => isset($idtl['sleeve_model']) ? strtoupper($idtl['sleeve_model']) : 'PENDEK',
-                                                            'SAKU' => isset($idtl['pocket_model']) ? strtoupper(str_replace('_', ' ', $idtl['pocket_model'])) : 'TANPA SAKU',
-                                                            'KANCING' => isset($idtl['button_model']) ? strtoupper($idtl['button_model']) : 'BIASA',
-                                                        ]
+                                                        'attrs' => $attrs
                                                     ];
                                                 }
                                                 $genders[$g]['models'][$mKey]['qty'] += $ai->quantity;
@@ -243,7 +252,7 @@ class AturTugasProduksi extends Page
 
                                             if ($hasItemsToShow) {
                                                 foreach ($genders as $gCode => $gData) {
-                                                    $gName = $gCode === 'P' ? 'PEREMPUAN' : 'LAKI-LAKI';
+                                                    $gName = $gCode === 'P' ? 'PEREMPUAN' : ($gCode === 'L' ? 'LAKI-LAKI' : 'RINCIAN UKURAN PESANAN');
                                                     $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
                                                     $html .= '<div @click="open = !open" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:#f9fafb;">';
                                                     $html .= '<div style="display:flex; align-items:center; gap:8px;">';
@@ -263,11 +272,14 @@ class AturTugasProduksi extends Page
                                                             $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . ';">' . $mData['qty'] . ' pcs</span>';
                                                             $html .= '</div>';
                                                         }
-                                                        $atxt = [];
-                                                        foreach ($mData['attrs'] as $ak => $av) {
-                                                            $atxt[] = '<span style="color:#9ca3af; font-size:10px;">' . $ak . ':</span><span style="color:#4b5563; margin-left:2px;">' . $av . '</span>';
+                                                        
+                                                        if (!empty($mData['attrs'])) {
+                                                            $atxt = [];
+                                                            foreach ($mData['attrs'] as $ak => $av) {
+                                                                $atxt[] = '<span style="color:#9ca3af; font-size:10px;">' . $ak . ':</span><span style="color:#4b5563; margin-left:2px;">' . $av . '</span>';
+                                                            }
+                                                            $html .= '<div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; font-weight:700; margin-bottom:16px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
                                                         }
-                                                        $html .= '<div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; font-weight:700; margin-bottom:16px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
                                                         $stxt = [];
                                                         foreach ($mData['sizes'] as $szKey => $sqty) {
                                                             $stxt[] = '<div style="padding:4px 8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:4px; font-size:12px; font-weight:800; color:#1e293b;">' . htmlspecialchars($szKey) . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
