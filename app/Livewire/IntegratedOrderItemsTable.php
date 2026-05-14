@@ -524,43 +524,111 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     $variantId = $data['bulk_material_variant_id'] ?? null;
                                     $useStock = filled($data['bulk_stock_qty'] ?? null);
                                     $stockQtyUsed = $useStock ? ($data['bulk_stock_qty'] / $totalToGenerate) : 0;
-                                } else {
+
+                                    for ($i = 0; $i < $qty; $i++) {
+                                        $this->order->orderItems()->create([
+                                            'product_name' => $productName,
+                                            'production_category' => $category,
+                                            'bahan_id' => $data['bulk_bahan'] ?? null,
+                                            'size' => $key,
+                                            'price' => (int) ($data['bulk_price'] ?? 0),
+                                            'quantity' => 1,
+                                            'size_and_request_details' => [
+                                                'gender' => $data['bulk_gender'] ?? 'L',
+                                                'sleeve_model' => $data['bulk_sleeve'] ?? 'pendek',
+                                                'pocket_model' => $data['bulk_pocket'] ?? 'tanpa_saku',
+                                                'button_model' => $data['bulk_button'] ?? 'biasa',
+                                                'is_tunic' => (bool) ($data['bulk_is_tunic'] ?? false),
+                                                'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
+                                                'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
+                                                'material_variant_id' => $variantId,
+                                                'product_variant_id' => null,
+                                                'supplier_product' => null,
+                                                'use_stock' => $useStock,
+                                                'stock_qty_used' => $stockQtyUsed,
+                                            ],
+                                        ]);
+                                    }
+                                } else if ($category === 'non_produksi') {
                                     $v = \App\Models\ProductVariant::where('product_id', $data['bulk_product_id'] ?? null)
                                         ->where('color_name', $data['bulk_product_color'] ?? null)
                                         ->where('size', $key)
                                         ->first();
+                                    
                                     $variantId = $v?->id;
-                                    $useStock = (bool) $variantId;
-                                    $stockQtyUsed = $useStock ? 1 : 0;
+                                    $availableStock = (float) ($v?->stock ?? 0); // Using 'stock' column as seen in previous steps
+                                    
+                                    $alreadyInOrder = OrderItem::where('order_id', $this->order->id)
+                                        ->get()
+                                        ->filter(fn($item) => ($item->size_and_request_details['product_variant_id'] ?? null) == $variantId)
+                                        ->sum(fn($item) => (float) ($item->size_and_request_details['stock_qty_used'] ?? 0));
+                                    
+                                    $currentRemaining = max(0, $availableStock - $alreadyInOrder);
 
-                                    if ($useStock) {
-                                        // Real-time stock validation
-                                        $usedInOrder = OrderItem::where('order_id', $this->order->id)
-                                            ->get()
-                                            ->filter(fn($item) => ($item->size_and_request_details['product_variant_id'] ?? null) == $variantId)
-                                            ->count();
-                                        
-                                        $available = max(0, $v->stock - $usedInOrder);
-
-                                        if ($qty > $available) {
-                                            Notification::make()
-                                                ->title("Stok tidak cukup untuk {$v->color_name} - {$v->size}!")
-                                                ->body("Tersedia: {$available} pcs. Anda mencoba menambah {$qty} pcs.")
-                                                ->danger()
-                                                ->send();
-                                            return; // Halt the whole bulk process for safety
+                                    for ($i = 0; $i < $qty; $i++) {
+                                        $useStockForThisItem = ($currentRemaining > 0);
+                                        if ($useStockForThisItem) {
+                                            $currentRemaining--;
                                         }
+
+                                        $this->order->orderItems()->create([
+                                            'product_name' => $productName,
+                                            'production_category' => $category,
+                                            'bahan_id' => null,
+                                            'size' => $key,
+                                            'price' => (int) ($data['bulk_price_non'] ?? 0),
+                                            'quantity' => 1,
+                                            'size_and_request_details' => [
+                                                'gender' => $data['bulk_gender'] ?? 'L',
+                                                'sleeve_model' => $data['bulk_sleeve'] ?? 'pendek',
+                                                'pocket_model' => $data['bulk_pocket'] ?? 'tanpa_saku',
+                                                'button_model' => $data['bulk_button'] ?? 'biasa',
+                                                'is_tunic' => (bool) ($data['bulk_is_tunic'] ?? false),
+                                                'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
+                                                'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
+                                                'material_variant_id' => null,
+                                                'product_variant_id' => $variantId,
+                                                'supplier_product' => $data['bulk_product_id'] ?? null,
+                                                'use_stock' => $useStockForThisItem,
+                                                'stock_qty_used' => $useStockForThisItem ? 1 : 0,
+                                            ],
+                                        ]);
+                                    }
+                                } else {
+                                    // Handle Jasa or other categories
+                                    for ($i = 0; $i < $qty; $i++) {
+                                        $this->order->orderItems()->create([
+                                            'product_name' => $productName,
+                                            'production_category' => $category,
+                                            'size' => $key,
+                                            'price' => (int) ($data['bulk_price_jasa'] ?? 0),
+                                            'quantity' => 1,
+                                            'size_and_request_details' => [
+                                                'gender' => $data['bulk_gender'] ?? 'L',
+                                                'sleeve_model' => $data['bulk_sleeve'] ?? 'pendek',
+                                                'pocket_model' => 'tanpa_saku',
+                                                'use_stock' => false,
+                                                'stock_qty_used' => 0,
+                                            ],
+                                        ]);
                                     }
                                 }
+                            }
+                            
+                            $cQty = (int) ($data['qty_custom'] ?? 0);
+                            if ($cQty > 0) {
+                                $customVariantId = ($category === 'produksi') ? ($data['bulk_material_variant_id'] ?? null) : null;
+                                $customUseStock = ($category === 'produksi' && filled($data['bulk_stock_qty'] ?? null));
+                                $customStockUsed = $customUseStock ? ($data['bulk_stock_qty'] / $totalToGenerate) : 0;
 
-                                for ($i = 0; $i < $qty; $i++) {
+                                for ($i = 0; $i < $cQty; $i++) {
                                     $this->order->orderItems()->create([
                                         'product_name' => $productName,
                                         'production_category' => $category,
                                         'bahan_id' => ($category === 'produksi') ? ($data['bulk_bahan'] ?? null) : null,
-                                        'size' => $key,
-                                        'price' => (int) ($category === 'produksi' ? ($data['bulk_price'] ?? 0) : ($data['bulk_price_non'] ?? 0)),
+                                        'size' => 'Custom',
                                         'quantity' => 1,
+                                        'price' => (int) ($category === 'produksi' ? ($data['bulk_price_custom'] ?? $data['bulk_price'] ?? 0) : ($data['bulk_price_non'] ?? 0)),
                                         'size_and_request_details' => [
                                             'gender' => $data['bulk_gender'] ?? 'L',
                                             'sleeve_model' => $data['bulk_sleeve'] ?? 'pendek',
@@ -569,30 +637,14 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             'is_tunic' => (bool) ($data['bulk_is_tunic'] ?? false),
                                             'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
                                             'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
-                                            'material_variant_id' => ($category === 'produksi') ? $variantId : null,
-                                            'product_variant_id' => ($category === 'non_produksi') ? $variantId : null,
-                                            'supplier_product' => ($category === 'non_produksi') ? ($data['bulk_product_id'] ?? null) : null,
-                                            'use_stock' => $useStock,
-                                            'stock_qty_used' => $stockQtyUsed,
+                                            'material_variant_id' => $customVariantId,
+                                            'product_variant_id' => null,
+                                            'supplier_product' => null,
+                                            'use_stock' => $customUseStock,
+                                            'stock_qty_used' => $customStockUsed,
                                         ],
                                     ]);
                                 }
-                            }
-                            
-                            $cQty = (int) ($data['qty_custom'] ?? 0);
-                            for ($i = 0; $i < $cQty; $i++) {
-                                $this->order->orderItems()->create([
-                                    'product_name' => $productName,
-                                    'production_category' => $category,
-                                    'size' => 'Custom',
-                                    'quantity' => 1,
-                                    'price' => (int) ($category === 'produksi' ? ($data['bulk_price_custom'] ?? $data['bulk_price'] ?? 0) : ($data['bulk_price_non'] ?? 0)),
-                                    'size_and_request_details' => [
-                                        'material_variant_id' => ($category === 'produksi') ? ($data['bulk_material_variant_id'] ?? null) : null,
-                                        'use_stock' => ($category === 'produksi' && filled($data['bulk_stock_qty'] ?? null)),
-                                        'stock_qty_used' => ($category === 'produksi' && filled($data['bulk_stock_qty'] ?? null)) ? ($data['bulk_stock_qty'] / $totalToGenerate) : 0,
-                                    ]
-                                ]);
                             }
                         }
                         $this->refreshOrderData();

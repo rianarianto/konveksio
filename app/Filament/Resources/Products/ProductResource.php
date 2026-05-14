@@ -221,18 +221,9 @@ class ProductResource extends Resource
                 TextColumn::make('type')
                     ->label('Jenis')
                     ->searchable(),
-                TextColumn::make('variants.color_name')
-                    ->label('Warna Tersedia')
-                    ->badge()
-                    ->separator(', ')
-                    ->getStateUsing(fn ($record) => $record->variants->pluck('color_name')->unique()->toArray()),
                 ColorColumn::make('variants.color_code')
-                    ->label('Swatch')
+                    ->label('Warna')
                     ->getStateUsing(fn ($record) => $record->variants->pluck('color_code')->unique()->toArray()),
-                TextColumn::make('variants_count')
-                    ->label('Varian')
-                    ->counts('variants')
-                    ->sortable(),
                 TextColumn::make('variants_sum_stock')
                     ->label('Total Stok')
                     ->sum('variants', 'stock')

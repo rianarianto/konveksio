@@ -60,6 +60,14 @@ class OrderItem extends Model
      */
     protected function adjustStock(?array $oldDetails, ?array $newDetails): void
     {
+        // --- LOGIKA PENGAMAN: JANGAN KEMBALIKAN STOK JIKA PESANAN SUDAH SELESAI/BATAL ---
+        // Jika kita sedang menghapus data (newDetails null) dan status pesanan sudah Selesai/Batal, 
+        // maka jangan kembalikan stok ke katalog.
+        $status = strtolower($this->order?->status ?? '');
+        if ($newDetails === null && in_array($status, ['selesai', 'batal'])) {
+            return;
+        }
+
         DB::transaction(function () use ($oldDetails, $newDetails) {
             // --- A. PENANGANAN BAHAN BAKU (PRODUKSI/CUSTOM) ---
             // Support both old keys ('bahan', 'bahan_usage') and new keys ('material_variant_id', 'stock_qty_used')
