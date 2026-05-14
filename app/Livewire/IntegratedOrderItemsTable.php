@@ -375,21 +375,15 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 if (!$variantId) return;
                                                 
                                                 $v = \App\Models\MaterialVariant::find($variantId);
-                                                $dbStock = (float) ($v?->current_stock ?? 0);
-                                                
-                                                $usedInOrder = OrderItem::where('order_id', $this->order->id)
-                                                    ->get()
-                                                    ->filter(fn($item) => ($item->size_and_request_details['material_variant_id'] ?? null) == $variantId)
-                                                    ->sum(fn($item) => (float) ($item->size_and_request_details['stock_qty_used'] ?? 0));
-                                                
-                                                // Gunakan pembulatan integer untuk menghindari masalah presisi float
-                                                $max = max(0, (int) round($dbStock - $usedInOrder));
+                                                // current_stock sudah mencerminkan sisa stok setelah dipotong saat item dibuat
+                                                // jadi tidak perlu kurangi lagi dengan usedInOrder (akan double-deduction)
+                                                $available = (int) ($v?->current_stock ?? 0);
 
-                                                if ((int) $state > $max) {
-                                                    $set('bulk_stock_qty', $max);
+                                                if ((int) $state > $available) {
+                                                    $set('bulk_stock_qty', $available);
                                                     Notification::make()
                                                         ->title('Jumlah melebihi stok tersedia!')
-                                                        ->body("Sisa stok yang bisa digunakan di pesanan ini adalah {$max} " . ($v?->material?->unit ?? 'm'))
+                                                        ->body("Sisa stok yang bisa digunakan adalah {$available} " . ($v?->material?->unit ?? 'm'))
                                                         ->warning()
                                                         ->send();
                                                 }
@@ -400,14 +394,14 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 $v = \App\Models\MaterialVariant::with('material')->find($variantId);
                                                 if (!$v) return "";
                                                 
-                                                $dbStock = (float) ($v->current_stock ?? 0);
-                                                $usedInOrder = OrderItem::where('order_id', $this->order->id)
+                                                // current_stock sudah nilai sesungguhnya setelah pemotongan order sebelumnya
+                                                $available = (int) ($v->current_stock ?? 0);
+                                                $usedInOrder = (int) OrderItem::where('order_id', $this->order->id)
                                                     ->get()
                                                     ->filter(fn($item) => ($item->size_and_request_details['material_variant_id'] ?? null) == $variantId)
-                                                    ->sum(fn($item) => (float) ($item->size_and_request_details['stock_qty_used'] ?? 0));
+                                                    ->sum(fn($item) => (int) ($item->size_and_request_details['stock_qty_used'] ?? 0));
                                                 
-                                                $available = max(0, (int) round($dbStock - $usedInOrder));
-                                                return "Stok Tersedia: {$available} {$v->material->unit}" . ($usedInOrder > 0 ? " (Terpakai " . (int) round($usedInOrder) . " di pesanan ini)" : "");
+                                                return "Stok Tersedia: {$available} {$v->material->unit}" . ($usedInOrder > 0 ? " (Terpakai {$usedInOrder} di pesanan ini)" : "");
                                             })
                                             ->visible(function(Get $get) {
                                                 if ($get('bulk_category') !== 'produksi') return false;
