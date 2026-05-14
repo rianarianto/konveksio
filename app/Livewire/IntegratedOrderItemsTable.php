@@ -560,26 +560,29 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                             if ($totalToGenerate === 0) return;
 
+                            // Inisialisasi di LUAR foreach agar total stok hanya tersimpan
+                            // di item PERTAMA dari seluruh batch (bukan per ukuran)
+                            $variantId = null;
+                            $useStock = false;
+                            $isFirstItem = true;
+                            $remainingStockToStore = 0;
+
+                            if ($category === 'produksi') {
+                                $variantId = $data['bulk_material_variant_id'] ?? null;
+                                $useStock = filled($data['bulk_stock_qty'] ?? null);
+                                $remainingStockToStore = $useStock ? (int) ($data['bulk_stock_qty']) : 0;
+                            }
+
                             foreach ($sizeOptions as $key => $label) {
                                 $qty = (int) ($data["qty_{$key}"] ?? 0);
                                 if ($qty <= 0) continue;
 
-                                $variantId = null;
-                                $useStock = false;
-                                $stockQtyUsed = 0;
-
                                 if ($category === 'produksi') {
-                                    $variantId = $data['bulk_material_variant_id'] ?? null;
-                                    $useStock = filled($data['bulk_stock_qty'] ?? null);
-                                    $totalStockQty = $useStock ? (int) ($data['bulk_stock_qty']) : 0;
-
-                                    $isFirst = true;
                                     for ($i = 0; $i < $qty; $i++) {
-                                        // Simpan semua stok di item pertama saja, sisanya 0
-                                        // Ini menghindari isu presisi desimal saat pengembalian stok
-                                        $itemStockUsed = ($isFirst && $useStock) ? $totalStockQty : 0;
-                                        $isFirst = false;
-                                        $totalStockQty = 0; // item berikutnya 0
+                                        // Simpan total stok di item pertama saja, sisanya 0
+                                        $itemStockUsed = ($isFirstItem && $useStock) ? $remainingStockToStore : 0;
+                                        $isFirstItem = false;
+                                        $remainingStockToStore = 0;
 
                                         $this->order->orderItems()->create([
                                             'product_name' => $productName,
