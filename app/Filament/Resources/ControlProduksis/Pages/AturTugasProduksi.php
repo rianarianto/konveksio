@@ -239,9 +239,9 @@ class AturTugasProduksi extends Page
                                             $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">RINCIAN PRODUKSI</div>';
                                             $html .= '<div style="display:flex; flex-direction:column; gap:8px;">';
 
-                                            $hasKonveksiItems = count($genders) > 0 && in_array($cat, ['produksi', 'custom']);
+                                            $hasItemsToShow = count($genders) > 0;
 
-                                            if ($hasKonveksiItems) {
+                                            if ($hasItemsToShow) {
                                                 foreach ($genders as $gCode => $gData) {
                                                     $gName = $gCode === 'P' ? 'PEREMPUAN' : 'LAKI-LAKI';
                                                     $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
