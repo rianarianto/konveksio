@@ -140,7 +140,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->options($sizeOptions + ['Custom' => 'Ukur Badan'])
                     ->disabled(fn(OrderItem $record) => $record->production_category === 'jasa')
                     ->placeholder(fn(OrderItem $record) => $record->production_category === 'jasa' ? '-' : 'Pilih')
-                    ->selectablePlaceholder(false)
                     ->sortable(),
 
                 SelectColumn::make('gender')
@@ -148,7 +147,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->options($genderOptions)
                     ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
                     ->placeholder(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Pilih' : '-')
-                    ->selectablePlaceholder(false)
                     ->updateStateUsing(function(OrderItem $record, $state) {
                         $details = $record->size_and_request_details ?? [];
                         $details['gender'] = $state;
@@ -161,7 +159,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->options($sleeveOptions)
                     ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
                     ->placeholder(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Pilih' : '-')
-                    ->selectablePlaceholder(false)
                     ->updateStateUsing(function(OrderItem $record, $state) {
                         $details = $record->size_and_request_details ?? [];
                         $details['sleeve_model'] = $state;
@@ -174,7 +171,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->options($pocketOptions)
                     ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
                     ->placeholder(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Pilih' : '-')
-                    ->selectablePlaceholder(false)
                     ->updateStateUsing(function(OrderItem $record, $state) {
                         $details = $record->size_and_request_details ?? [];
                         $details['pocket_model'] = $state;
@@ -187,7 +183,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->options($buttonOptions)
                     ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
                     ->placeholder(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Pilih' : '-')
-                    ->selectablePlaceholder(false)
                     ->updateStateUsing(function(OrderItem $record, $state) {
                         $details = $record->size_and_request_details ?? [];
                         $details['button_model'] = $state;

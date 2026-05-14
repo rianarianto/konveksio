@@ -173,21 +173,25 @@ class OrderItem extends Model
 
     public function getGenderAttribute()
     {
+        if (!in_array($this->production_category, ['produksi', 'custom'])) return null;
         return $this->size_and_request_details['gender'] ?? 'L';
     }
 
     public function getSleeveModelAttribute()
     {
+        if (!in_array($this->production_category, ['produksi', 'custom'])) return null;
         return $this->size_and_request_details['sleeve_model'] ?? 'pendek';
     }
 
     public function getPocketModelAttribute()
     {
+        if (!in_array($this->production_category, ['produksi', 'custom'])) return null;
         return $this->size_and_request_details['pocket_model'] ?? 'tanpa_saku';
     }
 
     public function getButtonModelAttribute()
     {
+        if (!in_array($this->production_category, ['produksi', 'custom'])) return null;
         return $this->size_and_request_details['button_model'] ?? 'biasa';
     }
 
