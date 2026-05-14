@@ -366,6 +366,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         TextInput::make('bulk_stock_qty')
                                             ->label('Jml Bahan Terpakai')
                                             ->numeric()
+                                            ->integer()
                                             ->placeholder('0')
                                             ->live()
                                             ->afterStateUpdated(function ($state, Set $set, Get $get) {
@@ -381,11 +382,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                     ->filter(fn($item) => ($item->size_and_request_details['material_variant_id'] ?? null) == $variantId)
                                                     ->sum(fn($item) => (float) ($item->size_and_request_details['stock_qty_used'] ?? 0));
                                                 
-                                                // Gunakan pembulatan untuk menghindari masalah presisi float (misal 9.99999999)
-                                                $max = round($dbStock - $usedInOrder, 2);
-                                                if ($max < 0) $max = 0;
+                                                // Gunakan pembulatan integer untuk menghindari masalah presisi float
+                                                $max = max(0, (int) round($dbStock - $usedInOrder));
 
-                                                if ((float)$state > $max) {
+                                                if ((int) $state > $max) {
                                                     $set('bulk_stock_qty', $max);
                                                     Notification::make()
                                                         ->title('Jumlah melebihi stok tersedia!')
@@ -406,8 +406,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                     ->filter(fn($item) => ($item->size_and_request_details['material_variant_id'] ?? null) == $variantId)
                                                     ->sum(fn($item) => (float) ($item->size_and_request_details['stock_qty_used'] ?? 0));
                                                 
-                                                $available = round(max(0, $dbStock - $usedInOrder), 3);
-                                                return "Stok Tersedia: {$available} {$v->material->unit}" . ($usedInOrder > 0 ? " (Terpakai " . round($usedInOrder, 3) . " di pesanan ini)" : "");
+                                                $available = max(0, (int) round($dbStock - $usedInOrder));
+                                                return "Stok Tersedia: {$available} {$v->material->unit}" . ($usedInOrder > 0 ? " (Terpakai " . (int) round($usedInOrder) . " di pesanan ini)" : "");
                                             })
                                             ->visible(function(Get $get) {
                                                 if ($get('bulk_category') !== 'produksi') return false;
@@ -505,7 +505,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                     ->helperText(function() use ($available, $usedInOrder) {
                                                         $text = "Tersedia: {$available} pcs";
                                                         if ($usedInOrder > 0) {
-                                                            $text .= " (Terpakai " . round($usedInOrder, 3) . " di pesanan ini)";
+                                                            $text .= " (Terpakai " . (int) $usedInOrder . " di pesanan ini)";
                                                         }
                                                         return $text;
                                                     })
@@ -577,9 +577,16 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 if ($category === 'produksi') {
                                     $variantId = $data['bulk_material_variant_id'] ?? null;
                                     $useStock = filled($data['bulk_stock_qty'] ?? null);
-                                    $stockQtyUsed = $useStock ? ($data['bulk_stock_qty'] / $totalToGenerate) : 0;
+                                    $totalStockQty = $useStock ? (int) ($data['bulk_stock_qty']) : 0;
 
+                                    $isFirst = true;
                                     for ($i = 0; $i < $qty; $i++) {
+                                        // Simpan semua stok di item pertama saja, sisanya 0
+                                        // Ini menghindari isu presisi desimal saat pengembalian stok
+                                        $itemStockUsed = ($isFirst && $useStock) ? $totalStockQty : 0;
+                                        $isFirst = false;
+                                        $totalStockQty = 0; // item berikutnya 0
+
                                         $this->order->orderItems()->create([
                                             'product_name' => $productName,
                                             'production_category' => $category,
@@ -599,7 +606,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 'product_variant_id' => null,
                                                 'supplier_product' => null,
                                                 'use_stock' => $useStock,
-                                                'stock_qty_used' => $stockQtyUsed,
+                                                'stock_qty_used' => $itemStockUsed,
                                             ],
                                         ]);
                                     }
