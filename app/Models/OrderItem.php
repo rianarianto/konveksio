@@ -92,15 +92,23 @@ class OrderItem extends Model
             // --- B. PENANGANAN BAJU JADI (NON-PRODUKSI) ---
             // 1. Handle New Format (One Variant per Row via product_variant_id)
             $oldVariantId = $oldDetails['product_variant_id'] ?? null;
-            $newVariantId = $newDetails['product_variant_id'] ?? null;
-            $qty = $this->quantity ?: 1;
+            $oldProductUsage = (int) ($oldDetails['stock_qty_used'] ?? (isset($oldDetails['use_stock']) && $oldDetails['use_stock'] ? 1 : 0));
+            if (!isset($oldDetails['stock_qty_used']) && !isset($oldDetails['use_stock'])) {
+                $oldProductUsage = $this->getOriginal('quantity') ?: 1; // Fallback for very old data
+            }
 
-            if ($oldVariantId !== $newVariantId) {
-                if ($oldVariantId) {
-                    ProductVariant::where('id', $oldVariantId)->increment('stock', $qty);
+            $newVariantId = $newDetails['product_variant_id'] ?? null;
+            $newProductUsage = (int) ($newDetails['stock_qty_used'] ?? (isset($newDetails['use_stock']) && $newDetails['use_stock'] ? 1 : 0));
+            if (!isset($newDetails['stock_qty_used']) && !isset($newDetails['use_stock'])) {
+                $newProductUsage = $this->quantity ?: 1; // Fallback for very old data
+            }
+
+            if ($oldVariantId != $newVariantId || $oldProductUsage != $newProductUsage) {
+                if ($oldVariantId && $oldProductUsage > 0) {
+                    ProductVariant::where('id', $oldVariantId)->increment('stock', $oldProductUsage);
                 }
-                if ($newVariantId) {
-                    ProductVariant::where('id', $newVariantId)->decrement('stock', $qty);
+                if ($newVariantId && $newProductUsage > 0) {
+                    ProductVariant::where('id', $newVariantId)->decrement('stock', $newProductUsage);
                 }
             }
 
