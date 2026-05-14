@@ -147,6 +147,7 @@ class MaterialResource extends Resource
                                         TextInput::make('current_stock')
                                             ->label('Stok Saat Ini')
                                             ->numeric()
+                                            ->integer()
                                             ->default(0)
                                             ->required(),
                                     ]),

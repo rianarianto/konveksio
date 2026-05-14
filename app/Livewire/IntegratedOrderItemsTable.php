@@ -406,8 +406,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                     ->filter(fn($item) => ($item->size_and_request_details['material_variant_id'] ?? null) == $variantId)
                                                     ->sum(fn($item) => (float) ($item->size_and_request_details['stock_qty_used'] ?? 0));
                                                 
-                                                $available = max(0, $dbStock - $usedInOrder);
-                                                return "Stok Tersedia: {$available} {$v->material->unit}" . ($usedInOrder > 0 ? " (Terpakai {$usedInOrder} di pesanan ini)" : "");
+                                                $available = round(max(0, $dbStock - $usedInOrder), 3);
+                                                return "Stok Tersedia: {$available} {$v->material->unit}" . ($usedInOrder > 0 ? " (Terpakai " . round($usedInOrder, 3) . " di pesanan ini)" : "");
                                             })
                                             ->visible(function(Get $get) {
                                                 if ($get('bulk_category') !== 'produksi') return false;
@@ -496,7 +496,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                     ->filter(fn($item) => ($item->size_and_request_details['product_variant_id'] ?? null) == $variant->id)
                                                     ->count();
                                                 
-                                                $available = max(0, $variant->stock - $usedInOrder);
+                                                $available = round(max(0, $variant->stock - $usedInOrder), 3);
 
                                                 return TextInput::make("qty_{$key}")
                                                     ->label($label)
@@ -505,7 +505,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                     ->helperText(function() use ($available, $usedInOrder) {
                                                         $text = "Tersedia: {$available} pcs";
                                                         if ($usedInOrder > 0) {
-                                                            $text .= " (Terpakai {$usedInOrder} di pesanan ini)";
+                                                            $text .= " (Terpakai " . round($usedInOrder, 3) . " di pesanan ini)";
                                                         }
                                                         return $text;
                                                     })

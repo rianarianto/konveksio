@@ -143,6 +143,7 @@ class ProductResource extends Resource
                                             return TextInput::make('qty_' . strtolower($size->name))
                                                 ->label($size->name)
                                                 ->numeric()
+                                                ->integer()
                                                 ->placeholder('0');
                                         })->toArray()
                                     ),
