@@ -188,20 +188,53 @@
         </table>
     </div>
 
+    @php
+        $totalStockUsed = collect($allGroupItems)->sum(function($i) {
+            return (float) ($i->size_and_request_details['stock_qty_used'] ?? 0);
+        });
+        $stockUnit = 'pcs';
+        if (in_array($record->production_category, ['produksi', 'custom'])) {
+            $stockUnit = $record->bahan?->material?->unit ?? 'm';
+        }
+        $fmtStock = $totalStockUsed == (int)$totalStockUsed ? (int)$totalStockUsed : number_format($totalStockUsed, 1, ',', '.');
+    @endphp
+
     <div class="section">
         <div class="section-title">1. INFO PRODUKSI & DEADLINE</div>
         <table class="grid">
             <tr>
-                <td class="info-label">Pelanggan</td>
-                <td class="info-value">: {{ $record->order->customer->name ?? '-' }}</td>
-                <td class="info-label">Bahan Utama</td>
-                <td class="info-value">: {{ $record->bahan ? ($record->bahan->material->name . ' - ' . $record->bahan->color_name) : 'Lihat Catatan' }}</td>
-            </tr>
-            <tr>
-                <td class="info-label">Deadline Produksi</td>
-                <td class="info-value text-danger text-bold">: {{ \Carbon\Carbon::parse($record->order->deadline)->format('d F Y') }}</td>
+                <td class="info-label">Nama Pesanan</td>
+                <td class="info-value" style="font-weight: bold; color: #7c3aed;">: {{ strtoupper($record->product_name) }}</td>
                 <td class="info-label">Total Qty</td>
                 <td class="info-value text-bold">: {{ $totalQuantity }} pcs</td>
+            </tr>
+            <tr>
+                <td class="info-label">Pelanggan</td>
+                <td class="info-value">: {{ $record->order->customer->name ?? '-' }}</td>
+                <td class="info-label">Deadline Produksi</td>
+                <td class="info-value text-danger text-bold">: {{ \Carbon\Carbon::parse($record->order->deadline)->format('d F Y') }}</td>
+            </tr>
+            <tr>
+                @if(in_array($record->production_category, ['produksi', 'custom']))
+                    <td class="info-label">Bahan Utama</td>
+                    <td class="info-value" colspan="3">
+                        : {{ $record->bahan ? ($record->bahan->material->name . ' - ' . $record->bahan->color_name) : 'Lihat Catatan' }}
+                        @if($totalStockUsed > 0)
+                            <span style="color: #d97706; font-weight: bold; margin-left: 4px;">(Stok {{ $fmtStock }}{{ $stockUnit }})</span>
+                        @endif
+                    </td>
+                @elseif($record->production_category === 'non_produksi')
+                    <td class="info-label">Produk Katalog</td>
+                    <td class="info-value" colspan="3">
+                        : {{ $record->size_and_request_details['supplier_product'] ? (\App\Models\Product::find($record->size_and_request_details['supplier_product'])?->name ?? 'Baju Jadi') : 'Baju Jadi' }}
+                        @if($totalStockUsed > 0)
+                            <span style="color: #d97706; font-weight: bold; margin-left: 4px;">(Ambil Stok: {{ $fmtStock }} pcs)</span>
+                        @endif
+                    </td>
+                @else
+                    <td class="info-label">Jenis Layanan</td>
+                    <td class="info-value" colspan="3">: Jasa Makloon / Tanpa Bahan</td>
+                @endif
             </tr>
         </table>
     </div>
@@ -231,9 +264,6 @@
                             <span class="spec-tag">KANCING: {{ $group['button'] }}</span>
                             @if($group['tunic'] === 'TUNIK') <span class="spec-tag">MODEL: TUNIK</span> @endif
                         </div>
-                            @if($group['use_stock'] ?? false)
-                                <div style="color: #d97706; font-size: 8pt; font-weight: bold; margin-top: 2px;">(AMBIL DARI STOK)</div>
-                            @endif
                             @if(!empty($group['requests']))
                                 <div style="font-size: 7.5pt; color: #555; margin-top: 3px; border-top: 1px dashed #ccc; padding-top: 2px;">
                                     <strong>REQ:</strong> {{ implode(' | ', $group['requests']) }}
