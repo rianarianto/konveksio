@@ -256,13 +256,15 @@
                 @foreach($specGroups as $index => $group)
                 <tr>
                     <td style="text-align: center;">{{ $loop->iteration }}</td>
-                    <td style="text-align: center;"><strong>{{ $group['gender'] }}</strong></td>
+                    <td style="text-align: center;"><strong>{{ $group['gender'] === 'UMUM' ? '-' : $group['gender'] }}</strong></td>
                     <td>
                         <div style="margin-bottom: 3px;">
-                            <span class="spec-tag">LENGAN: {{ $group['sleeve'] }}</span>
-                            <span class="spec-tag">SAKU: {{ $group['pocket'] }}</span>
-                            <span class="spec-tag">KANCING: {{ $group['button'] }}</span>
-                            @if($group['tunic'] === 'TUNIK') <span class="spec-tag">MODEL: TUNIK</span> @endif
+                            @if($group['gender'] !== 'UMUM')
+                                <span class="spec-tag">LENGAN: {{ $group['sleeve'] }}</span>
+                                <span class="spec-tag">SAKU: {{ $group['pocket'] }}</span>
+                                <span class="spec-tag">KANCING: {{ $group['button'] }}</span>
+                                @if($group['tunic'] === 'TUNIK') <span class="spec-tag">MODEL: TUNIK</span> @endif
+                            @endif
                         </div>
                             @if(!empty($group['requests']))
                                 <div style="font-size: 7.5pt; color: #555; margin-top: 3px; border-top: 1px dashed #ccc; padding-top: 2px;">

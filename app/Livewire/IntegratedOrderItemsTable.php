@@ -95,10 +95,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             ->select('order_items.*')
                             ->selectRaw('materials.name as bahan_name')
                             ->selectRaw('COALESCE(material_variants.color_name, product_variants.color_name) as varian_warna')
-                            ->selectRaw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.gender')), 'L') as gender")
-                            ->selectRaw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sleeve_model')), 'pendek') as sleeve_model")
-                            ->selectRaw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.pocket_model')), 'tanpa_saku') as pocket_model")
-                            ->selectRaw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.button_model')), 'biasa') as button_model")
+                            ->selectRaw("IF(production_category IN ('produksi', 'custom'), COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.gender')), 'L'), null) as gender")
+                            ->selectRaw("IF(production_category IN ('produksi', 'custom'), COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sleeve_model')), 'pendek'), null) as sleeve_model")
+                            ->selectRaw("IF(production_category IN ('produksi', 'custom'), COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.pocket_model')), 'tanpa_saku'), null) as pocket_model")
+                            ->selectRaw("IF(production_category IN ('produksi', 'custom'), COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.button_model')), 'biasa'), null) as button_model")
                             ->selectRaw("
                                 CONCAT(
                                     product_name, ' | ',
@@ -143,25 +143,63 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                 SelectColumn::make('gender')
                     ->label('JK')
                     ->options($genderOptions)
+                    ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
+                    ->placeholder(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Pilih' : '-')
+                    ->selectablePlaceholder(false)
+                    ->updateStateUsing(function(OrderItem $record, $state) {
+                        $details = $record->size_and_request_details ?? [];
+                        $details['gender'] = $state;
+                        $record->update(['size_and_request_details' => $details]);
+                    })
                     ->sortable(),
 
                 SelectColumn::make('sleeve_model')
                     ->label('Lengan')
                     ->options($sleeveOptions)
+                    ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
+                    ->placeholder(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Pilih' : '-')
+                    ->selectablePlaceholder(false)
+                    ->updateStateUsing(function(OrderItem $record, $state) {
+                        $details = $record->size_and_request_details ?? [];
+                        $details['sleeve_model'] = $state;
+                        $record->update(['size_and_request_details' => $details]);
+                    })
                     ->sortable(),
 
                 SelectColumn::make('pocket_model')
                     ->label('Saku')
                     ->options($pocketOptions)
+                    ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
+                    ->placeholder(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Pilih' : '-')
+                    ->selectablePlaceholder(false)
+                    ->updateStateUsing(function(OrderItem $record, $state) {
+                        $details = $record->size_and_request_details ?? [];
+                        $details['pocket_model'] = $state;
+                        $record->update(['size_and_request_details' => $details]);
+                    })
                     ->sortable(),
 
                 SelectColumn::make('button_model')
                     ->label('Kancing')
                     ->options($buttonOptions)
+                    ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
+                    ->placeholder(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Pilih' : '-')
+                    ->selectablePlaceholder(false)
+                    ->updateStateUsing(function(OrderItem $record, $state) {
+                        $details = $record->size_and_request_details ?? [];
+                        $details['button_model'] = $state;
+                        $record->update(['size_and_request_details' => $details]);
+                    })
                     ->sortable(),
 
                 \Filament\Tables\Columns\ToggleColumn::make('is_tunic')
                     ->label('Tunik?')
+                    ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
+                    ->updateStateUsing(function(OrderItem $record, $state) {
+                        $details = $record->size_and_request_details ?? [];
+                        $details['is_tunic'] = $state;
+                        $record->update(['size_and_request_details' => $details]);
+                    })
                     ->sortable(),
 
                 TextInputColumn::make('price')

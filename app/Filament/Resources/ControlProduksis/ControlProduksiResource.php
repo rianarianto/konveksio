@@ -373,11 +373,22 @@ class ControlProduksiResource extends Resource
                             $d = $gi->size_and_request_details ?? [];
                             
                             // Essential specs for grouping
-                            $gen = $d['gender'] ?? 'L';
-                            $slv = strtoupper($d['sleeve_model'] ?? 'PENDEK');
-                            $pck = strtoupper(str_replace('_', ' ', $d['pocket_model'] ?? 'TANPA SAKU'));
-                            $btn = strtoupper($d['button_model'] ?? 'BIASA');
-                            $tun = !empty($d['is_tunic']) ? 'TUNIK' : 'STANDAR';
+                            $isKonveksi = in_array($gi->production_category ?? 'produksi', ['produksi', 'custom']);
+                            
+                            if (!$isKonveksi) {
+                                $gen = 'UMUM';
+                                $slv = '-';
+                                $pck = '-';
+                                $btn = '-';
+                                $tun = '-';
+                            } else {
+                                $gen = $d['gender'] ?? 'L';
+                                $slv = strtoupper($d['sleeve_model'] ?? 'PENDEK');
+                                $pck = strtoupper(str_replace('_', ' ', $d['pocket_model'] ?? 'TANPA SAKU'));
+                                $btn = strtoupper($d['button_model'] ?? 'BIASA');
+                                $tun = !empty($d['is_tunic']) ? 'TUNIK' : 'STANDAR';
+                            }
+                            
                             $stk = !empty($d['use_stock']) ? 'YES' : 'NO';
                             
                             // Detailed Sablon/Bordir info
@@ -406,7 +417,7 @@ class ControlProduksiResource extends Resource
                             
                             if (!isset($specGroups[$groupKey])) {
                                 $specGroups[$groupKey] = [
-                                    'gender' => $gen === 'L' ? 'PRIA' : 'WANITA',
+                                    'gender' => $gen === 'UMUM' ? 'UMUM' : ($gen === 'L' ? 'PRIA' : 'WANITA'),
                                     'sleeve' => $slv,
                                     'pocket' => $pck,
                                     'button' => $btn,
