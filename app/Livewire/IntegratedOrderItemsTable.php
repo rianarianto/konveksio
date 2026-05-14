@@ -241,23 +241,33 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                     ->where('product_name', $state)
                                                     ->latest('id')
                                                     ->first();
+
                                                 if ($existing) {
                                                     $details = $existing->size_and_request_details ?? [];
                                                     $category = $existing->production_category === 'custom' ? 'produksi' : ($existing->production_category ?? 'produksi');
                                                     $set('bulk_category', $category);
 
+                                                    // Cari harga standar (yang bukan ukuran Custom)
+                                                    $stdItem = OrderItem::where('order_id', $this->order->id)
+                                                        ->where('product_name', $state)
+                                                        ->where('size', '!=', 'Custom')
+                                                        ->first();
+                                                    
+                                                    // Cari harga custom
+                                                    $customItem = OrderItem::where('order_id', $this->order->id)
+                                                        ->where('product_name', $state)
+                                                        ->where('size', 'Custom')
+                                                        ->first();
+
                                                     if ($category === 'non_produksi') {
-                                                        // Restore Baju Jadi specs
                                                         $variantId = $details['product_variant_id'] ?? null;
                                                         $productId = $details['supplier_product'] ?? null;
-                                                        
-                                                        // Fallback for older items that only stored variant_id
                                                         if (!$productId && $variantId) {
                                                             $productId = \App\Models\ProductVariant::find($variantId)?->product_id;
                                                         }
 
                                                         $set('bulk_product_id', (string) $productId);
-                                                        $set('bulk_price_non', $existing->price);
+                                                        $set('bulk_price_non', $stdItem?->price ?? $existing->price);
                                                         
                                                         if ($variantId) {
                                                             $colorName = \App\Models\ProductVariant::find($variantId)?->color_name;
@@ -268,7 +278,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                         $set('bulk_qty_jasa', $existing->quantity);
                                                     } else {
                                                         // Restore Konveksi specs
-                                                        $set('bulk_price', $existing->price);
+                                                        $set('bulk_price', $stdItem?->price ?? $existing->price);
+                                                        $set('bulk_price_custom', $customItem?->price ?? null);
+                                                        
                                                         $set('bulk_bahan', $existing->bahan_id);
                                                         $set('bulk_material_variant_id', $details['material_variant_id'] ?? null);
                                                         $set('bulk_gender', $details['gender'] ?? 'L');
@@ -323,18 +335,23 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 $variantId = $get('bulk_material_variant_id');
                                                 if (!$variantId) return;
                                                 
-                                                $dbStock = (float) (\App\Models\MaterialVariant::find($variantId)?->current_stock ?? 0);
+                                                $v = \App\Models\MaterialVariant::find($variantId);
+                                                $dbStock = (float) ($v?->current_stock ?? 0);
+                                                
                                                 $usedInOrder = OrderItem::where('order_id', $this->order->id)
                                                     ->get()
                                                     ->filter(fn($item) => ($item->size_and_request_details['material_variant_id'] ?? null) == $variantId)
                                                     ->sum(fn($item) => (float) ($item->size_and_request_details['stock_qty_used'] ?? 0));
                                                 
-                                                $max = max(0, $dbStock - $usedInOrder);
-                                                if ($state > $max) {
+                                                // Gunakan pembulatan untuk menghindari masalah presisi float (misal 9.99999999)
+                                                $max = round($dbStock - $usedInOrder, 2);
+                                                if ($max < 0) $max = 0;
+
+                                                if ((float)$state > $max) {
                                                     $set('bulk_stock_qty', $max);
                                                     Notification::make()
                                                         ->title('Jumlah melebihi stok tersedia!')
-                                                        ->body("Sisa stok yang bisa digunakan di pesanan ini adalah {$max}")
+                                                        ->body("Sisa stok yang bisa digunakan di pesanan ini adalah {$max} " . ($v?->material?->unit ?? 'm'))
                                                         ->warning()
                                                         ->send();
                                                 }
