@@ -62,7 +62,7 @@ class TaskActionController extends Controller
                             ->actions([
                                 \Filament\Actions\Action::make('lihat')
                                     ->label('Lihat Pesanan')
-                                    ->url(\App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order->id])),
+                                    ->url(\App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order->id, 'tenant' => $order->shop_id])),
                             ])
                             ->sendToDatabase($recipients);
                     }

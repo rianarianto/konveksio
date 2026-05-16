@@ -160,11 +160,18 @@ class AturTugasProduksi extends Page
                                             $html .= '</div>';
                                             $html .= '</div>';
 
-                                            $hex = $bahan?->color_code ?: '#e5e7eb';
-                                            $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
+                                            if ($cat === 'non_produksi') {
+                                                $vId = $details['product_variant_id'] ?? null;
+                                                $v = $vId ? \App\Models\ProductVariant::with('product')->find($vId) : null;
+                                                $hex = $v?->color_code ?: '#e5e7eb';
+                                                $bahanLabel = $v ? (($v->product?->name ?? $item->product_name) . ' - ' . ($v->color_name ?? 'Tanpa Warna')) : ($item->product_name ?? '-');
+                                            } else {
+                                                $hex = $bahan?->color_code ?: '#e5e7eb';
+                                                $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
+                                            }
 
                                             $html .= '<div style="margin-bottom:24px;">';
-                                            $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">INFORMASI BAHAN</div>';
+                                            $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . ($cat === 'non_produksi' ? 'INFORMASI BAJU JADI' : 'INFORMASI BAHAN') . '</div>';
                                             $html .= '<div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
                                             $html .= '<span style="width:16px; height:16px; border-radius:50%; background:' . $hex . '; border:1px solid rgba(0,0,0,0.15); flex-shrink:0;"></span>';
                                             $html .= '<div style="flex:1;">';
@@ -210,12 +217,12 @@ class AturTugasProduksi extends Page
                                                     ];
                                                 }
                                                 
-                                                $mKey = empty($mParts) ? 'Model Standar' : implode(', ', $mParts);
+                                                $mKey = empty($mParts) ? ($isKonveksi ? 'Model Standar' : 'Rincian Pesanan') : implode(', ', $mParts);
 
                                                 if (!isset($genders[$g]['models'][$mKey])) {
                                                     $genders[$g]['models'][$mKey] = [
                                                         'qty' => 0, 'sizes' => [], 'notes' => [], 'custom' => [],
-                                                        'attrs' => $attrs
+                                                        'attrs' => $isKonveksi ? $attrs : []
                                                     ];
                                                 }
                                                 $genders[$g]['models'][$mKey]['qty'] += $ai->quantity;

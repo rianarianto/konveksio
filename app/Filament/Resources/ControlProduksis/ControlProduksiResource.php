@@ -413,7 +413,18 @@ class ControlProduksiResource extends Resource
                             sort($reqList);
                             $reqStr = implode(' | ', $reqList);
 
-                            $groupKey = "{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$sbStr}|{$reqStr}|{$stk}";
+                            // Trim all components to prevent whitespace issues
+                            $gen = trim($gen);
+                            $slv = trim($slv);
+                            $pck = trim($pck);
+                            $btn = trim($btn);
+                            $tun = trim($tun);
+                            $sbStr = trim($sbStr);
+                            $reqStr = trim($reqStr);
+
+                            // Grouping key: Ignore $stk (stock status) so that "Ambil Stok" and "Produksi Baru" 
+                            // with same specs are merged in the production table.
+                            $groupKey = "{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$sbStr}|{$reqStr}";
                             
                             if (!isset($specGroups[$groupKey])) {
                                 $specGroups[$groupKey] = [
@@ -427,12 +438,36 @@ class ControlProduksiResource extends Resource
                                     'requests' => $reqList,
                                     'total_qty' => 0,
                                     'sizes' => [],
+                                    'recipients' => ['standard' => [], 'custom' => []],
                                 ];
                             }
                             
                             $specGroups[$groupKey]['total_qty'] += $gi->quantity;
                             $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
                             $specGroups[$groupKey]['sizes'][$sz] = ($specGroups[$groupKey]['sizes'][$sz] ?? 0) + $gi->quantity;
+
+                            // Collect recipient names & custom measurements for Section 3 (Grouped by this spec)
+                            if (!empty($d['detail_custom'])) {
+                                foreach ($d['detail_custom'] as $u) {
+                                    $specGroups[$groupKey]['recipients']['custom'][] = [
+                                        'nama' => $u['nama'] ?? '-',
+                                        'size' => $u['ukuran'] ?? 'Custom',
+                                        'desc' => !empty($u['LD']) ? "LD:{$u['LD']} PB:{$u['PB']} PL:{$u['PL']} LB:{$u['LB']} LP:{$u['LP']} LPh:{$u['LPh']}" : ""
+                                    ];
+                                }
+                            } elseif ($sz === 'CUSTOM') {
+                                $m = [];
+                                foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
+                                    if (!empty($d[$mk])) $m[] = "$mk:{$d[$mk]}";
+                                }
+                                $specGroups[$groupKey]['recipients']['custom'][] = [
+                                    'nama' => $gi->recipient_name ?? '-',
+                                    'size' => 'Custom',
+                                    'desc' => implode(' ', $m)
+                                ];
+                            } elseif (!empty($gi->recipient_name)) {
+                                $specGroups[$groupKey]['recipients']['standard'][$sz][] = $gi->recipient_name;
+                            }
                         }
 
                         $pdf = Pdf::loadView('pdf.spk-produksi', [

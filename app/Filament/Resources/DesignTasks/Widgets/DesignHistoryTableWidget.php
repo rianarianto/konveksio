@@ -141,11 +141,18 @@ class DesignHistoryTableWidget extends BaseWidget
                                 $html .= '</div>';
 
                                 // MATERIAL SECTION (Standard Color Swatch Style)
-                                $hex = $bahan?->color_code ?: '#e5e7eb';
-                                $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
+                                if ($cat === 'non_produksi') {
+                                    $vId = $details['product_variant_id'] ?? null;
+                                    $v = $vId ? \App\Models\ProductVariant::with('product')->find($vId) : null;
+                                    $hex = $v?->color_code ?: '#e5e7eb';
+                                    $bahanLabel = $v ? (($v->product?->name ?? $record->product_name) . ' - ' . ($v->color_name ?? 'Tanpa Warna')) : ($record->product_name ?? '-');
+                                } else {
+                                    $hex = $bahan?->color_code ?: '#e5e7eb';
+                                    $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
+                                }
 
                                 $html .= '<div style="margin-bottom:24px;">';
-                                $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">INFORMASI BAHAN</div>';
+                                $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . ($cat === 'non_produksi' ? 'INFORMASI BAJU JADI' : 'INFORMASI BAHAN') . '</div>';
                                 $html .= '<div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
                                 $html .= '<span style="width:16px; height:16px; border-radius:50%; background:' . $hex . '; border:1px solid rgba(0,0,0,0.15); flex-shrink:0;"></span>';
                                 $html .= '<div style="flex:1;">';
@@ -168,30 +175,33 @@ class DesignHistoryTableWidget extends BaseWidget
                                 $genders = [];
                                 foreach ($allOrderItems as $item) {
                                     $idtl = $item->size_and_request_details ?? [];
-                                    $g = $idtl['gender'] ?? 'L';
+                                    $isKonveksi = in_array($cat, ['produksi', 'custom']);
+                                    $g = $isKonveksi ? ($idtl['gender'] ?? 'L') : 'UMUM';
                                     if (!isset($genders[$g]))
                                         $genders[$g] = ['qty' => 0, 'models' => []];
                                     $genders[$g]['qty'] += $item->quantity;
 
                                     $mParts = [];
-                                    if (isset($idtl['sleeve_model']))
-                                        $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
-                                    if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku')
-                                        $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
-                                    if (!empty($idtl['is_tunic']))
-                                        $mParts[] = 'Tunik';
-                                    $mKey = empty($mParts) ? 'Model Standar' : implode(', ', $mParts);
+                                    if ($isKonveksi) {
+                                        if (isset($idtl['sleeve_model']))
+                                            $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
+                                        if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku')
+                                            $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
+                                        if (!empty($idtl['is_tunic']))
+                                            $mParts[] = 'Tunik';
+                                    }
+                                    $mKey = empty($mParts) ? ($isKonveksi ? 'Model Standar' : 'Rincian Pesanan') : implode(', ', $mParts);
 
                                     if (!isset($genders[$g]['models'][$mKey])) {
                                         $genders[$g]['models'][$mKey] = [
                                             'qty' => 0,
                                             'sizes' => [],
                                             'notes' => [],
-                                            'attrs' => [
+                                            'attrs' => $isKonveksi ? [
                                                 'LENGAN' => isset($idtl['sleeve_model']) ? strtoupper($idtl['sleeve_model']) : 'PENDEK',
                                                 'SAKU' => isset($idtl['pocket_model']) ? strtoupper(str_replace('_', ' ', $idtl['pocket_model'])) : 'TANPA SAKU',
                                                 'KANCING' => isset($idtl['button_model']) ? strtoupper($idtl['button_model']) : 'BIASA',
-                                            ]
+                                            ] : []
                                         ];
                                     }
                                     $genders[$g]['models'][$mKey]['qty'] += $item->quantity;
@@ -209,7 +219,7 @@ class DesignHistoryTableWidget extends BaseWidget
 
                                 if ($hasKonveksiItems) {
                                     foreach ($genders as $gCode => $gData) {
-                                        $gName = $gCode === 'P' ? 'PEREMPUAN' : 'LAKI-LAKI';
+                                        $gName = $gCode === 'P' ? 'PEREMPUAN' : ($gCode === 'L' ? 'LAKI-LAKI' : 'RINCIAN UKURAN PESANAN');
                                         $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
                                         $html .= '<div @click="open = !open" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:#f9fafb;">';
                                         $html .= '<div style="display:flex; align-items:center; gap:8px;">';

@@ -757,6 +757,7 @@
                                 $sizeQtyParts = [];
                                 if (!empty($task->size_quantities) && is_array($task->size_quantities)) {
                                     foreach ($task->size_quantities as $sz => $q) {
+                                        if (str_starts_with($sz, '_')) continue;
                                         if ((int) $q > 0)
                                             $sizeQtyParts[] = strtoupper($sz) . ':' . $q;
                                     }

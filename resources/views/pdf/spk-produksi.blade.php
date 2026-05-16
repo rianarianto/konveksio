@@ -293,85 +293,60 @@
         </table>
     </div>
 
-    @php
-        $hasNamesOrCustom = collect($allGroupItems)->contains(function($i) {
-            $details = $i->size_and_request_details ?? [];
-            return !empty($i->recipient_name) || strtoupper($i->size) === 'CUSTOM' || !empty($details['detail_custom']);
-        });
-    @endphp
-
-    @php
-        $standardNames = [];
-        $customEntries = [];
-        
-        foreach($allGroupItems as $gi) {
-            $details = $gi->size_and_request_details ?? [];
-            $size = strtoupper($gi->size ?? 'S');
-            
-            // 1. United Custom
-            if (!empty($details['detail_custom'])) {
-                foreach($details['detail_custom'] as $u) {
-                    $customEntries[] = [
-                        'nama' => $u['nama'] ?? '-',
-                        'size' => $u['ukuran'] ?? 'Custom',
-                        'desc' => !empty($u['LD']) ? "LD:{$u['LD']} PB:{$u['PB']} PL:{$u['PL']} LB:{$u['LB']}" : ""
-                    ];
-                }
-            } 
-            // 2. Individual Custom
-            elseif ($size === 'CUSTOM') {
-                 $m = [];
-                 foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
-                     if (!empty($details[$mk])) $m[] = "$mk:{$details[$mk]}";
-                 }
-                 $customEntries[] = [
-                        'nama' => $gi->recipient_name ?? '-',
-                        'size' => 'Custom',
-                        'desc' => implode(' ', $m)
-                    ];
-            }
-            // 3. Individual Standard with Name
-            elseif (!empty($gi->recipient_name)) {
-                $standardNames[$size][] = $gi->recipient_name;
-            }
-        }
-        $hasAnyNames = !empty($standardNames) || !empty($customEntries);
-    @endphp
-
-    @if($hasAnyNames)
-    <div class="section" style="border: 1px solid #7c3aed; padding: 6px; border-radius: 4px; background: #fafafa;">
+    <div class="section" style="border: 1px solid #7c3aed; padding: 6px; border-radius: 4px; background: #fafafa; min-height: 40px;">
         <div style="font-size: 8.5pt; font-weight: bold; color: #7c3aed; border-bottom: 1px solid #7c3aed; margin-bottom: 4px; padding-bottom: 2px;">
-            3. DAFTAR NAMA PENERIMA & DETAIL CUSTOM
+            3. DAFTAR NAMA PENERIMA & DETAIL CUSTOM (PER GRUP)
         </div>
-        
-        {{-- Render Standard Sizes with Names --}}
-        @foreach($standardNames as $sz => $names)
-            <div style="font-size: 8pt; margin-bottom: 2px;">
-                <strong style="background: #f3e8ff; padding: 0 4px; border-radius: 2px;">{{ $sz }}</strong>: {{ implode(', ', $names) }}
-            </div>
+
+        @php $hasAnyRecipients = false; @endphp
+        @foreach($specGroups as $group)
+            @php 
+                $rec = $group['recipients'] ?? [];
+                $hasRec = !empty($rec['standard']) || !empty($rec['custom']);
+            @endphp
+            
+            @if($hasRec)
+                @php $hasAnyRecipients = true; @endphp
+                <div style="margin-bottom: 8px; {{ !$loop->last ? 'border-bottom: 1px dashed #ddd; padding-bottom: 6px;' : '' }}">
+                    <div style="font-size: 8pt; font-weight: bold; color: #555; margin-bottom: 3px;">
+                        GRUP #{{ $loop->iteration }} ({{ $group['gender'] }} - {{ $group['sleeve'] }})
+                    </div>
+                    
+                    {{-- Standard Sizes with Names --}}
+                    @if(!empty($rec['standard']))
+                        @foreach($rec['standard'] as $sz => $names)
+                            <div style="font-size: 7.5pt; margin-bottom: 2px;">
+                                <strong style="background: #f3e8ff; padding: 0 4px; border-radius: 2px; color: #7c3aed;">{{ $sz }}</strong>: {{ implode(', ', $names) }}
+                            </div>
+                        @endforeach
+                    @endif
+
+                    {{-- Custom Measurements --}}
+                    @if(!empty($rec['custom']))
+                        <table style="width: 100%; border: none; border-collapse: collapse;">
+                            @foreach(array_chunk($rec['custom'], 2) as $row)
+                                <tr>
+                                    @foreach($row as $ce)
+                                        <td style="width: 50%; border: none; padding: 2px 0; vertical-align: top; font-size: 7.5pt;">
+                                            <span class="text-bold">• {{ $ce['nama'] }}</span> ({{ $ce['size'] }}) 
+                                            @if($ce['desc']) <br><span style="color: #666; font-size: 7pt; font-style: italic; margin-left: 10px;">{{ $ce['desc'] }}</span> @endif
+                                        </td>
+                                    @endforeach
+                                    @if(count($row) < 2) <td style="width: 50%; border: none;"></td> @endif
+                                </tr>
+                            @endforeach
+                        </table>
+                    @endif
+                </div>
+            @endif
         @endforeach
 
-        {{-- Render Custom Measurements --}}
-        @if(!empty($customEntries))
-            <div style="margin-top: 5px; font-size: 8pt; border-top: 1px dashed #ddd; padding-top: 4px;">
-                <strong>DETAIL CUSTOM:</strong>
-                <table style="width: 100%; border: none; border-collapse: collapse; margin-top: 2px;">
-                    @foreach(array_chunk($customEntries, 2) as $row)
-                        <tr>
-                            @foreach($row as $ce)
-                                <td style="width: 50%; border: none; padding: 2px 0; vertical-align: top;">
-                                    <span class="text-bold">• {{ $ce['nama'] }}</span> ({{ $ce['size'] }}) 
-                                    @if($ce['desc']) <br><span style="color: #444; font-size: 7pt; font-style: italic; margin-left: 10px;">{{ $ce['desc'] }}</span> @endif
-                                </td>
-                            @endforeach
-                            @if(count($row) < 2) <td style="width: 50%; border: none;"></td> @endif
-                        </tr>
-                    @endforeach
-                </table>
+        @if(!$hasAnyRecipients)
+            <div style="font-style: italic; color: #999; font-size: 8pt; text-align: center; padding: 10px;">
+                Tidak ada data nama penerima atau ukuran custom khusus.
             </div>
         @endif
     </div>
-    @endif
     <div class="section">
         <div class="section-title">4. DAFTAR PEMBAGIAN TUGAS PRODUKSI</div>
         <table class="data-table">
