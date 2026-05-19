@@ -888,10 +888,10 @@ class OrderResource extends Resource
                             $categories = [];
                             foreach ($itemsGroup as $item) {
                                 $cat = match ($item->production_category) {
-                                    'custom' => ['Konveksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
-                                    'non_produksi' => ['Baju Jadi', 'rgba(245,158,11,0.12)', '#d97706'],
+                                    'custom' => ['Produksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
+                                    'non_produksi' => ['Non-Produksi', 'rgba(245,158,11,0.12)', '#d97706'],
                                     'jasa' => ['Jasa', 'rgba(16,185,129,0.12)', '#059669'],
-                                    default => ['Konveksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
+                                    default => ['Produksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
                                 };
                                 $categories[$cat[0]] = $cat;
                             }
@@ -1005,8 +1005,8 @@ class OrderResource extends Resource
                 SelectFilter::make('tipe_produk')
                     ->label('Tipe Produk')
                     ->options([
-                        'produksi' => 'Konveksi',
-                        'non_produksi' => 'Baju Jadi',
+                        'produksi' => 'Produksi',
+                        'non_produksi' => 'Non-Produksi',
                         'jasa' => 'Jasa',
                     ])
                     ->query(function (Builder $query, array $data): Builder {

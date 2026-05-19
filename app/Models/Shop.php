@@ -11,6 +11,11 @@ class Shop extends Model
         'address',
         'phone',
         'max_capacity_pcs',
+        'production_spec_options',
+    ];
+
+    protected $casts = [
+        'production_spec_options' => 'array',
     ];
 
     public function users()

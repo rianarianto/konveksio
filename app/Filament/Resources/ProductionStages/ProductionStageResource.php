@@ -73,7 +73,7 @@ class ProductionStageResource extends Resource
                     ->placeholder('0')
                     ->prefix('Rp'),
                 Toggle::make('for_produksi_custom')
-                    ->label('Kategori Konveksi')
+                    ->label('Kategori Produksi')
                     ->default(true)
                     ->helperText('Tahapan ini akan muncul pada produk komplit/custom.'),
                 Toggle::make('for_non_produksi')
@@ -101,10 +101,10 @@ class ProductionStageResource extends Resource
                     ->money('IDR', locale: 'id')
                     ->sortable(),
                 IconColumn::make('for_produksi_custom')
-                    ->label('Konveksi')
+                    ->label('Produksi')
                     ->boolean(),
                 IconColumn::make('for_non_produksi')
-                    ->label('Non Produksi')
+                    ->label('Non-Produksi')
                     ->boolean(),
                 IconColumn::make('for_jasa')
                     ->label('Jasa')

@@ -66,20 +66,23 @@ class AturTugasProduksi extends Page
         }
 
         $tasksForRepeater = [];
-        foreach ($item->productionTasks as $task) {
-            $wagePerPcs = $task->quantity > 0 ? (int) ($task->wage_amount / $task->quantity) : 0;
+        $groupedTasks = $item->productionTasks->groupBy('stage_name');
+        foreach ($groupedTasks as $stageName => $tasks) {
+            $firstTask = $tasks->first();
+            $wagePerPcs = $firstTask->quantity > 0 ? (int) ($firstTask->wage_amount / $firstTask->quantity) : 0;
+            $workerIds = $tasks->pluck('assigned_to')->unique()->filter()->values()->toArray();
+
             $taskRow = [
-                'id' => $task->id,
-                'stage_name' => $task->stage_name,
-                'assigned_to' => $task->assigned_to,
-                'quantity' => $task->quantity,
+                'stage_name' => $stageName,
+                'assigned_to' => $workerIds,
+                'quantity' => $firstTask->quantity,
                 'wage_per_pcs' => $wagePerPcs,
-                'wage_custom_per_pcs' => $task->size_quantities['_wage_custom'] ?? $wagePerPcs,
-                'description' => $task->description,
+                'wage_custom_per_pcs' => $firstTask->size_quantities['_wage_custom'] ?? $wagePerPcs,
+                'description' => $firstTask->description,
             ];
 
-            if (is_array($task->size_quantities)) {
-                foreach ($task->size_quantities as $sz => $qty) {
+            if (is_array($firstTask->size_quantities)) {
+                foreach ($firstTask->size_quantities as $sz => $qty) {
                     $upperSz = strtoupper($sz);
                     if (str_starts_with($sz, '_')) {
                         continue;
@@ -126,208 +129,7 @@ class AturTugasProduksi extends Page
             ->schema([
                 Grid::make(12)
                     ->schema([
-                        // LEFT COLUMN: SPECIFICATIONS
-                        Group::make([
-                            Section::make('Rincian Spesifikasi')
-                                ->description('Detail model, ukuran, dan bahan')
-                                ->icon('heroicon-m-information-circle')
-                                ->compact()
-                                ->schema([
-                                    Placeholder::make('technical_specs')
-                                        ->hiddenLabel()
-                                        ->content(function () use ($item): HtmlString {
-                                            if (!$item) return new HtmlString('');
-
-                                            $name = htmlspecialchars($item->product_name ?? 'Produk');
-                                            $cat = $item->production_category ?? 'produksi';
-                                            $details = $item->size_and_request_details ?? [];
-                                            $bahan = $item->bahan;
-                                            $allOrderItems = OrderItem::where('order_id', $item->order_id)->where('product_name', $item->product_name)->get();
-
-                                            $catLabel = match ($cat) {
-                                                'non_produksi' => 'BAJU JADI',
-                                                'jasa' => 'JASA',
-                                                default => 'KONVEKSI',
-                                            };
-
-                                            $primaryColor = '#7c3aed';
-                                            $html = '<div style="font-family:inherit; color:#1f2937;">';
-
-                                            $html .= '<div style="margin-bottom:20px; border-bottom:1px solid #e5e7eb; padding-bottom:12px;">';
-                                            $html .= '<div style="display:flex; align-items:center; gap:8px;">';
-                                            $html .= '<span style="font-size:20px; font-weight:800; letter-spacing:-0.01em;">' . strtoupper($name) . '</span>';
-                                            $html .= '<small style="background:#f3e8ff; color:' . $primaryColor . '; font-weight:800; padding:2px 8px; border-radius:4px; font-size:10px; border:1px solid #ddd6fe;">' . $catLabel . '</small>';
-                                            $html .= '</div>';
-                                            $html .= '</div>';
-
-                                            if ($cat === 'non_produksi') {
-                                                $vId = $details['product_variant_id'] ?? null;
-                                                $v = $vId ? \App\Models\ProductVariant::with('product')->find($vId) : null;
-                                                $hex = $v?->color_code ?: '#e5e7eb';
-                                                $bahanLabel = $v ? (($v->product?->name ?? $item->product_name) . ' - ' . ($v->color_name ?? 'Tanpa Warna')) : ($item->product_name ?? '-');
-                                            } else {
-                                                $hex = $bahan?->color_code ?: '#e5e7eb';
-                                                $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
-                                            }
-
-                                            $html .= '<div style="margin-bottom:24px;">';
-                                            $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . ($cat === 'non_produksi' ? 'INFORMASI BAJU JADI' : 'INFORMASI BAHAN') . '</div>';
-                                            $html .= '<div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
-                                            $html .= '<span style="width:16px; height:16px; border-radius:50%; background:' . $hex . '; border:1px solid rgba(0,0,0,0.15); flex-shrink:0;"></span>';
-                                            $html .= '<div style="flex:1;">';
-                                            $html .= '<div style="font-size:13px; font-weight:700; color:#111827;">' . htmlspecialchars($bahanLabel) . '</div>';
-
-                                            $sablon = $details['sablon_bordir'] ?? [];
-                                            if (empty($sablon) && !empty($details['sablon_jenis'])) {
-                                                $sablon = [['jenis' => $details['sablon_jenis'], 'lokasi' => $details['sablon_lokasi'] ?? '-']];
-                                            }
-
-                                            if (!empty($sablon)) {
-                                                $sblnTexts = [];
-                                                foreach ($sablon as $s) {
-                                                    $sblnTexts[] = ($s['jenis'] ?? '') . ' (' . ($s['lokasi'] ?? '') . ')';
-                                                }
-                                                $html .= '<div style="font-size:11px; font-weight:600; color:' . $primaryColor . '; margin-top:2px;">SABLON/BORDIR: ' . htmlspecialchars(implode(', ', $sblnTexts)) . '</div>';
-                                            }
-                                            $html .= '</div>';
-                                            $html .= '</div>';
-                                            $html .= '</div>';
-
-                                            $genders = [];
-                                            foreach ($allOrderItems as $ai) {
-                                                $idtl = $ai->size_and_request_details ?? [];
-                                                $isKonveksi = in_array($cat, ['produksi', 'custom']);
-                                                $g = $isKonveksi ? ($idtl['gender'] ?? 'L') : 'UMUM';
-                                                
-                                                if (!isset($genders[$g])) $genders[$g] = ['qty' => 0, 'models' => []];
-                                                $genders[$g]['qty'] += $ai->quantity;
-
-                                                $mParts = [];
-                                                $attrs = [];
-                                                
-                                                if ($isKonveksi) {
-                                                    if (isset($idtl['sleeve_model'])) $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
-                                                    if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku') $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
-                                                    if (!empty($idtl['is_tunic'])) $mParts[] = 'Tunik';
-                                                    
-                                                    $attrs = [
-                                                        'LENGAN' => isset($idtl['sleeve_model']) ? strtoupper($idtl['sleeve_model']) : 'PENDEK',
-                                                        'SAKU' => isset($idtl['pocket_model']) ? strtoupper(str_replace('_', ' ', $idtl['pocket_model'])) : 'TANPA SAKU',
-                                                        'KANCING' => isset($idtl['button_model']) ? strtoupper($idtl['button_model']) : 'BIASA',
-                                                    ];
-                                                }
-                                                
-                                                $mKey = empty($mParts) ? ($isKonveksi ? 'Model Standar' : 'Rincian Pesanan') : implode(', ', $mParts);
-
-                                                if (!isset($genders[$g]['models'][$mKey])) {
-                                                    $genders[$g]['models'][$mKey] = [
-                                                        'qty' => 0, 'sizes' => [], 'notes' => [], 'custom' => [],
-                                                        'attrs' => $isKonveksi ? $attrs : []
-                                                    ];
-                                                }
-                                                $genders[$g]['models'][$mKey]['qty'] += $ai->quantity;
-                                                $sz = $ai->size ?? '-';
-                                                $genders[$g]['models'][$mKey]['sizes'][$sz] = ($genders[$g]['models'][$mKey]['sizes'][$sz] ?? 0) + $ai->quantity;
-                                                if (!empty($idtl['request_tambahan'])) $genders[$g]['models'][$mKey]['notes'][] = $idtl['request_tambahan'];
-
-                                                if ($ai->size === 'Custom') {
-                                                    $m = [];
-                                                    foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
-                                                        if (!empty($idtl[$mk])) $m[] = $mk . ':' . $idtl[$mk];
-                                                    }
-                                                    if (!empty($m) || $ai->recipient_name) {
-                                                        $genders[$g]['models'][$mKey]['custom'][] = ($ai->recipient_name ?: '-') . (!empty($m) ? ' (' . implode(' ', $m) . ')' : '');
-                                                    }
-                                                }
-
-                                                if (!empty($idtl['detail_custom'])) {
-                                                    foreach ($idtl['detail_custom'] as $u) {
-                                                        $m = [];
-                                                        foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
-                                                            if (!empty($u[$mk])) $m[] = $mk . ':' . $u[$mk];
-                                                        }
-                                                        $genders[$g]['models'][$mKey]['custom'][] = ($u['nama'] ?? '-') . (!empty($m) ? ' (' . implode(' ', $m) . ')' : '');
-                                                    }
-                                                }
-                                            }
-
-                                            $html .= '<div>';
-                                            $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">RINCIAN PRODUKSI</div>';
-                                            $html .= '<div style="display:flex; flex-direction:column; gap:8px;">';
-
-                                            $hasItemsToShow = count($genders) > 0;
-
-                                            if ($hasItemsToShow) {
-                                                foreach ($genders as $gCode => $gData) {
-                                                    $gName = $gCode === 'P' ? 'PEREMPUAN' : ($gCode === 'L' ? 'LAKI-LAKI' : 'RINCIAN UKURAN PESANAN');
-                                                    $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
-                                                    $html .= '<div @click="open = !open" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:#f9fafb;">';
-                                                    $html .= '<div style="display:flex; align-items:center; gap:8px;">';
-                                                    $html .= '<span style="font-size:12px; font-weight:800; color:#374151;">' . $gName . '</span>';
-                                                    $html .= '<span style="font-size:12px; font-weight:900; color:' . $primaryColor . ';">' . $gData['qty'] . ' pcs</span>';
-                                                    $html .= '</div>';
-                                                    $html .= '<svg :class="open ? \'rotate-180\' : \'\'" style="width:14px; height:14px; transition:0.2s;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';
-                                                    $html .= '</div>';
-
-                                                    $html .= '<div x-show="open" style="padding:16px; border-top:1px solid #f1f5f9; display:flex; flex-direction:column; gap:16px;">';
-                                                    $hasMultipleModels = count($gData['models']) > 1;
-                                                    foreach ($gData['models'] as $mKey => $mData) {
-                                                        $html .= '<div>';
-                                                        if ($hasMultipleModels) {
-                                                            $html .= '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:6px 10px; background:#f3e8ff; border-radius:6px;">';
-                                                            $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . '; text-transform:uppercase;">' . $mKey . '</span>';
-                                                            $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . ';">' . $mData['qty'] . ' pcs</span>';
-                                                            $html .= '</div>';
-                                                        }
-                                                        
-                                                        if (!empty($mData['attrs'])) {
-                                                            $atxt = [];
-                                                            foreach ($mData['attrs'] as $ak => $av) {
-                                                                $atxt[] = '<span style="color:#9ca3af; font-size:10px;">' . $ak . ':</span><span style="color:#4b5563; margin-left:2px;">' . $av . '</span>';
-                                                            }
-                                                            $html .= '<div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; font-weight:700; margin-bottom:16px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
-                                                        }
-                                                        $stxt = [];
-                                                        foreach ($mData['sizes'] as $szKey => $sqty) {
-                                                            $stxt[] = '<div style="padding:4px 8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:4px; font-size:12px; font-weight:800; color:#1e293b;">' . htmlspecialchars($szKey) . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
-                                                        }
-                                                        $html .= '<div style="display:flex; flex-wrap:wrap; gap:6px;">' . implode('', $stxt) . '</div>';
-                                                        if (!empty($mData['custom'])) {
-                                                            $html .= '<div style="margin-top:8px; padding:8px 12px; background:#faf5ff; border:1px solid #e9d5ff; border-radius:6px;">';
-                                                            $html .= '<div style="font-size:10px; font-weight:800; color:#6b21a8; text-transform:uppercase; margin-bottom:4px;">UKURAN CUSTOM:</div>';
-                                                            foreach ($mData['custom'] as $c) $html .= '<div style="font-size:12px; font-weight:700; color:#581c87;">• ' . htmlspecialchars($c) . '</div>';
-                                                            $html .= '</div>';
-                                                        }
-                                                        if (!empty($mData['notes'])) {
-                                                            $html .= '<div style="margin-top:8px; padding:8px 12px; background:#fffcf0; border:1px solid #fef3c7; border-radius:6px;">';
-                                                            $html .= '<div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; margin-bottom:4px;">CATATAN:</div>';
-                                                            foreach ($mData['notes'] as $n) $html .= '<div style="font-size:12px; font-weight:700; color:#92400e;">- ' . htmlspecialchars($n) . '</div>';
-                                                            $html .= '</div>';
-                                                        }
-                                                        $html .= '</div>';
-                                                        if ($hasMultipleModels && next($gData['models'])) $html .= '<hr style="border:none; border-top:1px dashed #e2e8f0; margin:4px 0;">';
-                                                    }
-                                                    $html .= '</div></div>';
-                                                }
-                                            }
-                                            $html .= '</div></div>';
-                                            
-                                            $url = route('filament.admin.resources.orders.edit', ['tenant' => \Filament\Facades\Filament::getTenant()->id, 'record' => $item->order_id]);
-                                            $html .= '<div style="margin-top:24px;">';
-                                            $html .= '<a href="' . $url . '" target="_blank" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:10px; background:#ffffff; color:#374151; border:1px solid #d1d5db; border-radius:6px; text-decoration:none; font-size:11px; font-weight:800; transition:0.1s;">';
-                                            $html .= '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>';
-                                            $html .= 'LIHAT DETAIL PESANAN';
-                                            $html .= '</a>';
-                                            $html .= '</div>';
-
-                                            $html .= '</div>';
-                                            return new HtmlString($html);
-                                        })
-                                        ->columnSpanFull(),
-                                ])
-                        ])->columnSpan(4),
-
-                        // RIGHT COLUMN: TASK ASSIGNMENT
+                        // LEFT COLUMN: TASK ASSIGNMENT
                         Group::make([
                             Section::make('Daftar Tugas Produksi')
                                 ->description('Tentukan tahapan dan karyawan yang bertugas')
@@ -392,6 +194,8 @@ class AturTugasProduksi extends Page
                                                         }),
                                                     Select::make('assigned_to')
                                                         ->label('Karyawan')
+                                                        ->multiple()
+                                                        ->live()
                                                         ->options(function() {
                                                             return Worker::where('is_active', true)
                                                                 ->get()
@@ -501,16 +305,197 @@ class AturTugasProduksi extends Page
                                                         ->numeric()
                                                         ->readOnly()
                                                         ->prefix('Σ'),
-                                                    TextInput::make('wage_per_pcs')
+                                                    TextInput::make('wage_per_pcs')->live(debounce: 500)
                                                         ->label('Upah Standar per Pcs')
                                                         ->numeric()
                                                         ->prefix('Rp'),
-                                                    TextInput::make('wage_custom_per_pcs')
+                                                    TextInput::make('wage_custom_per_pcs')->live(debounce: 500)
                                                         ->label('Upah Custom per Pcs')
                                                         ->numeric()
                                                         ->prefix('Rp')
                                                         ->visible(fn (Get $get) => (str_contains(strtolower($get('stage_name')), 'potong') || str_contains(strtolower($get('stage_name')), 'jahit')) && (int) ($get('CUSTOM') ?? 0) > 0),
                                                 ]),
+
+                                            Placeholder::make('split_preview')
+                                                 ->hiddenLabel()
+                                                 ->visible(fn (Get $get) => count((array) ($get('assigned_to') ?? [])) > 1)
+                                                 ->content(function (Get $get) use ($item): HtmlString {
+                                                     $workers = (array) ($get('assigned_to') ?? []);
+                                                     $workerCount = count($workers);
+                                                     if ($workerCount <= 1) return new HtmlString('');
+
+                                                     // Collect size quantities from the row state
+                                                     $sizeQuantities = [];
+                                                     $allSizes = OrderItem::where('order_id', $item->order_id)
+                                                         ->where('product_name', $item->product_name)
+                                                         ->where('bahan_id', $item->bahan_id)
+                                                         ->where('design_status', 'approved')
+                                                         ->get()
+                                                         ->pluck('size')
+                                                         ->unique()
+                                                         ->map(fn($s) => strtoupper($s ?? 'TANPA_UKURAN'))
+                                                         ->toArray();
+                                                     if ($item->production_category === 'custom') {
+                                                         $allSizes[] = 'CUSTOM';
+                                                     }
+
+                                                     foreach ($allSizes as $sz) {
+                                                         $val = (int) ($get($sz) ?? 0);
+                                                         if ($val > 0) {
+                                                             $sizeQuantities[$sz] = $val;
+                                                         }
+                                                     }
+
+                                                     $quantity = array_sum($sizeQuantities);
+                                                     if ($quantity === 0 && (int) $get('qty') > 0) $quantity = (int) $get('qty');
+                                                     if ($quantity === 0 && (int) $get('quantity') > 0) $quantity = (int) $get('quantity');
+
+                                                     $wagePerPcs = (float) ($get('wage_per_pcs') ?? 0);
+                                                     $wageCustomPerPcs = (float) ($get('wage_custom_per_pcs') ?? $wagePerPcs);
+
+                                                     $customQty = (int) ($sizeQuantities['CUSTOM'] ?? 0);
+                                                     $standardQty = $quantity - $customQty;
+                                                     $totalWage = ($standardQty * $wagePerPcs) + ($customQty * $wageCustomPerPcs);
+
+                                                     // 1. Get all custom names and size genders in order
+                                                     $customNames = [];
+                                                     $sizeGenders = [];
+                                                     $allItems = OrderItem::where('order_id', $item->order_id)
+                                                         ->where('product_name', $item->product_name)
+                                                         ->where('bahan_id', $item->bahan_id)
+                                                         ->where('design_status', 'approved')
+                                                         ->get();
+
+                                                     foreach ($allItems as $ai) {
+                                                         $idtl = $ai->size_and_request_details ?? [];
+                                                         if ($ai->production_category === 'custom') {
+                                                             if (!empty($idtl['detail_custom'])) {
+                                                                 foreach ($idtl['detail_custom'] as $u) {
+                                                                     if (!empty($u['nama'])) {
+                                                                         $customNames[] = $u['nama'];
+                                                                     }
+                                                                 }
+                                                             }
+                                                         } else {
+                                                             $sz = strtoupper($ai->size ?? 'TANPA_UKURAN');
+                                                             $g = strtoupper($idtl['gender'] ?? 'L');
+                                                             $gLabel = ($g === 'P' ? 'P' : 'L');
+                                                             
+                                                             $qtyVal = (int) $ai->quantity;
+                                                             for ($qIdx = 0; $qIdx < $qtyVal; $qIdx++) {
+                                                                 $sizeGenders[$sz][] = $gLabel;
+                                                             }
+                                                         }
+                                                     }
+
+                                                     // 2. Apply round-robin splitting algorithm
+                                                     $workerSizes = [];
+                                                     $workerCustomNames = [];
+                                                     $workerGenders = [];
+                                                     for ($i = 0; $i < $workerCount; $i++) {
+                                                         $workerSizes[$i] = [];
+                                                         $workerCustomNames[$i] = [];
+                                                         $workerGenders[$i] = [];
+                                                     }
+
+                                                     $remainders = [];
+                                                     foreach ($sizeQuantities as $sz => $qty) {
+                                                         $baseQty = (int) floor($qty / $workerCount);
+                                                         $remQty = $qty % $workerCount;
+                                                         for ($i = 0; $i < $workerCount; $i++) {
+                                                             if ($baseQty > 0) {
+                                                                 $workerSizes[$i][$sz] = $baseQty;
+                                                             }
+                                                         }
+                                                         for ($r = 0; $r < $remQty; $r++) {
+                                                             $remainders[] = $sz;
+                                                         }
+                                                     }
+
+                                                     $remCount = count($remainders);
+                                                     for ($r = 0; $r < $remCount; $r++) {
+                                                         $workerIdx = $r % $workerCount;
+                                                         $sz = $remainders[$r];
+                                                         $workerSizes[$workerIdx][$sz] = ($workerSizes[$workerIdx][$sz] ?? 0) + 1;
+                                                     }
+
+                                                     // Distribute custom names round-robin to matching worker custom allocations
+                                                     $cCount = count($customNames);
+                                                     for ($c = 0; $c < $cCount; $c++) {
+                                                         $workerIdx = $c % $workerCount;
+                                                         $workerCustomNames[$workerIdx][] = $customNames[$c];
+                                                     }
+
+                                                     // Distribute genders round-robin per size
+                                                     foreach ($sizeGenders as $sz => $gList) {
+                                                         for ($idx = 0; $idx < count($gList); $idx++) {
+                                                             $workerIdx = $idx % $workerCount;
+                                                             $gLabel = $gList[$idx] === 'P' ? 'P' : 'L';
+                                                             $workerGenders[$workerIdx][$sz][$gLabel] = ($workerGenders[$workerIdx][$sz][$gLabel] ?? 0) + 1;
+                                                         }
+                                                     }
+
+                                                     $workerModels = Worker::whereIn('id', $workers)->get()->keyBy('id');
+
+                                                     $html = '<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px 16px; font-size:12px; margin-bottom:16px;">';
+                                                     $html .= '<div style="font-weight:800; color:#166534; margin-bottom:8px; display:flex; align-items:center; gap:4px; font-size:11px; letter-spacing:0.02em;">🔍 PRATINJAU PEMBAGIAN TUGAS (DIBAGI RATA)</div>';
+                                                     $html .= '<div style="display:flex; flex-direction:column; gap:6px;">';
+
+                                                     for ($i = 0; $i < $workerCount; $i++) {
+                                                         $wId = $workers[$i];
+                                                         $wName = $workerModels[$wId]->name ?? 'Karyawan ' . ($i + 1);
+
+                                                         $eachSizes = $workerSizes[$i];
+                                                         $eachCleanSizes = array_filter($eachSizes, fn($k) => !str_starts_with($k, '_'), ARRAY_FILTER_USE_KEY);
+                                                         $eachQty = array_sum($eachCleanSizes);
+
+                                                         if ($eachQty === 0) {
+                                                             $eachQty = (int) floor($quantity / $workerCount);
+                                                             if ($i === 0) $eachQty += ($quantity % $workerCount);
+
+                                                             $eachWage = (int) floor($totalWage / $workerCount);
+                                                             if ($i === 0) {
+                                                                 $eachWage += ($totalWage % $workerCount);
+                                                             }
+                                                         } else {
+                                                             $eachCustomQty = (int) ($eachSizes['CUSTOM'] ?? 0);
+                                                             $eachStandardQty = $eachQty - $eachCustomQty;
+                                                             $eachWage = ($eachStandardQty * $wagePerPcs) + ($eachCustomQty * $wageCustomPerPcs);
+                                                         }
+
+                                                         $sizeString = [];
+                                                         foreach ($eachCleanSizes as $sz => $sqty) {
+                                                             $szGenders = $workerGenders[$i][$sz] ?? [];
+                                                             if (!empty($szGenders)) {
+                                                                 $gStrings = [];
+                                                                 foreach ($szGenders as $gLabel => $gQty) {
+                                                                     $gStrings[] = ($gLabel === 'P' ? 'Perempuan' : 'Laki-laki') . ': ' . $gQty;
+                                                                 }
+                                                                 $sizeString[] = $sz . ' (' . implode(', ', $gStrings) . ')';
+                                                             } else {
+                                                                 $sizeString[] = $sz . ': ' . $sqty;
+                                                             }
+                                                         }
+                                                         $sizeDetails = !empty($sizeString) ? ' (' . implode(' | ', $sizeString) . ')' : '';
+
+                                                         $eachCustomNames = $workerCustomNames[$i] ?? [];
+                                                         $customDetails = !empty($eachCustomNames) ? '<div style="font-size:11px; color:#15803d; font-weight:600; margin-top:4px; padding-left:20px; font-style:italic;">🧵 Baju Custom: ' . htmlspecialchars(implode(', ', $eachCustomNames)) . '</div>' : '';
+
+                                                         $html .= '<div style="display:flex; flex-direction:column; padding:8px 10px; background:white; border:1px solid #dcfce7; border-radius:6px; font-weight:700; color:#14532d;">';
+                                                         $html .= '<div style="display:flex; justify-content:space-between; align-items:center; width:100%;">';
+                                                         $html .= '<div>👤 ' . htmlspecialchars($wName) . '<span style="font-weight:600; font-size:11px; color:#16a34a; margin-left:6px;">' . $sizeDetails . '</span></div>';
+                                                         $html .= '<div style="text-align:right; font-size:12px;">' . $eachQty . ' pcs &nbsp;|&nbsp; <span style="color:#15803d; font-weight:800;">Rp ' . number_format($eachWage, 0, ',', '.') . '</span></div>';
+                                                         $html .= '</div>';
+                                                         $html .= $customDetails;
+                                                         $html .= '</div>';
+                                                     }
+
+                                                     $html .= '</div>';
+                                                     $html .= '</div>';
+
+                                                     return new HtmlString($html);
+                                                 })
+                                                 ->columnSpanFull(),
 
                                             Textarea::make('description')
                                                 ->label('Catatan Instruksi')
@@ -522,6 +507,229 @@ class AturTugasProduksi extends Page
                                         ->addAction(fn($action) => $action->color('primary')),
                                 ])
                         ])->columnSpan(8),
+
+                        // RIGHT COLUMN: SPECIFICATIONS (Sticky)
+                        Group::make([
+                            Section::make('Rincian Spesifikasi')
+                                ->description('Detail model, ukuran, dan bahan')
+                                ->icon('heroicon-m-information-circle')
+                                ->compact()
+                                ->schema([
+                                    Placeholder::make('technical_specs')
+                                        ->hiddenLabel()
+                                        ->content(function () use ($item): HtmlString {
+                                            if (!$item) return new HtmlString('');
+
+                                            $name = htmlspecialchars($item->product_name ?? 'Produk');
+                                            $cat = $item->production_category ?? 'produksi';
+                                            $details = $item->size_and_request_details ?? [];
+                                            $bahan = $item->bahan;
+                                            $allOrderItems = OrderItem::where('order_id', $item->order_id)->where('product_name', $item->product_name)->get();
+
+                                            $catLabel = match ($cat) {
+                                                'non_produksi' => 'NON-PRODUKSI',
+                                                'jasa' => 'JASA',
+                                                default => 'PRODUKSI',
+                                            };
+
+                                            $primaryColor = '#7c3aed';
+                                            $html = '<div style="font-family:inherit; color:#1f2937;">';
+
+                                            $html .= '<div style="margin-bottom:20px; border-bottom:1px solid #e5e7eb; padding-bottom:12px;">';
+                                            $html .= '<div style="display:flex; align-items:center; gap:8px;">';
+                                            $html .= '<span style="font-size:20px; font-weight:800; letter-spacing:-0.01em;">' . strtoupper($name) . '</span>';
+                                            $html .= '<small style="background:#f3e8ff; color:' . $primaryColor . '; font-weight:800; padding:2px 8px; border-radius:4px; font-size:10px; border:1px solid #ddd6fe;">' . $catLabel . '</small>';
+                                            $html .= '</div>';
+                                            $html .= '</div>';
+
+                                            if ($cat === 'non_produksi') {
+                                                $vId = $details['product_variant_id'] ?? null;
+                                                $v = $vId ? \App\Models\ProductVariant::with('product')->find($vId) : null;
+                                                $hex = $v?->color_code ?: '#e5e7eb';
+                                                $bahanLabel = $v ? (($v->product?->name ?? $item->product_name) . ' - ' . ($v->color_name ?? 'Tanpa Warna')) : ($item->product_name ?? '-');
+                                            } else {
+                                                $hex = $bahan?->color_code ?: '#e5e7eb';
+                                                $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
+                                            }
+
+                                            $html .= '<div style="margin-bottom:24px;">';
+                                            $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . ($cat === 'non_produksi' ? 'INFORMASI NON-PRODUKSI' : 'INFORMASI BAHAN') . '</div>';
+                                            $html .= '<div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
+                                            $html .= '<span style="width:16px; height:16px; border-radius:50%; background:' . $hex . '; border:1px solid rgba(0,0,0,0.15); flex-shrink:0;"></span>';
+                                            $html .= '<div style="flex:1;">';
+                                            $html .= '<div style="font-size:13px; font-weight:700; color:#111827;">' . htmlspecialchars($bahanLabel) . '</div>';
+
+                                            $sablonJenis = $details['sablon_jenis'] ?? null;
+                                            $sablonLokasi = $details['sablon_lokasi'] ?? null;
+                                            $sablonKet = $details['sablon_keterangan'] ?? null;
+                                            $sablon = [];
+                                            if ($sablonJenis && $sablonJenis !== 'Tanpa Sablon/Bordir') {
+                                                $sablon[] = [
+                                                    'jenis' => $sablonJenis,
+                                                    'lokasi' => ($sablonLokasi ?: '-') . ($sablonKet ? ' - Keterangan: "' . $sablonKet . '"' : '')
+                                                ];
+                                            }
+                                            if (empty($sablon) && !empty($details['sablon_jenis'])) {
+                                                $sablon = [['jenis' => $details['sablon_jenis'], 'lokasi' => $details['sablon_lokasi'] ?? '-']];
+                                            }
+
+                                            if (!empty($sablon)) {
+                                                $sblnTexts = [];
+                                                foreach ($sablon as $s) {
+                                                    $sblnTexts[] = ($s['jenis'] ?? '') . ' (' . ($s['lokasi'] ?? '') . ')';
+                                                }
+                                                $html .= '<div style="font-size:11px; font-weight:600; color:' . $primaryColor . '; margin-top:2px;">SABLON/BORDIR: ' . htmlspecialchars(implode(', ', $sblnTexts)) . '</div>';
+                                            }
+                                            $html .= '</div>';
+
+                                            // GENERAL ORDER NOTES SECTION
+                                            $orderNotes = $item->order->notes ?? null;
+                                            if (!empty($orderNotes)) {
+                                                $html .= '<div style="margin-bottom:24px; padding:12px 16px; background:#fffbeb; border:1px solid #fef3c7; border-radius:8px;">';
+                                                $html .= '<div style="font-size:11px; font-weight:800; color:#d97706; letter-spacing:0.05em; margin-bottom:6px; display:flex; align-items:center; gap:4px;">';
+                                                $html .= '⚠️ CATATAN UMUM PESANAN';
+                                                $html .= '</div>';
+                                                $html .= '<div style="font-size:12px; font-weight:700; color:#92400e; white-space:pre-wrap; line-height:1.5;">' . htmlspecialchars($orderNotes) . '</div>';
+                                                $html .= '</div>';
+                                            }
+                                            $html .= '</div>';
+                                            $html .= '</div>';
+
+                                            $genders = [];
+                                            foreach ($allOrderItems as $ai) {
+                                                $idtl = $ai->size_and_request_details ?? [];
+                                                $isProduksi = in_array($cat, ['produksi', 'custom']);
+                                                $g = $isProduksi ? ($idtl['gender'] ?? 'L') : 'UMUM';
+                                                
+                                                if (!isset($genders[$g])) $genders[$g] = ['qty' => 0, 'models' => []];
+                                                $genders[$g]['qty'] += $ai->quantity;
+
+                                                $mParts = [];
+                                                $attrs = [];
+                                                
+                                                if ($isProduksi) {
+                                                    if (isset($idtl['sleeve_model'])) $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
+                                                    if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku') $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
+                                                    if (!empty($idtl['is_tunic'])) $mParts[] = 'Tunik';
+                                                    
+                                                    $attrs = [
+                                                        'LENGAN' => isset($idtl['sleeve_model']) ? strtoupper($idtl['sleeve_model']) : 'PENDEK',
+                                                        'SAKU' => isset($idtl['pocket_model']) ? strtoupper(str_replace('_', ' ', $idtl['pocket_model'])) : 'TANPA SAKU',
+                                                        'KANCING' => isset($idtl['button_model']) ? strtoupper($idtl['button_model']) : 'BIASA',
+                                                    ];
+                                                }
+                                                
+                                                $mKey = empty($mParts) ? ($isProduksi ? 'Model Standar' : 'Rincian Pesanan') : implode(', ', $mParts);
+
+                                                if (!isset($genders[$g]['models'][$mKey])) {
+                                                    $genders[$g]['models'][$mKey] = [
+                                                        'qty' => 0, 'sizes' => [], 'notes' => [], 'custom' => [],
+                                                        'attrs' => $isProduksi ? $attrs : []
+                                                    ];
+                                                }
+                                                $genders[$g]['models'][$mKey]['qty'] += $ai->quantity;
+                                                $sz = $ai->size ?? '-';
+                                                $genders[$g]['models'][$mKey]['sizes'][$sz] = ($genders[$g]['models'][$mKey]['sizes'][$sz] ?? 0) + $ai->quantity;
+                                                if (!empty($idtl['request_tambahan'])) $genders[$g]['models'][$mKey]['notes'][] = $idtl['request_tambahan'];
+
+                                                if ($ai->size === 'Custom') {
+                                                    $m = [];
+                                                    foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
+                                                        if (!empty($idtl[$mk])) $m[] = $mk . ':' . $idtl[$mk];
+                                                    }
+                                                    if (!empty($m) || $ai->recipient_name) {
+                                                        $genders[$g]['models'][$mKey]['custom'][] = ($ai->recipient_name ?: '-') . (!empty($m) ? ' (' . implode(' ', $m) . ')' : '');
+                                                    }
+                                                }
+
+                                                if (!empty($idtl['detail_custom'])) {
+                                                    foreach ($idtl['detail_custom'] as $u) {
+                                                        $m = [];
+                                                        foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
+                                                            if (!empty($u[$mk])) $m[] = $mk . ':' . $u[$mk];
+                                                        }
+                                                        $genders[$g]['models'][$mKey]['custom'][] = ($u['nama'] ?? '-') . (!empty($m) ? ' (' . implode(' ', $m) . ')' : '');
+                                                    }
+                                                }
+                                            }
+
+                                            $html .= '<div>';
+                                            $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">RINCIAN PRODUKSI</div>';
+                                            $html .= '<div style="display:flex; flex-direction:column; gap:8px;">';
+
+                                            $hasItemsToShow = count($genders) > 0;
+
+                                            if ($hasItemsToShow) {
+                                                foreach ($genders as $gCode => $gData) {
+                                                    $gName = $gCode === 'P' ? 'PEREMPUAN' : ($gCode === 'L' ? 'LAKI-LAKI' : 'RINCIAN UKURAN PESANAN');
+                                                    $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
+                                                    $html .= '<div @click="open = !open" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:#f9fafb;">';
+                                                    $html .= '<div style="display:flex; align-items:center; gap:8px;">';
+                                                    $html .= '<span style="font-size:12px; font-weight:800; color:#374151;">' . $gName . '</span>';
+                                                    $html .= '<span style="font-size:12px; font-weight:900; color:' . $primaryColor . ';">' . $gData['qty'] . ' pcs</span>';
+                                                    $html .= '</div>';
+                                                    $html .= '<svg :class="open ? \'rotate-180\' : \'\'" style="width:14px; height:14px; transition:0.2s;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';
+                                                    $html .= '</div>';
+
+                                                    $html .= '<div x-show="open" style="padding:16px; border-top:1px solid #f1f5f9; display:flex; flex-direction:column; gap:16px;">';
+                                                    $hasMultipleModels = count($gData['models']) > 1;
+                                                    foreach ($gData['models'] as $mKey => $mData) {
+                                                        $html .= '<div>';
+                                                        if ($hasMultipleModels) {
+                                                            $html .= '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:6px 10px; background:#f3e8ff; border-radius:6px;">';
+                                                            $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . '; text-transform:uppercase;">' . $mKey . '</span>';
+                                                            $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . ';">' . $mData['qty'] . ' pcs</span>';
+                                                            $html .= '</div>';
+                                                        }
+                                                        
+                                                        if (!empty($mData['attrs'])) {
+                                                            $atxt = [];
+                                                            foreach ($mData['attrs'] as $ak => $av) {
+                                                                $atxt[] = '<span style="color:#9ca3af; font-size:10px;">' . $ak . ':</span><span style="color:#4b5563; margin-left:2px;">' . $av . '</span>';
+                                                            }
+                                                            $html .= '<div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; font-weight:700; margin-bottom:16px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
+                                                        }
+                                                        $stxt = [];
+                                                        foreach ($mData['sizes'] as $szKey => $sqty) {
+                                                            $stxt[] = '<div style="padding:4px 8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:4px; font-size:12px; font-weight:800; color:#1e293b;">' . htmlspecialchars($szKey) . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
+                                                        }
+                                                        $html .= '<div style="display:flex; flex-wrap:wrap; gap:6px;">' . implode('', $stxt) . '</div>';
+                                                        if (!empty($mData['custom'])) {
+                                                            $html .= '<div style="margin-top:8px; padding:8px 12px; background:#faf5ff; border:1px solid #e9d5ff; border-radius:6px;">';
+                                                            $html .= '<div style="font-size:10px; font-weight:800; color:#6b21a8; text-transform:uppercase; margin-bottom:4px;">UKURAN CUSTOM:</div>';
+                                                            foreach ($mData['custom'] as $c) $html .= '<div style="font-size:12px; font-weight:700; color:#581c87;">• ' . htmlspecialchars($c) . '</div>';
+                                                            $html .= '</div>';
+                                                        }
+                                                        if (!empty($mData['notes'])) {
+                                                            $html .= '<div style="margin-top:8px; padding:8px 12px; background:#fffcf0; border:1px solid #fef3c7; border-radius:6px;">';
+                                                            $html .= '<div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; margin-bottom:4px;">CATATAN:</div>';
+                                                            foreach ($mData['notes'] as $n) $html .= '<div style="font-size:12px; font-weight:700; color:#92400e;">- ' . htmlspecialchars($n) . '</div>';
+                                                            $html .= '</div>';
+                                                        }
+                                                        $html .= '</div>';
+                                                        if ($hasMultipleModels && next($gData['models'])) $html .= '<hr style="border:none; border-top:1px dashed #e2e8f0; margin:4px 0;">';
+                                                    }
+                                                    $html .= '</div></div>';
+                                                }
+                                            }
+                                            $html .= '</div></div>';
+                                            
+                                            $url = route('filament.admin.resources.orders.edit', ['tenant' => \Filament\Facades\Filament::getTenant()->id, 'record' => $item->order_id]);
+                                            $html .= '<div style="margin-top:24px;">';
+                                            $html .= '<a href="' . $url . '" target="_blank" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:10px; background:#ffffff; color:#374151; border:1px solid #d1d5db; border-radius:6px; text-decoration:none; font-size:11px; font-weight:800; transition:0.1s;">';
+                                            $html .= '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>';
+                                            $html .= 'LIHAT DETAIL PESANAN';
+                                            $html .= '</a>';
+                                            $html .= '</div>';
+
+                                            $html .= '</div>';
+                                            return new HtmlString($html);
+                                        })
+                                        ->columnSpanFull(),
+                                ])
+                        ])
+                        ->columnSpan(4)
+                        ->extraAttributes(['class' => 'sticky top-20']),
                     ]),
             ])
             ->statePath('data');
@@ -618,8 +826,47 @@ class AturTugasProduksi extends Page
         // ══════════════════════════════════════════════════════════════
         // SIMPAN
         // ══════════════════════════════════════════════════════════════
+        // Get existing tasks to preserve status/payment if they match stage and worker
+        $existingTasks = $item->productionTasks()->get()->groupBy(fn($t) => $t->stage_name . '_' . $t->assigned_to);
+
+        // Get all custom names and size genders in order once
+        $customNames = [];
+        $sizeGenders = [];
+        $allItems = OrderItem::where('order_id', $item->order_id)
+            ->where('product_name', $item->product_name)
+            ->where('bahan_id', $item->bahan_id)
+            ->where('design_status', 'approved')
+            ->get();
+
+        foreach ($allItems as $ai) {
+            $idtl = $ai->size_and_request_details ?? [];
+            if ($ai->production_category === 'custom') {
+                if (!empty($idtl['detail_custom'])) {
+                    foreach ($idtl['detail_custom'] as $u) {
+                        if (!empty($u['nama'])) {
+                            $customNames[] = $u['nama'];
+                        }
+                    }
+                }
+            } else {
+                $sz = strtoupper($ai->size ?? 'TANPA_UKURAN');
+                $g = strtoupper($idtl['gender'] ?? 'L');
+                $gLabel = ($g === 'P' ? 'P' : 'L');
+                
+                $qtyVal = (int) $ai->quantity;
+                for ($qIdx = 0; $qIdx < $qtyVal; $qIdx++) {
+                    $sizeGenders[$sz][] = $gLabel;
+                }
+            }
+        }
+
+        // Delete all existing tasks for this item
+        $item->productionTasks()->delete();
+
         $existingTaskIds = [];
         foreach ($tasksData as $taskItem) {
+            $workers = (array) ($taskItem['assigned_to'] ?? []);
+            
             $sizeQuantities = [];
             foreach (array_keys($originalSizes) as $key) {
                 if (isset($taskItem[$key]) && (int) $taskItem[$key] > 0) $sizeQuantities[$key] = (int) $taskItem[$key];
@@ -638,28 +885,146 @@ class AturTugasProduksi extends Page
                 $sizeQuantities['_wage_custom'] = $wageCustomPerPcs;
             }
 
-            $taskData = [
-                'stage_name' => $taskItem['stage_name'],
-                'assigned_to' => $taskItem['assigned_to'],
-                'quantity' => $quantity,
-                'wage_amount' => $totalWage,
-                'size_quantities' => empty($sizeQuantities) ? null : $sizeQuantities,
-                'description' => $taskItem['description'] ?? null,
-                'shop_id' => \Filament\Facades\Filament::getTenant()->id,
-            ];
+            $workerCount = count($workers);
+            
+            // 1. Initialize size quantities array for each worker
+            $workerSizes = [];
+            for ($i = 0; $i < $workerCount; $i++) {
+                $workerSizes[$i] = [];
+                if (isset($sizeQuantities['_wage_custom'])) {
+                    $workerSizes[$i]['_wage_custom'] = $sizeQuantities['_wage_custom'];
+                }
+            }
+            
+            // 2. Distribute base quantities and collect remainders
+            $remainders = [];
+            foreach ($sizeQuantities as $sz => $qty) {
+                if (str_starts_with($sz, '_')) {
+                    continue;
+                }
+                
+                $baseQty = (int) floor($qty / $workerCount);
+                $remQty = $qty % $workerCount;
+                
+                for ($i = 0; $i < $workerCount; $i++) {
+                    if ($baseQty > 0) {
+                        $workerSizes[$i][$sz] = $baseQty;
+                    }
+                }
+                
+                for ($r = 0; $r < $remQty; $r++) {
+                    $remainders[] = $sz;
+                }
+            }
+            
+            // 3. Distribute remainders round-robin to workers
+            $remCount = count($remainders);
+            for ($r = 0; $r < $remCount; $r++) {
+                $workerIdx = $r % $workerCount;
+                $sz = $remainders[$r];
+                $workerSizes[$workerIdx][$sz] = ($workerSizes[$workerIdx][$sz] ?? 0) + 1;
+            }
 
-            if (!empty($taskItem['id'])) {
-                $task = ProductionTask::find($taskItem['id']);
-                if ($task) { $task->update($taskData); $existingTaskIds[] = $task->id; }
-            } else {
-                $taskData['assigned_by'] = auth()->id();
-                $taskData['status'] = 'pending';
+            // Distribute custom names round-robin to matching worker custom allocations
+            $workerCustomNames = [];
+            $workerGenders = [];
+            for ($idx = 0; $idx < $workerCount; $idx++) {
+                $workerCustomNames[$idx] = [];
+                $workerGenders[$idx] = [];
+            }
+            
+            $cCount = count($customNames);
+            for ($c = 0; $c < $cCount; $c++) {
+                $workerIdx = $c % $workerCount;
+                $workerCustomNames[$workerIdx][] = $customNames[$c];
+            }
+
+            foreach ($sizeGenders as $sz => $gList) {
+                for ($idx = 0; $idx < count($gList); $idx++) {
+                    $workerIdx = $idx % $workerCount;
+                    $gLabel = $gList[$idx] === 'P' ? 'P' : 'L';
+                    $workerGenders[$workerIdx][$sz][$gLabel] = ($workerGenders[$workerIdx][$sz][$gLabel] ?? 0) + 1;
+                }
+            }
+
+            // 4. Create database records for each worker with their distributed portions
+            for ($i = 0; $i < $workerCount; $i++) {
+                $workerId = $workers[$i];
+                $eachSizeQuantities = $workerSizes[$i];
+                
+                // Exclude custom wage keys to get standard size items
+                $cleanSizes = array_filter($eachSizeQuantities, fn($k) => !str_starts_with($k, '_'), ARRAY_FILTER_USE_KEY);
+                
+                if (!empty($cleanSizes)) {
+                    $eachQuantity = array_sum($cleanSizes);
+                } else {
+                    $eachQuantity = (int) floor($quantity / $workerCount);
+                    if ($i === 0) {
+                        $eachQuantity += ($quantity % $workerCount);
+                    }
+                }
+                
+                if (!empty($cleanSizes)) {
+                    $eachCustomQty = (int) ($eachSizeQuantities['CUSTOM'] ?? 0);
+                    $eachStandardQty = $eachQuantity - $eachCustomQty;
+                    $eachWage = ($eachStandardQty * $wagePerPcs) + ($eachCustomQty * $wageCustomPerPcs);
+                } else {
+                    $eachWage = (int) floor($totalWage / $workerCount);
+                    if ($i === 0) {
+                        $eachWage += ($totalWage % $workerCount);
+                    }
+                }
+                
+                $autoDesc = [];
+                foreach ($cleanSizes as $sz => $sqty) {
+                    $szGenders = $workerGenders[$i][$sz] ?? [];
+                    if (!empty($szGenders)) {
+                        $gStrings = [];
+                        foreach ($szGenders as $gLabel => $gQty) {
+                            $gStrings[] = ($gLabel === 'P' ? 'Perempuan' : 'Laki-laki') . ': ' . $gQty;
+                        }
+                        $autoDesc[] = $sz . ' (' . implode(', ', $gStrings) . ')';
+                    } else {
+                        $autoDesc[] = $sz . ': ' . $sqty;
+                    }
+                }
+                
+                $eachCustomNames = $workerCustomNames[$i] ?? [];
+                
+                $descStrings = [];
+                if (!empty($autoDesc)) {
+                    $descStrings[] = 'Pembagian Ukuran: ' . implode(' | ', $autoDesc);
+                }
+                if (!empty($eachCustomNames)) {
+                    $descStrings[] = 'Baju Custom: ' . implode(', ', $eachCustomNames);
+                }
+                
+                $baseDesc = $taskItem['description'] ?? '';
+                if (!empty($descStrings)) {
+                    $baseDesc = trim($baseDesc . "\n" . implode("\n", $descStrings));
+                }
+
+                $lookupKey = $taskItem['stage_name'] . '_' . $workerId;
+                $oldTask = isset($existingTasks[$lookupKey]) ? $existingTasks[$lookupKey]->first() : null;
+
+                $taskData = [
+                    'stage_name' => $taskItem['stage_name'],
+                    'assigned_to' => $workerId,
+                    'quantity' => $eachQuantity,
+                    'wage_amount' => $eachWage,
+                    'size_quantities' => empty($eachSizeQuantities) ? null : $eachSizeQuantities,
+                    'description' => !empty($baseDesc) ? $baseDesc : null,
+                    'shop_id' => \Filament\Facades\Filament::getTenant()->id,
+                    'assigned_by' => $oldTask?->assigned_by ?? auth()->id(),
+                    'status' => $oldTask?->status ?? 'pending',
+                    'is_paid' => $oldTask?->is_paid ?? false,
+                    'worker_payroll_id' => $oldTask?->worker_payroll_id ?? null,
+                    'completed_at' => $oldTask?->completed_at ?? null,
+                ];
                 $newTask = $item->productionTasks()->create($taskData);
                 $existingTaskIds[] = $newTask->id;
             }
         }
-
-        $item->productionTasks()->whereNotIn('id', $existingTaskIds)->delete();
 
         // Sync status order
         $item->refresh();

@@ -106,10 +106,10 @@ class ControlProduksiResource extends Resource
                     ->sortable()
                     ->weight('bold')
                     ->description(fn(OrderItem $record): string => match ($record->production_category) {
-                        'custom' => '🧵 Konveksi (Ukur Badan)',
-                        'non_produksi' => '📦 Baju Jadi',
+                        'custom' => '🧵 Produksi (Ukur Badan)',
+                        'non_produksi' => '📦 Non-Produksi',
                         'jasa' => '🔧 Jasa',
-                        default => '🏭 Konveksi',
+                        default => '🏭 Produksi',
                     }),
 
                 TextColumn::make('total_quantity')
@@ -186,10 +186,10 @@ class ControlProduksiResource extends Resource
                 TableGroup::make('production_category')
                     ->label('Kategori Pesanan')
                     ->getTitleFromRecordUsing(fn(OrderItem $record): string => match ($record->production_category) {
-                        'custom' => '🧵 Konveksi (Ukur Badan)',
-                        'non_produksi' => '📦 Baju Jadi',
+                        'custom' => '🧵 Produksi (Ukur Badan)',
+                        'non_produksi' => '📦 Non-Produksi',
                         'jasa' => '🔧 Jasa',
-                        default => '🏭 Konveksi',
+                        default => '🏭 Produksi',
                     })
                     ->collapsible(),
 
@@ -373,20 +373,22 @@ class ControlProduksiResource extends Resource
                             $d = $gi->size_and_request_details ?? [];
                             
                             // Essential specs for grouping
-                            $isKonveksi = in_array($gi->production_category ?? 'produksi', ['produksi', 'custom']);
+                            $isProduksi = in_array($gi->production_category ?? 'produksi', ['produksi', 'custom']);
                             
-                            if (!$isKonveksi) {
+                            if (!$isProduksi) {
                                 $gen = 'UMUM';
                                 $slv = '-';
                                 $pck = '-';
                                 $btn = '-';
                                 $tun = '-';
+                                $clr = '-';
                             } else {
                                 $gen = $d['gender'] ?? 'L';
                                 $slv = strtoupper($d['sleeve_model'] ?? 'PENDEK');
                                 $pck = strtoupper(str_replace('_', ' ', $d['pocket_model'] ?? 'TANPA SAKU'));
                                 $btn = strtoupper($d['button_model'] ?? 'BIASA');
                                 $tun = !empty($d['is_tunic']) ? 'TUNIK' : 'STANDAR';
+                                $clr = strtoupper($d['collar_model'] ?? 'BIASA');
                             }
                             
                             $stk = !empty($d['use_stock']) ? 'YES' : 'NO';
@@ -395,10 +397,12 @@ class ControlProduksiResource extends Resource
                             $sbList = [];
                             if (!empty($d['sablon_bordir'])) {
                                 foreach ($d['sablon_bordir'] as $sb) {
-                                    $sbList[] = strtoupper($sb['jenis'] ?? '') . " (" . strtoupper($sb['lokasi'] ?? '') . ")";
+                                    $ket = !empty($sb['keterangan']) ? " - " . strtoupper($sb['keterangan']) : "";
+                                    $sbList[] = strtoupper($sb['jenis'] ?? '') . " (" . strtoupper($sb['lokasi'] ?? '') . $ket . ")";
                                 }
                             } elseif (!empty($d['sablon_jenis'])) {
-                                $sbList[] = strtoupper($d['sablon_jenis']) . " (" . strtoupper($d['sablon_lokasi'] ?? '-') . ")";
+                                $ket = !empty($d['sablon_keterangan']) ? " - " . strtoupper($d['sablon_keterangan']) : "";
+                                $sbList[] = strtoupper($d['sablon_jenis']) . " (" . strtoupper($d['sablon_lokasi'] ?? '-') . $ket . ")";
                             }
                             sort($sbList);
                             $sbStr = implode(' | ', $sbList);
@@ -424,15 +428,17 @@ class ControlProduksiResource extends Resource
 
                             // Grouping key: Ignore $stk (stock status) so that "Ambil Stok" and "Produksi Baru" 
                             // with same specs are merged in the production table.
-                            $groupKey = "{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$sbStr}|{$reqStr}";
+                            $groupKey = "{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|{$sbStr}|{$reqStr}";
                             
                             if (!isset($specGroups[$groupKey])) {
                                 $specGroups[$groupKey] = [
                                     'gender' => $gen === 'UMUM' ? 'UMUM' : ($gen === 'L' ? 'PRIA' : 'WANITA'),
+                                    'is_produksi' => $isProduksi,
                                     'sleeve' => $slv,
                                     'pocket' => $pck,
                                     'button' => $btn,
                                     'tunic' => $tun,
+                                    'collar' => $clr,
                                     'use_stock' => ($stk === 'YES'),
                                     'sablon_bordir' => $sbList,
                                     'requests' => $reqList,
@@ -486,6 +492,33 @@ class ControlProduksiResource extends Resource
                     }),
 
 
+
+                Action::make('hapus_tugas')
+                    ->label('Hapus Semua Tugas')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->visible(fn(OrderItem $record) => $record->productionTasks()->exists())
+                    ->requiresConfirmation()
+                    ->modalHeading('Hapus Semua Tugas Produksi?')
+                    ->modalDescription('Tindakan ini akan menghapus seluruh penugasan kerja untuk item ini secara permanen. Status pengerjaan item akan kembali ke Belum Diatur.')
+                    ->modalSubmitActionLabel('Ya, Hapus')
+                    ->action(function (OrderItem $record) {
+                        $record->productionTasks()->delete();
+                        
+                        $record->refresh();
+                        if ($order = $record->order) {
+                            $totalTasks = $order->orderItems()->withCount('productionTasks')->get()->sum('production_tasks_count');
+                            if ($totalTasks === 0 && $order->status === 'antrian') {
+                                $order->update(['status' => 'diterima']);
+                            }
+                        }
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Penugasan berhasil dihapus')
+                            ->body('Seluruh tugas produksi untuk item ini telah dihapus dan status diatur ulang.')
+                            ->success()
+                            ->send();
+                    }),
 
                 Action::make('atur_tugas')
                     ->hidden(fn(OrderItem $record) => $record->productionTasks()->exists() && $record->productionTasks()->where('status', '!=', 'done')->count() === 0)

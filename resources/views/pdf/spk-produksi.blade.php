@@ -177,10 +177,10 @@
                     <div style="font-size: 13pt; font-weight: bold;">{{ strtoupper($record->product_name) }}</div>
                     <div class="badge badge-primary">
                         {{ match($record->production_category) {
-                            'custom' => 'KONVEKSI',
-                            'non_produksi' => 'BAJU JADI',
+                            'custom' => 'PRODUKSI',
+                            'non_produksi' => 'NON-PRODUKSI',
                             'jasa' => 'JASA',
-                            default => 'KONVEKSI'
+                            default => 'PRODUKSI'
                         } }}
                     </div>
                 </td>
@@ -226,7 +226,7 @@
                 @elseif($record->production_category === 'non_produksi')
                     <td class="info-label">Produk Katalog</td>
                     <td class="info-value" colspan="3">
-                        : {{ $record->size_and_request_details['supplier_product'] ? (\App\Models\Product::find($record->size_and_request_details['supplier_product'])?->name ?? 'Baju Jadi') : 'Baju Jadi' }}
+                        : {{ $record->size_and_request_details['supplier_product'] ? (\App\Models\Product::find($record->size_and_request_details['supplier_product'])?->name ?? 'Non-Produksi') : 'Non-Produksi' }}
                         @if($totalStockUsed > 0)
                             <span style="color: #d97706; font-weight: bold; margin-left: 4px;">(Ambil Stok: {{ $fmtStock }} pcs)</span>
                         @endif
@@ -247,7 +247,7 @@
                     <th style="width: 20px;">#</th>
                     <th style="width: 45px;">Gender</th>
                     <th style="width: 150px;">Detail Model (Lengan/Saku/Kancing)</th>
-                    <th>Aplikasi Bordir / Sablon & Lokasi</th>
+                    <th>Aplikasi (Titik & Ket)</th>
                     <th style="width: 150px;">Ukuran & Qty</th>
                     <th style="width: 40px; text-align: center;">Total</th>
                 </tr>
@@ -263,6 +263,7 @@
                                 <span class="spec-tag">LENGAN: {{ $group['sleeve'] }}</span>
                                 <span class="spec-tag">SAKU: {{ $group['pocket'] }}</span>
                                 <span class="spec-tag">KANCING: {{ $group['button'] }}</span>
+                                <span class="spec-tag">KERAH: {{ $group['collar'] }}</span>
                                 @if($group['tunic'] === 'TUNIK') <span class="spec-tag">MODEL: TUNIK</span> @endif
                             @endif
                         </div>

@@ -29,10 +29,10 @@ class ProductionControlRelationManager extends RelationManager
                     ->label('Produk')
                     ->weight('bold')
                     ->description(fn(OrderItem $record): string => match ($record->production_category) {
-                        'custom' => '🧵 Konveksi (Ukur Badan)',
-                        'non_produksi' => '📦 Baju Jadi',
+                        'custom' => '🧵 Produksi (Ukur Badan)',
+                        'non_produksi' => '📦 Non-Produksi',
                         'jasa' => '🔧 Jasa',
-                        default => '🏭 Konveksi',
+                        default => '🏭 Produksi',
                     }),
 
                 TextColumn::make('recipient_name')

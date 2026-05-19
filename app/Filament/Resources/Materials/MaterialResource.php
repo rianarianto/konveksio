@@ -115,7 +115,7 @@ class MaterialResource extends Resource
                                     ->options([
                                         'Kain' => '🧵 Kain',
                                         'Aksesoris' => '🪡 Aksesoris',
-                                        'Baju Jadi' => '👕 Baju Jadi',
+                                        'Baju Jadi' => '👕 Non-Produksi',
                                         'Lainnya' => '📦 Lainnya',
                                     ]),
                             ])

@@ -60,9 +60,9 @@ class DesignHistoryTableWidget extends BaseWidget
                         default => 'primary',
                     })
                     ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'non_produksi' => 'Baju Jadi',
+                        'non_produksi' => 'Non-Produksi',
                         'jasa' => 'Jasa',
-                        default => 'Konveksi',
+                        default => 'Produksi',
                     }),
 
                 TextColumn::make('order.deadline')
@@ -159,7 +159,16 @@ class DesignHistoryTableWidget extends BaseWidget
                                 $html .= '<div style="font-size:13px; font-weight:700; color:#111827;">' . htmlspecialchars($bahanLabel) . '</div>';
 
                                 // Sablon Info inside Material Info
-                                $sablon = $details['sablon_bordir'] ?? [];
+                                $sablonJenis = $details['sablon_jenis'] ?? null;
+                                $sablonLokasi = $details['sablon_lokasi'] ?? null;
+                                $sablonKet = $details['sablon_keterangan'] ?? null;
+                                $sablon = [];
+                                if ($sablonJenis && $sablonJenis !== 'Tanpa Sablon/Bordir') {
+                                    $sablon[] = [
+                                        'jenis' => $sablonJenis,
+                                        'lokasi' => ($sablonLokasi ?: '-') . ($sablonKet ? ' - Keterangan: "' . $sablonKet . '"' : '')
+                                    ];
+                                }
                                 if (!empty($sablon)) {
                                     $sblnTexts = [];
                                     foreach ($sablon as $s) {
@@ -171,18 +180,29 @@ class DesignHistoryTableWidget extends BaseWidget
                                 $html .= '</div>';
                                 $html .= '</div>';
 
+                                // GENERAL ORDER NOTES SECTION
+                                $orderNotes = $record->order->notes ?? null;
+                                if (!empty($orderNotes)) {
+                                    $html .= '<div style="margin-bottom:24px; padding:12px 16px; background:#fffbeb; border:1px solid #fef3c7; border-radius:8px;">';
+                                    $html .= '<div style="font-size:11px; font-weight:800; color:#d97706; letter-spacing:0.05em; margin-bottom:6px; display:flex; align-items:center; gap:4px;">';
+                                    $html .= '⚠️ CATATAN UMUM PESANAN';
+                                    $html .= '</div>';
+                                    $html .= '<div style="font-size:12px; font-weight:700; color:#92400e; white-space:pre-wrap; line-height:1.5;">' . htmlspecialchars($orderNotes) . '</div>';
+                                    $html .= '</div>';
+                                }
+
                                 // VARIATION SECTION
                                 $genders = [];
                                 foreach ($allOrderItems as $item) {
                                     $idtl = $item->size_and_request_details ?? [];
-                                    $isKonveksi = in_array($cat, ['produksi', 'custom']);
-                                    $g = $isKonveksi ? ($idtl['gender'] ?? 'L') : 'UMUM';
+                                    $isProduksi = in_array($cat, ['produksi', 'custom']);
+                                    $g = $isProduksi ? ($idtl['gender'] ?? 'L') : 'UMUM';
                                     if (!isset($genders[$g]))
                                         $genders[$g] = ['qty' => 0, 'models' => []];
                                     $genders[$g]['qty'] += $item->quantity;
 
                                     $mParts = [];
-                                    if ($isKonveksi) {
+                                    if ($isProduksi) {
                                         if (isset($idtl['sleeve_model']))
                                             $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
                                         if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku')
@@ -190,14 +210,14 @@ class DesignHistoryTableWidget extends BaseWidget
                                         if (!empty($idtl['is_tunic']))
                                             $mParts[] = 'Tunik';
                                     }
-                                    $mKey = empty($mParts) ? ($isKonveksi ? 'Model Standar' : 'Rincian Pesanan') : implode(', ', $mParts);
+                                    $mKey = empty($mParts) ? ($isProduksi ? 'Model Standar' : 'Rincian Pesanan') : implode(', ', $mParts);
 
                                     if (!isset($genders[$g]['models'][$mKey])) {
                                         $genders[$g]['models'][$mKey] = [
                                             'qty' => 0,
                                             'sizes' => [],
                                             'notes' => [],
-                                            'attrs' => $isKonveksi ? [
+                                            'attrs' => $isProduksi ? [
                                                 'LENGAN' => isset($idtl['sleeve_model']) ? strtoupper($idtl['sleeve_model']) : 'PENDEK',
                                                 'SAKU' => isset($idtl['pocket_model']) ? strtoupper(str_replace('_', ' ', $idtl['pocket_model'])) : 'TANPA SAKU',
                                                 'KANCING' => isset($idtl['button_model']) ? strtoupper($idtl['button_model']) : 'BIASA',
@@ -215,9 +235,9 @@ class DesignHistoryTableWidget extends BaseWidget
                                 $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">RINCIAN PRODUKSI</div>';
                                 $html .= '<div style="display:flex; flex-direction:column; gap:8px;">';
 
-                                $hasKonveksiItems = count($genders) > 0 && in_array($cat, ['produksi', 'custom']);
+                                $hasProduksiItems = count($genders) > 0 && in_array($cat, ['produksi', 'custom']);
 
-                                if ($hasKonveksiItems) {
+                                if ($hasProduksiItems) {
                                     foreach ($genders as $gCode => $gData) {
                                         $gName = $gCode === 'P' ? 'PEREMPUAN' : ($gCode === 'L' ? 'LAKI-LAKI' : 'RINCIAN UKURAN PESANAN');
                                         $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';

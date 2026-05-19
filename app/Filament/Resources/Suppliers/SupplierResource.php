@@ -55,7 +55,7 @@ class SupplierResource extends Resource
                     ->options([
                         'Kain' => '🧵 Kain',
                         'Aksesoris' => '🪡 Aksesoris (Benang, Kancing, dll)',
-                        'Baju Jadi' => '👕 Baju Jadi / Grosir',
+                        'Baju Jadi' => '👕 Non-Produksi',
                         'Lainnya' => '📦 Lainnya',
                     ])
                     ->required(),

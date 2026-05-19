@@ -48,9 +48,9 @@ class OrderForm
                         Select::make('bulk_category')
                             ->label('Kategori Default')
                             ->options([
-                                'produksi' => 'Konveksi',
+                                'produksi' => 'Produksi',
                                 'jasa' => 'Jasa',
-                                'non_produksi' => 'Baju Jadi',
+                                'non_produksi' => 'Non-Produksi',
                             ])
                             ->default('produksi')
                             ->live(),
@@ -61,14 +61,14 @@ class OrderForm
                             ->allowHtml()
                             ->searchable(),
                         Select::make('bulk_product')
-                            ->label('Baju Jadi (Pilih Produk)')
+                            ->label('Non-Produksi (Pilih Produk)')
                             ->options(OrderResource::getSupplierProductOptions())
                             ->visible(fn(Get $get) => $get('bulk_category') === 'non_produksi')
                             ->allowHtml()
                             ->searchable(),
                     ]),
 
-                // Atribut Default untuk Konveksi
+                // Atribut Default untuk Produksi
                 Grid::make(4)
                     ->schema([
                         Select::make('bulk_gender')
@@ -314,9 +314,9 @@ class OrderForm
                                 Select::make('production_category')
                                     ->hiddenLabel()
                                     ->options([
-                                        'produksi' => 'Konv.',
+                                        'produksi' => 'Prod.',
                                         'custom' => 'Cust.',
-                                        'non_produksi' => 'Jadi',
+                                        'non_produksi' => 'Non-P.',
                                         'jasa' => 'Jasa',
                                     ])
                                     ->required()

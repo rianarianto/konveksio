@@ -53,10 +53,10 @@
                     $cat = $item->production_category ?? 'produksi';
                     $badgeStyle = 'background:#f3e8ff;color:#7c3aed;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;';
                     $badgeLabel = match ($cat) {
-                        'custom' => 'Konveksi',
-                        'non_produksi' => 'Baju Jadi',
+                        'custom' => 'Produksi',
+                        'non_produksi' => 'Non-Produksi',
                         'jasa' => 'Jasa',
-                        default => 'Konveksi',
+                        default => 'Produksi',
                     };
                 @endphp
 

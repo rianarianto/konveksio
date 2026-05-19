@@ -91,6 +91,7 @@ class DesignTaskResource extends Resource
                             Placeholder::make('technical_specs')
                                 ->label(false)
                                 ->content(function ($record): HtmlString {
+                                    $isKonveksi = true;
                                     if (!$record)
                                         return new HtmlString('');
 
@@ -101,9 +102,9 @@ class DesignTaskResource extends Resource
                                     $allOrderItems = OrderItem::where('order_id', $record->order_id)->where('product_name', $record->product_name)->get();
 
                                     $catLabel = match ($cat) {
-                                        'non_produksi' => 'BAJU JADI',
+                                        'non_produksi' => 'NON-PRODUKSI',
                                         'jasa' => 'JASA',
-                                        default => 'KONVEKSI',
+                                        default => 'PRODUKSI',
                                     };
 
                                     // STYLE CONSTANTS FROM ORDERRESOURCE
@@ -130,37 +131,56 @@ class DesignTaskResource extends Resource
                                     }
 
                                     $html .= '<div style="margin-bottom:24px;">';
-                                    $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . ($cat === 'non_produksi' ? 'INFORMASI BAJU JADI' : 'INFORMASI BAHAN') . '</div>';
+                                    $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . ($cat === 'non_produksi' ? 'INFORMASI NON-PRODUKSI' : 'INFORMASI BAHAN') . '</div>';
                                     $html .= '<div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
                                     $html .= '<span style="width:16px; height:16px; border-radius:50%; background:' . $hex . '; border:1px solid rgba(0,0,0,0.15); flex-shrink:0;"></span>';
                                     $html .= '<div style="flex:1;">';
                                     $html .= '<div style="font-size:13px; font-weight:700; color:#111827;">' . htmlspecialchars($bahanLabel) . '</div>';
 
-                                    // Sablon Info inside Material Info
-                                    $sablon = $details['sablon_bordir'] ?? [];
-                                    if (!empty($sablon)) {
-                                        $sblnTexts = [];
-                                        foreach ($sablon as $s) {
-                                            $sblnTexts[] = ($s['jenis'] ?? '') . ' (' . ($s['lokasi'] ?? '') . ')';
-                                        }
-                                        $html .= '<div style="font-size:11px; font-weight:600; color:' . $primaryColor . '; margin-top:2px;">SABLON/BORDIR: ' . htmlspecialchars(implode(', ', $sblnTexts)) . '</div>';
-                                    }
-                                    $html .= '</div>';
-                                    $html .= '</div>';
-                                    $html .= '</div>';
+                                     // Sablon Info inside Material Info
+                                     $sablonJenis = $details['sablon_jenis'] ?? null;
+                                     $sablonLokasi = $details['sablon_lokasi'] ?? null;
+                                     $sablonKet = $details['sablon_keterangan'] ?? null;
+
+                                     if ($sablonJenis && $sablonJenis !== 'Tanpa Sablon/Bordir') {
+                                         $html .= '<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e5e7eb;">';
+                                         $html .= '<div style="font-size:11px; font-weight:800; color:' . $primaryColor . '; letter-spacing:0.02em; margin-bottom:4px;">🎨 DETAIL APLIKASI (SABLON / BORDIR)</div>';
+                                         $html .= '<div style="font-size:12px; font-weight:700; color:#111827;">Teknik: <span style="font-weight:600;">' . htmlspecialchars($sablonJenis) . '</span></div>';
+                                         if ($sablonLokasi) {
+                                             $html .= '<div style="font-size:12px; font-weight:700; color:#111827; margin-top:2px;">Titik Lokasi: <span style="font-weight:600;">' . htmlspecialchars($sablonLokasi) . '</span></div>';
+                                         }
+                                         if ($sablonKet) {
+                                             $html .= '<div style="font-size:11px; font-weight:600; color:#b45309; background:#fffbeb; border:1px solid #fef3c7; padding:6px 10px; border-radius:4px; margin-top:6px; font-style:italic;">Keterangan Desain: "' . htmlspecialchars($sablonKet) . '"</div>';
+                                         }
+                                         $html .= '</div>';
+                                     }
+                                     $html .= '</div>';
+                                     $html .= '</div>';
+                                     $html .= '</div>';
+
+                                     // GENERAL ORDER NOTES SECTION
+                                     $orderNotes = $record->order->notes ?? null;
+                                     if (!empty($orderNotes)) {
+                                         $html .= '<div style="margin-bottom:24px; padding:12px 16px; background:#fffbeb; border:1px solid #fef3c7; border-radius:8px;">';
+                                         $html .= '<div style="font-size:11px; font-weight:800; color:#d97706; letter-spacing:0.05em; margin-bottom:6px; display:flex; align-items:center; gap:4px;">';
+                                         $html .= '⚠️ CATATAN UMUM PESANAN';
+                                         $html .= '</div>';
+                                         $html .= '<div style="font-size:12px; font-weight:700; color:#92400e; white-space:pre-wrap; line-height:1.5;">' . htmlspecialchars($orderNotes) . '</div>';
+                                         $html .= '</div>';
+                                     }
 
                                     // VARIATION SECTION
                                     $genders = [];
                                     foreach ($allOrderItems as $item) {
                                         $idtl = $item->size_and_request_details ?? [];
-                                        $isKonveksi = in_array($cat, ['produksi', 'custom']);
-                                        $g = $isKonveksi ? ($idtl['gender'] ?? 'L') : 'UMUM';
+                                        $isProduksi = in_array($cat, ['produksi', 'custom']);
+                                        $g = $isProduksi ? ($idtl['gender'] ?? 'L') : 'UMUM';
                                         if (!isset($genders[$g]))
                                             $genders[$g] = ['qty' => 0, 'models' => []];
                                         $genders[$g]['qty'] += $item->quantity;
 
                                         $mParts = [];
-                                        if ($isKonveksi) {
+                                        if ($isProduksi) {
                                             if (isset($idtl['sleeve_model']))
                                                 $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
                                             if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku')
@@ -326,7 +346,7 @@ class DesignTaskResource extends Resource
                     ->sortable(['quantity']),
                 TextColumn::make('production_category')->label('Kategori')->badge()
                     ->color(fn($state) => match ($state) { 'non_produksi' => 'info', 'jasa' => 'success', default => 'primary', })
-                    ->formatStateUsing(fn($state) => match ($state) { 'non_produksi' => 'Baju Jadi', 'jasa' => 'Jasa', default => 'Konveksi', }),
+                    ->formatStateUsing(fn($state) => match ($state) { 'non_produksi' => 'Non-Produksi', 'jasa' => 'Jasa', default => 'Produksi', }),
                 TextColumn::make('order.deadline')->label('Deadline')->date('d M Y')->sortable()->color('danger')->weight('bold'),
                 TextColumn::make('design_status')->label('Status Desain')->badge()
                     ->color(fn($state) => match ($state) { 'pending' => 'warning', 'uploaded' => 'info', 'approved' => 'success', default => 'gray', }),

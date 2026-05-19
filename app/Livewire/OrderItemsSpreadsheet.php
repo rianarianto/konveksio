@@ -67,8 +67,8 @@ class OrderItemsSpreadsheet extends Component
     ];
 
     public array $productionCategories = [
-        'produksi' => 'Konveksi',
-        'non_produksi' => 'Baju Jadi',
+        'produksi' => 'Produksi',
+        'non_produksi' => 'Non-Produksi',
         'jasa' => 'Jasa',
     ];
 
@@ -204,7 +204,7 @@ class OrderItemsSpreadsheet extends Component
 
         // Determine actual product name
         if ($this->bulkCategory === 'non_produksi') {
-            $productName = strip_tags($this->productOptions[$this->bulkProduct] ?? 'Baju Jadi');
+            $productName = strip_tags($this->productOptions[$this->bulkProduct] ?? 'Non-Produksi');
         } else {
             $productName = $materialName ?: '';
         }

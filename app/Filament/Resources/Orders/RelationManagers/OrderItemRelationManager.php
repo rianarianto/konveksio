@@ -47,8 +47,8 @@ class OrderItemRelationManager extends RelationManager
             ->toArray();
 
         $categoryOptions = [
-            'produksi' => 'Konveksi',
-            'non_produksi' => 'Baju Jadi',
+            'produksi' => 'Produksi',
+            'non_produksi' => 'Non-Produksi',
             'jasa' => 'Jasa',
         ];
 
@@ -78,7 +78,7 @@ class OrderItemRelationManager extends RelationManager
                         $saku = $record->pocket_model === 'tanpa_saku' ? '❌ Saku' : '✅ ' . Str::title($record->pocket_model);
                         return "{$gender} | {$lengan} | {$saku}";
                     })
-                    ->description(fn(OrderItem $record) => $record->production_category === 'produksi' ? '🧵 ' . ($record->bahan?->name ?? 'Bahan Belum Diatur') : '📦 Baju Jadi / Jasa')
+                    ->description(fn(OrderItem $record) => $record->production_category === 'produksi' ? '🧵 ' . ($record->bahan?->name ?? 'Bahan Belum Diatur') : '📦 Non-Produksi / Jasa')
                     ->color('gray')
                     ->fontFamily('mono')
                     ->size('xs'),
@@ -366,8 +366,8 @@ class OrderItemRelationManager extends RelationManager
                         Select::make('production_category')
                             ->label('Kategori Baru')
                             ->options([
-                                'produksi' => 'Konveksi',
-                                'non_produksi' => 'Baju Jadi',
+                                'produksi' => 'Produksi',
+                                'non_produksi' => 'Non-Produksi',
                                 'jasa' => 'Jasa',
                             ])
                             ->required(),

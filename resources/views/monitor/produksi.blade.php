@@ -604,10 +604,10 @@
                         $dlClass = $daysLeft <= 1 ? 'urgent' : ($daysLeft <= 3 ? 'soon' : 'ok');
 
                         $cat = match ($item->production_category) {
-                            'custom' => '🧵 Konveksi',
-                            'non_produksi' => '📦 Baju Jadi',
+                            'custom' => '🧵 Produksi',
+                            'non_produksi' => '📦 Non-Produksi',
                             'jasa' => '🔧 Jasa',
-                            default => '🏭 Konveksi',
+                            default => '🏭 Produksi',
                         };
 
                         $details = $item->size_and_request_details ?? [];
