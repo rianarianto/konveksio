@@ -102,6 +102,21 @@ class DesignHistoryTableWidget extends BaseWidget
                     ->toggleable(),
             ])
             ->actions([
+                \Filament\Tables\Actions\Action::make('reupload')
+                    ->label('Upload Ulang')
+                    ->icon('heroicon-m-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Upload Ulang Desain?')
+                    ->modalDescription('Desain akan dikembalikan ke antrian upload. File lama akan dihapus dan Anda bisa upload ulang dari halaman Meja Desain.')
+                    ->action(function (OrderItem $record) {
+                        OrderItem::where('order_id', $record->order_id)
+                            ->where('product_name', $record->product_name)
+                            ->update([
+                                'design_status' => 'pending',
+                                'design_image' => null,
+                            ]);
+                    }),
                 \Filament\Actions\Action::make('view')
                     ->label('Rincian')
                     ->icon('heroicon-o-eye')

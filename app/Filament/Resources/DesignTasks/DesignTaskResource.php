@@ -357,38 +357,11 @@ class DesignTaskResource extends Resource
                 EditAction::make()->label('Upload / Edit Desain')->icon('heroicon-m-paint-brush')->modalWidth('6xl')
                     ->using(function (OrderItem $record, array $data): OrderItem {
                         OrderItem::where('order_id', $record->order_id)->where('product_name', $record->product_name)->update([
-                            'design_status' => 'uploaded',
+                            'design_status' => 'approved',
                             'design_image' => $data['design_image'] ?? null,
                         ]);
                         $record->refresh();
                         return $record;
-                    }),
-                \Filament\Tables\Actions\Action::make('approve_design')
-                    ->label('Setujui & Kirim ke Produksi')
-                    ->icon('heroicon-m-check-circle')
-                    ->color('success')
-                    ->visible(fn(OrderItem $record) => $record->design_status === 'uploaded')
-                    ->requiresConfirmation()
-                    ->modalHeading('Setujui Desain?')
-                    ->modalDescription('Desain akan disetujui dan dikirim ke antrian produksi.')
-                    ->action(function (OrderItem $record) {
-                        OrderItem::where('order_id', $record->order_id)->where('product_name', $record->product_name)->update([
-                            'design_status' => 'approved',
-                        ]);
-                    }),
-                \Filament\Tables\Actions\Action::make('reset_design')
-                    ->label('Batalkan Upload')
-                    ->icon('heroicon-m-x-circle')
-                    ->color('danger')
-                    ->visible(fn(OrderItem $record) => $record->design_status === 'uploaded')
-                    ->requiresConfirmation()
-                    ->modalHeading('Batalkan Upload Desain?')
-                    ->modalDescription('File desain akan dihapus dan status kembali ke Pending. Anda bisa upload ulang setelahnya.')
-                    ->action(function (OrderItem $record) {
-                        OrderItem::where('order_id', $record->order_id)->where('product_name', $record->product_name)->update([
-                            'design_status' => 'pending',
-                            'design_image' => null,
-                        ]);
                     }),
             ])
             ->defaultGroup(
