@@ -112,18 +112,15 @@ class OrderResource extends Resource
 
         $options = [];
         foreach ($variants as $variant) {
-            $hex = $variant->color_code ?: '#e5e7eb';
-            $label = $variant->material_name . ($variant->color_name ? " - {$variant->color_name}" : "") . ($variant->type ? " ({$variant->type})" : '');
+            $colorLabel = $variant->color_name ? " - {$variant->color_name}" . ($variant->color_code ? " ({$variant->color_code})" : "") : "";
+            $label = $variant->material_name . $colorLabel . ($variant->type ? " ({$variant->type})" : '');
 
             $stockInfo = '';
             if ($variant->current_stock > 0) {
-                $stockInfo = ' <small style="color:#7c3aed;font-weight:700;margin-left:4px;">(Stok: ' . $variant->current_stock . ' ' . $variant->unit . ')</small>';
+                $stockInfo = ' (Stok: ' . $variant->current_stock . ' ' . $variant->unit . ')';
             }
 
-            $options[$variant->id] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
-                . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $hex . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
-                . '<span>' . htmlspecialchars($label) . $stockInfo . '</span>'
-                . '</span>';
+            $options[$variant->id] = $label . $stockInfo;
         }
         return $options;
     }
@@ -138,19 +135,15 @@ class OrderResource extends Resource
         $products = Product::where('shop_id', $tenantId)->withSum('variants', 'stock')->get();
         $options = [];
         foreach ($products as $product) {
-            $hex = $product->color_code ?: '#e5e7eb';
             $label = $product->name . ($product->type ? " ({$product->type})" : '');
 
             $totalStock = (int) ($product->variants_sum_stock ?? 0);
             $stockInfo = '';
             if ($totalStock > 0) {
-                $stockInfo = ' <small style="color:#7c3aed;font-weight:700;margin-left:4px;">(Stok: ' . $totalStock . ' pcs)</small>';
+                $stockInfo = ' (Stok: ' . $totalStock . ' pcs)';
             }
 
-            $options[$product->id] = '<span style="display:inline-flex;align-items:center;gap:8px;">'
-                . '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' . $hex . ';border:1px solid rgba(0,0,0,0.15);flex-shrink:0;"></span>'
-                . '<span>' . htmlspecialchars($label) . $stockInfo . '</span>'
-                . '</span>';
+            $options[$product->id] = $label . $stockInfo;
         }
         return $options;
     }

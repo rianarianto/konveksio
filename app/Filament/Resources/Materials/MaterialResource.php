@@ -142,8 +142,10 @@ class MaterialResource extends Resource
                                             ->label('Nama Warna')
                                             ->placeholder('misal: Navy Blue')
                                             ->required(),
-                                        ColorPicker::make('color_code')
-                                            ->label('Visual'),
+                                        TextInput::make('color_code')
+                                            ->label('Kode Warna')
+                                            ->placeholder('misal: BLK-01')
+                                            ->required(),
                                         TextInput::make('current_stock')
                                             ->label('Stok Saat Ini')
                                             ->numeric()
@@ -173,7 +175,7 @@ class MaterialResource extends Resource
                     ->label('Jenis')
                     ->searchable(),
 
-                TextColumn::make('variants_summary')
+                 TextColumn::make('variants_summary')
                     ->label('Warna & Stok')
                     ->getStateUsing(function ($record) {
                         $variants = collect($record->variants);
@@ -183,11 +185,13 @@ class MaterialResource extends Resource
 
                         $html = '<div class="flex flex-wrap gap-1.5 py-1">';
                         foreach ($display as $v) {
-                            $dot = $v->color_code ? "<span class='w-2 h-2 rounded-full border border-black/10 shrink-0' style='background-color:{$v->color_code}'></span>" : "";
+                            $isHex = is_string($v->color_code) && str_starts_with($v->color_code, '#');
+                            $dot = $isHex ? "<span class='w-2 h-2 rounded-full border border-black/10 shrink-0' style='background-color:{$v->color_code}'></span>" : "";
                             $stock = number_format($v->current_stock, 0, ',', '.');
+                            $colorLabel = $v->color_name . ($v->color_code ? " ({$v->color_code})" : "");
                             $html .= "<div class='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-50 border border-gray-200 shadow-sm whitespace-nowrap'>";
                             $html .= $dot;
-                            $html .= "<span class='text-[10px] font-bold text-gray-700'>{$v->color_name}</span>";
+                            $html .= "<span class='text-[10px] font-bold text-gray-700'>{$colorLabel}</span>";
                             $unit = match ($record->unit) {
                                 'Meter' => 'M',
                                 'Kg' => 'Kg',

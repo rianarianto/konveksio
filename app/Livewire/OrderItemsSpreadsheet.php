@@ -96,7 +96,7 @@ class OrderItemsSpreadsheet extends Component
             ->mapWithKeys(function ($item) {
                 return [$item->id => [
                     'id' => $item->id,
-                    'name' => $item->name . ($item->color_name ? " - " . $item->color_name : ""),
+                    'name' => $item->name . ($item->color_name ? " - " . $item->color_name . ($item->color_code ? " ({$item->color_code})" : "") : ""),
                     'color_code' => $item->color_code
                 ]];
             })

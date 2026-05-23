@@ -330,8 +330,11 @@
                                                             $selectedMat = $materialOptions[$selectedMatId] ?? null;
                                                         @endphp
                                                         @if($selectedMat && !empty($selectedMat['color_code']))
+                                                            @php
+                                                                $hex = (is_string($selectedMat['color_code']) && str_starts_with($selectedMat['color_code'], '#')) ? $selectedMat['color_code'] : '#e5e7eb';
+                                                            @endphp
                                                             <div class="w-2.5 h-2.5 rounded-full border border-gray-200 shrink-0 shadow-sm"
-                                                                style="background-color: {{ $selectedMat['color_code'] }};"></div>
+                                                                style="background-color: {{ $hex }};"></div>
                                                         @endif
                                                         <select wire:model.live="items.{{ $actualIndex }}.bahan_baju"
                                                             x-on:change="flashCell($el.parentElement.parentElement)"
@@ -530,6 +533,10 @@
                                 <div class="flex flex-wrap gap-2 max-h-[180px] overflow-y-auto p-1.5 custom-scrollbar"
                                     x-data="{ activeId: @entangle('bulkVariant') }">
                                     @foreach($bulkVariantOptions as $v)
+                                        @php
+                                            $hex = (is_string($v['color_code']) && str_starts_with($v['color_code'], '#')) ? $v['color_code'] : '#f3f4f6';
+                                            $colorLabel = !empty($v['color_name']) ? $v['color_name'] . (!empty($v['color_code']) ? " ({$v['color_code']})" : "") : 'Tanpa Nama';
+                                        @endphp
                                         <button type="button" @click="activeId = '{{ $v['id'] }}'"
                                             wire:click="$set('bulkVariant', '{{ $v['id'] }}')"
                                             class="inline-flex items-center gap-1 px-4 py-2 rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
@@ -537,11 +544,11 @@
 
                                             <span class="h-3.5 w-3.5 rounded-full border border-black/10 shadow-inner"
                                                 :class="String(activeId) === '{{ $v['id'] }}' ? 'ring-1 ring-white/60' : ''"
-                                                style="background-color: {{ $v['color_code'] ?: '#f3f4f6' }}">
+                                                style="background-color: {{ $hex }}">
                                             </span>
 
                                             <span class="text-[12px] font-bold tracking-tight whitespace-nowrap">
-                                                {{ !empty($v['color_name']) ? $v['color_name'] : 'Tanpa Nama' }}
+                                                {{ $colorLabel }}
                                             </span>
                                         </button>
                                     @endforeach

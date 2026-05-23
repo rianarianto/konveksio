@@ -39,9 +39,9 @@ class EditOrder extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('download_receipt')
-                ->label('Download Kuitansi')
-                ->icon('heroicon-o-document-arrow-down')
+            Action::make('print_receipt')
+                ->label('Cetak Kuitansi')
+                ->icon('heroicon-o-printer')
                 ->color('primary')
                 ->url(fn() => route('orders.receipt', $this->record))
                 ->openUrlInNewTab(),

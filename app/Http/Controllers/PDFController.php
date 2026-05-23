@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class PDFController extends Controller
 {
-    public function downloadReceipt(Order $order)
+    public function downloadReceipt(Order $order, Request $request)
     {
         // Load relationships needed for the receipt
         $order->load(['customer', 'shop', 'orderItems', 'payments']);
@@ -17,13 +17,12 @@ class PDFController extends Controller
             'order' => $order,
         ]);
 
-        $pdfOutput = $pdf->output();
-        $base64 = base64_encode($pdfOutput);
-        
-        return response()->make(
-            '<html><head><title>Kuitansi '.$order->order_number.'</title></head><body style="margin:0;padding:0;"><iframe src="data:application/pdf;base64,'.$base64.'" width="100%" height="100%" style="border:none;"></iframe></body></html>',
-            200,
-            ['Content-Type' => 'text/html']
-        );
+        $filename = 'Kuitansi-' . str_replace('#', '', $order->order_number) . '.pdf';
+
+        if ($request->query('download') == 1) {
+            return $pdf->download($filename);
+        }
+
+        return $pdf->stream($filename);
     }
 }

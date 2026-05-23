@@ -134,8 +134,10 @@ class ProductResource extends Resource
                                             ->placeholder('Hitam, Merah...')
                                             ->required(),
                                         
-                                        ColorPicker::make('color_code')
-                                            ->label('Warna'),
+                                        TextInput::make('color_code')
+                                            ->label('Kode Warna')
+                                            ->placeholder('misal: BLK-01')
+                                            ->required(),
                                     ]),
 
                                     Grid::make($storeSizes->count() ?: 1)->schema(
@@ -222,9 +224,32 @@ class ProductResource extends Resource
                 TextColumn::make('type')
                     ->label('Jenis')
                     ->searchable(),
-                ColorColumn::make('variants.color_code')
-                    ->label('Warna')
-                    ->getStateUsing(fn ($record) => $record->variants->pluck('color_code')->unique()->toArray()),
+                 TextColumn::make('variants_summary')
+                    ->label('Warna & Stok')
+                    ->getStateUsing(function ($record) {
+                        $variants = $record->variants;
+                        $grouped = $variants->groupBy('color_name');
+
+                        $html = '<div class="flex flex-wrap gap-1.5 py-1">';
+                        foreach ($grouped as $colorName => $items) {
+                            $code = $items->first()->color_code ?? '';
+                            $totalStock = $items->sum('stock');
+                            $isHex = is_string($code) && str_starts_with($code, '#');
+                            $dot = $isHex ? "<span class='w-2 h-2 rounded-full border border-black/10 shrink-0' style='background-color:{$code}'></span>" : "";
+
+                            $label = $colorName . ($code ? " ({$code})" : "");
+
+                            $html .= "<div class='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-50 border border-gray-200 shadow-sm whitespace-nowrap'>";
+                            $html .= $dot;
+                            $html .= "<span class='text-[10px] font-bold text-gray-700'>{$label}</span>";
+                            $html .= "<span class='text-[10px] font-black text-primary-600 border-l border-gray-200 pl-1.5'>{$totalStock} pcs</span>";
+                            $html .= "</div>";
+                        }
+                        $html .= '</div>';
+                        return $html;
+                    })
+                    ->html()
+                    ->searchable(['variants.color_name']),
                 TextColumn::make('variants_sum_stock')
                     ->label('Total Stok')
                     ->sum('variants', 'stock')
