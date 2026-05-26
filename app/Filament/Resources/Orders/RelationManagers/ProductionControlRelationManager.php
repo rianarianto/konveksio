@@ -5,7 +5,7 @@ namespace App\Filament\Resources\Orders\RelationManagers;
 use App\Models\OrderItem;
 use App\Models\ProductionTask;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables\Actions\Action;
+use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Grouping\Group as TableGroup;

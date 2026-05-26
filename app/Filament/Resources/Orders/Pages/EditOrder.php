@@ -47,7 +47,7 @@ class EditOrder extends EditRecord
                 ->openUrlInNewTab(),
             Action::make('create_return')
                 ->label('Catat Retur')
-                ->icon('heroicon-o-arrow-path')
+                ->icon('heroicon-o-arrow-uturn-left')
                 ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
                 ->action(function (array $data): void {
                     $this->record->returns()->create($data);
@@ -57,7 +57,7 @@ class EditOrder extends EditRecord
                         ->send();
                 })
                 ->modalHeading('Catat Retur Pesanan')
-                ->modalSubmitActionLabel('Simpan Retur'),
+                ->modalSubmitActionLabel('Simpan'),
             DeleteAction::make()
                 ->visible(fn() => auth()->user()->role === 'owner'),
         ];

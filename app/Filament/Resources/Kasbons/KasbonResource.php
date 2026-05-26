@@ -119,7 +119,8 @@ class KasbonResource extends Resource
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->label('+ Beri Kasbon')
+                    ->label('Tambah Kasbon')
+                    ->icon('heroicon-o-plus')
                     ->modalHeading('Pengajuan Kasbon Baru')
                     ->modalWidth('lg')
                     ->form([
@@ -228,7 +229,8 @@ class KasbonResource extends Resource
                     }),
 
                 Action::make('set_limit')
-                    ->label('⚙ Atur Limit Kasbon')
+                    ->label('Atur Limit Kasbon')
+                    ->icon('heroicon-o-cog-6-tooth')
                     ->visible(fn() => auth()->user()->role === 'owner')
                     ->color('gray')
                     ->modalHeading('Atur Limit Kasbon')

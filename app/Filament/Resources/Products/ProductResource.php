@@ -8,6 +8,7 @@ use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Grid;
@@ -127,33 +128,86 @@ class ProductResource extends Resource
                                     ->orderBy('sort_order')
                                     ->get();
 
-                                return [
-                                    Grid::make(3)->schema([
-                                        TextInput::make('color_name')
-                                            ->label('Nama Warna')
-                                            ->placeholder('Hitam, Merah...')
-                                            ->required(),
-                                        
-                                        TextInput::make('color_code')
-                                            ->label('Kode Warna')
-                                            ->placeholder('misal: BLK-01')
-                                            ->required(),
-                                    ]),
+                                $fields = [
+                                    TextInput::make('color_name')
+                                        ->label('Nama Warna')
+                                        ->placeholder('Hitam, Merah...')
+                                        ->required()
+                                        ->rules([
+                                            fn ($get) => function (string $attribute, $value, $fail) use ($get) {
+                                                $rows = $get('../../color_matrix') ?? [];
+                                                
+                                                // Filament v5 pakai UUID sebagai key repeater, bukan integer
+                                                preg_match('/color_matrix\.([^.]+)\.color_name/', $attribute, $matches);
+                                                $currentKey = $matches[1] ?? null;
 
-                                    Grid::make($storeSizes->count() ?: 1)->schema(
-                                        $storeSizes->map(function ($size) {
-                                            return TextInput::make('qty_' . strtolower($size->name))
-                                                ->label($size->name)
-                                                ->numeric()
-                                                ->integer()
-                                                ->placeholder('0');
-                                        })->toArray()
-                                    ),
+                                                foreach ($rows as $key => $row) {
+                                                    if ((string) $key === (string) $currentKey) {
+                                                        continue;
+                                                    }
+
+                                                    if (isset($row['color_name']) && strtolower(trim($row['color_name'])) === strtolower(trim($value))) {
+                                                        $fail('Nama warna ini sudah digunakan pada barang ini.');
+                                                        return;
+                                                    }
+                                                }
+                                            }
+                                        ]),
+                                    
+                                    TextInput::make('color_code')
+                                        ->label('Kode Warna')
+                                        ->placeholder('misal: BLK-01')
+                                        ->required()
+                                        ->rules([
+                                            fn ($get) => function (string $attribute, $value, $fail) use ($get) {
+                                                $rows = $get('../../color_matrix') ?? [];
+                                                
+                                                // Filament v5 pakai UUID sebagai key repeater, bukan integer
+                                                preg_match('/color_matrix\.([^.]+)\.color_code/', $attribute, $matches);
+                                                $currentKey = $matches[1] ?? null;
+
+                                                foreach ($rows as $key => $row) {
+                                                    if ((string) $key === (string) $currentKey) {
+                                                        continue;
+                                                    }
+
+                                                    if (isset($row['color_code']) && strtolower(trim($row['color_code'])) === strtolower(trim($value))) {
+                                                        $fail('Kode warna ini sudah digunakan pada barang ini.');
+                                                        return;
+                                                    }
+                                                }
+                                            }
+                                        ]),
                                 ];
+
+                                foreach ($storeSizes as $size) {
+                                    $fields[] = TextInput::make('qty_' . strtolower($size->name))
+                                        ->label($size->name)
+                                        ->numeric()
+                                        ->integer()
+                                        ->placeholder('0');
+                                }
+
+                                return $fields;
                             })
-                            ->collapsible()
-                            ->collapsed()
-                            ->itemLabel(fn (array $state): ?string => $state['color_name'] ?? null)
+                            ->table(function () {
+                                $storeSizes = \App\Models\StoreSize::where('shop_id', Filament::getTenant()->id)
+                                    ->where('is_active', true)
+                                    ->orderBy('sort_order')
+                                    ->get();
+
+                                $columns = [
+                                    TableColumn::make('Nama Warna')->markAsRequired(),
+                                    TableColumn::make('Kode Warna')->markAsRequired(),
+                                ];
+
+                                foreach ($storeSizes as $size) {
+                                    $columns[] = TableColumn::make($size->name);
+                                }
+
+                                return $columns;
+                            })
+                            ->compact()
                             ->defaultItems(1)
                             ->addActionLabel('+ Tambah Warna Baru')
                             ->columnSpanFull()

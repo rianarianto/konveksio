@@ -14,7 +14,8 @@ class ListAddonOptions extends ListRecords
     {
         return [
             CreateAction::make()
-                ->label('+ Tambah Opsi'),
+                ->label('Tambah Opsi')
+                ->icon('heroicon-o-plus'),
         ];
     }
 }

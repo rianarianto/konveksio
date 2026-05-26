@@ -118,7 +118,9 @@ class ReturnsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                CreateAction::make()->label('Catat Retur Baru'),
+                CreateAction::make()
+                    ->label('Tambah Retur')
+                    ->icon('heroicon-o-plus'),
             ])
             ->recordActions([
                 EditAction::make(),

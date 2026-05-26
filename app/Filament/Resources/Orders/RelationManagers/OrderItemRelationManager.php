@@ -13,9 +13,9 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
-use Filament\Tables\Actions\BulkAction;
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Actions\BulkAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
@@ -107,7 +107,7 @@ class OrderItemRelationManager extends RelationManager
             ])
 
             ->headerActions([
-                \Filament\Tables\Actions\CreateAction::make()
+                \Filament\Actions\CreateAction::make()
                     ->label('Tambah Item')
                     ->icon('heroicon-o-plus')
                     ->form([
@@ -148,7 +148,7 @@ class OrderItemRelationManager extends RelationManager
                     }),
 
                 // ─── BULK GENERATOR ────────────────────────────────────────
-                \Filament\Tables\Actions\Action::make('bulk_generate')
+                \Filament\Actions\Action::make('bulk_generate')
                     ->label('Bulk Generate')
                     ->icon('heroicon-o-squares-plus')
                     ->color('primary')
@@ -265,7 +265,7 @@ class OrderItemRelationManager extends RelationManager
             ])
 
             ->actions([
-                \Filament\Tables\Actions\Action::make('edit_specs')
+                \Filament\Actions\Action::make('edit_specs')
                     ->label('Detail')
                     ->icon('heroicon-m-adjustments-vertical')
                     ->modalHeading('Detail Spesifikasi & Ukuran')

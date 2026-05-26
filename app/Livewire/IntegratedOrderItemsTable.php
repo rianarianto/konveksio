@@ -1171,18 +1171,26 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             \Filament\Forms\Components\TagsInput::make('sleeve_options')
                                 ->label('Pilihan Lengan')
                                 ->placeholder('Tambah opsi lengan...')
+                                ->helperText('Ketik lalu tekan Enter/Tab untuk menambah')
+                                ->splitKeys(['Tab', ','])
                                 ->default($savedSpecs['sleeve_options'] ?? ['Pendek', 'Panjang', '3/4']),
                             \Filament\Forms\Components\TagsInput::make('pocket_options')
                                 ->label('Pilihan Saku')
                                 ->placeholder('Tambah opsi saku...')
+                                ->helperText('Ketik lalu tekan Enter/Tab untuk menambah')
+                                ->splitKeys(['Tab', ','])
                                 ->default($savedSpecs['pocket_options'] ?? ['Tanpa Saku', 'Jalan Tol', 'Semi Kelewang', 'Kelewang', 'Saku Tabuk', 'Patah Suduik']),
                             \Filament\Forms\Components\TagsInput::make('button_options')
                                 ->label('Pilihan Kancing')
                                 ->placeholder('Tambah opsi kancing...')
+                                ->helperText('Ketik lalu tekan Enter/Tab untuk menambah')
+                                ->splitKeys(['Tab', ','])
                                 ->default($savedSpecs['button_options'] ?? ['Biasa', 'Tutup']),
                             \Filament\Forms\Components\TagsInput::make('collar_options')
                                 ->label('Pilihan Kerah')
                                 ->placeholder('Tambah opsi kerah...')
+                                ->helperText('Ketik lalu tekan Enter/Tab untuk menambah')
+                                ->splitKeys(['Tab', ','])
                                 ->default($savedSpecs['collar_options'] ?? ['Shanghai', 'Kemeja', 'Ramora']),
                         ];
                     })

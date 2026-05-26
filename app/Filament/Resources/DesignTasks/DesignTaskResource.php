@@ -362,7 +362,8 @@ class DesignTaskResource extends Resource
                         ]);
                         $record->refresh();
                         return $record;
-                    }),
+                    })
+                    ->after(fn ($livewire) => $livewire->dispatch('designTaskCompleted')),
             ])
             ->defaultGroup(
                 TableGroup::make('order_id')

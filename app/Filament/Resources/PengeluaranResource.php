@@ -175,7 +175,8 @@ class PengeluaranResource extends Resource
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->label('+ Tambah Pengeluaran')
+                    ->label('Tambah Pengeluaran')
+                    ->icon('heroicon-o-plus')
                     ->modalHeading('Tambah Pengeluaran')
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['shop_id'] = Filament::getTenant()?->id;

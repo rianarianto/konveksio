@@ -14,7 +14,8 @@ class ListProducts extends ListRecords
     {
         return [
             CreateAction::make()
-                ->label('+ Tambah Barang Jadi'),
+                ->label('Tambah Barang Jadi')
+                ->icon('heroicon-o-plus'),
         ];
     }
 }

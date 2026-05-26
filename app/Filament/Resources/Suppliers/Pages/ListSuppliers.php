@@ -14,7 +14,8 @@ class ListSuppliers extends ListRecords
     {
         return [
             CreateAction::make()
-                ->label('+ Tambah Supplier'),
+                ->label('Tambah Supplier')
+                ->icon('heroicon-o-plus'),
         ];
     }
 }

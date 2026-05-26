@@ -118,12 +118,14 @@ class PaymentsRelationManager extends RelationManager
                     ->label('Tanggal')
                     ->date('d M Y')
                     ->sortable()
+                    ->verticallyAlignCenter()
                     ->weight('semibold'),
 
                 TextColumn::make('amount')
                     ->label('Jumlah')
                     ->formatStateUsing(fn($state) => 'Rp ' . number_format($state, 0, ',', '.'))
                     ->color('success')
+                    ->verticallyAlignCenter()
                     ->weight('bold'),
 
                 TextColumn::make('payment_method')
@@ -138,10 +140,12 @@ class PaymentsRelationManager extends RelationManager
                         'transfer' => 'info',
                         'qris' => 'warning',
                         default => 'success',
-                    }),
+                    })
+                    ->verticallyAlignCenter(),
 
                 TextColumn::make('note')
                     ->label('Catatan')
+                    ->verticallyAlignCenter()
                     ->placeholder('—'),
 
                 ImageColumn::make('proof_image')
@@ -150,18 +154,20 @@ class PaymentsRelationManager extends RelationManager
                     ->disk(null)
                     ->square()
                     ->size(48)
+                    ->verticallyAlignCenter()
                     ->defaultImageUrl(null),
 
                 TextColumn::make('recorder.name')
                     ->label('Dicatat Oleh')
                     ->placeholder('—')
+                    ->verticallyAlignCenter()
                     ->color('gray'),
 
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->label('+ Tambah Pembayaran')
-                    ->color('primary')
+                    ->label('Tambah Pembayaran')
+                    ->icon('heroicon-o-plus')
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['recorded_by'] = auth()->id();
                         return $data;

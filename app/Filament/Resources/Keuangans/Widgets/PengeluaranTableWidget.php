@@ -68,7 +68,8 @@ class PengeluaranTableWidget extends BaseWidget
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->label('+ Tambah Pengeluaran')
+                    ->label('Tambah Pengeluaran')
+                    ->icon('heroicon-o-plus')
                     ->modalHeading('Tambah Pengeluaran')
                     ->form([
                         TextInput::make('keperluan')
@@ -121,7 +122,9 @@ class PengeluaranTableWidget extends BaseWidget
                     }),
             ])
             ->actions([
-                EditAction::make()->modalHeading('Edit Pengeluaran')
+                EditAction::make()
+                    ->label('Ubah')
+                    ->modalHeading('Ubah Pengeluaran')
                     ->form([
                         TextInput::make('keperluan')
                             ->label('Keperluan')
@@ -201,6 +204,6 @@ class PengeluaranTableWidget extends BaseWidget
             ])
             ->filtersFormColumns(2)
             ->emptyStateHeading('Belum ada pengeluaran')
-            ->emptyStateDescription('Klik "+ Tambah Pengeluaran" untuk mencatat pengeluaran operasional.');
+            ->emptyStateDescription('Klik "Tambah Pengeluaran" untuk mencatat pengeluaran operasional.');
     }
 }

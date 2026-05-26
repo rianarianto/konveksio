@@ -9,6 +9,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Schemas\Components\Grid;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -95,7 +96,7 @@ class MaterialResource extends Resource
                                 'Pcs' => 'Pcs',
                                 'Lusin' => 'Lusin',
                             ])
-                            ->default('Kg')
+                            ->default('Meter')
                             ->required(),
 
                         Select::make('supplier_id')
@@ -136,28 +137,68 @@ class MaterialResource extends Resource
                             ->label('Daftar Warna')
                             ->relationship()
                             ->schema([
-                                Grid::make(4)
-                                    ->schema([
-                                        TextInput::make('color_name')
-                                            ->label('Nama Warna')
-                                            ->placeholder('misal: Navy Blue')
-                                            ->required(),
-                                        TextInput::make('color_code')
-                                            ->label('Kode Warna')
-                                            ->placeholder('misal: BLK-01')
-                                            ->required(),
-                                        TextInput::make('current_stock')
-                                            ->label('Stok Saat Ini')
-                                            ->numeric()
-                                            ->integer()
-                                            ->default(0)
-                                            ->required(),
+                                TextInput::make('color_name')
+                                    ->label('Nama Warna')
+                                    ->placeholder('misal: Navy Blue')
+                                    ->required()
+                                    ->rules([
+                                        fn ($get) => function (string $attribute, $value, $fail) use ($get) {
+                                            $variants = $get('../../variants') ?? [];
+                                            
+                                            // Filament v5 pakai UUID sebagai key repeater, bukan integer
+                                            preg_match('/variants\.([^.]+)\.color_name/', $attribute, $matches);
+                                            $currentKey = $matches[1] ?? null;
+
+                                            foreach ($variants as $key => $variant) {
+                                                if ((string) $key === (string) $currentKey) {
+                                                    continue;
+                                                }
+
+                                                if (isset($variant['color_name']) && strtolower(trim($variant['color_name'])) === strtolower(trim($value))) {
+                                                    $fail('Nama warna ini sudah digunakan pada bahan ini.');
+                                                    return;
+                                                }
+                                            }
+                                        }
                                     ]),
+                                TextInput::make('color_code')
+                                    ->label('Kode Warna')
+                                    ->placeholder('misal: BLK-01')
+                                    ->required()
+                                    ->rules([
+                                        fn ($get) => function (string $attribute, $value, $fail) use ($get) {
+                                            $variants = $get('../../variants') ?? [];
+                                            
+                                            // Filament v5 pakai UUID sebagai key repeater, bukan integer
+                                            preg_match('/variants\.([^.]+)\.color_code/', $attribute, $matches);
+                                            $currentKey = $matches[1] ?? null;
+
+                                            foreach ($variants as $key => $variant) {
+                                                if ((string) $key === (string) $currentKey) {
+                                                    continue;
+                                                }
+
+                                                if (isset($variant['color_code']) && strtolower(trim($variant['color_code'])) === strtolower(trim($value))) {
+                                                    $fail('Kode warna ini sudah digunakan pada bahan ini.');
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                    ]),
+                                TextInput::make('current_stock')
+                                    ->label('Stok Saat Ini')
+                                    ->numeric()
+                                    ->integer()
+                                    ->default(0)
+                                    ->required(),
                             ])
-                            ->collapsible()
-                            ->collapsed()
-                            ->defaultItems(1)
-                            ->itemLabel(fn(array $state): ?string => $state['color_name'] ?? null),
+                            ->table([
+                                TableColumn::make('Nama Warna')->markAsRequired(),
+                                TableColumn::make('Kode Warna')->markAsRequired(),
+                                TableColumn::make('Stok Saat Ini')->markAsRequired(),
+                            ])
+                            ->compact()
+                            ->defaultItems(1),
                     ]),
             ]);
     }

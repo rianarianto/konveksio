@@ -14,6 +14,8 @@ class ManageProductionStages extends ManageRecords
     {
         return [
             CreateAction::make()
+                ->label('Tambah Tahapan')
+                ->icon('heroicon-o-plus')
                 ->mutateFormDataUsing(function (array $data): array {
                     $data['shop_id'] = \Filament\Facades\Filament::getTenant()->id;
                     return $data;

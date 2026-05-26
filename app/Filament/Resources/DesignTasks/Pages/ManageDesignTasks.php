@@ -10,6 +10,10 @@ class ManageDesignTasks extends ManageRecords
 {
     protected static string $resource = DesignTaskResource::class;
 
+    protected $listeners = [
+        'designTaskReuploaded' => '$refresh',
+    ];
+
     protected function getHeaderActions(): array
     {
         return [];

@@ -15,7 +15,9 @@ class ManagePrintTypes extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->label('Tambah Jenis Print')
+                ->icon('heroicon-o-plus'),
         ];
     }
 

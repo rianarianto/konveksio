@@ -102,7 +102,7 @@ class DesignHistoryTableWidget extends BaseWidget
                     ->toggleable(),
             ])
             ->actions([
-                \Filament\Tables\Actions\Action::make('reupload')
+                \Filament\Actions\Action::make('reupload')
                     ->label('Upload Ulang')
                     ->icon('heroicon-m-arrow-path')
                     ->color('warning')
@@ -116,7 +116,8 @@ class DesignHistoryTableWidget extends BaseWidget
                                 'design_status' => 'pending',
                                 'design_image' => null,
                             ]);
-                    }),
+                    })
+                    ->after(fn ($livewire) => $livewire->dispatch('designTaskReuploaded')),
                 \Filament\Actions\Action::make('view')
                     ->label('Rincian')
                     ->icon('heroicon-o-eye')
