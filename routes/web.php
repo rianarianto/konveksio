@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TaskActionController;
 use App\Http\Controllers\MonitorController;
 use App\Http\Controllers\PDFController;
+use App\Http\Controllers\WorkTaskController;
 
 Route::get('/', function () {
     return redirect('/app');
@@ -34,4 +35,6 @@ Route::get('/payroll/{payroll}/print', [\App\Http\Controllers\PayrollController:
     ->middleware(['web', 'auth'])
     ->name('payroll.print');
 
-
+// ─── Halaman Tugas Tukang (akses publik via token, tanpa login) ──────────────
+Route::get('/tugas', [WorkTaskController::class, 'index'])
+    ->name('work.task');

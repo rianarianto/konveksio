@@ -132,9 +132,7 @@ class DesignTaskResource extends Resource
 
                                     $html .= '<div style="margin-bottom:24px;">';
                                     $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . ($cat === 'non_produksi' ? 'INFORMASI NON-PRODUKSI' : 'INFORMASI BAHAN') . '</div>';
-                                    $html .= '<div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
-                                    $html .= '<span style="width:16px; height:16px; border-radius:50%; background:' . $hex . '; border:1px solid rgba(0,0,0,0.15); flex-shrink:0;"></span>';
-                                    $html .= '<div style="flex:1;">';
+                                    $html .= '<div style="padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
                                     $html .= '<div style="font-size:13px; font-weight:700; color:#111827;">' . htmlspecialchars($bahanLabel) . '</div>';
 
                                      // Sablon Info inside Material Info
@@ -154,7 +152,6 @@ class DesignTaskResource extends Resource
                                          }
                                          $html .= '</div>';
                                      }
-                                     $html .= '</div>';
                                      $html .= '</div>';
                                      $html .= '</div>';
 
@@ -242,7 +239,9 @@ class DesignTaskResource extends Resource
                                             foreach ($mData['attrs'] as $ak => $av) {
                                                 $atxt[] = '<span style="color:#9ca3af; font-size:10px;">' . $ak . ':</span><span style="color:#4b5563; margin-left:2px;">' . $av . '</span>';
                                             }
-                                            $html .= '<div style="display:flex; gap:12px; font-size:11px; font-weight:700; margin-bottom:8px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
+                                            if (!empty($atxt)) {
+                                                $html .= '<div style="display:flex; gap:12px; font-size:11px; font-weight:700; margin-bottom:8px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
+                                            }
 
                                             // Sizes (Pill style)
                                             $stxt = [];

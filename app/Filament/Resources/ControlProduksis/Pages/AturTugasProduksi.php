@@ -65,50 +65,68 @@ class AturTugasProduksi extends Page
             }
         }
 
+        // Move 'CUSTOM' to the end of the array if it exists
+        if (array_key_exists('CUSTOM', $maxSizes)) {
+            $customVal = $maxSizes['CUSTOM'];
+            unset($maxSizes['CUSTOM']);
+            $maxSizes['CUSTOM'] = $customVal;
+        }
+
         $tasksForRepeater = [];
         $groupedTasks = $item->productionTasks->groupBy('stage_name');
         foreach ($groupedTasks as $stageName => $tasks) {
             $firstTask = $tasks->first();
-            $wagePerPcs = $firstTask->quantity > 0 ? (int) ($firstTask->wage_amount / $firstTask->quantity) : 0;
-            $workerIds = $tasks->pluck('assigned_to')->unique()->filter()->values()->toArray();
-
-            $taskRow = [
-                'stage_name' => $stageName,
-                'assigned_to' => $workerIds,
-                'quantity' => $firstTask->quantity,
-                'wage_per_pcs' => $wagePerPcs,
-                'wage_custom_per_pcs' => $firstTask->size_quantities['_wage_custom'] ?? $wagePerPcs,
-                'description' => $firstTask->description,
-            ];
-
-            if (is_array($firstTask->size_quantities)) {
-                foreach ($firstTask->size_quantities as $sz => $qty) {
-                    $upperSz = strtoupper($sz);
-                    if (str_starts_with($sz, '_')) {
-                        continue;
-                    }
-                    if ((str_starts_with($upperSz, 'PERSON_') || !isset($maxSizes[$upperSz])) && isset($maxSizes['CUSTOM'])) {
-                        $taskRow['CUSTOM'] = ($taskRow['CUSTOM'] ?? 0) + $qty;
-                    } else {
-                        $taskRow[$upperSz] = $qty ?: null;
-                    }
-                }
-            }
             
-            if (isset($taskRow['CUSTOM']) && $taskRow['CUSTOM'] === 0) {
-                $taskRow['CUSTOM'] = null;
-            }
+            $workerRows = [];
+            foreach ($tasks as $task) {
+                $wagePerPcs = $task->quantity > 0 ? (int) ($task->wage_amount / $task->quantity) : 0;
+                $workerRow = [
+                    'id' => $task->id,
+                    'worker_id' => $task->assigned_to,
+                    'quantity' => $task->quantity,
+                    'wage_per_pcs' => $wagePerPcs,
+                    'wage_custom_per_pcs' => $task->size_quantities['_wage_custom'] ?? $wagePerPcs,
+                    'description' => $task->description,
+                ];
 
-            $isAllFilled = !empty($maxSizes);
-            foreach ($maxSizes as $key => $max) {
-                if (($taskRow[$key] ?? 0) < $max) {
-                    $isAllFilled = false;
-                    break;
+                if (is_array($task->size_quantities)) {
+                    foreach ($task->size_quantities as $sz => $qty) {
+                        $upperSz = strtoupper($sz);
+                        if (str_starts_with($sz, '_')) {
+                            if ($sz === '_custom_recipients') {
+                                $workerRow['_custom_recipients'] = $qty;
+                            }
+                            continue;
+                        }
+                        if ((str_starts_with($upperSz, 'PERSON_') || !isset($maxSizes[$upperSz])) && isset($maxSizes['CUSTOM'])) {
+                            $workerRow['CUSTOM'] = ($workerRow['CUSTOM'] ?? 0) + $qty;
+                        } else {
+                            $workerRow[$upperSz] = $qty ?: null;
+                        }
+                    }
                 }
-            }
-            $taskRow['_fill_all'] = $isAllFilled;
 
-            $tasksForRepeater[(string) Str::uuid()] = $taskRow;
+                if (isset($workerRow['CUSTOM']) && $workerRow['CUSTOM'] === 0) {
+                    $workerRow['CUSTOM'] = null;
+                }
+
+                $isAllFilled = !empty($maxSizes);
+                foreach ($maxSizes as $key => $max) {
+                    if (($workerRow[$key] ?? 0) < $max) {
+                        $isAllFilled = false;
+                        break;
+                    }
+                }
+                $workerRow['_fill_all'] = $isAllFilled;
+
+                $workerRows[(string) Str::uuid()] = $workerRow;
+            }
+
+            $tasksForRepeater[(string) Str::uuid()] = [
+                'stage_name' => $stageName,
+                'wajib_qc' => $firstTask->wajib_qc ?? true,
+                'workers' => $workerRows,
+            ];
         }
 
         $this->form->fill([
@@ -127,6 +145,23 @@ class AturTugasProduksi extends Page
         
         return $schema
             ->schema([
+                \Filament\Forms\Components\Placeholder::make('_global_styles')
+                    ->hiddenLabel()
+                    ->content(new \Illuminate\Support\HtmlString('
+                        <style>
+                            .fi-fo-repeater-item-header {
+                                position: sticky !important;
+                                top: 0 !important;
+                                z-index: 10 !important;
+                                background-color: white !important;
+                                box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1) !important;
+                            }
+                            .dark .fi-fo-repeater-item-header {
+                                background-color: #1f2937 !important;
+                            }
+                        </style>
+                    ')),
+
                 Grid::make(12)
                     ->schema([
                         // LEFT COLUMN: TASK ASSIGNMENT
@@ -135,16 +170,104 @@ class AturTugasProduksi extends Page
                                 ->description('Tentukan tahapan dan karyawan yang bertugas')
                                 ->icon('heroicon-m-clipboard-document-list')
                                 ->schema([
+                                    Select::make('_preset_template')
+                                        ->label('Gunakan Template Alur Pekerjaan')
+                                        ->placeholder('Pilih Preset Alur Pekerjaan')
+                                        ->options([
+                                            'full' => 'Produksi Penuh (Potong, Jahit, Kancing, Sablon/Bordir, Finishing)',
+                                            'simple' => 'Jasa / Non-Produksi (Sablon/Bordir, Finishing)',
+                                        ])
+                                        ->live()
+                                        ->afterStateUpdated(function ($state, Set $set) {
+                                            if (!$state) return;
+                                            
+                                            $presets = [
+                                                'full' => [
+                                                    ['stage_name' => 'Potong', 'wajib_qc' => true],
+                                                    ['stage_name' => 'Jahit', 'wajib_qc' => true],
+                                                    ['stage_name' => 'Kancing', 'wajib_qc' => false],
+                                                    ['stage_name' => 'Dekorasi', 'wajib_qc' => false],
+                                                    ['stage_name' => 'Finishing', 'wajib_qc' => true],
+                                                ],
+                                                'simple' => [
+                                                    ['stage_name' => 'Dekorasi', 'wajib_qc' => false],
+                                                    ['stage_name' => 'Finishing', 'wajib_qc' => true],
+                                                ]
+                                            ];
+                                            
+                                            $selectedPreset = $presets[$state] ?? [];
+                                            
+                                            $newTasks = [];
+                                            foreach ($selectedPreset as $p) {
+                                                $stageModel = \App\Models\ProductionStage::where('name', 'like', '%' . $p['stage_name'] . '%')->first();
+                                                $baseWage = $stageModel?->base_wage ?? 0;
+                                                
+                                                $newTasks[] = [
+                                                    'stage_name' => $stageModel?->name ?? $p['stage_name'],
+                                                    'wajib_qc' => $p['wajib_qc'],
+                                                    'workers' => [],
+                                                ];
+                                            }
+                                            
+                                            $set('productionTasks', $newTasks);
+                                        }),
+
                                     Repeater::make('productionTasks')
                                         ->label(false)
                                         ->collapsible()
+                                        ->collapsed()
                                         ->itemLabel(function (array $state) {
                                             $stage = $state['stage_name'] ?? null;
                                             if (!$stage) return null;
                                             $colors = \App\Models\ProductionStage::getThemeColor($stage);
-                                            
                                             $stageId = str($stage)->slug();
                                             
+                                            // Dynamic summary details
+                                            $workersData = $state['workers'] ?? [];
+                                            $totalQty = 0;
+                                            $workerNames = [];
+                                            $totalWage = 0;
+
+                                            foreach ($workersData as $wData) {
+                                                $qty = $wData['quantity'] ?? 0;
+                                                $totalQty += $qty;
+
+                                                $workerId = $wData['worker_id'] ?? null;
+                                                if ($workerId) {
+                                                    $name = \App\Models\Worker::find($workerId)?->name;
+                                                    if ($name) $workerNames[] = $name;
+                                                }
+
+                                                $wagePerPcs = (int) ($wData['wage_per_pcs'] ?? 0);
+                                                $wageCustomPerPcs = (int) ($wData['wage_custom_per_pcs'] ?? $wagePerPcs);
+
+                                                $customQty = 0;
+                                                if (isset($wData['CUSTOM'])) {
+                                                    $customQty = (int) ($wData['CUSTOM'] ?? 0);
+                                                }
+                                                
+                                                $standardQty = $qty - $customQty;
+                                                $totalWage += ($standardQty * $wagePerPcs) + ($customQty * $wageCustomPerPcs);
+                                            }
+
+                                            $summaryParts = [];
+                                            if ($totalQty > 0) {
+                                                $summaryParts[] = $totalQty . ' Pcs';
+                                            }
+                                            if (!empty($workerNames)) {
+                                                $summaryParts[] = '👤 ' . implode(' & ', array_unique($workerNames));
+                                            }
+                                            if ($totalWage > 0) {
+                                                $summaryParts[] = '💰 Rp ' . number_format($totalWage, 0, ',', '.');
+                                            }
+                                            
+                                            $qcLabel = '';
+                                            if (!($state['wajib_qc'] ?? true)) {
+                                                $qcLabel = ' <span style="font-size: 9px; padding: 2px 6px; background: #fee2e2; color: #ef4444; border-radius: 4px; font-weight: 800; text-transform: uppercase; margin-left: 8px;">QC SKIP</span>';
+                                            }
+
+                                            $summaryText = implode(' | ', $summaryParts);
+
                                             return new \Illuminate\Support\HtmlString('
                                                 <style>
                                                     .fi-fo-repeater-item-header:has(.stage-label-'.$stageId.') {
@@ -154,14 +277,18 @@ class AturTugasProduksi extends Page
                                                         border-top-right-radius: 12px !important;
                                                     }
                                                 </style>
-                                                <span class="stage-label-'.$stageId.'"
-                                                      style="font-weight: 900; color: '.$colors['text'].'; text-transform: uppercase; letter-spacing: 0.05em;">
-                                                    ' . $stage . '
-                                                </span>
+                                                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                                                     <span class="stage-label-'.$stageId.'"
+                                                           style="font-weight: 900; color: '.$colors['text'].'; text-transform: uppercase; letter-spacing: 0.05em;">
+                                                         ' . $stage . '
+                                                     </span>
+                                                     <span style="font-size:11px; font-weight:700; color:#4b5563; margin-right:24px;">
+                                                         ' . $summaryText . $qcLabel . '
+                                                     </span>
+                                                </div>
                                             ');
                                         })
                                         ->schema([
-                                            Hidden::make('id'),
                                             Grid::make(2)
                                                 ->schema([
                                                     Select::make('stage_name')
@@ -180,22 +307,38 @@ class AturTugasProduksi extends Page
                                                         })
                                                         ->required()
                                                         ->live()
-                                                        ->afterStateUpdated(function ($state, Set $set) {
+                                                        ->afterStateUpdated(function ($state, Set $set, Get $get) {
                                                             if ($state) {
                                                                 $stage = ProductionStage::where('name', $state)->first();
                                                                 if ($stage) {
-                                                                    $set('wage_per_pcs', $stage->base_wage);
-                                                                    // If it's the 'Potong' or 'Jahit' stage, also set the custom wage default
-                                                                    if (str_contains(strtolower($state), 'potong') || str_contains(strtolower($state), 'jahit')) {
-                                                                        $set('wage_custom_per_pcs', $stage->base_wage);
+                                                                    $workers = $get('workers') ?? [];
+                                                                    foreach (array_keys($workers) as $key) {
+                                                                        $set("workers.{$key}.wage_per_pcs", $stage->base_wage);
+                                                                        if (str_contains(strtolower($state), 'potong') || str_contains(strtolower($state), 'jahit')) {
+                                                                            $set("workers.{$key}.wage_custom_per_pcs", $stage->base_wage);
+                                                                        }
                                                                     }
                                                                 }
                                                             }
                                                         }),
-                                                    Select::make('assigned_to')
+                                                    Toggle::make('wajib_qc')
+                                                        ->label('Wajib Pemeriksaan QC Setelah Tahap Ini')
+                                                        ->default(true),
+                                                ]),
+
+                                            Repeater::make('workers')
+                                                ->label('Daftar Pekerja & Kuantitas')
+                                                ->itemLabel(function (array $state) {
+                                                    $workerId = $state['worker_id'] ?? null;
+                                                    $qty = $state['quantity'] ?? 0;
+                                                    $name = $workerId ? \App\Models\Worker::find($workerId)?->name : 'Pekerja';
+                                                    return $name . ' (' . $qty . ' Pcs)';
+                                                })
+                                                ->collapsible()
+                                                ->schema([
+                                                    Hidden::make('id'),
+                                                    Select::make('worker_id')
                                                         ->label('Karyawan')
-                                                        ->multiple()
-                                                        ->live()
                                                         ->options(function() {
                                                             return Worker::where('is_active', true)
                                                                 ->get()
@@ -207,306 +350,212 @@ class AturTugasProduksi extends Page
                                                         })
                                                         ->searchable()
                                                         ->required(),
-                                                ]),
 
-                                            Fieldset::make('Distribusi Qty Per Ukuran')
-                                                ->schema(function (Get $get, Set $set) use ($item) {
-                                                    $allGroupItems = OrderItem::where('order_id', $item->order_id)
-                                                        ->where('product_name', $item->product_name)
-                                                        ->where('bahan_id', $item->bahan_id)
-                                                        ->where('design_status', 'approved')
-                                                        ->get();
+                                                    Fieldset::make('Distribusi Qty Per Ukuran')
+                                                        ->schema(function (Get $get, Set $set) use ($item) {
+                                                            $allGroupItems = OrderItem::where('order_id', $item->order_id)
+                                                                ->where('product_name', $item->product_name)
+                                                                ->where('bahan_id', $item->bahan_id)
+                                                                ->where('design_status', 'approved')
+                                                                ->get();
 
-                                                    $standardSizes = [];
-                                                    $requestPerSize = [];
-                                                    foreach ($allGroupItems as $gi) {
-                                                        $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-                                                        $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
-                                                        $dtl = $gi->size_and_request_details ?? [];
-                                                        if (!empty($dtl['request_tambahan'])) {
-                                                            foreach ($dtl['request_tambahan'] as $rt) {
-                                                                $reqText = ($rt['jenis'] ?? '') . ': ' . ($rt['keterangan'] ?? '');
-                                                                $requestPerSize[$sz][] = $reqText;
-                                                            }
-                                                        }
-                                                    }
-
-                                                    if ($item->production_category === 'custom') {
-                                                        $details = $item->size_and_request_details ?? [];
-                                                        $count = count($details['detail_custom'] ?? []);
-                                                        if ($count > 0) $standardSizes['CUSTOM'] = ($standardSizes['CUSTOM'] ?? 0) + $count;
-                                                    }
-
-                                                    $recalcQty = function (Get $get, Set $set) use ($standardSizes) {
-                                                        $total = 0;
-                                                        foreach (array_keys($standardSizes) as $sz) $total += (int) ($get($sz) ?? 0);
-                                                        if ($total === 0) $total = (int) ($get('qty') ?? 0);
-                                                        $set('quantity', $total);
-                                                    };
-
-                                                    $fields = [
-                                                        Toggle::make('_fill_all')
-                                                            ->label('Kerjakan Semua')
-                                                            ->live()
-                                                            ->afterStateUpdated(function ($state, Set $set) use ($standardSizes) {
-                                                                foreach ($standardSizes as $sz => $max) $set($sz, $state ? $max : null);
-                                                                $total = $state ? array_sum($standardSizes) : 0;
-                                                                $set('quantity', $total);
-                                                            })
-                                                            ->columnSpanFull(),
-                                                    ];
-
-                                                    foreach ($standardSizes as $sz => $max) {
-                                                        $fields[] = TextInput::make($sz)
-                                                            ->label("Size {$sz} (Maks: {$max})")
-                                                            ->numeric()
-                                                            ->minValue(0)
-                                                            ->maxValue($max)
-                                                            ->placeholder('0')
-                                                            ->default(null)
-                                                            ->live(debounce: 300)
-                                                            ->afterStateUpdated(function ($state, Set $set, Get $get) use ($sz, $max, $recalcQty) {
-                                                                if ((int) $state > $max) {
-                                                                    $set($sz, $max);
+                                                            $standardSizes = [];
+                                                            $requestPerSize = [];
+                                                            foreach ($allGroupItems as $gi) {
+                                                                $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                                                                $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
+                                                                $dtl = $gi->size_and_request_details ?? [];
+                                                                if (!empty($dtl['request_tambahan'])) {
+                                                                    foreach ($dtl['request_tambahan'] as $rt) {
+                                                                        $reqText = ($rt['jenis'] ?? '') . ': ' . ($rt['keterangan'] ?? '');
+                                                                        $requestPerSize[$sz][] = $reqText;
+                                                                    }
                                                                 }
-                                                                $recalcQty($get, $set);
-                                                            })
-                                                            ->extraAttributes(['style' => 'align-self: end;']);
-                                                    }
+                                                            }
 
-                                                    if (!empty($requestPerSize)) {
-                                                        $summaryParts = [];
-                                                        foreach ($requestPerSize as $sz => $reqs) $summaryParts[] = strtoupper($sz) . ' -> ' . implode(', ', $reqs);
-                                                        $summaryText = '* Request Tambahan:  ' . implode('   |   ', $summaryParts);
-                                                        $fields[] = Placeholder::make('req_info')->hiddenLabel()->content(new HtmlString('<div style="font-size:11px;color:#b45309;font-weight:600;padding:4px 8px;background:#fffbeb;border-radius:6px;border:1px solid #fef3c7;">' . $summaryText . '</div>'))->columnSpanFull();
-                                                    }
+                                                            if ($item->production_category === 'custom') {
+                                                                $details = $item->size_and_request_details ?? [];
+                                                                $count = count($details['detail_custom'] ?? []);
+                                                                if ($count > 0) $standardSizes['CUSTOM'] = ($standardSizes['CUSTOM'] ?? 0) + $count;
+                                                            }
 
-                                                    if (empty($fields) || (count($fields) === 1 && $fields[0] instanceof Toggle)) {
-                                                        $fields[] = TextInput::make('qty')
-                                                            ->label('Target Qty')
-                                                            ->numeric()
-                                                            ->minValue(0)
-                                                            ->placeholder('0')
-                                                            ->live(debounce: 300)
-                                                            ->afterStateUpdated(fn($state, Set $set, Get $get) => $recalcQty($get, $set))
-                                                            ->extraAttributes(['style' => 'align-self: end;']);
-                                                    }
+                                                            // Move 'CUSTOM' to the end of the array if it exists
+                                                            if (array_key_exists('CUSTOM', $standardSizes)) {
+                                                                $customVal = $standardSizes['CUSTOM'];
+                                                                unset($standardSizes['CUSTOM']);
+                                                                $standardSizes['CUSTOM'] = $customVal;
+                                                            }
 
-                                                    return $fields;
-                                                })
-                                                ->columns(6)
-                                                ->extraAttributes(['class' => 'distribusi-qty-grid'])
-                                                ->columnSpanFull(),
+                                                            $recalcQty = function (Get $get, Set $set) use ($standardSizes) {
+                                                                $total = 0;
+                                                                foreach (array_keys($standardSizes) as $sz) {
+                                                                    $val = (int) ($get($sz) ?? 0);
+                                                                    if ($val > 0) {
+                                                                        $total += $val;
+                                                                    }
+                                                                }
+                                                                if ($total === 0) {
+                                                                    $qtyVal = (int) ($get('qty') ?? 0);
+                                                                    $total = $qtyVal > 0 ? $qtyVal : 0;
+                                                                }
+                                                                $set('quantity', $total);
+                                                            };
 
-                                            Grid::make(2)
-                                                ->schema([
-                                                    TextInput::make('quantity')
-                                                        ->label('Total Qty')
-                                                        ->numeric()
-                                                        ->readOnly()
-                                                        ->prefix('Σ'),
-                                                    TextInput::make('wage_per_pcs')->live(debounce: 500)
-                                                        ->label('Upah Standar per Pcs')
-                                                        ->numeric()
-                                                        ->prefix('Rp'),
-                                                    TextInput::make('wage_custom_per_pcs')->live(debounce: 500)
-                                                        ->label('Upah Custom per Pcs')
-                                                        ->numeric()
-                                                        ->prefix('Rp')
-                                                        ->visible(fn (Get $get) => (str_contains(strtolower($get('stage_name')), 'potong') || str_contains(strtolower($get('stage_name')), 'jahit')) && (int) ($get('CUSTOM') ?? 0) > 0),
-                                                ]),
+                                                            $fields = [
+                                                                Toggle::make('_fill_all')
+                                                                    ->label('Kerjakan Semua')
+                                                                    ->live()
+                                                                    ->afterStateUpdated(function ($state, Set $set) use ($standardSizes, $item) {
+                                                                        foreach ($standardSizes as $sz => $max) $set($sz, $state ? $max : null);
+                                                                        
+                                                                        if ($item->production_category === 'custom') {
+                                                                            $details = $item->size_and_request_details ?? [];
+                                                                            $allNames = [];
+                                                                            foreach ($details['detail_custom'] ?? [] as $u) {
+                                                                                if (!empty($u['nama'])) $allNames[] = $u['nama'];
+                                                                            }
+                                                                            $set('_custom_recipients', $state ? $allNames : []);
+                                                                        }
 
-                                            Placeholder::make('split_preview')
-                                                 ->hiddenLabel()
-                                                 ->visible(fn (Get $get) => count((array) ($get('assigned_to') ?? [])) > 1)
-                                                 ->content(function (Get $get) use ($item): HtmlString {
-                                                     $workers = (array) ($get('assigned_to') ?? []);
-                                                     $workerCount = count($workers);
-                                                     if ($workerCount <= 1) return new HtmlString('');
+                                                                        $total = $state ? array_sum($standardSizes) : 0;
+                                                                        $set('quantity', $total);
+                                                                    })
+                                                                    ->columnSpanFull(),
+                                                            ];
 
-                                                     // Collect size quantities from the row state
-                                                     $sizeQuantities = [];
-                                                     $allSizes = OrderItem::where('order_id', $item->order_id)
-                                                         ->where('product_name', $item->product_name)
-                                                         ->where('bahan_id', $item->bahan_id)
-                                                         ->where('design_status', 'approved')
-                                                         ->get()
-                                                         ->pluck('size')
-                                                         ->unique()
-                                                         ->map(fn($s) => strtoupper($s ?? 'TANPA_UKURAN'))
-                                                         ->toArray();
-                                                     if ($item->production_category === 'custom') {
-                                                         $allSizes[] = 'CUSTOM';
-                                                     }
+                                                            if ($item->production_category === 'custom') {
+                                                                $fields[] = Select::make('_custom_recipients')
+                                                                    ->label('Pilih Orang (Custom)')
+                                                                    ->multiple()
+                                                                    ->options(function () use ($item) {
+                                                                        $details = $item->size_and_request_details ?? [];
+                                                                        $options = [];
+                                                                        foreach ($details['detail_custom'] ?? [] as $u) {
+                                                                            $name = $u['nama'] ?? 'Tanpa Nama';
+                                                                            $specs = [];
+                                                                            foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
+                                                                                if (!empty($u[$mk])) {
+                                                                                    $specs[] = "$mk:{$u[$mk]}";
+                                                                                }
+                                                                            }
+                                                                            $label = $name . (!empty($specs) ? ' (' . implode(' ', $specs) . ')' : '');
+                                                                            $options[$name] = $label;
+                                                                        }
+                                                                        return $options;
+                                                                    })
+                                                                    ->live()
+                                                                    ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcQty) {
+                                                                        $set('CUSTOM', count($state ?? []));
+                                                                        $recalcQty($get, $set);
+                                                                    })
+                                                                    ->columnSpanFull();
+                                                            }
 
-                                                     foreach ($allSizes as $sz) {
-                                                         $val = (int) ($get($sz) ?? 0);
-                                                         if ($val > 0) {
-                                                             $sizeQuantities[$sz] = $val;
-                                                         }
-                                                     }
+                                                            $sizeColumns = [];
+                                                            foreach ($standardSizes as $sz => $max) {
+                                                                $sizeColumns[] = TextInput::make($sz)
+                                                                    ->label($sz)
+                                                                    ->helperText('Maks ' . $max)
+                                                                    ->numeric()
+                                                                    ->minValue(0)
+                                                                    ->maxValue($max)
+                                                                    ->placeholder('0')
+                                                                    ->default(null)
+                                                                    ->readOnly(fn() => $sz === 'CUSTOM' && $item->production_category === 'custom')
+                                                                    ->live(debounce: 300)
+                                                                    ->afterStateUpdated(function ($state, Set $set, Get $get) use ($sz, $max, $recalcQty) {
+                                                                        $val = (int) $state;
+                                                                        if ($val < 0) {
+                                                                            $set($sz, 0);
+                                                                        } elseif ($val > $max) {
+                                                                            $set($sz, $max);
+                                                                        }
+                                                                        $recalcQty($get, $set);
+                                                                    })
+                                                                    ->extraInputAttributes(['style' => 'text-align: center;']);
+                                                            }
 
-                                                     $quantity = array_sum($sizeQuantities);
-                                                     if ($quantity === 0 && (int) $get('qty') > 0) $quantity = (int) $get('qty');
-                                                     if ($quantity === 0 && (int) $get('quantity') > 0) $quantity = (int) $get('quantity');
+                                                            foreach ($sizeColumns as $col) {
+                                                                $fields[] = $col;
+                                                            }
 
-                                                     $wagePerPcs = (float) ($get('wage_per_pcs') ?? 0);
-                                                     $wageCustomPerPcs = (float) ($get('wage_custom_per_pcs') ?? $wagePerPcs);
+                                                            if (!empty($requestPerSize)) {
+                                                                $summaryParts = [];
+                                                                foreach ($requestPerSize as $sz => $reqs) $summaryParts[] = strtoupper($sz) . ' -> ' . implode(', ', $reqs);
+                                                                $summaryText = '* Request Tambahan:  ' . implode('   |   ', $summaryParts);
+                                                                $fields[] = Placeholder::make('req_info')->hiddenLabel()->content(new HtmlString('<div style="font-size:11px;color:#b45309;font-weight:600;padding:4px 8px;background:#fffbeb;border-radius:6px;border:1px solid #fef3c7;">' . $summaryText . '</div>'))->columnSpanFull();
+                                                            }
 
-                                                     $customQty = (int) ($sizeQuantities['CUSTOM'] ?? 0);
-                                                     $standardQty = $quantity - $customQty;
-                                                     $totalWage = ($standardQty * $wagePerPcs) + ($customQty * $wageCustomPerPcs);
+                                                            if (empty($fields) || (count($fields) === 1 && $fields[0] instanceof Toggle)) {
+                                                                $fields[] = TextInput::make('qty')
+                                                                    ->label('Target Qty')
+                                                                    ->numeric()
+                                                                    ->minValue(0)
+                                                                    ->placeholder('0')
+                                                                    ->live(debounce: 300)
+                                                                    ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcQty) {
+                                                                        if ($state !== null && $state !== '' && (int) $state < 0) {
+                                                                            $set('qty', 0);
+                                                                        }
+                                                                        $recalcQty($get, $set);
+                                                                    })
+                                                                    ->extraInputAttributes(['style' => 'text-align: center;'])
+                                                                    ->extraAttributes(['style' => 'width: 150px; max-width: 150px;']);
+                                                            }
 
-                                                     // 1. Get all custom names and size genders in order
-                                                     $customNames = [];
-                                                     $sizeGenders = [];
-                                                     $allItems = OrderItem::where('order_id', $item->order_id)
-                                                         ->where('product_name', $item->product_name)
-                                                         ->where('bahan_id', $item->bahan_id)
-                                                         ->where('design_status', 'approved')
-                                                         ->get();
+                                                            return $fields;
+                                                        })
+                                                        ->columns(6)
+                                                        ->columnSpanFull(),
 
-                                                     foreach ($allItems as $ai) {
-                                                         $idtl = $ai->size_and_request_details ?? [];
-                                                         if ($ai->production_category === 'custom') {
-                                                             if (!empty($idtl['detail_custom'])) {
-                                                                 foreach ($idtl['detail_custom'] as $u) {
-                                                                     if (!empty($u['nama'])) {
-                                                                         $customNames[] = $u['nama'];
-                                                                     }
-                                                                 }
-                                                             }
-                                                         } else {
-                                                             $sz = strtoupper($ai->size ?? 'TANPA_UKURAN');
-                                                             $g = strtoupper($idtl['gender'] ?? 'L');
-                                                             $gLabel = ($g === 'P' ? 'P' : 'L');
-                                                             
-                                                             $qtyVal = (int) $ai->quantity;
-                                                             for ($qIdx = 0; $qIdx < $qtyVal; $qIdx++) {
-                                                                 $sizeGenders[$sz][] = $gLabel;
-                                                             }
-                                                         }
-                                                     }
+                                                    Grid::make(2)
+                                                        ->schema([
+                                                            TextInput::make('quantity')
+                                                                ->label('Total Qty')
+                                                                ->numeric()
+                                                                ->readOnly()
+                                                                ->prefix('Σ'),
+                                                            TextInput::make('wage_per_pcs')->live(debounce: 500)
+                                                                ->label('Upah Standar per Pcs')
+                                                                ->numeric()
+                                                                ->prefix('Rp')
+                                                                ->default(function (Get $get) {
+                                                                    $stageName = $get('../../stage_name');
+                                                                    if ($stageName) {
+                                                                        $stage = ProductionStage::where('name', $stageName)->first();
+                                                                        return $stage?->base_wage ?? 0;
+                                                                    }
+                                                                    return 0;
+                                                                }),
+                                                            TextInput::make('wage_custom_per_pcs')->live(debounce: 500)
+                                                                ->label('Upah Custom per Pcs')
+                                                                ->numeric()
+                                                                ->prefix('Rp')
+                                                                ->default(function (Get $get) {
+                                                                    $stageName = $get('../../stage_name');
+                                                                    if ($stageName) {
+                                                                        $stage = ProductionStage::where('name', $stageName)->first();
+                                                                        return $stage?->base_wage ?? 0;
+                                                                    }
+                                                                    return 0;
+                                                                })
+                                                                ->visible(fn (Get $get) => (str_contains(strtolower($get('../../stage_name')), 'potong') || str_contains(strtolower($get('../../stage_name')), 'jahit')) && (int) ($get('CUSTOM') ?? 0) > 0),
+                                                        ]),
 
-                                                     // 2. Apply round-robin splitting algorithm
-                                                     $workerSizes = [];
-                                                     $workerCustomNames = [];
-                                                     $workerGenders = [];
-                                                     for ($i = 0; $i < $workerCount; $i++) {
-                                                         $workerSizes[$i] = [];
-                                                         $workerCustomNames[$i] = [];
-                                                         $workerGenders[$i] = [];
-                                                     }
-
-                                                     $remainders = [];
-                                                     foreach ($sizeQuantities as $sz => $qty) {
-                                                         $baseQty = (int) floor($qty / $workerCount);
-                                                         $remQty = $qty % $workerCount;
-                                                         for ($i = 0; $i < $workerCount; $i++) {
-                                                             if ($baseQty > 0) {
-                                                                 $workerSizes[$i][$sz] = $baseQty;
-                                                             }
-                                                         }
-                                                         for ($r = 0; $r < $remQty; $r++) {
-                                                             $remainders[] = $sz;
-                                                         }
-                                                     }
-
-                                                     $remCount = count($remainders);
-                                                     for ($r = 0; $r < $remCount; $r++) {
-                                                         $workerIdx = $r % $workerCount;
-                                                         $sz = $remainders[$r];
-                                                         $workerSizes[$workerIdx][$sz] = ($workerSizes[$workerIdx][$sz] ?? 0) + 1;
-                                                     }
-
-                                                     // Distribute custom names round-robin to matching worker custom allocations
-                                                     $cCount = count($customNames);
-                                                     for ($c = 0; $c < $cCount; $c++) {
-                                                         $workerIdx = $c % $workerCount;
-                                                         $workerCustomNames[$workerIdx][] = $customNames[$c];
-                                                     }
-
-                                                     // Distribute genders round-robin per size
-                                                     foreach ($sizeGenders as $sz => $gList) {
-                                                         for ($idx = 0; $idx < count($gList); $idx++) {
-                                                             $workerIdx = $idx % $workerCount;
-                                                             $gLabel = $gList[$idx] === 'P' ? 'P' : 'L';
-                                                             $workerGenders[$workerIdx][$sz][$gLabel] = ($workerGenders[$workerIdx][$sz][$gLabel] ?? 0) + 1;
-                                                         }
-                                                     }
-
-                                                     $workerModels = Worker::whereIn('id', $workers)->get()->keyBy('id');
-
-                                                     $html = '<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px 16px; font-size:12px; margin-bottom:16px;">';
-                                                     $html .= '<div style="font-weight:800; color:#166534; margin-bottom:8px; display:flex; align-items:center; gap:4px; font-size:11px; letter-spacing:0.02em;">🔍 PRATINJAU PEMBAGIAN TUGAS (DIBAGI RATA)</div>';
-                                                     $html .= '<div style="display:flex; flex-direction:column; gap:6px;">';
-
-                                                     for ($i = 0; $i < $workerCount; $i++) {
-                                                         $wId = $workers[$i];
-                                                         $wName = $workerModels[$wId]->name ?? 'Karyawan ' . ($i + 1);
-
-                                                         $eachSizes = $workerSizes[$i];
-                                                         $eachCleanSizes = array_filter($eachSizes, fn($k) => !str_starts_with($k, '_'), ARRAY_FILTER_USE_KEY);
-                                                         $eachQty = array_sum($eachCleanSizes);
-
-                                                         if ($eachQty === 0) {
-                                                             $eachQty = (int) floor($quantity / $workerCount);
-                                                             if ($i === 0) $eachQty += ($quantity % $workerCount);
-
-                                                             $eachWage = (int) floor($totalWage / $workerCount);
-                                                             if ($i === 0) {
-                                                                 $eachWage += ($totalWage % $workerCount);
-                                                             }
-                                                         } else {
-                                                             $eachCustomQty = (int) ($eachSizes['CUSTOM'] ?? 0);
-                                                             $eachStandardQty = $eachQty - $eachCustomQty;
-                                                             $eachWage = ($eachStandardQty * $wagePerPcs) + ($eachCustomQty * $wageCustomPerPcs);
-                                                         }
-
-                                                         $sizeString = [];
-                                                         foreach ($eachCleanSizes as $sz => $sqty) {
-                                                             $szGenders = $workerGenders[$i][$sz] ?? [];
-                                                             if (!empty($szGenders)) {
-                                                                 $gStrings = [];
-                                                                 foreach ($szGenders as $gLabel => $gQty) {
-                                                                     $gStrings[] = ($gLabel === 'P' ? 'Perempuan' : 'Laki-laki') . ': ' . $gQty;
-                                                                 }
-                                                                 $sizeString[] = $sz . ' (' . implode(', ', $gStrings) . ')';
-                                                             } else {
-                                                                 $sizeString[] = $sz . ': ' . $sqty;
-                                                             }
-                                                         }
-                                                         $sizeDetails = !empty($sizeString) ? ' (' . implode(' | ', $sizeString) . ')' : '';
-
-                                                         $eachCustomNames = $workerCustomNames[$i] ?? [];
-                                                         $customDetails = !empty($eachCustomNames) ? '<div style="font-size:11px; color:#15803d; font-weight:600; margin-top:4px; padding-left:20px; font-style:italic;">🧵 Baju Custom: ' . htmlspecialchars(implode(', ', $eachCustomNames)) . '</div>' : '';
-
-                                                         $html .= '<div style="display:flex; flex-direction:column; padding:8px 10px; background:white; border:1px solid #dcfce7; border-radius:6px; font-weight:700; color:#14532d;">';
-                                                         $html .= '<div style="display:flex; justify-content:space-between; align-items:center; width:100%;">';
-                                                         $html .= '<div>👤 ' . htmlspecialchars($wName) . '<span style="font-weight:600; font-size:11px; color:#16a34a; margin-left:6px;">' . $sizeDetails . '</span></div>';
-                                                         $html .= '<div style="text-align:right; font-size:12px;">' . $eachQty . ' pcs &nbsp;|&nbsp; <span style="color:#15803d; font-weight:800;">Rp ' . number_format($eachWage, 0, ',', '.') . '</span></div>';
-                                                         $html .= '</div>';
-                                                         $html .= $customDetails;
-                                                         $html .= '</div>';
-                                                     }
-
-                                                     $html .= '</div>';
-                                                     $html .= '</div>';
-
-                                                     return new HtmlString($html);
-                                                 })
-                                                 ->columnSpanFull(),
-
-                                            Textarea::make('description')
-                                                ->label('Catatan Instruksi')
-                                                ->rows(2)
-                                                ->columnSpanFull(),
+                                                    Textarea::make('description')
+                                                        ->label('Catatan Instruksi')
+                                                        ->rows(2)
+                                                        ->columnSpanFull(),
+                                                ])
+                                                ->columnSpanFull()
+                                                ->addActionLabel('+ Tambah Pekerja')
+                                                ->addAction(fn($action) => $action->color('success')),
                                         ])
                                         ->columnSpanFull()
                                         ->addActionLabel('+ Tambah Tugas Baru')
                                         ->addAction(fn($action) => $action->color('primary')),
-                                ])
-                        ])->columnSpan(8),
+                                    ])
+                            ])->columnSpan(8),
 
                         // RIGHT COLUMN: SPECIFICATIONS (Sticky)
                         Group::make([
@@ -552,12 +601,14 @@ class AturTugasProduksi extends Page
                                                 $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
                                             }
 
-                                            $html .= '<div style="margin-bottom:24px;">';
+                                            $html .= '<div style="margin-bottom:20px;">';
                                             $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . ($cat === 'non_produksi' ? 'INFORMASI NON-PRODUKSI' : 'INFORMASI BAHAN') . '</div>';
-                                            $html .= '<div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">';
-                                            $html .= '<span style="width:16px; height:16px; border-radius:50%; background:' . $hex . '; border:1px solid rgba(0,0,0,0.15); flex-shrink:0;"></span>';
-                                            $html .= '<div style="flex:1;">';
-                                            $html .= '<div style="font-size:13px; font-weight:700; color:#111827;">' . htmlspecialchars($bahanLabel) . '</div>';
+                                            
+                                            // Material Info Box
+                                            $html .= '<div style="padding:16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:12px;">';
+                                            
+                                            // Title
+                                            $html .= '<div style="font-size:13px; font-weight:700; color:#111827; margin-bottom:4px;">' . htmlspecialchars($bahanLabel) . '</div>';
 
                                             $sablonJenis = $details['sablon_jenis'] ?? null;
                                             $sablonLokasi = $details['sablon_lokasi'] ?? null;
@@ -578,21 +629,20 @@ class AturTugasProduksi extends Page
                                                 foreach ($sablon as $s) {
                                                     $sblnTexts[] = ($s['jenis'] ?? '') . ' (' . ($s['lokasi'] ?? '') . ')';
                                                 }
-                                                $html .= '<div style="font-size:11px; font-weight:600; color:' . $primaryColor . '; margin-top:2px;">SABLON/BORDIR: ' . htmlspecialchars(implode(', ', $sblnTexts)) . '</div>';
+                                                $html .= '<div style="font-size:11px; font-weight:600; color:' . $primaryColor . '; margin-top:4px;">SABLON/BORDIR: ' . htmlspecialchars(implode(', ', $sblnTexts)) . '</div>';
                                             }
-                                            $html .= '</div>';
+                                            $html .= '</div>'; // Closes Material Info Box
 
                                             // GENERAL ORDER NOTES SECTION
                                             $orderNotes = $item->order->notes ?? null;
                                             if (!empty($orderNotes)) {
-                                                $html .= '<div style="margin-bottom:24px; padding:12px 16px; background:#fffbeb; border:1px solid #fef3c7; border-radius:8px;">';
+                                                $html .= '<div style="margin-bottom:12px; padding:12px 16px; background:#fffbeb; border:1px solid #fef3c7; border-radius:8px;">';
                                                 $html .= '<div style="font-size:11px; font-weight:800; color:#d97706; letter-spacing:0.05em; margin-bottom:6px; display:flex; align-items:center; gap:4px;">';
                                                 $html .= '⚠️ CATATAN UMUM PESANAN';
                                                 $html .= '</div>';
                                                 $html .= '<div style="font-size:12px; font-weight:700; color:#92400e; white-space:pre-wrap; line-height:1.5;">' . htmlspecialchars($orderNotes) . '</div>';
                                                 $html .= '</div>';
                                             }
-                                            $html .= '</div>';
                                             $html .= '</div>';
 
                                             $genders = [];
@@ -662,7 +712,7 @@ class AturTugasProduksi extends Page
                                             if ($hasItemsToShow) {
                                                 foreach ($genders as $gCode => $gData) {
                                                     $gName = $gCode === 'P' ? 'PEREMPUAN' : ($gCode === 'L' ? 'LAKI-LAKI' : 'RINCIAN UKURAN PESANAN');
-                                                    $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
+                                                    $html .= '<div x-data="{ open: false }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
                                                     $html .= '<div @click="open = !open" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:#f9fafb;">';
                                                     $html .= '<div style="display:flex; align-items:center; gap:8px;">';
                                                     $html .= '<span style="font-size:12px; font-weight:800; color:#374151;">' . $gName . '</span>';
@@ -768,56 +818,88 @@ class AturTugasProduksi extends Page
             $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
             $originalSizes[$sz] = ($originalSizes[$sz] ?? 0) + (int) $gi->quantity;
         }
+
+        if ($item->production_category === 'custom') {
+            $details = $item->size_and_request_details ?? [];
+            $count = count($details['detail_custom'] ?? []);
+            if ($count > 0) {
+                $originalSizes['CUSTOM'] = ($originalSizes['CUSTOM'] ?? 0) + $count;
+            }
+        }
         $totalOrderQty = array_sum($originalSizes);
 
         // ══════════════════════════════════════════════════════════════
         // VALIDASI
         // ══════════════════════════════════════════════════════════════
-        $usedQtyPerStageSize = [];
-        $usedQtyPerStage = [];
-        $assignedStages = [];
+        $allocatedPerStageSize = [];
+        $allocatedPerStageTotal = [];
+        $excludeKeys = ['id', 'worker_id', 'wage_per_pcs', 'wage_custom_per_pcs', 'quantity', 'description', '_fill_all', 'qty', '_custom_recipients'];
         
         foreach ($tasksData as $taskItem) {
             $stage = $taskItem['stage_name'] ?? null;
-            $calculatedQty = 0;
-            $sqs = [];
-            $excludeKeys = ['id', 'stage_name', 'assigned_to', 'wage_per_pcs', 'wage_custom_per_pcs', 'quantity', 'description', '_fill_all', 'qty'];
-            foreach ($taskItem as $k => $v) {
-                if (!in_array($k, $excludeKeys) && is_numeric($v) && (int) $v > 0) {
-                    $calculatedQty += (int) $v;
-                    $sqs[$k] = (int) $v;
-                }
-            }
-            if ($calculatedQty === 0 && isset($taskItem['qty']) && (int) $taskItem['qty'] > 0) $calculatedQty = (int) $taskItem['qty'];
-            if ($calculatedQty === 0 && isset($taskItem['quantity']) && (int) $taskItem['quantity'] > 0) $calculatedQty = (int) $taskItem['quantity'];
+            if (!$stage) continue;
 
-            if ($calculatedQty === 0) {
-                Notification::make()->title('Ada Tugas Tanpa Qty!')->body("Baris tugas <strong>{$stage}</strong> tidak memiliki qty.")->danger()->send();
+            $workers = $taskItem['workers'] ?? [];
+            if (empty($workers)) {
+                Notification::make()->title('Pekerja Belum Dipilih!')->body("Tahap <strong>{$stage}</strong> belum ditentukan pekerja/karyawannya.")->danger()->send();
                 return;
             }
 
-            if ($stage) {
-                $assignedStages[] = $stage;
-                $usedQtyPerStage[$stage] = ($usedQtyPerStage[$stage] ?? 0) + $calculatedQty;
-                foreach ($sqs as $key => $val) {
-                    $upperKey = strtoupper($key);
-                    $usedQtyPerStageSize[$stage][$upperKey] = ($usedQtyPerStageSize[$stage][$upperKey] ?? 0) + (int) $val;
+            foreach ($workers as $wItem) {
+                $workerId = $wItem['worker_id'] ?? null;
+                if (!$workerId) {
+                    Notification::make()->title('Pekerja Belum Dipilih!')->body("Ada baris pekerja di tahap <strong>{$stage}</strong> yang belum dipilih.")->danger()->send();
+                    return;
+                }
+
+                $rowQty = 0;
+                $rowSizes = [];
+                foreach ($wItem as $k => $v) {
+                    if (!in_array($k, $excludeKeys) && is_numeric($v) && (int) $v > 0) {
+                        $rowQty += (int) $v;
+                        $rowSizes[strtoupper($k)] = (int) $v;
+                    }
+                }
+
+                if ($rowQty === 0 && isset($wItem['qty']) && (int) $wItem['qty'] > 0) $rowQty = (int) $wItem['qty'];
+                if ($rowQty === 0 && isset($wItem['quantity']) && (int) $wItem['quantity'] > 0) $rowQty = (int) $wItem['quantity'];
+
+                if ($rowQty <= 0) {
+                    Notification::make()->title('Ada Pekerja Tanpa Qty!')->body("Pekerja di tahap <strong>{$stage}</strong> tidak memiliki qty.")->danger()->send();
+                    return;
+                }
+
+                $allocatedPerStageTotal[$stage] = ($allocatedPerStageTotal[$stage] ?? 0) + $rowQty;
+                foreach ($rowSizes as $sz => $qty) {
+                    $allocatedPerStageSize[$stage][$sz] = ($allocatedPerStageSize[$stage][$sz] ?? 0) + $qty;
                 }
             }
         }
 
-        if (empty($usedQtyPerStage)) {
+        if (empty($allocatedPerStageTotal)) {
             Notification::make()->title('❌ Belum Ada Tugas!')->danger()->send();
             return;
         }
 
         $mismatchErrors = [];
-        foreach ($usedQtyPerStage as $stageName => $totalUsed) {
+        foreach ($allocatedPerStageTotal as $stageName => $totalUsed) {
             if ($totalUsed !== $totalOrderQty) {
                 $diff = $totalOrderQty - $totalUsed;
-                $mismatchErrors[] = "Tahap <strong>{$stageName}</strong>: " . ($diff > 0 ? "kurang {$diff} pcs" : "kelebihan " . abs($diff) . " pcs");
+                $mismatchErrors[] = "Tahap <strong>{$stageName}</strong>: Total target harus {$totalOrderQty} pcs, saat ini teratur {$totalUsed} pcs (" . ($diff > 0 ? "kurang {$diff} pcs" : "kelebihan " . abs($diff) . " pcs") . ").";
+            }
+
+            if (!empty($originalSizes)) {
+                $stageSizes = $allocatedPerStageSize[$stageName] ?? [];
+                foreach ($originalSizes as $sz => $expectedQty) {
+                    $actualQty = $stageSizes[$sz] ?? 0;
+                    if ($actualQty !== $expectedQty) {
+                        $diff = $expectedQty - $actualQty;
+                        $mismatchErrors[] = "Tahap <strong>{$stageName}</strong> ukuran <strong>{$sz}</strong>: Harus {$expectedQty} pcs, teratur {$actualQty} pcs (" . ($diff > 0 ? "kurang {$diff} pcs" : "kelebihan " . abs($diff) . " pcs") . ").";
+                    }
+                }
             }
         }
+
         if (!empty($mismatchErrors)) {
             Notification::make()->title('❌ Jumlah Tugas Tidak Sesuai!')->body(new HtmlString(implode('<br>', $mismatchErrors)))->danger()->send();
             return;
@@ -863,121 +945,71 @@ class AturTugasProduksi extends Page
         // Delete all existing tasks for this item
         $item->productionTasks()->delete();
 
-        $existingTaskIds = [];
+        // Keep local pools of custom names and genders per stage
+        $stageCustomPools = [];
+        $stageGenderPools = [];
+
         foreach ($tasksData as $taskItem) {
-            $workers = (array) ($taskItem['assigned_to'] ?? []);
-            
-            $sizeQuantities = [];
-            foreach (array_keys($originalSizes) as $key) {
-                if (isset($taskItem[$key]) && (int) $taskItem[$key] > 0) $sizeQuantities[$key] = (int) $taskItem[$key];
-            }
-            $quantity = array_sum($sizeQuantities);
-            if ($quantity === 0 && isset($taskItem['qty']) && (int) $taskItem['qty'] > 0) $quantity = (int) $taskItem['qty'];
-            
-            $wagePerPcs = (float) ($taskItem['wage_per_pcs'] ?? 0);
-            $wageCustomPerPcs = (float) ($taskItem['wage_custom_per_pcs'] ?? $wagePerPcs);
-            
-            $customQty = (int) ($sizeQuantities['CUSTOM'] ?? 0);
-            $standardQty = $quantity - $customQty;
-            $totalWage = ($standardQty * $wagePerPcs) + ($customQty * $wageCustomPerPcs);
+            $stage = $taskItem['stage_name'];
+            $wajibQc = $taskItem['wajib_qc'] ?? true;
+            $workers = $taskItem['workers'] ?? [];
 
-            if ($customQty > 0) {
-                $sizeQuantities['_wage_custom'] = $wageCustomPerPcs;
+            if (!isset($stageCustomPools[$stage])) {
+                $stageCustomPools[$stage] = $customNames;
+            }
+            if (!isset($stageGenderPools[$stage])) {
+                $stageGenderPools[$stage] = $sizeGenders;
             }
 
-            $workerCount = count($workers);
-            
-            // 1. Initialize size quantities array for each worker
-            $workerSizes = [];
-            for ($i = 0; $i < $workerCount; $i++) {
-                $workerSizes[$i] = [];
-                if (isset($sizeQuantities['_wage_custom'])) {
-                    $workerSizes[$i]['_wage_custom'] = $sizeQuantities['_wage_custom'];
-                }
-            }
-            
-            // 2. Distribute base quantities and collect remainders
-            $remainders = [];
-            foreach ($sizeQuantities as $sz => $qty) {
-                if (str_starts_with($sz, '_')) {
-                    continue;
-                }
+            foreach ($workers as $wItem) {
+                $workerId = $wItem['worker_id'];
                 
-                $baseQty = (int) floor($qty / $workerCount);
-                $remQty = $qty % $workerCount;
+                $sizeQuantities = [];
+                foreach (array_keys($originalSizes) as $key) {
+                    if (isset($wItem[$key]) && (int) $wItem[$key] > 0) $sizeQuantities[$key] = (int) $wItem[$key];
+                }
+                $quantity = array_sum($sizeQuantities);
+                if ($quantity === 0 && isset($wItem['qty']) && (int) $wItem['qty'] > 0) $quantity = (int) $wItem['qty'];
                 
-                for ($i = 0; $i < $workerCount; $i++) {
-                    if ($baseQty > 0) {
-                        $workerSizes[$i][$sz] = $baseQty;
+                $wagePerPcs = (float) ($wItem['wage_per_pcs'] ?? 0);
+                $wageCustomPerPcs = (float) ($wItem['wage_custom_per_pcs'] ?? $wagePerPcs);
+                
+                $customQty = (int) ($sizeQuantities['CUSTOM'] ?? 0);
+                $standardQty = $quantity - $customQty;
+                $totalWage = ($standardQty * $wagePerPcs) + ($customQty * $wageCustomPerPcs);
+
+                if ($customQty > 0) {
+                    $sizeQuantities['_wage_custom'] = $wageCustomPerPcs;
+                }
+
+                if (!empty($wItem['_custom_recipients'])) {
+                    $sizeQuantities['_custom_recipients'] = $wItem['_custom_recipients'];
+                }
+
+                $workerCustomNames = $wItem['_custom_recipients'] ?? [];
+                $workerGenders = [];
+
+                foreach ($sizeQuantities as $sz => $qty) {
+                    if (str_starts_with($sz, '_')) continue;
+
+                    for ($qIdx = 0; $qIdx < $qty; $qIdx++) {
+                        if ($sz === 'CUSTOM') {
+                            if (empty($workerCustomNames) && !empty($stageCustomPools[$stage])) {
+                                $workerCustomNames[] = array_shift($stageCustomPools[$stage]);
+                            }
+                        } else {
+                            if (!empty($stageGenderPools[$stage][$sz])) {
+                                $gLabel = array_shift($stageGenderPools[$stage][$sz]);
+                                $workerGenders[$sz][$gLabel] = ($workerGenders[$sz][$gLabel] ?? 0) + 1;
+                            }
+                        }
                     }
                 }
-                
-                for ($r = 0; $r < $remQty; $r++) {
-                    $remainders[] = $sz;
-                }
-            }
-            
-            // 3. Distribute remainders round-robin to workers
-            $remCount = count($remainders);
-            for ($r = 0; $r < $remCount; $r++) {
-                $workerIdx = $r % $workerCount;
-                $sz = $remainders[$r];
-                $workerSizes[$workerIdx][$sz] = ($workerSizes[$workerIdx][$sz] ?? 0) + 1;
-            }
 
-            // Distribute custom names round-robin to matching worker custom allocations
-            $workerCustomNames = [];
-            $workerGenders = [];
-            for ($idx = 0; $idx < $workerCount; $idx++) {
-                $workerCustomNames[$idx] = [];
-                $workerGenders[$idx] = [];
-            }
-            
-            $cCount = count($customNames);
-            for ($c = 0; $c < $cCount; $c++) {
-                $workerIdx = $c % $workerCount;
-                $workerCustomNames[$workerIdx][] = $customNames[$c];
-            }
-
-            foreach ($sizeGenders as $sz => $gList) {
-                for ($idx = 0; $idx < count($gList); $idx++) {
-                    $workerIdx = $idx % $workerCount;
-                    $gLabel = $gList[$idx] === 'P' ? 'P' : 'L';
-                    $workerGenders[$workerIdx][$sz][$gLabel] = ($workerGenders[$workerIdx][$sz][$gLabel] ?? 0) + 1;
-                }
-            }
-
-            // 4. Create database records for each worker with their distributed portions
-            for ($i = 0; $i < $workerCount; $i++) {
-                $workerId = $workers[$i];
-                $eachSizeQuantities = $workerSizes[$i];
-                
-                // Exclude custom wage keys to get standard size items
-                $cleanSizes = array_filter($eachSizeQuantities, fn($k) => !str_starts_with($k, '_'), ARRAY_FILTER_USE_KEY);
-                
-                if (!empty($cleanSizes)) {
-                    $eachQuantity = array_sum($cleanSizes);
-                } else {
-                    $eachQuantity = (int) floor($quantity / $workerCount);
-                    if ($i === 0) {
-                        $eachQuantity += ($quantity % $workerCount);
-                    }
-                }
-                
-                if (!empty($cleanSizes)) {
-                    $eachCustomQty = (int) ($eachSizeQuantities['CUSTOM'] ?? 0);
-                    $eachStandardQty = $eachQuantity - $eachCustomQty;
-                    $eachWage = ($eachStandardQty * $wagePerPcs) + ($eachCustomQty * $wageCustomPerPcs);
-                } else {
-                    $eachWage = (int) floor($totalWage / $workerCount);
-                    if ($i === 0) {
-                        $eachWage += ($totalWage % $workerCount);
-                    }
-                }
-                
                 $autoDesc = [];
+                $cleanSizes = array_filter($sizeQuantities, fn($k) => !str_starts_with($k, '_'), ARRAY_FILTER_USE_KEY);
                 foreach ($cleanSizes as $sz => $sqty) {
-                    $szGenders = $workerGenders[$i][$sz] ?? [];
+                    $szGenders = $workerGenders[$sz] ?? [];
                     if (!empty($szGenders)) {
                         $gStrings = [];
                         foreach ($szGenders as $gLabel => $gQty) {
@@ -988,42 +1020,75 @@ class AturTugasProduksi extends Page
                         $autoDesc[] = $sz . ': ' . $sqty;
                     }
                 }
-                
-                $eachCustomNames = $workerCustomNames[$i] ?? [];
-                
+
                 $descStrings = [];
                 if (!empty($autoDesc)) {
                     $descStrings[] = 'Pembagian Ukuran: ' . implode(' | ', $autoDesc);
                 }
-                if (!empty($eachCustomNames)) {
-                    $descStrings[] = 'Baju Custom: ' . implode(', ', $eachCustomNames);
+                if (!empty($workerCustomNames)) {
+                    $descStrings[] = 'Baju Custom: ' . implode(', ', $workerCustomNames);
                 }
                 
-                $baseDesc = $taskItem['description'] ?? '';
+                $baseDesc = $wItem['description'] ?? '';
                 if (!empty($descStrings)) {
                     $baseDesc = trim($baseDesc . "\n" . implode("\n", $descStrings));
                 }
 
-                $lookupKey = $taskItem['stage_name'] . '_' . $workerId;
+                $lookupKey = $stage . '_' . $workerId;
                 $oldTask = isset($existingTasks[$lookupKey]) ? $existingTasks[$lookupKey]->first() : null;
 
                 $taskData = [
-                    'stage_name' => $taskItem['stage_name'],
+                    'stage_name' => $stage,
                     'assigned_to' => $workerId,
-                    'quantity' => $eachQuantity,
-                    'wage_amount' => $eachWage,
-                    'size_quantities' => empty($eachSizeQuantities) ? null : $eachSizeQuantities,
+                    'quantity' => $quantity,
+                    'wage_amount' => $totalWage,
+                    'size_quantities' => empty($sizeQuantities) ? null : $sizeQuantities,
                     'description' => !empty($baseDesc) ? $baseDesc : null,
                     'shop_id' => \Filament\Facades\Filament::getTenant()->id,
                     'assigned_by' => $oldTask?->assigned_by ?? auth()->id(),
                     'status' => $oldTask?->status ?? 'pending',
                     'is_paid' => $oldTask?->is_paid ?? false,
+                    'wajib_qc' => $wajibQc,
                     'worker_payroll_id' => $oldTask?->worker_payroll_id ?? null,
                     'completed_at' => $oldTask?->completed_at ?? null,
                 ];
-                $newTask = $item->productionTasks()->create($taskData);
-                $existingTaskIds[] = $newTask->id;
+                $item->productionTasks()->create($taskData);
             }
+        }
+
+        // Sync to WorkOrder
+        $groupItemIds = $item->getItemsInGroup()->pluck('id');
+        $workOrder = \App\Models\WorkOrder::withoutGlobalScopes()->whereIn('order_item_id', $groupItemIds)->first();
+        if (!$workOrder && $item->order) {
+            $workOrder = \App\Models\WorkOrder::create([
+                'shop_id' => $item->order->shop_id,
+                'order_item_id' => $item->id,
+            ]);
+        }
+
+        if ($workOrder) {
+            $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->get();
+
+            $workerUpdates = [
+                'cutting_worker_id' => null,
+                'sewing_worker_id' => null,
+                'decoration_worker_id' => null,
+                'button_worker_id' => null,
+                'finishing_worker_id' => null,
+            ];
+
+            foreach ($tasks as $task) {
+                $col = \App\Models\WorkOrder::resolveWorkerColumnForStage($task->stage_name);
+                if ($col && $task->assigned_to) {
+                    if ($workerUpdates[$col] === null) {
+                        $workerUpdates[$col] = $task->assigned_to;
+                    }
+                }
+            }
+
+            $workOrder->update($workerUpdates);
         }
 
         // Sync status order

@@ -200,7 +200,28 @@ class OrderResource extends Resource
                 // MAIN CONTAINER - Expanded to full width
                 Group::make([
                     // Section 1: Data Pesanan
-                    Section::make('Data Pesanan')
+                    Section::make()
+                        ->heading(function (?Order $record) {
+                            $woHtml = '';
+                            if (!$record) {
+                                $woHtml = '<span style="font-size: 13px; font-weight: 500; color: #6b7280; margin-left: auto;">Work Order: Belum ada WO</span>';
+                            } else {
+                                $woNumbers = \App\Models\WorkOrder::whereHas('orderItem', function ($query) use ($record) {
+                                    $query->where('order_id', $record->id);
+                                })->pluck('wo_number')->filter()->unique()->toArray();
+                                
+                                if (empty($woNumbers)) {
+                                    $woHtml = '<span style="font-size: 13px; font-weight: 500; color: #6b7280; margin-left: auto;">Work Order: Belum ada WO</span>';
+                                } else {
+                                    $badges = [];
+                                    foreach ($woNumbers as $wo) {
+                                        $badges[] = '<span style="background: #f3e8ff; color: #7e22ce; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; border: 1px solid #e9d5ff;">' . $wo . '</span>';
+                                    }
+                                    $woHtml = '<div style="display: flex; gap: 6px; align-items: center; margin-left: auto;"><span style="font-size: 13px; font-weight: 500; color: #6b7280;">Work Order:</span>' . implode('', $badges) . '</div>';
+                                }
+                            }
+                            return new \Illuminate\Support\HtmlString('<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;"><span>Data Pesanan</span>' . $woHtml . '</div>');
+                        })
                         ->schema([
                             TextInput::make('order_number')
                                 ->label('No. Pesanan')
@@ -241,6 +262,7 @@ class OrderResource extends Resource
                                 ->visible(fn(Get $get): bool => (bool) $get('is_express'))
                                 ->helperText('Biaya tambahan untuk layanan express')
                                 ->columnSpan(1),
+                                
                             Hidden::make('status')->default('draft'),
                         ])
                         ->columns(3),

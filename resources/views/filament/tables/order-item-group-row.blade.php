@@ -11,7 +11,7 @@
         $cat = $record->production_category === 'custom' ? 'produksi' : $record->production_category;
         $catLabel = match ($cat) {
             'produksi' => '🏭 Konveksi',
-            'non_produksi' => '📦 Baju Jadi',
+            'non_produksi' => '📦 Non-Produksi',
             'jasa' => '🔧 Jasa',
             default => $cat,
         };

@@ -319,4 +319,21 @@ class OrderItem extends Model
     {
         return $this->hasOneThrough(Shop::class, Order::class, 'shop_id', 'id', 'order_id', 'shop_id');
     }
+
+    public function workOrder(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(WorkOrder::class);
+    }
+
+    /**
+     * Mendapatkan semua OrderItem dalam grup yang sama untuk keperluan Work Order.
+     * Pengelompokan cukup berdasarkan nama produk/jasa saja.
+     * Selama nama produknya sama dalam 1 order = 1 WO.
+     */
+    public function getItemsInGroup(): \Illuminate\Support\Collection
+    {
+        return self::where('order_id', $this->order_id)
+            ->where('product_name', $this->product_name)
+            ->get();
+    }
 }

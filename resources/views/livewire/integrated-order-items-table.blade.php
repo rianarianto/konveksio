@@ -79,6 +79,7 @@
             max-height: 500px;
             overflow-y: auto !important;
             overflow-x: auto !important;
+            padding-bottom: 24px !important;
         }
         
         /* Buat header tabel (th) menempel di atas saat di-scroll */

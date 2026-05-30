@@ -277,7 +277,7 @@
 
                             $cat = match ($item->production_category) {
                                 'custom' => 'Konveksi',
-                                'non_produksi' => 'Baju Jadi',
+                                'non_produksi' => 'Non-Produksi',
                                 'jasa' => 'Jasa',
                                 default => 'Konveksi'
                             };

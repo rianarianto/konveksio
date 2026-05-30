@@ -45,6 +45,24 @@ class ControlProduksiResource extends Resource
         return in_array(auth()->user()->role, ['admin', 'designer', 'owner']);
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        if (!filament()->getTenant()) {
+            return null;
+        }
+
+        $count = static::getEloquentQuery()
+            ->whereDoesntHave('productionTasks')
+            ->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'warning';
+    }
+
     public static function getNavigationIcon(): string
     {
         return 'heroicon-o-squares-2x2';
@@ -493,6 +511,25 @@ class ControlProduksiResource extends Resource
 
 
 
+                Action::make('kirim_tugas')
+                    ->label('Kirim Tugas')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('success')
+                    ->visible(fn(OrderItem $record) => $record->productionTasks()->where('status', 'pending')->exists())
+                    ->requiresConfirmation()
+                    ->modalHeading('Kirim Notifikasi ke Semua Pekerja?')
+                    ->modalDescription('Sistem akan mengirim pesan WhatsApp ke seluruh pekerja yang ditugaskan pada item ini beserta link portal tugas mereka.')
+                    ->modalSubmitActionLabel('Ya, Kirim Sekarang')
+                    ->action(function (OrderItem $record) {
+                        \App\Helpers\NotificationHelper::notifyAllWorkers($record);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Notifikasi terkirim!')
+                            ->body('Pesan WhatsApp sedang dikirim ke seluruh pekerja.')
+                            ->success()
+                            ->send();
+                    }),
+
                 Action::make('hapus_tugas')
                     ->label('Hapus Semua Tugas')
                     ->icon('heroicon-o-trash')
@@ -519,6 +556,7 @@ class ControlProduksiResource extends Resource
                             ->success()
                             ->send();
                     }),
+
 
                 Action::make('atur_tugas')
                     ->hidden(fn(OrderItem $record) => $record->productionTasks()->exists() && $record->productionTasks()->where('status', '!=', 'done')->count() === 0)
