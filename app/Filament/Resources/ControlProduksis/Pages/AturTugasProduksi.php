@@ -263,10 +263,10 @@ class AturTugasProduksi extends Page
                                             
                                             $qcLabel = '';
                                             if (!($state['wajib_qc'] ?? true)) {
-                                                $qcLabel = ' <span style="font-size: 9px; padding: 2px 6px; background: #fee2e2; color: #ef4444; border-radius: 4px; font-weight: 800; text-transform: uppercase; margin-left: 8px;">QC SKIP</span>';
+                                                $qcLabel = '<span style="font-size:9px; padding:2px 8px; background:#fee2e2; color:#ef4444; border-radius:4px; font-weight:800; text-transform:uppercase; margin-left:12px; flex-shrink:0;">QC SKIP</span>';
                                             }
 
-                                            $summaryText = implode(' | ', $summaryParts);
+                                            $summaryText = implode(' &nbsp;|&nbsp; ', $summaryParts);
 
                                             return new \Illuminate\Support\HtmlString('
                                                 <style>
@@ -277,12 +277,12 @@ class AturTugasProduksi extends Page
                                                         border-top-right-radius: 12px !important;
                                                     }
                                                 </style>
-                                                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                                                <div style="display:flex; justify-content:space-between; width:100%; align-items:center; gap:12px;">
                                                      <span class="stage-label-'.$stageId.'"
-                                                           style="font-weight: 900; color: '.$colors['text'].'; text-transform: uppercase; letter-spacing: 0.05em;">
+                                                           style="font-weight:900; color:'.$colors['text'].'; text-transform:uppercase; letter-spacing:0.07em; white-space:nowrap; min-width:80px;">
                                                          ' . $stage . '
                                                      </span>
-                                                     <span style="font-size:11px; font-weight:700; color:#4b5563; margin-right:24px;">
+                                                     <span style="display:flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#4b5563; margin-right:24px; flex-wrap:nowrap;">
                                                          ' . $summaryText . $qcLabel . '
                                                      </span>
                                                 </div>
@@ -322,19 +322,177 @@ class AturTugasProduksi extends Page
                                                             }
                                                         }),
                                                     Toggle::make('wajib_qc')
-                                                        ->label('Wajib Pemeriksaan QC Setelah Tahap Ini')
+                                                        ->label('Wajib di QC')
+                                                        ->inline(false)
+                                                        ->live()
                                                         ->default(true),
                                                 ]),
 
+                                            \Filament\Schemas\Components\Actions::make([
+                                                \Filament\Actions\Action::make('autoDistribute')
+                                                    ->label('Bagi Tugas Otomatis')
+                                                    ->icon('heroicon-m-sparkles')
+                                                    ->color('primary')
+                                                    ->action(function (Set $set, Get $get) use ($item) {
+                                                        $workers = $get('workers') ?? [];
+                                                        if (empty($workers)) {
+                                                            \Filament\Notifications\Notification::make()
+                                                                ->title('Pekerja Kosong')
+                                                                ->body('Silakan tambahkan pekerja terlebih dahulu sebelum melakukan pembagian otomatis.')
+                                                                ->warning()
+                                                                ->send();
+                                                            return;
+                                                        }
+
+                                                        // 1. Get original size quantities
+                                                        $allGroupItems = \App\Models\OrderItem::where('order_id', $item->order_id)
+                                                            ->where('product_name', $item->product_name)
+                                                            ->where('bahan_id', $item->bahan_id)
+                                                            ->where('design_status', 'approved')
+                                                            ->get();
+
+                                                        $standardSizes = [];
+                                                        foreach ($allGroupItems as $gi) {
+                                                            $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                                                            $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
+                                                        }
+
+                                                        if ($item->production_category === 'custom') {
+                                                            $details = $item->size_and_request_details ?? [];
+                                                            $count = count($details['detail_custom'] ?? []);
+                                                            if ($count > 0) {
+                                                                $standardSizes['CUSTOM'] = ($standardSizes['CUSTOM'] ?? 0) + $count;
+                                                            }
+                                                        }
+
+                                                        // Move 'CUSTOM' to the end if it exists
+                                                        if (array_key_exists('CUSTOM', $standardSizes)) {
+                                                            $customVal = $standardSizes['CUSTOM'];
+                                                            unset($standardSizes['CUSTOM']);
+                                                            $standardSizes['CUSTOM'] = $customVal;
+                                                        }
+
+                                                        $totalQty = array_sum($standardSizes);
+                                                        if ($totalQty <= 0) return;
+
+                                                        $numWorkers = count($workers);
+                                                        $workerKeys = array_keys($workers);
+                                                        $lastWorkerKey = end($workerKeys);
+
+                                                        // Target per worker (including custom allocated to last worker)
+                                                        $customQtyTotal = $standardSizes['CUSTOM'] ?? 0;
+                                                        $stdQtyTotal = $totalQty - $customQtyTotal;
+
+                                                        // Reset allocations for all sizes in all workers
+                                                        $allSizeKeys = array_keys($standardSizes);
+                                                        foreach ($workerKeys as $wKey) {
+                                                            foreach ($allSizeKeys as $sz) {
+                                                                $workers[$wKey][$sz] = null;
+                                                            }
+                                                            $workers[$wKey]['qty'] = null;
+                                                            $workers[$wKey]['quantity'] = 0;
+                                                            $workers[$wKey]['_custom_recipients'] = [];
+                                                        }
+
+                                                        // 2. Allocate CUSTOM to the last worker
+                                                        if ($item->production_category === 'custom' && $customQtyTotal > 0) {
+                                                            $details = $item->size_and_request_details ?? [];
+                                                            $allNames = [];
+                                                            foreach ($details['detail_custom'] ?? [] as $u) {
+                                                                if (!empty($u['nama'])) $allNames[] = $u['nama'];
+                                                            }
+                                                            $workers[$lastWorkerKey]['_custom_recipients'] = $allNames;
+                                                            $workers[$lastWorkerKey]['CUSTOM'] = $customQtyTotal;
+                                                            $workers[$lastWorkerKey]['quantity'] += $customQtyTotal;
+                                                        }
+
+                                                        // 3. Sequential distribution of standard sizes
+                                                        // Calculate how much std qty each worker should get (balanced with custom consideration)
+                                                        // Effective target for std sizes: distribute stdQtyTotal evenly over numWorkers
+                                                        // but last worker already has custom load, so we balance total load
+                                                        $stdSizesOnly = array_filter($standardSizes, fn($k) => $k !== 'CUSTOM', ARRAY_FILTER_USE_KEY);
+                                                        if (!empty($stdSizesOnly)) {
+                                                            // Build flat ordered list: [sz => remaining qty]
+                                                            $sizeQueue = $stdSizesOnly; // already in order as stored
+
+                                                            // Compute per-worker std target (balanced against custom load)
+                                                            // For last worker: target_std = floor(totalQty/numWorkers) - customQtyTotal
+                                                            // For others: target_std = floor(totalQty/numWorkers)
+                                                            $targetPerWorker = (int) floor($totalQty / $numWorkers);
+                                                            $remainder = $totalQty % $numWorkers;
+
+                                                            $workerStdTargets = [];
+                                                            $wIdx = 0;
+                                                            foreach ($workerKeys as $wKey) {
+                                                                $base = $targetPerWorker + ($wIdx < $remainder ? 1 : 0);
+                                                                if ($wKey === $lastWorkerKey) {
+                                                                    $workerStdTargets[$wKey] = max(0, $base - $customQtyTotal);
+                                                                } else {
+                                                                    $workerStdTargets[$wKey] = $base;
+                                                                }
+                                                                $wIdx++;
+                                                            }
+
+                                                            // Walk through sizes sequentially, filling each worker up to their std target
+                                                            $sizeQueueKeys = array_keys($sizeQueue);
+                                                            $sizeIdx = 0;
+                                                            $sizeRemaining = $sizeIdx < count($sizeQueueKeys) ? $sizeQueue[$sizeQueueKeys[$sizeIdx]] : 0;
+
+                                                            foreach ($workerKeys as $wKey) {
+                                                                $workerNeed = $workerStdTargets[$wKey];
+                                                                while ($workerNeed > 0 && $sizeIdx < count($sizeQueueKeys)) {
+                                                                    $sz = $sizeQueueKeys[$sizeIdx];
+                                                                    $take = min($workerNeed, $sizeRemaining);
+                                                                    if ($take > 0) {
+                                                                        $workers[$wKey][$sz] = ($workers[$wKey][$sz] ?? 0) + $take;
+                                                                        $workers[$wKey]['quantity'] += $take;
+                                                                        $sizeRemaining -= $take;
+                                                                        $workerNeed -= $take;
+                                                                    }
+                                                                    if ($sizeRemaining <= 0) {
+                                                                        $sizeIdx++;
+                                                                        $sizeRemaining = $sizeIdx < count($sizeQueueKeys) ? $sizeQueue[$sizeQueueKeys[$sizeIdx]] : 0;
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            // If any remaining (due to rounding), give to last worker
+                                                            while ($sizeIdx < count($sizeQueueKeys)) {
+                                                                $sz = $sizeQueueKeys[$sizeIdx];
+                                                                if ($sizeRemaining > 0) {
+                                                                    $workers[$lastWorkerKey][$sz] = ($workers[$lastWorkerKey][$sz] ?? 0) + $sizeRemaining;
+                                                                    $workers[$lastWorkerKey]['quantity'] += $sizeRemaining;
+                                                                }
+                                                                $sizeIdx++;
+                                                                $sizeRemaining = $sizeIdx < count($sizeQueueKeys) ? $sizeQueue[$sizeQueueKeys[$sizeIdx]] : 0;
+                                                            }
+                                                        }
+
+                                                        // Clean up 0 values to null for cleaner UI input
+                                                        foreach (array_keys($workers) as $wKey) {
+                                                            foreach ($allSizeKeys as $sz) {
+                                                                if (isset($workers[$wKey][$sz]) && $workers[$wKey][$sz] === 0) {
+                                                                    $workers[$wKey][$sz] = null;
+                                                                }
+                                                            }
+                                                        }
+
+                                                        $set('workers', $workers);
+                                                        \Filament\Notifications\Notification::make()
+                                                            ->title('Tugas Terbagi')
+                                                            ->success()
+                                                            ->send();
+                                                    })
+                                            ]),
                                             Repeater::make('workers')
                                                 ->label('Daftar Pekerja & Kuantitas')
+                                                ->collapsible()
                                                 ->itemLabel(function (array $state) {
                                                     $workerId = $state['worker_id'] ?? null;
                                                     $qty = $state['quantity'] ?? 0;
-                                                    $name = $workerId ? \App\Models\Worker::find($workerId)?->name : 'Pekerja';
-                                                    return $name . ' (' . $qty . ' Pcs)';
+                                                    $name = $workerId ? \App\Models\Worker::find($workerId)?->name : null;
+                                                    return ($name ?? 'Pilih Karyawan') . ' (' . $qty . ' Pcs)';
                                                 })
-                                                ->collapsible()
                                                 ->schema([
                                                     Hidden::make('id'),
                                                     Select::make('worker_id')
@@ -513,8 +671,10 @@ class AturTugasProduksi extends Page
                                                             TextInput::make('quantity')
                                                                 ->label('Total Qty')
                                                                 ->numeric()
-                                                                ->readOnly()
+                                                                ->disabled()
+                                                                ->dehydrated()
                                                                 ->prefix('Σ'),
+                                                            Hidden::make('quantity_hidden'),  // backup
                                                             TextInput::make('wage_per_pcs')->live(debounce: 500)
                                                                 ->label('Upah Standar per Pcs')
                                                                 ->numeric()
@@ -549,7 +709,7 @@ class AturTugasProduksi extends Page
                                                 ])
                                                 ->columnSpanFull()
                                                 ->addActionLabel('+ Tambah Pekerja')
-                                                ->addAction(fn($action) => $action->color('success')),
+                                                ->addAction(fn($action) => $action->color('primary')),
                                         ])
                                         ->columnSpanFull()
                                         ->addActionLabel('+ Tambah Tugas Baru')
