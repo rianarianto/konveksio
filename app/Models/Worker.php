@@ -16,6 +16,7 @@ class Worker extends Model implements HasTenants
         'shop_id',
         'name',
         'phone',
+        'portal_token',
         'is_active',
         'max_cash_advance',
         'current_cash_advance',
@@ -35,6 +36,13 @@ class Worker extends Model implements HasTenants
     protected static function booted(): void
     {
         static::addGlobalScope(new ShopScope());
+
+        // Auto-generate portal_token saat create
+        static::creating(function (Worker $worker) {
+            if (empty($worker->portal_token)) {
+                $worker->portal_token = \Illuminate\Support\Str::random(40);
+            }
+        });
     }
 
     public function shop(): BelongsTo

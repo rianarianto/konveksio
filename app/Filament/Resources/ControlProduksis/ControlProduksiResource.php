@@ -173,6 +173,28 @@ class ControlProduksiResource extends Resource
                         default => 'gray',
                     })
                     ->description(function (OrderItem $record) {
+                        // Cek WorkOrder status dulu
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->first();
+
+                        if ($wo) {
+                            $woStatus = $wo->status;
+                            if ($woStatus === \App\Models\WorkOrder::STATUS_CREATED) {
+                                return '📝 Belum dimulai';
+                            }
+                            if ($woStatus === \App\Models\WorkOrder::STATUS_QC_PREP || $woStatus === 'QC_PERSIAPAN') {
+                                return '📋 QC Persiapan - menunggu approve';
+                            }
+                            if ($woStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
+                                return '⚙️ QC ' . ($wo->current_review_stage ?? '') . ' - menunggu verifikasi';
+                            }
+                            if ($woStatus === \App\Models\WorkOrder::STATUS_COMPLETED) {
+                                return '✅ Selesai';
+                            }
+                        }
+
                         $tasks = $record->productionTasks;
                         if ($tasks->isEmpty())
                             return null;
@@ -237,6 +259,15 @@ class ControlProduksiResource extends Resource
                         return ['item_id' => $record->id];
                     })
                     ->form(function (OrderItem $record) {
+                        // Load WorkOrder untuk item ini
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $workOrder = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->first();
+
+                        $woStatus = $workOrder?->status ?? 'NO_WO';
+                        $woStatusLabel = $workOrder?->status_label ?? 'Belum ada WO';
+
                         // Load tugas dan group berdasarkan urutan stage
                         $tasks = $record->productionTasks()
                             ->with(['assignedTo'])
@@ -244,30 +275,54 @@ class ControlProduksiResource extends Resource
 
                         // Ambil semua stage yang ada beserta order_sequence-nya
                         $stageOrder = \App\Models\ProductionStage::pluck('order_sequence', 'name');
+                        // QC_PERSIAPAN always first (before any production stage)
+                        $stageOrder['QC_PERSIAPAN'] = -1;
 
                         // Sort tugas berdasarkan order_sequence tahap, kemudian by id
                         $sortedTasks = $tasks->sortBy(function ($task) use ($stageOrder) {
                             return [$stageOrder[$task->stage_name] ?? 999, $task->id];
                         });
 
-                        // Tentukan stage yang sedang "aktif" (bisa dimulai):
-                        // Tahap pertama selalu bisa, tahap berikutnya hanya jika SEMUA tasks di tahap sebelumnya = done
+                        // Tentukan stage yang sedang "aktif" berdasarkan WO status:
+                        // - Kalau WO di QC_PREP/QC_REVIEW → semua task terkunci
+                        // - Kalau WO di CREATED → semua task terkunci (perlu advance dulu)
+                        // - Kalau WO di nama tahap → hanya task di tahap itu yang unlock
+                        // - Kalau WO di COMPLETED → semua task done
                         $groupedByStage = $sortedTasks->groupBy('stage_name');
                         $stagesInOrder = $groupedByStage->keys()->sortBy(fn($s) => $stageOrder[$s] ?? 999);
 
+                        // Tentukan stage mana yang "current" berdasarkan WO
+                        $currentWoStage = null;
+                        // QC_PERSIAPAN is also a QC stage (WO status might be 'QC_PERSIAPAN' from stage_sequence)
+                        $isWoInQcStage = in_array($woStatus, [\App\Models\WorkOrder::STATUS_QC_PREP, \App\Models\WorkOrder::STATUS_QC_REVIEW, 'QC_PERSIAPAN']);
+                        $isWoCompleted = $woStatus === \App\Models\WorkOrder::STATUS_COMPLETED;
+                        $isWoCreated = $woStatus === \App\Models\WorkOrder::STATUS_CREATED;
+
+                        if (!$isWoInQcStage && !$isWoCompleted && !$isWoCreated && $woStatus !== 'NO_WO') {
+                            $currentWoStage = $woStatus; // nama tahap (Potong, Jahit, dll)
+                        }
+
+                        // Unlock logic: hanya stage yang <= current WO stage yang unlock
+                        // Dan task di stage itu bisa dikerjakan kalau task sebelumnya done
                         $unlockedStages = [];
+                        $currentStageIdx = $currentWoStage ? array_search($currentWoStage, $stagesInOrder->values()->toArray()) : -1;
+
                         foreach ($stagesInOrder as $i => $stageName) {
-                            if ($i === 0) {
-                                $unlockedStages[] = $stageName;
-                                continue;
-                            }
-                            // Stage ini bisa dibuka jika semua task di stage sebelumnya = done
-                            $prevStage = $stagesInOrder[$i - 1];
-                            $prevDone = $groupedByStage[$prevStage]->every(fn($t) => $t->status === 'done');
-                            if ($prevDone) {
-                                $unlockedStages[] = $stageName;
+                            // Stage unlock kalau: stage ini <= current WO stage DAN semua task sebelumnya done
+                            if ($currentStageIdx >= 0 && $i <= $currentStageIdx) {
+                                if ($i === 0) {
+                                    $unlockedStages[] = $stageName;
+                                } else {
+                                    $prevStage = $stagesInOrder->values()[$i - 1];
+                                    $prevDone = $groupedByStage[$prevStage]->every(fn($t) => $t->status === 'done');
+                                    if ($prevDone) {
+                                        $unlockedStages[] = $stageName;
+                                    } else {
+                                        break;
+                                    }
+                                }
                             } else {
-                                break; // Tahap berikutnya tetap terkunci
+                                break;
                             }
                         }
 
@@ -277,8 +332,9 @@ class ControlProduksiResource extends Resource
                         foreach ($sortedTasks as $task) {
                             $isUnlocked = in_array($task->stage_name, $unlockedStages);
                             $workerName = $task->assignedTo?->name ?? 'Tidak Diketahui';
-                            $stageName = htmlspecialchars($task->stage_name);
-                            $qty = $task->quantity . ' pcs';
+                            $stageName = htmlspecialchars(str_replace('_', ' ', $task->stage_name));
+                            // QC_PERSIAPAN doesn't track quantity - it's just a confirmation task
+                            $qty = $task->stage_name === 'QC_PERSIAPAN' ? '-' : ($task->quantity . ' pcs');
                             $showStageLabel = $task->stage_name !== $prevStageName;
                             $prevStageName = $task->stage_name;
 
@@ -313,6 +369,50 @@ class ControlProduksiResource extends Resource
                                 </tr>';
                         }
 
+                        // ─── Banner WorkOrder Status ──────────────────────────────
+                        $woBannerHtml = '';
+                        $itemId = $record->id;
+
+                        if ($woStatus === 'NO_WO') {
+                            $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;display:flex;align-items:center;gap:10px;">'
+                                . '<span style="font-size:18px;">⚠️</span>'
+                                . '<span style="font-size:13px;color:#991b1b;font-weight:500;">Work Order belum dibuat</span>'
+                                . '</div>';
+                        } elseif ($isWoCreated) {
+                            $advanceUrl = route('filament.admin.resources.control-produksis.wo-action', ['action' => 'advance', 'item' => $itemId]);
+                            $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;display:flex;align-items:center;gap:10px;">'
+                                . '<span style="font-size:18px;">📝</span>'
+                                . '<span style="font-size:13px;color:#0c4a6e;font-weight:500;flex:1;">Status: Belum dimulai</span>'
+                                . '<a href="' . $advanceUrl . '" style="background:#0284c7;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">▶ Mulai Produksi</a>'
+                                . '</div>';
+                        } elseif ($woStatus === \App\Models\WorkOrder::STATUS_QC_PREP || $woStatus === 'QC_PERSIAPAN') {
+                            $approveUrl = route('filament.admin.resources.control-produksis.wo-action', ['action' => 'approve_qc', 'item' => $itemId]);
+                            $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#faf5ff;border:1px solid #c4b5fd;border-radius:8px;display:flex;align-items:center;gap:10px;">'
+                                . '<span style="font-size:18px;">📋</span>'
+                                . '<span style="font-size:13px;color:#5b21b6;font-weight:500;flex:1;">QC Persiapan Bahan & Peralatan</span>'
+                                . '<a href="' . $approveUrl . '" style="background:#7c3aed;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Approve</a>'
+                                . '</div>';
+                        } elseif ($woStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
+                            $reviewStage = $workOrder->current_review_stage ?? '-';
+                            $approveUrl = route('filament.admin.resources.control-produksis.wo-action', ['action' => 'approve_qc', 'item' => $itemId]);
+                            $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;display:flex;align-items:center;gap:10px;">'
+                                . '<span style="font-size:18px;">⚙️</span>'
+                                . '<span style="font-size:13px;color:#9a3412;font-weight:500;flex:1;">QC ' . htmlspecialchars($reviewStage) . ' - menunggu verifikasi</span>'
+                                . '<a href="' . $approveUrl . '" style="background:#ea580c;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Approve</a>'
+                                . '</div>';
+                        } elseif ($isWoCompleted) {
+                            $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;display:flex;align-items:center;gap:10px;">'
+                                . '<span style="font-size:18px;">✅</span>'
+                                . '<span style="font-size:13px;color:#166534;font-weight:500;">Produksi Selesai</span>'
+                                . '</div>';
+                        } else {
+                            // WO di tahap produksi (nama tahap)
+                            $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;display:flex;align-items:center;gap:10px;">'
+                                . '<span style="font-size:18px;">🔨</span>'
+                                . '<span style="font-size:13px;color:#1e40af;font-weight:500;">Sedang di tahap: <strong>' . htmlspecialchars($woStatus) . '</strong></span>'
+                                . '</div>';
+                        }
+
                         // ─── Banner desain ───────────────────────────────────────
                         $designHtml = '';
                         if ($record->design_image) {
@@ -337,7 +437,7 @@ class ControlProduksiResource extends Resource
                                 </div>';
                         }
 
-                        $html = $designHtml . '
+                        $html = $woBannerHtml . $designHtml . '
                             <div style="border-radius:10px;overflow-x:auto;border:1px solid #e5e7eb;-webkit-overflow-scrolling:touch;">
                                 <table style="width:100%;min-width:600px;border-collapse:collapse;">
                                     <thead>
@@ -362,6 +462,72 @@ class ControlProduksiResource extends Resource
                     ->action(function (array $data, OrderItem $record) {
                         // Action utama form ini hanya sebagai re-render / reload
                         // Update status dilakukan via dedicated route (link tombol per baris)
+                    }),
+
+                // QC Review Reject Action - only visible when WO is in QC_REVIEW
+                Action::make('qc_revisi')
+                    ->label('🔧 QC Revisi')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('danger')
+                    ->visible(function (OrderItem $record) {
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->first();
+                        return $wo && $wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW;
+                    })
+                    ->form([
+                        \Filament\Forms\Components\Textarea::make('reject_reason')
+                            ->label('Alasan Revisi')
+                            ->placeholder('Tuliskan alasan revisi...')
+                            ->required()
+                            ->rows(3),
+                    ])
+                    ->action(function (array $data, OrderItem $record) {
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->first();
+
+                        if (!$wo) {
+                            Notification::make()->title('Work Order tidak ditemukan')->danger()->send();
+                            return;
+                        }
+
+                        app(\App\Services\WorkOrderService::class)->rejectQC($wo->id, $data['reject_reason']);
+
+                        // Mark task back to pending for revision
+                        $prevStage = $wo->current_review_stage;
+                        if ($prevStage) {
+                            $task = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $wo->order_item_id)
+                                ->where('stage_name', $prevStage)
+                                ->first();
+                            if ($task) {
+                                $task->update([
+                                    'status' => 'pending',
+                                    'completed_at' => null,
+                                    'is_revision' => true,
+                                ]);
+                            }
+                        }
+
+                        // Sync order status
+                        $order = $record->order;
+                        if ($order) {
+                            $allGroupIds = $order->orderItems()->pluck('id');
+                            $wos = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $allGroupIds)
+                                ->get();
+                            $anyInProgress = $wos->some(fn($w) => !$w->isCompleted() && $w->status !== \App\Models\WorkOrder::STATUS_CREATED);
+                            $order->update(['status' => $anyInProgress ? 'diproses' : 'antrian']);
+                        }
+
+                        Notification::make()
+                            ->title('Revisi Dikirim')
+                            ->body('Pekerja akan memperbaiki pekerjaan di tahap ' . str_replace('_', ' ', $prevStage ?? '-'))
+                            ->success()
+                            ->send();
                     }),
 
                 Action::make('cetak_spk')
@@ -571,6 +737,7 @@ class ControlProduksiResource extends Resource
                     ->button()
                     ->label('Aksi'),
             ])
+            ->actionsPosition(\Filament\Tables\Enums\RecordActionsPosition::AfterCells)
             ->bulkActions([
                 //
             ]);

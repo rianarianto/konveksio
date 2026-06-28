@@ -15,6 +15,11 @@ Route::get('/task-action/{task}/{action}/{item}', [TaskActionController::class, 
     ->middleware(['web', 'auth'])
     ->name('filament.admin.resources.control-produksis.task-action');
 
+// Route untuk WorkOrder actions (approve QC, advance dari QC_PREP)
+Route::get('/wo-action/{action}/{item}', [TaskActionController::class, 'handleWoAction'])
+    ->middleware(['web', 'auth'])
+    ->name('filament.admin.resources.control-produksis.wo-action');
+
 // ─── Monitor Produksi (tanpa auth — untuk TV/monitor di ruang produksi) ───────
 Route::get('/monitor/{shop}', [MonitorController::class, 'produksi'])
     ->name('monitor.produksi');
@@ -38,3 +43,8 @@ Route::get('/payroll/{payroll}/print', [\App\Http\Controllers\PayrollController:
 // ─── Halaman Tugas Tukang (akses publik via token, tanpa login) ──────────────
 Route::get('/tugas', [WorkTaskController::class, 'index'])
     ->name('work.task');
+
+// ─── Dashboard Worker (list semua tugas worker) ──────────────────────────────
+Route::get('/worker/{token}', function (string $token) {
+    return view('worker-dashboard', ['token' => $token]);
+})->name('worker.dashboard');

@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'wa_bot' => [
+        'url' => env('WA_BOT_URL', 'http://localhost:5001'),
+    ],
+
 ];

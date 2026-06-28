@@ -63,12 +63,13 @@ class TugasTukang extends Component
     {
         $this->ensureValidWo();
 
-        if (!in_array($this->wo->status, ['CREATED', ...WorkOrder::WORKER_STATUSES])) {
+        if ($this->wo->status !== WorkOrder::STATUS_CREATED && !$this->wo->isInWorkerStage()) {
             $this->addError('aksi', 'Anda tidak bisa memulai tugas ini saat ini.');
             return;
         }
 
         app(WorkOrderService::class)->startTask($this->wo->id);
+        $this->syncOrderStatus();
         $this->loadWorkOrder();
         $this->dispatch('refreshed');
     }
@@ -77,12 +78,31 @@ class TugasTukang extends Component
     {
         $this->ensureValidWo();
 
-        if (!in_array($this->wo->status, WorkOrder::WORKER_STATUSES)) {
+        if (!$this->wo->isInWorkerStage()) {
             $this->addError('aksi', 'Tugas ini tidak bisa diselesaikan saat ini.');
             return;
         }
 
+        // Find and mark the current worker's task as done
+        $worker = $this->resolveCurrentWorker();
+        if ($worker) {
+            $groupItemIds = $this->wo->orderItem
+                ? $this->wo->orderItem->getItemsInGroup()->pluck('id')
+                : [$this->wo->order_item_id];
+            
+            $task = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('stage_name', $this->wo->status)
+                ->where('assigned_to', $worker->id)
+                ->first();
+            
+            if ($task) {
+                $task->update(['status' => 'done', 'completed_at' => now()]);
+            }
+        }
+
         app(WorkOrderService::class)->advance($this->wo->id);
+        $this->syncOrderStatus();
         $this->loadWorkOrder();
         $this->dispatch('refreshed');
     }
@@ -99,6 +119,7 @@ class TugasTukang extends Component
         }
 
         app(WorkOrderService::class)->approveQC($this->wo->id);
+        $this->syncOrderStatus();
         $this->loadWorkOrder();
         $this->dispatch('refreshed');
     }
@@ -126,6 +147,7 @@ class TugasTukang extends Component
             $proofPath
         );
 
+        $this->syncOrderStatus();
         $this->reset('rejectReason', 'rejectProof', 'showRejectForm');
         $this->loadWorkOrder();
         $this->dispatch('refreshed');
@@ -186,14 +208,48 @@ class TugasTukang extends Component
         }
     }
 
+    /**
+     * Sync Order status berdasarkan status WO.
+     */
+    protected function syncOrderStatus(): void
+    {
+        $order = $this->wo->orderItem?->order;
+        if (!$order) return;
+
+        $groupItemIds = $order->orderItems()->pluck('id');
+        $wos = WorkOrder::withoutGlobalScopes()
+            ->whereIn('order_item_id', $groupItemIds)
+            ->get();
+
+        if ($wos->isEmpty()) return;
+
+        $allCompleted = $wos->every(fn($wo) => $wo->isCompleted());
+        $anyInProgress = $wos->some(fn($wo) => !$wo->isCompleted() && $wo->status !== WorkOrder::STATUS_CREATED);
+
+        $newStatus = 'antrian';
+        if ($allCompleted) $newStatus = 'selesai';
+        elseif ($anyInProgress) $newStatus = 'diproses';
+
+        if ($order->status !== $newStatus) {
+            $order->update(['status' => $newStatus]);
+        }
+    }
+
     protected function resolveCurrentWorker(): ?\App\Models\Worker
     {
         if (!$this->wo) return null;
 
         // Cari worker dari salah satu relasi yang ada
-        foreach (WorkOrder::STATUS_WORKER_MAP as $status => $col) {
-            $worker = $this->wo->$col;
-            if ($worker) return $worker;
+        $workerCols = [
+            'cutting_worker_id', 'sewing_worker_id', 'decoration_worker_id',
+            'button_worker_id', 'finishing_worker_id',
+        ];
+        foreach ($workerCols as $col) {
+            $workerId = $this->wo->$col;
+            if ($workerId) {
+                $worker = \App\Models\Worker::find($workerId);
+                if ($worker) return $worker;
+            }
         }
 
         return null;

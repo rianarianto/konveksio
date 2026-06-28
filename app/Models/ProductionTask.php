@@ -19,6 +19,7 @@ class ProductionTask extends Model
         'size_quantities',
         'status',
         'is_paid',
+        'is_revision',
         'worker_payroll_id',
         'description',
         'wajib_qc',
@@ -31,6 +32,7 @@ class ProductionTask extends Model
         'size_quantities' => 'array',
         'status' => 'string',
         'is_paid' => 'boolean',
+        'is_revision' => 'boolean',
         'wajib_qc' => 'boolean',
         'completed_at' => 'datetime',
     ];

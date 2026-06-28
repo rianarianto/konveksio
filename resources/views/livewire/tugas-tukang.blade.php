@@ -27,8 +27,12 @@
     {{-- ── WORKER GREETING ── --}}
     @php
         $worker = null;
-        foreach (\App\Models\WorkOrder::STATUS_WORKER_MAP as $s => $col) {
-            if ($wo->$col) { $worker = $wo->$col; break; }
+        $workerCols = ['cutting_worker_id', 'sewing_worker_id', 'decoration_worker_id', 'button_worker_id', 'finishing_worker_id'];
+        foreach ($workerCols as $col) {
+            if ($wo->$col) {
+                $worker = \App\Models\Worker::find($wo->$col);
+                if ($worker) break;
+            }
         }
         $workerName = $worker?->name ?? 'Pekerja';
         $isCompleted = $wo->isCompleted();
@@ -139,15 +143,35 @@
         </div>
         <div class="stage-list">
             @php
-                $allStatuses = array_keys(\App\Models\WorkOrder::STATUS_LABELS);
-                $currentIndex = array_search($wo->status, $allStatuses);
+                // Gunakan stage_sequence dinamis + CREATED dan COMPLETED
+                $stages = $wo->stage_sequence ?? [];
+                $allStages = ['CREATED'];
+                // Tambah QC_PREP jika has_qc_prep = true
+                if ($wo->has_qc_prep) {
+                    $allStages[] = 'QC_PREP';
+                }
+                $allStages = array_merge($allStages, $stages, ['COMPLETED']);
+                $currentIdx = array_search($wo->status, $allStages);
+                if ($currentIdx === false && $wo->status === 'QC_REVIEW') {
+                    // Kalau QC_REVIEW, anggap current = tahap yang di-review
+                    $currentIdx = array_search($wo->current_review_stage, $allStages);
+                }
             @endphp
-            @foreach(\App\Models\WorkOrder::STATUS_LABELS as $s => $label)
+            @foreach($allStages as $s)
             @php
-                $idx = array_search($s, $allStatuses);
-                $isDone = $idx < $currentIndex;
-                $isCurrent = $s === $wo->status;
-                $isPending = $idx > $currentIndex;
+                $idx = array_search($s, $allStages);
+                $isDone = $idx < $currentIdx;
+                $isCurrent = $idx === $currentIdx;
+                $label = match($s) {
+                    'CREATED' => 'Dibuat',
+                    'QC_PREP' => 'QC Persiapan',
+                    'COMPLETED' => 'Selesai',
+                    default => $s,
+                };
+                if ($wo->status === 'QC_REVIEW' && $s === $wo->current_review_stage) {
+                    $isCurrent = true;
+                    $label = 'QC ' . $s;
+                }
             @endphp
             <div class="stage-item {{ $isCurrent ? 'stage-current' : ($isDone ? 'stage-done' : 'stage-pending') }}">
                 <div class="stage-dot">
@@ -171,6 +195,19 @@
     @elseif($isQcStage)
     {{-- QC Actions --}}
     <div class="action-card">
+        @if($wo->status === 'QC_PREP')
+        {{-- QC Persiapan: hanya approve (tidak ada reject) --}}
+        <div class="action-title">📋 QC Persiapan Bahan & Peralatan</div>
+        <p class="action-desc">Pastikan semua bahan dan peralatan sudah siap sebelum produksi dimulai. Tekan Approve untuk melanjutkan ke tahap produksi.</p>
+
+        <button wire:click="approveQC"
+                wire:loading.attr="disabled"
+                class="btn btn-primary btn-full">
+            <span wire:loading.remove wire:target="approveQC">✅ Approve & Mulai Produksi</span>
+            <span wire:loading wire:target="approveQC">⏳ Memproses...</span>
+        </button>
+        @else
+        {{-- QC Review: approve + reject --}}
         <div class="action-title">⚙️ Verifikasi QC — {{ $statusLabel }}</div>
         <p class="action-desc">Periksa hasil pengerjaan. Tekan Approve jika sudah sesuai standar, atau Reject jika perlu diperbaiki.</p>
 
@@ -222,6 +259,7 @@
                 </button>
             </div>
         </div>
+        @endif
         @endif
     </div>
 

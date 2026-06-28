@@ -22,3 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+/wa-bot/node_modules
+/wa-bot/.wwebjs_auth
+/wa-bot/.wwebjs_cache

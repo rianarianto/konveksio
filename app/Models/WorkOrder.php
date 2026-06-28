@@ -14,6 +14,9 @@ class WorkOrder extends Model
         'order_item_id',
         'wo_number',
         'status',
+        'stage_sequence',
+        'current_stage_index',
+        'current_review_stage',
         'decoration_type',
         'token',
         'cutting_worker_id',
@@ -25,66 +28,33 @@ class WorkOrder extends Model
         'reject_proof_image',
         'started_at',
         'completed_at',
+        'stage_entered_at',
+        'is_express',
+        'has_qc_prep',
+        'has_qc_selesai',
+        'qc_worker_id',
     ];
 
     protected $casts = [
-        'started_at'   => 'datetime',
-        'completed_at' => 'datetime',
+        'started_at'          => 'datetime',
+        'completed_at'        => 'datetime',
+        'stage_entered_at'    => 'datetime',
+        'stage_sequence'      => 'array',
+        'is_express'          => 'boolean',
+        'has_qc_prep'         => 'boolean',
+        'has_qc_selesai'      => 'boolean',
     ];
 
     /**
-     * Urutan state machine yang valid.
+     * Status khusus (bukan nama tahap).
      */
-    public const TRANSITIONS = [
-        'CREATED'       => 'QC_PREP',
-        'QC_PREP'       => 'CUTTING',
-        'CUTTING'       => 'QC_CUT_CHECK',
-        'QC_CUT_CHECK'  => 'SEWING',
-        'SEWING'        => 'QC_SEW_CHECK',
-        'QC_SEW_CHECK'  => 'BUTTON',
-        'BUTTON'        => 'DECORATION',
-        'DECORATION'    => 'FINISHING',
-        'FINISHING'     => 'QC_FINAL_CHECK',
-        'QC_FINAL_CHECK'=> 'COMPLETED',
-    ];
+    public const STATUS_CREATED = 'CREATED';
+    public const STATUS_COMPLETED = 'COMPLETED';
+    public const STATUS_QC_REVIEW = 'QC_REVIEW';
+    public const STATUS_QC_PREP = 'QC_PREP';
 
     /**
-     * Peta: dari status QC → kembali ke divisi pelaksana sebelumnya (untuk reject).
-     */
-    public const QC_REJECT_MAP = [
-        'QC_PREP'       => 'CREATED',
-        'QC_CUT_CHECK'  => 'CUTTING',
-        'QC_SEW_CHECK'  => 'SEWING',
-        'QC_FINAL_CHECK'=> 'FINISHING',
-    ];
-
-    /**
-     * Status yang tergolong QC Check (hanya QC yang boleh aksi di sini).
-     */
-    public const QC_STATUSES = [
-        'QC_PREP', 'QC_CUT_CHECK', 'QC_SEW_CHECK', 'QC_FINAL_CHECK',
-    ];
-
-    /**
-     * Status divisi pelaksana (hanya tukang yang boleh aksi di sini).
-     */
-    public const WORKER_STATUSES = [
-        'CUTTING', 'SEWING', 'DECORATION', 'BUTTON', 'FINISHING',
-    ];
-
-    /**
-     * Peta status → kolom worker yang bertugas di tahap tersebut.
-     */
-    public const STATUS_WORKER_MAP = [
-        'CUTTING'    => 'cutting_worker_id',
-        'SEWING'     => 'sewing_worker_id',
-        'DECORATION' => 'decoration_worker_id',
-        'BUTTON'     => 'button_worker_id',
-        'FINISHING'  => 'finishing_worker_id',
-    ];
-
-    /**
-     * Mapping keyword nama tahap ProductionStage → kolom worker WorkOrder.
+     * Mapping keyword nama tahap → kolom worker WorkOrder.
      */
     public const STAGE_NAME_WORKER_MAP = [
         'potong'    => 'cutting_worker_id',
@@ -112,21 +82,21 @@ class WorkOrder extends Model
     }
 
     /**
-     * Label tampilan untuk tiap status.
+     * Cari worker_id yang ditugaskan di tahap saat ini.
      */
-    public const STATUS_LABELS = [
-        'CREATED'        => 'Dibuat',
-        'QC_PREP'        => 'QC Persiapan',
-        'CUTTING'        => 'Potong',
-        'QC_CUT_CHECK'   => 'QC Potong',
-        'SEWING'         => 'Jahit',
-        'QC_SEW_CHECK'   => 'QC Jahit',
-        'DECORATION'     => 'Dekorasi',
-        'BUTTON'         => 'Kancing',
-        'FINISHING'      => 'Finishing',
-        'QC_FINAL_CHECK' => 'QC Final',
-        'COMPLETED'      => 'Selesai',
-    ];
+    public function getCurrentWorkerId(): ?int
+    {
+        $col = self::resolveWorkerColumnForStage($this->status);
+        return $col ? $this->$col : null;
+    }
+
+    public function getCurrentWorker(): ?Worker
+    {
+        $workerId = $this->getCurrentWorkerId();
+        return $workerId ? Worker::find($workerId) : null;
+    }
+
+
 
     protected static function booted(): void
     {
@@ -165,28 +135,27 @@ class WorkOrder extends Model
 
     public function isCompleted(): bool
     {
-        return $this->status === 'COMPLETED';
+        return $this->status === self::STATUS_COMPLETED;
     }
 
     public function isInQcStage(): bool
     {
-        return in_array($this->status, self::QC_STATUSES);
+        return $this->status === self::STATUS_QC_REVIEW || $this->status === self::STATUS_QC_PREP;
     }
 
     public function isInWorkerStage(): bool
     {
-        return in_array($this->status, self::WORKER_STATUSES);
+        $stages = $this->stage_sequence ?? [];
+        return in_array($this->status, $stages);
     }
 
     public function getStatusLabelAttribute(): string
     {
-        return self::STATUS_LABELS[$this->status] ?? $this->status;
-    }
-
-    public function getCurrentWorker(): ?Worker
-    {
-        $col = self::STATUS_WORKER_MAP[$this->status] ?? null;
-        return $col ? $this->$col : null;
+        if ($this->status === self::STATUS_CREATED) return 'Dibuat';
+        if ($this->status === self::STATUS_COMPLETED) return 'Selesai';
+        if ($this->status === self::STATUS_QC_PREP) return 'QC Persiapan';
+        if ($this->status === self::STATUS_QC_REVIEW) return 'QC ' . ($this->current_review_stage ?? '');
+        return $this->status; // nama tahap langsung (Potong, Jahit, dll)
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────
@@ -226,106 +195,151 @@ class WorkOrder extends Model
         return $this->belongsTo(Worker::class, 'finishing_worker_id');
     }
 
-    public function isQcRequiredForStage(string $status): bool
+    /**
+     * Cek apakah tahap tertentu wajib QC.
+     * Baca dari production_task yang match nama tahap.
+     */
+    public function isQcRequiredForStage(string $stageName): bool
     {
-        $workerCol = self::STATUS_WORKER_MAP[$status] ?? null;
-        if (!$workerCol) {
-            return true;
-        }
-
-        $stages = [];
-        foreach (self::STAGE_NAME_WORKER_MAP as $stageKeyword => $col) {
-            if ($col === $workerCol) {
-                $stages[] = $stageKeyword;
-            }
-        }
-
-        $groupItemIds = $this->orderItem ? $this->orderItem->getItemsInGroup()->pluck('id') : [$this->order_item_id];
+        $groupItemIds = $this->orderItem
+            ? $this->orderItem->getItemsInGroup()->pluck('id')
+            : [$this->order_item_id];
 
         $task = \App\Models\ProductionTask::withoutGlobalScopes()
             ->whereIn('order_item_id', $groupItemIds)
-            ->where(function ($q) use ($stages) {
-                foreach ($stages as $stage) {
-                    $q->orWhere('stage_name', 'like', "%{$stage}%");
-                }
-            })
+            ->where('stage_name', $stageName)
             ->first();
 
-        return $task ? (bool) $task->wajib_qc : true;
+        return $task ? (bool) $task->wajib_qc : false;
     }
 
+    /**
+     * Ambil nama tahap saat ini (jika di worker stage).
+     */
+    public function getCurrentStageName(): ?string
+    {
+        $stages = $this->stage_sequence ?? [];
+        if (in_array($this->status, $stages)) {
+            return $this->status;
+        }
+        if ($this->status === self::STATUS_QC_REVIEW) {
+            return $this->current_review_stage;
+        }
+        return null;
+    }
+
+    /**
+     * Status berikutnya berdasarkan stage_sequence yang dinamis.
+     */
     public function getNextStatus(): ?string
     {
-        $category = $this->orderItem?->production_category ?? 'produksi';
-        $hasDecoration = filled($this->decoration_type);
+        $stages = $this->stage_sequence ?? [];
+        if (empty($stages)) return null;
 
-        if ($category === 'non_produksi' || $category === 'jasa') {
-            return match ($this->status) {
-                'CREATED'        => 'QC_PREP',
-                'QC_PREP'        => $hasDecoration ? 'DECORATION' : 'FINISHING',
-                'DECORATION'     => 'FINISHING',
-                'FINISHING'      => $this->isQcRequiredForStage('FINISHING') ? 'QC_FINAL_CHECK' : 'COMPLETED',
-                'QC_FINAL_CHECK' => 'COMPLETED',
-                default          => null,
-            };
+        // CREATED → QC_PREP (jika on) atau langsung tahap pertama
+        if ($this->status === self::STATUS_CREATED) {
+            if ($this->has_qc_prep) {
+                return self::STATUS_QC_PREP;
+            }
+            return $stages[0] ?? self::STATUS_COMPLETED;
         }
 
-        // 'produksi' flow
-        switch ($this->status) {
-            case 'CREATED':
-                return 'QC_PREP';
-            case 'QC_PREP':
-                return 'CUTTING';
-            case 'CUTTING':
-                return $this->isQcRequiredForStage('CUTTING') ? 'QC_CUT_CHECK' : 'SEWING';
-            case 'QC_CUT_CHECK':
-                return 'SEWING';
-            case 'SEWING':
-                return $this->isQcRequiredForStage('SEWING') ? 'QC_SEW_CHECK' : 'BUTTON';
-            case 'QC_SEW_CHECK':
-                return 'BUTTON';
-            case 'BUTTON':
-                return $hasDecoration ? 'DECORATION' : 'FINISHING';
-            case 'DECORATION':
-                return 'FINISHING';
-            case 'FINISHING':
-                return $this->isQcRequiredForStage('FINISHING') ? 'QC_FINAL_CHECK' : 'COMPLETED';
-            case 'QC_FINAL_CHECK':
-                return 'COMPLETED';
-            default:
-                return null;
+        // QC_PREP → tahap pertama di stage_sequence
+        if ($this->status === self::STATUS_QC_PREP) {
+            return $stages[0] ?? self::STATUS_COMPLETED;
         }
+
+        // QC_REVIEW → tahap berikutnya setelah yang di-review
+        if ($this->status === self::STATUS_QC_REVIEW) {
+            $reviewIdx = array_search($this->current_review_stage, $stages);
+            $nextIdx = ($reviewIdx !== false) ? $reviewIdx + 1 : 0;
+            return $stages[$nextIdx] ?? self::STATUS_COMPLETED;
+        }
+
+        // COMPLETED → sudah selesai
+        if ($this->status === self::STATUS_COMPLETED) {
+            return null;
+        }
+
+        // Worker stage → cek wajib_qc, lalu lanjut
+        $currentIdx = array_search($this->status, $stages);
+        if ($currentIdx === false) return null;
+
+        // Kalau wajib_qc = true untuk tahap ini → masuk QC_REVIEW
+        if ($this->isQcRequiredForStage($this->status)) {
+            return self::STATUS_QC_REVIEW;
+        }
+
+        // Kalau tidak, lanjut ke tahap berikutnya atau COMPLETED
+        $nextIdx = $currentIdx + 1;
+        return $stages[$nextIdx] ?? self::STATUS_COMPLETED;
     }
 
+    /**
+     * Status sebelumnya berdasarkan stage_sequence yang dinamis.
+     */
     public function getPreviousStatus(): ?string
     {
-        $category = $this->orderItem?->production_category ?? 'produksi';
-        $hasDecoration = filled($this->decoration_type);
+        $stages = $this->stage_sequence ?? [];
+        if (empty($stages)) return null;
 
-        if ($category === 'non_produksi' || $category === 'jasa') {
-            return match ($this->status) {
-                'QC_PREP'        => 'CREATED',
-                'DECORATION'     => 'QC_PREP',
-                'FINISHING'      => $hasDecoration ? 'DECORATION' : 'QC_PREP',
-                'QC_FINAL_CHECK' => 'FINISHING',
-                'COMPLETED'      => 'QC_FINAL_CHECK',
-                default          => null,
-            };
+        // CREATED → ga ada sebelumnya
+        if ($this->status === self::STATUS_CREATED) {
+            return null;
         }
 
-        // 'produksi' flow
-        return match ($this->status) {
-            'QC_PREP'        => 'CREATED',
-            'CUTTING'        => 'QC_PREP',
-            'QC_CUT_CHECK'   => 'CUTTING',
-            'SEWING'         => $this->isQcRequiredForStage('CUTTING') ? 'QC_CUT_CHECK' : 'CUTTING',
-            'QC_SEW_CHECK'   => 'SEWING',
-            'BUTTON'         => $this->isQcRequiredForStage('SEWING') ? 'QC_SEW_CHECK' : 'SEWING',
-            'DECORATION'     => 'BUTTON',
-            'FINISHING'      => $hasDecoration ? 'DECORATION' : 'BUTTON',
-            'QC_FINAL_CHECK' => 'FINISHING',
-            'COMPLETED'      => 'QC_FINAL_CHECK',
-            default          => null,
-        };
+        // QC_PREP → balik ke CREATED
+        if ($this->status === self::STATUS_QC_PREP) {
+            return self::STATUS_CREATED;
+        }
+
+        // QC_REVIEW → balik ke tahap yang di-review
+        if ($this->status === self::STATUS_QC_REVIEW) {
+            return $this->current_review_stage;
+        }
+
+        // COMPLETED → cek tahap terakhir
+        if ($this->status === self::STATUS_COMPLETED) {
+            $lastStage = end($stages);
+            // Kalau tahap terakhir wajib_qc, previous-nya QC_REVIEW
+            if ($this->isQcRequiredForStage($lastStage)) {
+                return self::STATUS_QC_REVIEW;
+            }
+            return $lastStage;
+        }
+
+        // Worker stage → cek tahap sebelumnya
+        $currentIdx = array_search($this->status, $stages);
+        if ($currentIdx === false) return self::STATUS_CREATED;
+
+        // Ini tahap pertama → QC_PREP (jika on) atau CREATED
+        if ($currentIdx === 0) {
+            return $this->has_qc_prep ? self::STATUS_QC_PREP : self::STATUS_CREATED;
+        }
+
+        $prevStage = $stages[$currentIdx - 1];
+        // Kalau tahap sebelumnya wajib_qc, previous-nya QC_REVIEW
+        if ($this->isQcRequiredForStage($prevStage)) {
+            return self::STATUS_QC_REVIEW;
+        }
+        return $prevStage;
+    }
+
+    /**
+     * Set status ke stage tertentu, update current_stage_index & stage_entered_at.
+     */
+    public function advanceToStage(string $newStatus): void
+    {
+        $stages = $this->stage_sequence ?? [];
+        $idx = array_search($newStatus, $stages);
+
+        $this->update([
+            'status' => $newStatus,
+            'current_stage_index' => $idx !== false ? $idx : $this->current_stage_index,
+            'stage_entered_at' => now(),
+            'current_review_stage' => ($newStatus === self::STATUS_QC_REVIEW)
+                ? $this->status  // tahap yang sedang di-review = tahap sekarang
+                : null,
+        ]);
     }
 }

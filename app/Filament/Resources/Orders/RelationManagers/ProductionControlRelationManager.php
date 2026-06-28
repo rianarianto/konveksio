@@ -61,6 +61,20 @@ class ProductionControlRelationManager extends RelationManager
                         default => 'gray',
                     })
                     ->description(function (OrderItem $record) {
+                        // Cek WorkOrder status dulu
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->first();
+
+                        if ($wo) {
+                            $woStatus = $wo->status;
+                            if ($woStatus === \App\Models\WorkOrder::STATUS_CREATED) return '📝 Belum dimulai';
+                            if ($woStatus === \App\Models\WorkOrder::STATUS_QC_PREP) return '📋 QC Persiapan - menunggu approve';
+                            if ($woStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) return '⚙️ QC ' . ($wo->current_review_stage ?? '') . ' - menunggu verifikasi';
+                            if ($woStatus === \App\Models\WorkOrder::STATUS_COMPLETED) return '✅ Selesai';
+                        }
+
                         $tasks = $record->productionTasks;
                         if ($tasks->isEmpty()) return null;
                         $activeTask = $tasks->firstWhere('status', 'in_progress');

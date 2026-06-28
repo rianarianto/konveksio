@@ -30,7 +30,14 @@ class NotificationHelper
         }
 
         $phone  = $worker->phone;
-        $label  = WorkOrder::STATUS_LABELS[$newStatus] ?? $newStatus;
+        // Label: nama tahap langsung, atau QC_REVIEW → "QC [tahap]", atau QC_PREP → "QC Persiapan"
+        if ($newStatus === WorkOrder::STATUS_QC_PREP) {
+            $label = 'QC Persiapan';
+        } elseif ($newStatus === WorkOrder::STATUS_QC_REVIEW) {
+            $label = 'QC ' . ($wo->current_review_stage ?? '');
+        } else {
+            $label = $newStatus;
+        }
         $link   = url("/tugas?wo_id={$wo->id}&token={$wo->token}");
         $produk = $wo->orderItem->product_name ?? '-';
         $qty    = $wo->orderItem->quantity ?? '-';
@@ -98,13 +105,9 @@ class NotificationHelper
                 continue;
             }
 
-            // Cari WorkOrder untuk link portal
-            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
-                ->where('order_item_id', $item->id)
-                ->first();
-
-            $link = $wo
-                ? url("/tugas?wo_id={$wo->id}&token={$wo->token}")
+            // Link ke dashboard worker (list semua tugas)
+            $link = $worker->portal_token
+                ? url("/worker/{$worker->portal_token}")
                 : url('/');
 
             // Rincian tugas per tahap
@@ -143,14 +146,17 @@ class NotificationHelper
      */
     protected static function resolveWorkerForStatus(WorkOrder $wo, string $status): ?Worker
     {
-        $col = WorkOrder::STATUS_WORKER_MAP[$status] ?? null;
+        // Kalau QC_REVIEW, yang perlu notifikasi = worker dari tahap yang di-review
+        $stageName = ($status === WorkOrder::STATUS_QC_REVIEW)
+            ? ($wo->current_review_stage ?? $status)
+            : $status;
 
+        $col = WorkOrder::resolveWorkerColumnForStage($stageName);
         if ($col) {
-            return $wo->$col;
+            $workerId = $wo->$col;
+            return $workerId ? Worker::find($workerId) : null;
         }
 
-        // Untuk status QC → kirim notifikasi ke owner/admin toko (ambil dari users)
-        // Ini bisa dikembangkan lebih lanjut jika ada user QC dedicated
         return null;
     }
 }

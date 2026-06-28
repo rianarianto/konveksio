@@ -75,6 +75,11 @@ class AturTugasProduksi extends Page
         $tasksForRepeater = [];
         $groupedTasks = $item->productionTasks->groupBy('stage_name');
         foreach ($groupedTasks as $stageName => $tasks) {
+            // Skip QC stages - dikontrol oleh toggle di atas, bukan row repeater
+            if (str_starts_with($stageName, 'QC_')) {
+                continue;
+            }
+            
             $firstTask = $tasks->first();
             
             $workerRows = [];
@@ -129,8 +134,18 @@ class AturTugasProduksi extends Page
             ];
         }
 
+        // Load has_qc_prep, qc_worker_id dari WorkOrder yang sudah ada (jika ada)
+        $groupItemIds = $item->getItemsInGroup()->pluck('id');
+        $existingWo = \App\Models\WorkOrder::withoutGlobalScopes()
+            ->whereIn('order_item_id', $groupItemIds)
+            ->first();
+        $hasQcPrep = $existingWo?->has_qc_prep ?? true;
+        $qcWorkerId = $existingWo?->qc_worker_id ?? null;
+
         $this->form->fill([
             'productionTasks' => $tasksForRepeater,
+            'has_qc_prep' => $hasQcPrep,
+            'qc_worker_id' => $qcWorkerId,
         ]);
     }
 
@@ -170,47 +185,64 @@ class AturTugasProduksi extends Page
                                 ->description('Tentukan tahapan dan karyawan yang bertugas')
                                 ->icon('heroicon-m-clipboard-document-list')
                                 ->schema([
-                                    Select::make('_preset_template')
-                                        ->label('Gunakan Template Alur Pekerjaan')
-                                        ->placeholder('Pilih Preset Alur Pekerjaan')
-                                        ->options([
-                                            'full' => 'Produksi Penuh (Potong, Jahit, Kancing, Sablon/Bordir, Finishing)',
-                                            'simple' => 'Jasa / Non-Produksi (Sablon/Bordir, Finishing)',
-                                        ])
-                                        ->live()
-                                        ->afterStateUpdated(function ($state, Set $set) {
-                                            if (!$state) return;
-                                            
-                                            $presets = [
-                                                'full' => [
-                                                    ['stage_name' => 'Potong', 'wajib_qc' => true],
-                                                    ['stage_name' => 'Jahit', 'wajib_qc' => true],
-                                                    ['stage_name' => 'Kancing', 'wajib_qc' => false],
-                                                    ['stage_name' => 'Dekorasi', 'wajib_qc' => false],
-                                                    ['stage_name' => 'Finishing', 'wajib_qc' => true],
-                                                ],
-                                                'simple' => [
-                                                    ['stage_name' => 'Dekorasi', 'wajib_qc' => false],
-                                                    ['stage_name' => 'Finishing', 'wajib_qc' => true],
-                                                ]
-                                            ];
-                                            
-                                            $selectedPreset = $presets[$state] ?? [];
-                                            
-                                            $newTasks = [];
-                                            foreach ($selectedPreset as $p) {
-                                                $stageModel = \App\Models\ProductionStage::where('name', 'like', '%' . $p['stage_name'] . '%')->first();
-                                                $baseWage = $stageModel?->base_wage ?? 0;
-                                                
-                                                $newTasks[] = [
-                                                    'stage_name' => $stageModel?->name ?? $p['stage_name'],
-                                                    'wajib_qc' => $p['wajib_qc'],
-                                                    'workers' => [],
-                                                ];
-                                            }
-                                            
-                                            $set('productionTasks', $newTasks);
-                                        }),
+                                    // Baris 1: Template Alur + Petugas QC + QC Persiapan
+                                    Grid::make(3)
+                                        ->extraAttributes(['style' => 'align-items: flex-end;'])
+                                        ->schema([
+                                            Select::make('_preset_template')
+                                                ->label('Template Alur Pekerjaan')
+                                                ->placeholder('Pilih Preset')
+                                                ->options([
+                                                    'full' => 'Produksi Penuh',
+                                                    'simple' => 'Jasa / Non-Produksi',
+                                                ])
+                                                ->searchable()
+                                                ->live()
+                                                ->afterStateUpdated(function ($state, Set $set) {
+                                                    if (!$state) return;
+                                                    
+                                                    $presets = [
+                                                        'full' => [
+                                                            ['stage_name' => 'Potong', 'wajib_qc' => true],
+                                                            ['stage_name' => 'Jahit', 'wajib_qc' => true],
+                                                            ['stage_name' => 'Kancing', 'wajib_qc' => false],
+                                                            ['stage_name' => 'Bordir/Sablon', 'wajib_qc' => false],
+                                                            ['stage_name' => 'Finishing', 'wajib_qc' => true],
+                                                        ],
+                                                        'simple' => [
+                                                            ['stage_name' => 'Bordir/Sablon', 'wajib_qc' => false],
+                                                            ['stage_name' => 'Finishing', 'wajib_qc' => true],
+                                                        ]
+                                                    ];
+                                                    
+                                                    $selectedPreset = $presets[$state] ?? [];
+                                                    
+                                                    $newTasks = [];
+                                                    foreach ($selectedPreset as $p) {
+                                                        $stageModel = \App\Models\ProductionStage::where('name', 'like', '%' . $p['stage_name'] . '%')->first();
+                                                        $baseWage = $stageModel?->base_wage ?? 0;
+                                                        
+                                                        $newTasks[] = [
+                                                            'stage_name' => $stageModel?->name ?? $p['stage_name'],
+                                                            'wajib_qc' => $p['wajib_qc'],
+                                                            'workers' => [],
+                                                        ];
+                                                    }
+                                                    
+                                                    $set('productionTasks', $newTasks);
+                                                    $set('_preset_template', null);
+                                                }),
+                                            Select::make('qc_worker_id')
+                                                ->label('Petugas QC')
+                                                ->placeholder('Pilih Petugas QC')
+                                                ->options(\App\Models\Worker::pluck('name', 'id'))
+                                                ->searchable()
+                                                ->nullable(),
+                                            Toggle::make('has_qc_prep')
+                                                ->label('QC Persiapan')
+                                                ->default(true)
+                                                ->inline(false),
+                                        ]),
 
                                     Repeater::make('productionTasks')
                                         ->label(false)
@@ -293,6 +325,7 @@ class AturTugasProduksi extends Page
                                                 ->schema([
                                                     Select::make('stage_name')
                                                         ->label('Tahap Pekerjaan')
+                                                        ->placeholder('-- Pilih Tahap --')
                                                         ->options(function () use ($item) {
                                                             $category = $item->production_category ?? 'produksi';
                                                             $query = ProductionStage::query()->orderBy('order_sequence');
@@ -329,8 +362,8 @@ class AturTugasProduksi extends Page
                                                 ]),
 
                                             \Filament\Schemas\Components\Actions::make([
-                                                \Filament\Actions\Action::make('autoDistribute')
-                                                    ->label('Bagi Tugas Otomatis')
+                                                    \Filament\Actions\Action::make('autoDistribute')
+                                                        ->label('Bagi Tugas Otomatis')
                                                     ->icon('heroicon-m-sparkles')
                                                     ->color('primary')
                                                     ->action(function (Set $set, Get $get) use ($item) {
@@ -395,7 +428,7 @@ class AturTugasProduksi extends Page
                                                         }
 
                                                         // 2. Allocate CUSTOM to the last worker
-                                                        if ($item->production_category === 'custom' && $customQtyTotal > 0) {
+                                                        if ($customQtyTotal > 0) {
                                                             $details = $item->size_and_request_details ?? [];
                                                             $allNames = [];
                                                             foreach ($details['detail_custom'] ?? [] as $u) {
@@ -487,6 +520,9 @@ class AturTugasProduksi extends Page
                                             Repeater::make('workers')
                                                 ->label('Daftar Pekerja & Kuantitas')
                                                 ->collapsible()
+                                                ->extraAttributes([
+                                                    'data-auto-collapse-new' => true,
+                                                ])
                                                 ->itemLabel(function (array $state) {
                                                     $workerId = $state['worker_id'] ?? null;
                                                     $qty = $state['quantity'] ?? 0;
@@ -506,6 +542,7 @@ class AturTugasProduksi extends Page
                                                                     return [$worker->id => $label];
                                                                 });
                                                         })
+                                                        ->live()
                                                         ->searchable()
                                                         ->required(),
 
@@ -559,27 +596,7 @@ class AturTugasProduksi extends Page
                                                                 $set('quantity', $total);
                                                             };
 
-                                                            $fields = [
-                                                                Toggle::make('_fill_all')
-                                                                    ->label('Kerjakan Semua')
-                                                                    ->live()
-                                                                    ->afterStateUpdated(function ($state, Set $set) use ($standardSizes, $item) {
-                                                                        foreach ($standardSizes as $sz => $max) $set($sz, $state ? $max : null);
-                                                                        
-                                                                        if ($item->production_category === 'custom') {
-                                                                            $details = $item->size_and_request_details ?? [];
-                                                                            $allNames = [];
-                                                                            foreach ($details['detail_custom'] ?? [] as $u) {
-                                                                                if (!empty($u['nama'])) $allNames[] = $u['nama'];
-                                                                            }
-                                                                            $set('_custom_recipients', $state ? $allNames : []);
-                                                                        }
-
-                                                                        $total = $state ? array_sum($standardSizes) : 0;
-                                                                        $set('quantity', $total);
-                                                                    })
-                                                                    ->columnSpanFull(),
-                                                            ];
+                                                            $fields = [];
 
                                                             if ($item->production_category === 'custom') {
                                                                 $fields[] = Select::make('_custom_recipients')
@@ -1005,6 +1022,20 @@ class AturTugasProduksi extends Page
                 return;
             }
 
+            // Check duplicate workers in same stage
+            $seenWorkers = [];
+            foreach ($workers as $wItem) {
+                $wid = $wItem['worker_id'] ?? null;
+                if ($wid) {
+                    if (isset($seenWorkers[$wid])) {
+                        $workerName = \App\Models\Worker::find($wid)?->name ?? "ID {$wid}";
+                        Notification::make()->title('Pekerja Duplikat!')->body("<strong>{$workerName}</strong> dipilih lebih dari sekali di tahap <strong>{$stage}</strong>. Gabungkan jadi satu baris.")->danger()->send();
+                        return;
+                    }
+                    $seenWorkers[$wid] = true;
+                }
+            }
+
             foreach ($workers as $wItem) {
                 $workerId = $wItem['worker_id'] ?? null;
                 if (!$workerId) {
@@ -1219,10 +1250,39 @@ class AturTugasProduksi extends Page
         // Sync to WorkOrder
         $groupItemIds = $item->getItemsInGroup()->pluck('id');
         $workOrder = \App\Models\WorkOrder::withoutGlobalScopes()->whereIn('order_item_id', $groupItemIds)->first();
+
+        // Ambil is_express dari order
+        $isExpress = (bool) ($item->order?->is_express ?? false);
+
+        // Ambil QC settings dari form
+        $hasQcPrep = (bool) ($data['has_qc_prep'] ?? true);
+        $qcWorkerId = $data['qc_worker_id'] ?? null;
+
+        // Build stage_sequence: QC_PERSIAPAN (if on) + production stages only
+        // QC after each stage handled by QC_REVIEW mechanism (not QC_ prefix stages)
+        $stageSequence = [];
+        
+        // QC Persiapan di awal
+        if ($hasQcPrep) {
+            $stageSequence[] = 'QC_PERSIAPAN';
+        }
+        
+        // Tahap produksi saja (tanpa QC_ prefix)
+        foreach ($tasksData as $taskData) {
+            $stageName = $taskData['stage_name'] ?? null;
+            if ($stageName) {
+                $stageSequence[] = $stageName;
+            }
+        }
+
         if (!$workOrder && $item->order) {
             $workOrder = \App\Models\WorkOrder::create([
                 'shop_id' => $item->order->shop_id,
                 'order_item_id' => $item->id,
+                'stage_sequence' => $stageSequence,
+                'is_express' => $isExpress,
+                'has_qc_prep' => $hasQcPrep,
+                'qc_worker_id' => $qcWorkerId,
             ]);
         }
 
@@ -1248,7 +1308,49 @@ class AturTugasProduksi extends Page
                 }
             }
 
+            // Update stage_sequence, is_express, QC settings, dan worker assignments
+            $workerUpdates['stage_sequence'] = $stageSequence;
+            $workerUpdates['is_express'] = $isExpress;
+            $workerUpdates['has_qc_prep'] = $hasQcPrep;
+            $workerUpdates['qc_worker_id'] = $qcWorkerId;
             $workOrder->update($workerUpdates);
+
+            // Buat ProductionTask HANYA untuk QC_PERSIAPAN (QC worker perlu action)
+            // QC setelah stage (QC_POTONG, QC_JAHIT, dll) = WO stage aja, bukan task
+            if ($qcWorkerId && $hasQcPrep) {
+                $existingQcTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->where('order_item_id', $item->id)
+                    ->where('stage_name', 'QC_PERSIAPAN')
+                    ->first();
+                
+                if (!$existingQcTask) {
+                    \App\Models\ProductionTask::create([
+                        'order_item_id' => $item->id,
+                        'stage_name' => 'QC_PERSIAPAN',
+                        'quantity' => $item->quantity ?? 1,
+                        'assigned_to' => $qcWorkerId,
+                        'assigned_by' => auth()->id(),
+                        'status' => 'pending',
+                        'is_paid' => false,
+                        'wajib_qc' => false,
+                        'shop_id' => \Filament\Facades\Filament::getTenant()->id,
+                    ]);
+                } else {
+                    $existingQcTask->update(['assigned_to' => $qcWorkerId]);
+                }
+            }
+
+            // Auto-advance dari CREATED ke status berikutnya (QC_PREP atau tahap pertama)
+            if ($workOrder->status === \App\Models\WorkOrder::STATUS_CREATED) {
+                $nextStatus = $workOrder->getNextStatus();
+                if ($nextStatus) {
+                    $workOrder->update([
+                        'status' => $nextStatus,
+                        'stage_entered_at' => now(),
+                        'started_at' => now(),
+                    ]);
+                }
+            }
         }
 
         // Sync status order
@@ -1259,6 +1361,10 @@ class AturTugasProduksi extends Page
         }
 
         Notification::make()->title('Berhasil Diatur')->success()->send();
+
+        // Kirim notifikasi WhatsApp ke semua pekerja
+        \App\Helpers\NotificationHelper::notifyAllWorkers($item);
+
         $this->redirect(ControlProduksiResource::getUrl('index'));
     }
 }

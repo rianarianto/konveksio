@@ -10,13 +10,37 @@ use Illuminate\Support\Facades\Storage;
 class WorkOrderService
 {
     /**
-     * Memajukan status WO ke tahap berikutnya (digunakan oleh Tukang saat menyelesaikan tugas).
-     * Atomic: menggunakan lockForUpdate untuk mencegah race condition.
+     * Memajukan status WO ke tahap berikutnya (dinamis berdasarkan stage_sequence).
      */
     public function advance(int $woId): WorkOrder
     {
         return DB::transaction(function () use ($woId) {
             $wo = WorkOrder::lockForUpdate()->findOrFail($woId);
+
+            $now = now();
+
+            // If currently in worker stage, check if ALL tasks for this stage are done
+            if ($wo->isInWorkerStage()) {
+                $currentStage = $wo->status;
+                
+                // Get all tasks for this stage
+                $groupItemIds = $wo->orderItem
+                    ? $wo->orderItem->getItemsInGroup()->pluck('id')
+                    : [$wo->order_item_id];
+                
+                $allTasksForStage = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItemIds)
+                    ->where('stage_name', $currentStage)
+                    ->get();
+                
+                $pendingTasks = $allTasksForStage->where('status', '!=', 'done');
+                
+                // If there are still pending/in_progress tasks, don't advance yet
+                if ($pendingTasks->count() > 0) {
+                    // Just return the WO without advancing
+                    return $wo;
+                }
+            }
 
             $nextStatus = $wo->getNextStatus();
 
@@ -24,36 +48,36 @@ class WorkOrderService
                 throw new \RuntimeException("Work Order [{$wo->wo_number}] sudah selesai atau tidak bisa dilanjutkan.");
             }
 
-            $now = now();
-
-            $updateData = ['status' => $nextStatus];
+            $updateData = ['status' => $nextStatus, 'stage_entered_at' => $now];
 
             // Catat waktu mulai saat pertama kali keluar dari CREATED
-            if ($wo->status === 'CREATED' && !$wo->started_at) {
+            if ($wo->status === WorkOrder::STATUS_CREATED && !$wo->started_at) {
                 $updateData['started_at'] = $now;
             }
 
             // Catat waktu selesai saat mencapai COMPLETED
-            if ($nextStatus === 'COMPLETED') {
+            if ($nextStatus === WorkOrder::STATUS_COMPLETED) {
                 $updateData['completed_at'] = $now;
             }
 
-            // Sync ProductionTask status to done
-            $completedStatus = $wo->status;
-            if (in_array($completedStatus, WorkOrder::WORKER_STATUSES)) {
-                $task = $this->getProductionTaskForStatus($wo, $completedStatus);
-                if ($task) {
-                    $task->update([
-                        'status' => 'done',
-                        'completed_at' => $now,
-                    ]);
-                }
+            // Update current_stage_index
+            $stages = $wo->stage_sequence ?? [];
+            $idx = array_search($nextStatus, $stages);
+            if ($idx !== false) {
+                $updateData['current_stage_index'] = $idx;
+            }
+
+            // Handle QC_REVIEW: simpan tahap yang di-review
+            if ($nextStatus === WorkOrder::STATUS_QC_REVIEW) {
+                $updateData['current_review_stage'] = $wo->status;
+            } else {
+                $updateData['current_review_stage'] = null;
             }
 
             $wo->update($updateData);
             $wo->refresh();
 
-            // Kirim notifikasi WA di latar belakang
+            // Kirim notifikasi WA
             NotificationHelper::notify($wo, $nextStatus);
 
             return $wo;
@@ -69,8 +93,7 @@ class WorkOrderService
     }
 
     /**
-     * QC Reject: mengembalikan status ke divisi pengerjaan sebelumnya.
-     * Menyimpan alasan penolakan dan bukti foto (opsional).
+     * QC Reject: mengembalikan status ke tahap yang sedang di-review.
      */
     public function rejectQC(int $woId, string $reason, ?string $proofImagePath = null): WorkOrder
     {
@@ -81,32 +104,28 @@ class WorkOrderService
                 throw new \RuntimeException("Work Order [{$wo->wo_number}] tidak sedang dalam tahap QC.");
             }
 
-            $prevStatus = $wo->getPreviousStatus();
-
+            $prevStatus = $wo->current_review_stage;
             if (!$prevStatus) {
-                throw new \RuntimeException("Tidak ada status sebelumnya yang bisa dikembalikan.");
+                throw new \RuntimeException("Tidak ada tahap yang sedang di-review.");
             }
 
-            // Sync ProductionTask status back to in_progress
-            if (in_array($prevStatus, WorkOrder::WORKER_STATUSES)) {
-                $task = $this->getProductionTaskForStatus($wo, $prevStatus);
-                if ($task) {
-                    $task->update([
-                        'status' => 'in_progress',
-                        'completed_at' => null,
-                    ]);
-                }
+            // Sync ProductionTask kembali ke in_progress
+            $task = $this->getProductionTaskForStage($wo, $prevStatus);
+            if ($task) {
+                $task->update(['status' => 'in_progress', 'completed_at' => null]);
             }
 
             $wo->update([
                 'status'             => $prevStatus,
+                'current_review_stage' => null,
                 'reject_reason'      => $reason,
                 'reject_proof_image' => $proofImagePath,
+                'stage_entered_at'   => now(),
             ]);
 
             $wo->refresh();
 
-            // Kirim notifikasi WA penolakan ke pekerja terkait
+            // Kirim notifikasi WA penolakan
             NotificationHelper::notify($wo, $prevStatus, isReject: true, rejectReason: $reason);
 
             return $wo;
@@ -114,9 +133,7 @@ class WorkOrderService
     }
 
     /**
-     * Mulai mengerjakan tugas (CREATED/awal divisi → in_progress sinyal).
-     * Secara state machine, ini hanya mencatat started_at jika belum ada.
-     * Untuk tombol "Mulai Kerjakan" di UI.
+     * Mulai mengerjakan tugas (worker stage).
      */
     public function startTask(int $woId): WorkOrder
     {
@@ -127,9 +144,19 @@ class WorkOrderService
                 $wo->update(['started_at' => now()]);
             }
 
-            // Sync ProductionTask status to in_progress
-            if (in_array($wo->status, WorkOrder::WORKER_STATUSES)) {
-                $task = $this->getProductionTaskForStatus($wo, $wo->status);
+            // Determine the actual stage name for task lookup
+            $stageName = $wo->status;
+            if ($wo->status === WorkOrder::STATUS_QC_PREP) {
+                $stageName = 'QC_PERSIAPAN';
+            }
+
+            // Check if this is a valid worker stage
+            $stages = $wo->stage_sequence ?? [];
+            $isValidWorkerStage = in_array($stageName, $stages);
+
+            // Sync ProductionTask ke in_progress
+            if ($isValidWorkerStage) {
+                $task = $this->getProductionTaskForStage($wo, $stageName);
                 if ($task && $task->status === 'pending') {
                     $task->update(['status' => 'in_progress']);
                 }
@@ -141,46 +168,23 @@ class WorkOrderService
     }
 
     /**
-     * Cari ProductionTask yang sesuai dengan status/tahap WorkOrder saat ini.
+     * Cari ProductionTask yang match nama tahap.
      */
-    protected function getProductionTaskForStatus(WorkOrder $wo, string $status): ?\App\Models\ProductionTask
+    protected function getProductionTaskForStage(WorkOrder $wo, string $stageName): ?\App\Models\ProductionTask
     {
-        $workerCol = WorkOrder::STATUS_WORKER_MAP[$status] ?? null;
-        if (!$workerCol) {
-            return null;
-        }
+        $workerCol = WorkOrder::resolveWorkerColumnForStage($stageName);
+        $workerId = $workerCol ? $wo->$workerCol : null;
 
-        $workerId = $wo->$workerCol;
-        if (!$workerId) {
-            return null;
-        }
-
-        $groupItemIds = $wo->orderItem ? $wo->orderItem->getItemsInGroup()->pluck('id') : [$wo->order_item_id];
+        $groupItemIds = $wo->orderItem
+            ? $wo->orderItem->getItemsInGroup()->pluck('id')
+            : [$wo->order_item_id];
 
         $query = \App\Models\ProductionTask::withoutGlobalScopes()
             ->whereIn('order_item_id', $groupItemIds)
-            ->where('assigned_to', $workerId);
+            ->where('stage_name', $stageName);
 
-        // Cari pencocokan tahap yang ketat berdasarkan kata kunci
-        $strictQuery = clone $query;
-        $stages = [];
-        foreach (WorkOrder::STAGE_NAME_WORKER_MAP as $stageKeyword => $col) {
-            if ($col === $workerCol) {
-                $stages[] = $stageKeyword;
-            }
-        }
-
-        if (!empty($stages)) {
-            $strictQuery->where(function ($q) use ($stages) {
-                foreach ($stages as $stage) {
-                    $q->orWhere('stage_name', 'like', "%{$stage}%");
-                }
-            });
-
-            $task = $strictQuery->first();
-            if ($task) {
-                return $task;
-            }
+        if ($workerId) {
+            $query->where('assigned_to', $workerId);
         }
 
         return $query->first();
