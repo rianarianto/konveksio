@@ -179,8 +179,16 @@
 
     {{-- Kartu Progress WO --}}
     <div class="card">
-        <div class="card-header">
-            <span class="card-label">Detail Work Order</span>
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-label" style="margin-bottom: 0;">Detail Work Order</span>
+                <a href="{{ route('work.task.spk', $wo->id) }}" target="_blank" class="download-spk-link" title="Download SPK PDF">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                    </svg>
+                    <span>SPK</span>
+                </a>
+            </div>
             <span class="wo-badge {{ $isCompleted ? 'badge-green' : ($isQcStage ? 'badge-blue' : 'badge-purple') }}">
                 {{ $statusLabel }}
             </span>
@@ -214,9 +222,11 @@
                     'bordir_3d'      => '🧵 Bordir 3D',
                     'sablon_dtf'     => '🖨️ Sablon DTF',
                     'sablon_manual'  => '🖨️ Sablon Manual',
+                    'Bordir'         => '🧵 Bordir',
+                    'Sablon'         => '🖨️ Sablon',
                 ];
             @endphp
-            <span class="decor-label">{{ $decLabels[$decType] ?? $decType }}</span>
+            <span class="decor-label">{{ $decLabels[$decType] ?? ($decLabels[ucfirst(strtolower($decType))] ?? $decType) }}</span>
         </div>
         @endif
     </div>
@@ -492,13 +502,38 @@
             @php
                 // Bangun urutan tahap: CREATED → (QC_PREP opsional) → stages → COMPLETED
                 $stages = $wo->stage_sequence ?? [];
-                $allStages = ['CREATED'];
-                if ($wo->has_qc_prep) { $allStages[] = 'QC_PREP'; }
-                $allStages = array_merge($allStages, $stages, ['COMPLETED']);
-                $currentIdx = array_search($wo->status, $allStages);
-                if ($currentIdx === false && $wo->status === 'QC_REVIEW') {
-                    $currentIdx = array_search($wo->current_review_stage, $allStages);
+                
+                // Normalisasi dan hilangkan duplikasi QC_PERSIAPAN / QC_PREP di $stages
+                $normalizedStages = [];
+                $hasPrep = false;
+                foreach ($stages as $stg) {
+                    $stgUpper = strtoupper($stg);
+                    if ($stgUpper === 'QC_PREP' || $stgUpper === 'QC_PERSIAPAN') {
+                        if ($hasPrep) { continue; } // Lewati jika duplikat
+                        $normalizedStages[] = 'QC_PREP';
+                        $hasPrep = true;
+                    } else {
+                        $normalizedStages[] = $stg;
+                    }
                 }
+                
+                $allStages = ['CREATED'];
+                if ($wo->has_qc_prep && !$hasPrep) {
+                    $allStages[] = 'QC_PREP';
+                }
+                $allStages = array_merge($allStages, $normalizedStages, ['COMPLETED']);
+                
+                // Normalisasi status saat ini untuk pencocokan indeks
+                $currentStatus = $wo->status;
+                if ($currentStatus === 'QC_PERSIAPAN') { $currentStatus = 'QC_PREP'; }
+                if ($currentStatus === 'QC_REVIEW') {
+                    $currentStatus = $wo->current_review_stage;
+                    if ($currentStatus === 'QC_PERSIAPAN') { $currentStatus = 'QC_PREP'; }
+                }
+                
+                $currentIdx = array_search($currentStatus, $allStages);
+                if ($currentIdx === false) { $currentIdx = 1; } // fallback ke tahap awal jika tidak cocok
+                
                 $stageLabels = [
                     'CREATED'       => 'Dibuat',
                     'QC_PREP'       => 'QC Persiapan',
@@ -685,6 +720,24 @@
     transition: color 0.15s;
 }
 .back-btn:hover { color: #4D0099; }
+.download-spk-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #F3E8FF;
+    color: #8000FF;
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid #E9D5FF;
+    transition: all 0.15s ease;
+}
+.download-spk-link:hover {
+    background: #E9D5FF;
+    color: #6B21A8;
+}
 .header-brand { display: flex; align-items: center; gap: 10px; }
 .brand-icon {
     width: 34px; height: 34px;
