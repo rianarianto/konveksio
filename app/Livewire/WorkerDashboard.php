@@ -46,7 +46,7 @@ class WorkerDashboard extends Component
 
         $tasks = ProductionTask::withoutGlobalScopes()
             ->where('assigned_to', $this->worker->id)
-            ->with(['orderItem.order.customer', 'orderItem.order'])
+            ->with(['orderItem.order.customer', 'orderItem.order', 'workOrder'])
             ->orderBy('created_at', 'asc')
             ->get();
 

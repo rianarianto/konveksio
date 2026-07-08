@@ -377,7 +377,7 @@ class AturTugasProduksi extends Page
                                                             return;
                                                         }
 
-                                                        // 1. Get original size quantities
+                                                        // 1. Kumpulkan ukuran dari semua item di grup
                                                         $allGroupItems = \App\Models\OrderItem::where('order_id', $item->order_id)
                                                             ->where('product_name', $item->product_name)
                                                             ->where('bahan_id', $item->bahan_id)
@@ -390,119 +390,70 @@ class AturTugasProduksi extends Page
                                                             $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
                                                         }
 
+                                                        // Hitung CUSTOM (ukuran perorangan)
+                                                        $customQtyTotal = 0;
+                                                        $customNames = [];
                                                         if ($item->production_category === 'custom') {
                                                             $details = $item->size_and_request_details ?? [];
-                                                            $count = count($details['detail_custom'] ?? []);
-                                                            if ($count > 0) {
-                                                                $standardSizes['CUSTOM'] = ($standardSizes['CUSTOM'] ?? 0) + $count;
-                                                            }
+                                                            $customNames = array_values(array_filter(
+                                                                array_map(fn($u) => $u['nama'] ?? null, $details['detail_custom'] ?? [])
+                                                            ));
+                                                            $customQtyTotal = count($customNames);
                                                         }
 
-                                                        // Move 'CUSTOM' to the end if it exists
-                                                        if (array_key_exists('CUSTOM', $standardSizes)) {
-                                                            $customVal = $standardSizes['CUSTOM'];
-                                                            unset($standardSizes['CUSTOM']);
-                                                            $standardSizes['CUSTOM'] = $customVal;
-                                                        }
-
-                                                        $totalQty = array_sum($standardSizes);
+                                                        $totalQty = array_sum($standardSizes) + $customQtyTotal;
                                                         if ($totalQty <= 0) return;
 
-                                                        $numWorkers = count($workers);
-                                                        $workerKeys = array_keys($workers);
-                                                        $lastWorkerKey = end($workerKeys);
+                                                        $allSizeKeys   = array_merge(array_keys($standardSizes), $customQtyTotal > 0 ? ['CUSTOM'] : []);
+                                                        $workerKeys    = array_keys($workers);
+                                                        $numWorkers    = count($workerKeys);
 
-                                                        // Target per worker (including custom allocated to last worker)
-                                                        $customQtyTotal = $standardSizes['CUSTOM'] ?? 0;
-                                                        $stdQtyTotal = $totalQty - $customQtyTotal;
-
-                                                        // Reset allocations for all sizes in all workers
-                                                        $allSizeKeys = array_keys($standardSizes);
+                                                        // 2. Reset semua alokasi
                                                         foreach ($workerKeys as $wKey) {
                                                             foreach ($allSizeKeys as $sz) {
                                                                 $workers[$wKey][$sz] = null;
                                                             }
-                                                            $workers[$wKey]['qty'] = null;
-                                                            $workers[$wKey]['quantity'] = 0;
+                                                            $workers[$wKey]['qty']               = null;
+                                                            $workers[$wKey]['quantity']          = 0;
                                                             $workers[$wKey]['_custom_recipients'] = [];
                                                         }
 
-                                                        // 2. Allocate CUSTOM to the last worker
+                                                        // 3. Algoritma Greedy Bin-Packing — ukuran TIDAK BOLEH dipecah
+                                                        //    Urutkan ukuran dari yang terbesar (agar distribusi lebih merata)
+                                                        $stdSizes = $standardSizes;
+                                                        arsort($stdSizes); // dari terbesar ke terkecil
+
+                                                        // Lacak beban setiap worker dalam array sederhana
+                                                        $workerLoad = array_fill_keys($workerKeys, 0);
+
+                                                        foreach ($stdSizes as $sz => $qty) {
+                                                            // Temukan worker dengan beban paling ringan
+                                                            $lightestKey = null;
+                                                            $lightestLoad = PHP_INT_MAX;
+                                                            foreach ($workerKeys as $wKey) {
+                                                                if ($workerLoad[$wKey] < $lightestLoad) {
+                                                                    $lightestLoad = $workerLoad[$wKey];
+                                                                    $lightestKey  = $wKey;
+                                                                }
+                                                            }
+
+                                                            // Masukkan ukuran ini secara utuh ke worker terpilih
+                                                            $workers[$lightestKey][$sz]        = $qty;
+                                                            $workers[$lightestKey]['quantity'] += $qty;
+                                                            $workerLoad[$lightestKey]          += $qty;
+                                                        }
+
+                                                        // 4. Alokasikan CUSTOM ke worker dengan beban PALING RINGAN setelah distribusi standar
                                                         if ($customQtyTotal > 0) {
-                                                            $details = $item->size_and_request_details ?? [];
-                                                            $allNames = [];
-                                                            foreach ($details['detail_custom'] ?? [] as $u) {
-                                                                if (!empty($u['nama'])) $allNames[] = $u['nama'];
-                                                            }
-                                                            $workers[$lastWorkerKey]['_custom_recipients'] = $allNames;
-                                                            $workers[$lastWorkerKey]['CUSTOM'] = $customQtyTotal;
-                                                            $workers[$lastWorkerKey]['quantity'] += $customQtyTotal;
+                                                            $lightestKey  = array_keys($workerLoad, min($workerLoad))[0];
+                                                            $workers[$lightestKey]['CUSTOM']              = $customQtyTotal;
+                                                            $workers[$lightestKey]['quantity']            += $customQtyTotal;
+                                                            $workers[$lightestKey]['_custom_recipients']  = $customNames;
+                                                            $workerLoad[$lightestKey]                     += $customQtyTotal;
                                                         }
 
-                                                        // 3. Sequential distribution of standard sizes
-                                                        // Calculate how much std qty each worker should get (balanced with custom consideration)
-                                                        // Effective target for std sizes: distribute stdQtyTotal evenly over numWorkers
-                                                        // but last worker already has custom load, so we balance total load
-                                                        $stdSizesOnly = array_filter($standardSizes, fn($k) => $k !== 'CUSTOM', ARRAY_FILTER_USE_KEY);
-                                                        if (!empty($stdSizesOnly)) {
-                                                            // Build flat ordered list: [sz => remaining qty]
-                                                            $sizeQueue = $stdSizesOnly; // already in order as stored
-
-                                                            // Compute per-worker std target (balanced against custom load)
-                                                            // For last worker: target_std = floor(totalQty/numWorkers) - customQtyTotal
-                                                            // For others: target_std = floor(totalQty/numWorkers)
-                                                            $targetPerWorker = (int) floor($totalQty / $numWorkers);
-                                                            $remainder = $totalQty % $numWorkers;
-
-                                                            $workerStdTargets = [];
-                                                            $wIdx = 0;
-                                                            foreach ($workerKeys as $wKey) {
-                                                                $base = $targetPerWorker + ($wIdx < $remainder ? 1 : 0);
-                                                                if ($wKey === $lastWorkerKey) {
-                                                                    $workerStdTargets[$wKey] = max(0, $base - $customQtyTotal);
-                                                                } else {
-                                                                    $workerStdTargets[$wKey] = $base;
-                                                                }
-                                                                $wIdx++;
-                                                            }
-
-                                                            // Walk through sizes sequentially, filling each worker up to their std target
-                                                            $sizeQueueKeys = array_keys($sizeQueue);
-                                                            $sizeIdx = 0;
-                                                            $sizeRemaining = $sizeIdx < count($sizeQueueKeys) ? $sizeQueue[$sizeQueueKeys[$sizeIdx]] : 0;
-
-                                                            foreach ($workerKeys as $wKey) {
-                                                                $workerNeed = $workerStdTargets[$wKey];
-                                                                while ($workerNeed > 0 && $sizeIdx < count($sizeQueueKeys)) {
-                                                                    $sz = $sizeQueueKeys[$sizeIdx];
-                                                                    $take = min($workerNeed, $sizeRemaining);
-                                                                    if ($take > 0) {
-                                                                        $workers[$wKey][$sz] = ($workers[$wKey][$sz] ?? 0) + $take;
-                                                                        $workers[$wKey]['quantity'] += $take;
-                                                                        $sizeRemaining -= $take;
-                                                                        $workerNeed -= $take;
-                                                                    }
-                                                                    if ($sizeRemaining <= 0) {
-                                                                        $sizeIdx++;
-                                                                        $sizeRemaining = $sizeIdx < count($sizeQueueKeys) ? $sizeQueue[$sizeQueueKeys[$sizeIdx]] : 0;
-                                                                    }
-                                                                }
-                                                            }
-
-                                                            // If any remaining (due to rounding), give to last worker
-                                                            while ($sizeIdx < count($sizeQueueKeys)) {
-                                                                $sz = $sizeQueueKeys[$sizeIdx];
-                                                                if ($sizeRemaining > 0) {
-                                                                    $workers[$lastWorkerKey][$sz] = ($workers[$lastWorkerKey][$sz] ?? 0) + $sizeRemaining;
-                                                                    $workers[$lastWorkerKey]['quantity'] += $sizeRemaining;
-                                                                }
-                                                                $sizeIdx++;
-                                                                $sizeRemaining = $sizeIdx < count($sizeQueueKeys) ? $sizeQueue[$sizeQueueKeys[$sizeIdx]] : 0;
-                                                            }
-                                                        }
-
-                                                        // Clean up 0 values to null for cleaner UI input
-                                                        foreach (array_keys($workers) as $wKey) {
+                                                        // 5. Bersihkan nilai 0 → null agar UI tetap rapi
+                                                        foreach ($workerKeys as $wKey) {
                                                             foreach ($allSizeKeys as $sz) {
                                                                 if (isset($workers[$wKey][$sz]) && $workers[$wKey][$sz] === 0) {
                                                                     $workers[$wKey][$sz] = null;
@@ -513,6 +464,7 @@ class AturTugasProduksi extends Page
                                                         $set('workers', $workers);
                                                         \Filament\Notifications\Notification::make()
                                                             ->title('Tugas Terbagi')
+                                                            ->body('Setiap ukuran dialokasikan utuh ke satu pekerja.')
                                                             ->success()
                                                             ->send();
                                                     })
@@ -1195,6 +1147,13 @@ class AturTugasProduksi extends Page
                             }
                         }
                     }
+                }
+
+                if (!empty($workerCustomNames)) {
+                    $sizeQuantities['_custom_recipients'] = $workerCustomNames;
+                }
+                if (!empty($workerGenders)) {
+                    $sizeQuantities['_genders'] = $workerGenders;
                 }
 
                 $autoDesc = [];

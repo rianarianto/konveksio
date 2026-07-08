@@ -32,6 +32,11 @@ class OrderItemObserver
      */
     public function created(OrderItem $item): void
     {
+        // Jika status pesanan masih draft, ubah otomatis ke 'diterima' agar langsung aktif
+        $order = $item->order;
+        if ($order && $order->status === 'draft') {
+            $order->update(['status' => 'diterima']);
+        }
 
         // Cegah duplikasi jika sudah ada WO di item ini atau di item lain dalam grup yang sama
         if ($item->workOrder()->exists()) {

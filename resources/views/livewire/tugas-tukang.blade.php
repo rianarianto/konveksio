@@ -1,13 +1,25 @@
 <div class="app-shell">
     {{-- ── HEADER ── --}}
     <header class="app-header">
-        <div class="header-brand">
-            <div class="brand-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        <div class="header-left">
+            @php $wtToken = request()->query('wt'); @endphp
+            @if($wtToken)
+            <a href="{{ route('worker.dashboard', ['token' => $wtToken]) }}" class="back-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M19 12H5M12 5l-7 7 7 7"/>
                 </svg>
+                <span>Dashboard</span>
+            </a>
+            @else
+            <div class="header-brand">
+                <div class="brand-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                </div>
+                <span class="brand-name">Konveksio</span>
             </div>
-            <span class="brand-name">Konveksio</span>
+            @endif
         </div>
 
         @if($wo)
@@ -26,12 +38,19 @@
     @else
     {{-- ── WORKER GREETING ── --}}
     @php
+        // Resolve viewer worker dari wtToken (URL param) atau fallback WO worker cols
+        $wtToken = request()->query('wt');
         $worker = null;
-        $workerCols = ['cutting_worker_id', 'sewing_worker_id', 'decoration_worker_id', 'button_worker_id', 'finishing_worker_id'];
-        foreach ($workerCols as $col) {
-            if ($wo->$col) {
-                $worker = \App\Models\Worker::find($wo->$col);
-                if ($worker) break;
+        if ($wtToken) {
+            $worker = \App\Models\Worker::withoutGlobalScopes()->where('portal_token', $wtToken)->first();
+        }
+        if (!$worker) {
+            $workerCols = ['cutting_worker_id', 'sewing_worker_id', 'decoration_worker_id', 'button_worker_id', 'finishing_worker_id'];
+            foreach ($workerCols as $col) {
+                if ($wo->$col) {
+                    $worker = \App\Models\Worker::find($wo->$col);
+                    if ($worker) break;
+                }
             }
         }
         $workerName = $worker?->name ?? 'Pekerja';
@@ -42,9 +61,105 @@
         $orderItem = $wo->orderItem;
         $order = $orderItem?->order;
         $customer = $order?->customer;
-        $sizes = $orderItem?->size_and_request_details ?? [];
-        $varianUkuran = $sizes['varian_ukuran'] ?? [];
-        $totalQty = $orderItem?->quantity ?? 0;
+
+        // Agregasi total qty dari seluruh group items
+        $groupItems = $orderItem ? $orderItem->getItemsInGroup() : collect();
+        $totalQty = $groupItems->sum('quantity');
+
+        // Info bahan & deadline
+        $bahan = $orderItem?->bahan;
+        $bahanLabel = $bahan ? ($bahan->material?->name . ' - ' . $bahan->color_name) : null;
+        $deadline = $order?->deadline ? \Carbon\Carbon::parse($order->deadline) : null;
+        $catatanUmum = $order?->notes ?? null;
+
+        // Gambar desain (dari orderItem grup, ambil yang pertama punya gambar)
+        $designImage = null;
+        foreach ($groupItems as $gi) {
+            if ($gi->design_image && file_exists(public_path('storage/' . $gi->design_image))) {
+                $designImage = asset('storage/' . $gi->design_image);
+                break;
+            }
+        }
+
+        // Build specGroups (sama persis dengan PDFController)
+        $specGroups = [];
+        foreach ($groupItems as $gi) {
+            $d = $gi->size_and_request_details ?? [];
+            $isProduksi = in_array($gi->production_category ?? 'produksi', ['produksi', 'custom']);
+            if (!$isProduksi) {
+                $gen = 'UMUM'; $slv = '-'; $pck = '-'; $btn = '-'; $tun = '-'; $clr = '-';
+            } else {
+                $gen = $d['gender'] ?? 'L';
+                $slv = strtoupper($d['sleeve_model'] ?? 'PENDEK');
+                $pck = strtoupper(str_replace('_', ' ', $d['pocket_model'] ?? 'TANPA SAKU'));
+                $btn = strtoupper($d['button_model'] ?? 'BIASA');
+                $tun = !empty($d['is_tunic']) ? 'TUNIK' : 'STANDAR';
+                $clr = strtoupper($d['collar_model'] ?? 'BIASA');
+            }
+            $sbList = [];
+            if (!empty($d['sablon_bordir'])) {
+                foreach ($d['sablon_bordir'] as $sb) {
+                    $ket = !empty($sb['keterangan']) ? ' - ' . $sb['keterangan'] : '';
+                    $sbList[] = ($sb['jenis'] ?? '') . ' (' . ($sb['lokasi'] ?? '') . $ket . ')';
+                }
+            } elseif (!empty($d['sablon_jenis'])) {
+                $ket = !empty($d['sablon_keterangan']) ? ' - ' . $d['sablon_keterangan'] : '';
+                $sbList[] = ($d['sablon_jenis'] ?? '') . ' (' . ($d['sablon_lokasi'] ?? '-') . $ket . ')';
+            }
+            $reqList = [];
+            if (!empty($d['request_tambahan']) && is_array($d['request_tambahan'])) {
+                foreach ($d['request_tambahan'] as $rt) {
+                    $reqList[] = ($rt['jenis'] ?? '') . ': ' . ($rt['keterangan'] ?? '');
+                }
+            }
+            $groupKey = "{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|" . implode('|', $sbList);
+            if (!isset($specGroups[$groupKey])) {
+                $specGroups[$groupKey] = [
+                    'gender'       => $gen === 'UMUM' ? 'UMUM' : ($gen === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN'),
+                    'is_produksi'  => $isProduksi,
+                    'sleeve'       => $slv,
+                    'pocket'       => $pck,
+                    'button'       => $btn,
+                    'tunic'        => $tun,
+                    'collar'       => $clr,
+                    'sablon_bordir'=> $sbList,
+                    'requests'     => $reqList,
+                    'total_qty'    => 0,
+                    'sizes'        => [],
+                    'recipients'   => ['standard' => [], 'custom' => []],
+                ];
+            }
+            $specGroups[$groupKey]['total_qty'] += $gi->quantity;
+            $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+            $specGroups[$groupKey]['sizes'][$sz] = ($specGroups[$groupKey]['sizes'][$sz] ?? 0) + $gi->quantity;
+            if (!empty($d['detail_custom'])) {
+                foreach ($d['detail_custom'] as $u) {
+                    $specGroups[$groupKey]['recipients']['custom'][] = [
+                        'nama' => $u['nama'] ?? '-',
+                        'size' => $u['ukuran'] ?? 'Custom',
+                        'ukuran_badan' => !empty($u['LD']) ? "LD:{$u['LD']} PB:{$u['PB']} LP:{$u['LP']}" : '',
+                    ];
+                }
+            } elseif ($sz === 'CUSTOM') {
+                $mArr = [];
+                foreach (['LD','PB','PL','LB','LP','LPh'] as $mk) {
+                    if (!empty($d[$mk])) $mArr[] = "$mk:{$d[$mk]}";
+                }
+                $specGroups[$groupKey]['recipients']['custom'][] = [
+                    'nama' => $gi->recipient_name ?? '-',
+                    'size' => 'Custom',
+                    'ukuran_badan' => implode(' ', $mArr),
+                ];
+            } elseif (!empty($gi->recipient_name)) {
+                $specGroups[$groupKey]['recipients']['standard'][$sz][] = $gi->recipient_name;
+            }
+        }
+
+        // Tugas spesifik worker ini untuk WO ini
+        $myTask = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->where('order_item_id', $wo->order_item_id)
+            ->where('assigned_to', $worker?->id)
+            ->first();
     @endphp
 
     <div class="greeting-bar">
@@ -58,22 +173,9 @@
         </div>
     </div>
 
-    {{-- ── TAB NAV ── --}}
-    <div class="tab-nav">
-        <button wire:click="$set('activeTab', 'tugas')"
-                class="tab-btn {{ $activeTab === 'tugas' ? 'tab-active' : '' }}">
-            🔧 Pekerjaan
-        </button>
-        <button wire:click="$set('activeTab', 'akunting')"
-                class="tab-btn {{ $activeTab === 'akunting' ? 'tab-active' : '' }}">
-            💰 Dompet
-        </button>
-    </div>
 
-    {{-- ══════════════════════════════════════════════════ --}}
-    {{-- TAB: PEKERJAAN --}}
-    {{-- ══════════════════════════════════════════════════ --}}
-    @if($activeTab === 'tugas')
+
+    {{-- ── DETAIL PEKERJAAN ── --}}
 
     {{-- Kartu Progress WO --}}
     <div class="card">
@@ -119,21 +221,238 @@
         @endif
     </div>
 
-    {{-- Rincian Ukuran --}}
-    @if(count($varianUkuran) > 0)
-    <div class="card">
-        <div class="card-header">
-            <span class="card-label">Rincian Ukuran</span>
+
+    {{-- ── SECTION: TUGAS SAYA ── --}}
+    @if($myTask)
+    <div class="section-title-bar">🔧 TUGAS KAMU</div>
+    <div class="card card-task-highlight">
+        <div class="task-detail-row">
+            <div class="task-detail-label">Tahap</div>
+            <div class="task-detail-value">{{ strtoupper(str_replace('_', ' ', $myTask->stage_name)) }}</div>
         </div>
+        <div class="task-detail-row">
+            <div class="task-detail-label">Qty Kamu</div>
+            <div class="task-detail-value text-purple"><strong>{{ $myTask->quantity }} pcs</strong></div>
+        </div>
+        @if(!empty($myTask->size_quantities))
+        <div class="task-detail-row">
+            <div class="task-detail-label">Rincian Ukuran</div>
+            <div class="task-detail-value">
+                <div class="size-grid mt-0">
+                    @foreach($myTask->size_quantities as $sz => $qty)
+                        @if(!str_starts_with($sz, '_') && $qty > 0)
+                        <div class="size-chip size-chip-sm">
+                            <span class="size-label">{{ $sz }}</span>
+                            <span class="size-qty">{{ $qty }}</span>
+                        </div>
+                        @endif
+                    @endforeach
+                </div>
+            </div>
+        </div>
+        
+        {{-- Cocokkan siapa saja penerima/ukuran custom khusus untuk tugas ini --}}
+        @php
+            $taskCustomRecipients = [];
+            $taskStandardRecipients = [];
+            foreach ($groupItems as $gi) {
+                $giSize = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                $taskQtyForSize = $myTask->size_quantities[$giSize] ?? 0;
+                
+                if ($taskQtyForSize > 0) {
+                    $d = $gi->size_and_request_details ?? [];
+                    if (!empty($d['detail_custom'])) {
+                        foreach ($d['detail_custom'] as $u) {
+                            $taskCustomRecipients[] = [
+                                'nama' => $u['nama'] ?? '-',
+                                'size' => $u['ukuran'] ?? 'Custom',
+                                'ukuran_badan' => !empty($u['LD']) ? "LD:{$u['LD']} PB:{$u['PB']} LP:{$u['LP']}" : '',
+                            ];
+                        }
+                    } elseif ($giSize === 'CUSTOM') {
+                        $mArr = [];
+                        foreach (['LD','PB','PL','LB','LP','LPh'] as $mk) {
+                            if (!empty($d[$mk])) $mArr[] = "$mk:{$d[$mk]}";
+                        }
+                        $taskCustomRecipients[] = [
+                            'nama' => $gi->recipient_name ?? '-',
+                            'size' => 'Custom',
+                            'ukuran_badan' => implode(' ', $mArr),
+                        ];
+                    } elseif (!empty($gi->recipient_name)) {
+                        $taskStandardRecipients[$giSize][] = $gi->recipient_name;
+                    }
+                }
+            }
+        @endphp
+
+        @if(!empty($taskCustomRecipients))
+        <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left;">
+            <div class="task-detail-label" style="margin-bottom: 4px;">📐 Ukuran Custom Tugas Anda</div>
+            <div style="width: 100%;">
+                @foreach($taskCustomRecipients as $c)
+                <div class="recipient-custom-row" style="padding: 2px 0;">
+                    <span class="recipient-nama" style="font-size:11px;">• {{ $c['nama'] }}</span>
+                    @if($c['ukuran_badan'])
+                    <span class="recipient-ukuran" style="font-size:10px; color:#4B5563;">({{ $c['ukuran_badan'] }})</span>
+                    @endif
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
+        @if(!empty($taskStandardRecipients))
+        <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left;">
+            <div class="task-detail-label" style="margin-bottom: 4px;">👤 Penerima Tugas Anda</div>
+            <div style="width: 100%;">
+                @foreach($taskStandardRecipients as $sz => $names)
+                <div class="recipient-row" style="font-size:11px; margin-bottom: 2px;">
+                    <span class="recipient-size" style="font-size:10px; padding:0 3px; min-width:20px;">{{ $sz }}</span>
+                    <span class="recipient-names">{{ implode(', ', $names) }}</span>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+        @endif
+        @if($myTask->description)
+        <div class="task-detail-row">
+            <div class="task-detail-label">Instruksi</div>
+            <div class="task-detail-value text-note">{{ $myTask->description }}</div>
+        </div>
+        @endif
+        @if($myTask->is_revision)
+        <div class="revision-notice">
+            🔧 Ini adalah tugas REVISI — perbaiki sesuai catatan QC
+        </div>
+        @endif
+    </div>
+    @endif
+
+    {{-- ── SECTION: INFO BAHAN & DEADLINE ── --}}
+    @if($bahanLabel || $deadline || $catatanUmum)
+    <div class="section-title-bar">📦 INFORMASI BAHAN</div>
+    <div class="card">
+        @if($bahanLabel)
+        <div class="bahan-name">{{ $bahanLabel }}</div>
+        @endif
+        @if($deadline)
+        <div class="info-row">
+            <span class="info-label">Deadline</span>
+            <span class="info-value {{ $deadline->isPast() ? 'text-danger' : ($deadline->diffInDays(now()) <= 3 ? 'text-warning' : 'text-green') }}">
+                {{ $deadline->format('d F Y') }}
+                @if(!$deadline->isPast())
+                <span style="font-size:11px;font-weight:400;">({{ $deadline->diffForHumans() }})</span>
+                @else
+                <span style="font-size:11px;font-weight:400;"> — Lewat deadline!</span>
+                @endif
+            </span>
+        </div>
+        @endif
+        @if($catatanUmum)
+        <div class="catatan-box">
+            <div class="catatan-label">⚠️ CATATAN UMUM PESANAN</div>
+            <div class="catatan-text">{{ $catatanUmum }}</div>
+        </div>
+        @endif
+    </div>
+    @endif
+
+    {{-- ── SECTION: GAMBAR DESAIN ── --}}
+    @if($designImage)
+    <div class="section-title-bar">🎨 REFERENSI DESAIN</div>
+    <div class="card" style="padding:12px;">
+        <img src="{{ $designImage }}" alt="Gambar Desain" style="width:100%;border-radius:10px;border:1px solid #E5E7EB;">
+    </div>
+    @endif
+
+    {{-- ── SECTION: RINCIAN PRODUKSI (per grup spesifikasi) ── --}}
+    @if(!empty($specGroups))
+    <div class="section-title-bar">📋 RINCIAN PRODUKSI</div>
+    @foreach($specGroups as $group)
+    <div class="card spec-group-card">
+        <div class="spec-group-header">
+            <span class="spec-gender">{{ $group['gender'] }}</span>
+            <span class="spec-qty-badge">{{ $group['total_qty'] }} pcs</span>
+        </div>
+
+        @if($group['is_produksi'] && $group['gender'] !== 'UMUM')
+        <div class="spec-model-row">
+            <span class="spec-tag-item">LENGAN: <strong>{{ $group['sleeve'] }}</strong></span>
+            <span class="spec-sep">|</span>
+            <span class="spec-tag-item">SAKU: <strong>{{ $group['pocket'] }}</strong></span>
+            <span class="spec-sep">|</span>
+            <span class="spec-tag-item">KANCING: <strong>{{ $group['button'] }}</strong></span>
+        </div>
+        @if(!empty($group['collar']) && $group['collar'] !== 'BIASA')
+        <div class="spec-model-row" style="margin-top:4px;">
+            <span class="spec-tag-item">KERAH: <strong>{{ $group['collar'] }}</strong></span>
+            @if($group['tunic'] === 'TUNIK')
+            <span class="spec-sep">|</span>
+            <span class="spec-tag-item">MODEL: <strong>TUNIK</strong></span>
+            @endif
+        </div>
+        @endif
+        @endif
+
+        @if(!empty($group['requests']))
+        <div class="request-row">
+            📌 {{ implode(' | ', $group['requests']) }}
+        </div>
+        @endif
+
+        {{-- Sablon / Bordir --}}
+        @if(!empty($group['sablon_bordir']))
+        <div class="sablon-section">
+            <div class="sablon-title">🎨 DETAIL APLIKASI (SABLON / BORDIR)</div>
+            @foreach($group['sablon_bordir'] as $sb)
+            <div class="sablon-item">{{ $sb }}</div>
+            @endforeach
+        </div>
+        @endif
+
+        {{-- Ukuran & Qty --}}
+        @if(!empty($group['sizes']))
         <div class="size-grid">
-            @foreach($varianUkuran as $varian)
+            @foreach($group['sizes'] as $sz => $qty)
             <div class="size-chip">
-                <span class="size-label">{{ $varian['ukuran'] ?? '?' }}</span>
-                <span class="size-qty">{{ $varian['jumlah'] ?? $varian['qty'] ?? '?' }}</span>
+                <span class="size-label">{{ $sz }}</span>
+                <span class="size-qty">{{ $qty }}</span>
             </div>
             @endforeach
         </div>
+        @endif
+
+        {{-- Penerima Standar --}}
+        @if(!empty($group['recipients']['standard']))
+        <div class="recipients-section">
+            <div class="recipients-title">👤 Nama Penerima</div>
+            @foreach($group['recipients']['standard'] as $sz => $names)
+            <div class="recipient-row">
+                <span class="recipient-size">{{ $sz }}</span>
+                <span class="recipient-names">{{ implode(', ', $names) }}</span>
+            </div>
+            @endforeach
+        </div>
+        @endif
+
+        {{-- Custom Ukuran Badan --}}
+        @if(!empty($group['recipients']['custom']))
+        <div class="recipients-section">
+            <div class="recipients-title">📐 Ukuran Custom</div>
+            @foreach($group['recipients']['custom'] as $c)
+            <div class="recipient-custom-row">
+                <span class="recipient-nama">{{ $c['nama'] }}</span>
+                @if($c['ukuran_badan'])
+                <span class="recipient-ukuran">{{ $c['ukuran_badan'] }}</span>
+                @endif
+            </div>
+            @endforeach
+        </div>
+        @endif
     </div>
+    @endforeach
     @endif
 
     {{-- Progress Tahapan --}}
@@ -143,34 +462,32 @@
         </div>
         <div class="stage-list">
             @php
-                // Gunakan stage_sequence dinamis + CREATED dan COMPLETED
+                // Bangun urutan tahap: CREATED → (QC_PREP opsional) → stages → COMPLETED
                 $stages = $wo->stage_sequence ?? [];
                 $allStages = ['CREATED'];
-                // Tambah QC_PREP jika has_qc_prep = true
-                if ($wo->has_qc_prep) {
-                    $allStages[] = 'QC_PREP';
-                }
+                if ($wo->has_qc_prep) { $allStages[] = 'QC_PREP'; }
                 $allStages = array_merge($allStages, $stages, ['COMPLETED']);
                 $currentIdx = array_search($wo->status, $allStages);
                 if ($currentIdx === false && $wo->status === 'QC_REVIEW') {
-                    // Kalau QC_REVIEW, anggap current = tahap yang di-review
                     $currentIdx = array_search($wo->current_review_stage, $allStages);
                 }
+                $stageLabels = [
+                    'CREATED'       => 'Dibuat',
+                    'QC_PREP'       => 'QC Persiapan',
+                    'QC_PERSIAPAN'  => 'QC Persiapan',
+                    'QC_REVIEW'     => 'QC Review',
+                    'COMPLETED'     => 'Selesai',
+                ];
             @endphp
             @foreach($allStages as $s)
             @php
                 $idx = array_search($s, $allStages);
                 $isDone = $idx < $currentIdx;
                 $isCurrent = $idx === $currentIdx;
-                $label = match($s) {
-                    'CREATED' => 'Dibuat',
-                    'QC_PREP' => 'QC Persiapan',
-                    'COMPLETED' => 'Selesai',
-                    default => $s,
-                };
+                $label = $stageLabels[$s] ?? str_replace('_', ' ', $s);
                 if ($wo->status === 'QC_REVIEW' && $s === $wo->current_review_stage) {
                     $isCurrent = true;
-                    $label = 'QC ' . $s;
+                    $label = 'QC ' . str_replace('_', ' ', $s);
                 }
             @endphp
             <div class="stage-item {{ $isCurrent ? 'stage-current' : ($isDone ? 'stage-done' : 'stage-pending') }}">
@@ -298,119 +615,7 @@
     <div class="alert-error">{{ $message }}</div>
     @enderror
 
-    @endif {{-- end tab tugas --}}
 
-
-    {{-- ══════════════════════════════════════════════════ --}}
-    {{-- TAB: AKUNTING / DOMPET --}}
-    {{-- ══════════════════════════════════════════════════ --}}
-    @if($activeTab === 'akunting')
-    @if(!$worker)
-    <div class="empty-state">
-        <div class="empty-icon">👷</div>
-        <p>Data pekerja tidak ditemukan.</p>
-    </div>
-    @else
-    @php
-        $unpaid   = (int) $worker->unpaid_wage;
-        $kasbon   = (int) $worker->current_cash_advance;
-        $limit    = (int) $worker->max_cash_advance;
-        $sisa_limit = max(0, $limit - $kasbon);
-        // Proyeksi WO aktif: gunakan ProductionTask yang masih aktif
-        $activeProjection = (int) \App\Models\ProductionTask::where('assigned_to', $worker->id)
-            ->whereIn('status', ['pending', 'in_progress'])
-            ->sum('wage_amount');
-        $total = $unpaid + $activeProjection;
-    @endphp
-
-    <div class="wallet-hero">
-        <div class="wallet-label">Estimasi Upah Total (Termasuk WO Aktif)</div>
-        <div class="wallet-total">Rp {{ number_format($total, 0, ',', '.') }}</div>
-        <div class="wallet-breakdown">
-            <div class="wallet-sub">
-                <div class="sub-value">Rp {{ number_format($unpaid, 0, ',', '.') }}</div>
-                <div class="sub-label">Upah Selesai</div>
-            </div>
-            <div class="wallet-divider"></div>
-            <div class="wallet-sub">
-                <div class="sub-value">Rp {{ number_format($activeProjection, 0, ',', '.') }}</div>
-                <div class="sub-label">WO Aktif (Proyeksi)</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Sisa Kasbon Sekarang</span>
-                <span class="info-value {{ $kasbon > 0 ? 'text-danger' : '' }}">
-                    Rp {{ number_format($kasbon, 0, ',', '.') }}
-                </span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Limit Pengajuan (70%)</span>
-                <span class="info-value {{ $sisa_limit <= 0 ? 'text-danger' : 'text-purple' }}">
-                    Rp {{ number_format($sisa_limit, 0, ',', '.') }}
-                </span>
-            </div>
-        </div>
-
-        {{-- Progress bar kasbon --}}
-        @if($limit > 0)
-        @php $pct = min(100, round(($kasbon / $limit) * 100)); @endphp
-        <div class="progress-bar-wrap">
-            <div class="progress-bar-fill" style="width: {{ $pct }}%; background: {{ $pct >= 80 ? '#ef4444' : '#8000FF' }}"></div>
-        </div>
-        <div class="progress-label">{{ $pct }}% dari limit kasbon terpakai</div>
-        @endif
-    </div>
-
-    @if(session('kasbon_success'))
-    <div class="alert-success">✅ {{ session('kasbon_success') }}</div>
-    @endif
-
-    @if(!$showKasbonForm)
-    <button wire:click="$set('showKasbonForm', true)"
-            class="btn btn-primary btn-full">
-        💸 Ajukan Kasbon Baru
-    </button>
-    @else
-    <div class="card">
-        <div class="card-header">
-            <span class="card-label">Form Pengajuan Kasbon</span>
-        </div>
-
-        <label class="form-label">Nominal <span class="required">*</span></label>
-        <input type="number" wire:model="kasbonAmount"
-               class="form-input"
-               placeholder="Contoh: 200000"
-               min="10000">
-        @error('kasbonAmount') <span class="form-error">{{ $message }}</span> @enderror
-
-        <label class="form-label mt-sm">Catatan (Opsional)</label>
-        <input type="text" wire:model="kasbonNote"
-               class="form-input"
-               placeholder="Keperluan kasbon...">
-
-        @error('kasbon') <span class="form-error">{{ $message }}</span> @enderror
-
-        <div class="btn-row mt-sm">
-            <button wire:click="ajukanKasbon"
-                    wire:loading.attr="disabled"
-                    class="btn btn-primary btn-half">
-                <span wire:loading.remove wire:target="ajukanKasbon">Ajukan</span>
-                <span wire:loading wire:target="ajukanKasbon">⏳...</span>
-            </button>
-            <button wire:click="$set('showKasbonForm', false)"
-                    class="btn btn-outline btn-half">
-                Batal
-            </button>
-        </div>
-    </div>
-    @endif
-    @endif {{-- end $worker check --}}
-
-    @endif {{-- end tab akunting --}}
 
     {{-- ── FOOTER ── --}}
     <footer class="app-footer">
@@ -442,6 +647,16 @@
     top: 0;
     z-index: 10;
 }
+.header-left { display: flex; align-items: center; }
+.back-btn {
+    display: flex; align-items: center; gap: 6px;
+    color: #6600CC; font-size: 13px; font-weight: 700;
+    text-decoration: none;
+    padding: 6px 10px 6px 2px;
+    border-radius: 8px;
+    transition: color 0.15s;
+}
+.back-btn:hover { color: #4D0099; }
 .header-brand { display: flex; align-items: center; gap: 10px; }
 .brand-icon {
     width: 34px; height: 34px;
@@ -550,6 +765,7 @@
 
 /* ── Size Grid ── */
 .size-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.size-grid.mt-0 { margin-top: 0; }
 .size-chip {
     display: flex; flex-direction: column; align-items: center;
     padding: 8px 14px;
@@ -558,8 +774,215 @@
     border-radius: 10px;
     min-width: 56px;
 }
+.size-chip-sm {
+    padding: 4px 8px;
+    min-width: 40px;
+}
+.size-chip-sm .size-qty {
+    font-size: 15px;
+}
 .size-label { font-size: 12px; font-weight: 700; color: #374151; }
 .size-qty { font-size: 20px; font-weight: 800; color: #8000FF; line-height: 1.2; }
+
+/* ── Section Title Bar ── */
+.section-title-bar {
+    font-size: 11px;
+    font-weight: 700;
+    color: #4B5563;
+    margin: 20px 18px 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ── Card Task Highlight ── */
+.card-task-highlight {
+    border-left: 4px solid #8000FF;
+    background: #FAF8FF;
+}
+.task-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 1px dashed #E5E7EB;
+}
+.task-detail-row:last-child {
+    border-bottom: none;
+}
+.task-detail-label {
+    font-size: 12px;
+    color: #6B7280;
+    font-weight: 600;
+}
+.task-detail-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+    text-align: right;
+}
+.task-detail-value.text-note {
+    font-weight: 500;
+    color: #4B5563;
+    font-style: italic;
+}
+.revision-notice {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #FEF2F2;
+    border: 1px solid #FEE2E2;
+    color: #DC2626;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* ── Bahan & Deadline ── */
+.bahan-name {
+    font-size: 15px;
+    font-weight: 800;
+    color: #111827;
+    margin-bottom: 8px;
+}
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+}
+.catatan-box {
+    margin-top: 10px;
+    padding: 10px;
+    background: #FFFBEB;
+    border: 1px solid #FEF3C7;
+    border-radius: 8px;
+}
+.catatan-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #D97706;
+}
+.catatan-text {
+    font-size: 12px;
+    color: #78350F;
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+/* ── Spec Group Card ── */
+.spec-group-card {
+    border-top: 3px solid #8000FF;
+}
+.spec-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.spec-gender {
+    font-size: 14px;
+    font-weight: 800;
+    color: #111827;
+}
+.spec-qty-badge {
+    background: #F3E8FF;
+    color: #8000FF;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+.spec-model-row {
+    font-size: 11px;
+    color: #4B5563;
+    background: #F9FAFB;
+    padding: 6px 10px;
+    border-radius: 6px;
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.spec-tag-item {
+    font-weight: 500;
+}
+.spec-sep {
+    color: #D1D5DB;
+}
+.request-row {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6B7280;
+    background: #EFF6FF;
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+.sablon-section {
+    margin-top: 8px;
+    margin-bottom: 12px;
+    padding: 10px;
+    background: #F5F3FF;
+    border: 1px solid #EDE9FE;
+    border-radius: 8px;
+}
+.sablon-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #6D28D9;
+    margin-bottom: 4px;
+}
+.sablon-item {
+    font-size: 12px;
+    color: #4C1D95;
+    font-weight: 600;
+}
+.recipients-section {
+    margin-top: 12px;
+    border-top: 1px solid #E5E7EB;
+    padding-top: 10px;
+}
+.recipients-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #6B7280;
+    margin-bottom: 6px;
+}
+.recipient-row {
+    display: flex;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+.recipient-size {
+    font-weight: 700;
+    color: #8000FF;
+    background: #F3E8FF;
+    padding: 0 4px;
+    border-radius: 4px;
+    margin-right: 8px;
+    min-width: 24px;
+    text-align: center;
+}
+.recipient-names {
+    color: #374151;
+}
+.recipient-custom-row {
+    font-size: 12px;
+    padding: 4px 0;
+    border-bottom: 1px dashed #F3F4F6;
+}
+.recipient-custom-row:last-child {
+    border-bottom: none;
+}
+.recipient-nama {
+    font-weight: 700;
+    color: #374151;
+}
+.recipient-ukuran {
+    font-size: 11px;
+    color: #6B7280;
+    display: block;
+    font-family: monospace;
+}
 
 /* ── Stage List ── */
 .stage-list { display: flex; flex-direction: column; gap: 6px; }

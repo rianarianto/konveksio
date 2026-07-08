@@ -400,14 +400,24 @@
 
     <div class="footer">Dicetak via Sistem {{ $record->order->shop->name ?? 'Konveksio' }}. Dokumen ini adalah instruksi resmi.</div>
 
-    @if($record->design_image)
+    @php
+        $base64Image = null;
+        if ($record->design_image && file_exists(public_path('storage/' . $record->design_image))) {
+            $imagePath = public_path('storage/' . $record->design_image);
+            $imageData = base64_encode(file_get_contents($imagePath));
+            $imageType = pathinfo($imagePath, PATHINFO_EXTENSION);
+            $base64Image = 'data:image/' . $imageType . ';base64,' . $imageData;
+        }
+    @endphp
+
+    @if($base64Image)
         <div class="page-break"></div>
         <div class="header">
             <h1 class="header-title">REFERENSI DESAIN - {{ $record->order->order_number }}</h1>
             <div class="header-meta">Produk: {{ strtoupper($record->product_name) }}</div>
         </div>
         <div class="design-container">
-            <img src="{{ public_path('storage/' . $record->design_image) }}" class="full-design-image" alt="Desain Full">
+            <img src="{{ $base64Image }}" class="full-design-image" alt="Desain Full">
         </div>
     @endif
 </body>

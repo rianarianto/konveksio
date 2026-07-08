@@ -239,7 +239,7 @@ class OrderResource extends Resource
                                 ->label('Deadline')
                                 ->required()
                                 ->native(false)
-                                ->minDate(now()),
+                                ->minDate(now()->startOfDay()),
 
                             // Express
                             Toggle::make('is_express')

@@ -58,7 +58,7 @@
             <div class="task-info">
                 <div class="task-stage task-stage-review">Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}</div>
                 <div class="task-product">{{ $wo->orderItem?->product_name ?? '-' }}</div>
-                <div class="task-customer">{{ $wo->orderItem?->order?->customer?->name ?? '-' }} • {{ $wo->orderItem?->quantity ?? 0 }} pcs</div>
+                <div class="task-customer">{{ $wo->orderItem?->order?->customer?->name ?? '-' }} • {{ $wo->orderItem ? $wo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs</div>
             </div>
         </div>
         <div class="review-actions-inline">
@@ -74,6 +74,7 @@
             </button>
         </div>
     </div>
+    @if($wo)</a>@endif
     @endforeach
     @endif
 
@@ -127,14 +128,20 @@
     </div>
 
     @foreach($tasks['in_progress'] as $task)
-    <div class="card task-card">
+    @php
+        $wo = $task->workOrder;
+    @endphp
+    @if($wo)
+    <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
+    @endif
+    <div class="card task-card" style="cursor:pointer;">
         <div class="task-header">
             <div class="task-info">
                 <div class="task-stage">{{ str_replace('_', ' ', $task->stage_name) }}</div>
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
-                <div class="task-customer">{{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->quantity }} pcs</div>
+                <div class="task-customer">{{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs</div>
             </div>
-            <button wire:click="selesaiKerjakan({{ $task->id }})"
+            <button wire:click.prevent="selesaiKerjakan({{ $task->id }})"
                     wire:loading.attr="disabled"
                     class="btn btn-success btn-sm">
                 <span wire:loading.remove wire:target="selesaiKerjakan({{ $task->id }})">✅ Selesai</span>
@@ -142,6 +149,7 @@
             </button>
         </div>
     </div>
+    @if($wo)</a>@endif
     @endforeach
     @endif
 
@@ -159,8 +167,12 @@
         $blocking = $canStart ? null : $this->getBlockingStage($task);
         $progress = $this->getStageProgress($task);
         $isRevision = $task->is_revision ?? false;
+        $wo = $task->workOrder;
     @endphp
-    <div class="card task-card {{ $canStart ? ($isRevision ? 'task-revision' : 'task-ready') : '' }}">
+    @if($wo)
+    <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
+    @endif
+    <div class="card task-card {{ $canStart ? ($isRevision ? 'task-revision' : 'task-ready') : '' }}" style="cursor:pointer;">
         <div class="task-header">
             <div class="task-info">
                 <div class="task-stage {{ $isRevision ? 'task-stage-revision' : '' }}">
@@ -171,14 +183,14 @@
                 </div>
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
                 <div class="task-customer">
-                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->quantity }} pcs
+                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
                     @if($task->orderItem?->order?->is_express)
                     <span class="express-badge">⚡ Express</span>
                     @endif
                 </div>
             </div>
             @if($canStart)
-            <button wire:click="mulaiKerjakan({{ $task->id }})"
+            <button wire:click.prevent="mulaiKerjakan({{ $task->id }})"
                     wire:loading.attr="disabled"
                     class="btn {{ $isRevision ? 'btn-warning' : 'btn-primary' }} btn-sm">
                 <span wire:loading.remove wire:target="mulaiKerjakan({{ $task->id }})">
@@ -212,6 +224,7 @@
         <div class="blocking-info">⏳ Menunggu: {{ str_replace('_', ' ', $blocking) }}</div>
         @endif
     </div>
+    @if($wo)</a>@endif
     @endforeach
     @endif
 
@@ -224,13 +237,19 @@
     </div>
 
     @foreach($tasks['done'] as $task)
-    <div class="card task-card task-done">
+    @php
+        $wo = $task->workOrder;
+    @endphp
+    @if($wo)
+    <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
+    @endif
+    <div class="card task-card task-done" style="cursor:pointer;">
         <div class="task-header">
             <div class="task-info">
                 <div class="task-stage">{{ str_replace('_', ' ', $task->stage_name) }}</div>
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
                 <div class="task-customer">
-                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->quantity }} pcs
+                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
                     @if($task->completed_at)
                     <span class="task-date">• {{ $task->completed_at->format('d M') }}</span>
                     @endif
@@ -239,6 +258,7 @@
             <span class="done-check">✓</span>
         </div>
     </div>
+    @if($wo)</a>@endif
     @endforeach
     @endif
 

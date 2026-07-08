@@ -15,6 +15,12 @@ class EditOrder extends EditRecord
 {
     protected static string $resource = OrderResource::class;
 
+    protected function getSaveFormAction(): \Filament\Actions\Action
+    {
+        return parent::getSaveFormAction()
+            ->label('Simpan Pesanan');
+    }
+
     /**
      * When the IntegratedOrderItemsTable updates the order subtotal in DB,
      * it dispatches this event so we can refresh the form fields.

@@ -197,102 +197,68 @@ client = createClient();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Endpoint - PERBAIKAN VALIDASI
+// API Endpoint
 const api = async (req, res) => {
     console.log('📩 API Request received:', req.method, req.query, req.body);
-    
-    // Terima berbagai format parameter
+
     let nohp = req.query.nohp || req.query.number || req.body.nohp || req.body.number;
     const pesan = req.query.pesan || req.query.message || req.body.pesan || req.body.message;
 
-    try {
-        // Validasi input - PERBAIKAN DI SINI
-        if (!nohp) {
-            return res.status(400).json({ 
-                status: "error", 
-                pesan: "Parameter 'nohp' atau 'number' wajib diisi" 
-            });
-        }
-        
-        if (!pesan) {
-            return res.status(400).json({ 
-                status: "error", 
-                pesan: "Parameter 'pesan' atau 'message' wajib diisi" 
-            });
-        }
+    if (!nohp) {
+        return res.status(400).json({ status: "error", pesan: "Parameter 'nohp' atau 'number' wajib diisi" });
+    }
+    if (!pesan) {
+        return res.status(400).json({ status: "error", pesan: "Parameter 'pesan' atau 'message' wajib diisi" });
+    }
 
-        // Konversi ke string dan trim
-        nohp = String(nohp).trim();
-        const messageText = String(pesan).trim();
+    nohp = String(nohp).trim();
+    const messageText = String(pesan).trim();
 
-        // Format nomor WhatsApp
-        let formattedNumber = nohp;
-        if (nohp.startsWith('0')) {
-            formattedNumber = '62' + nohp.slice(1);
-        } else if (nohp.startsWith('+')) {
-            formattedNumber = nohp.slice(1);
-        }
-        
-        // Pastikan ada @c.us
-        if (!formattedNumber.includes('@c.us')) {
-            formattedNumber = formattedNumber + '@c.us';
-        }
+    // Format nomor WhatsApp
+    let formattedNumber = nohp;
+    if (nohp.startsWith('0')) {
+        formattedNumber = '62' + nohp.slice(1);
+    } else if (nohp.startsWith('+')) {
+        formattedNumber = nohp.slice(1);
+    }
+    if (!formattedNumber.includes('@c.us')) {
+        formattedNumber = formattedNumber + '@c.us';
+    }
 
-        console.log('📱 Formatted number:', formattedNumber);
+    console.log('📱 Formatted number:', formattedNumber);
 
-        // Cek status client - PERBAIKAN LOGIC
-        if (!client) {
-            console.error('❌ Client is null!');
-            return res.status(503).json({ 
-                status: "error", 
-                pesan: "WhatsApp client tidak terinisialisasi" 
-            });
-        }
-
-        // Cek apakah client ready dengan multiple methods
-        const isReady = clientStatus === 'ready' && client.info;
-        
-        if (!isReady) {
-            console.error('❌ Client not ready. Status:', clientStatus, 'Info:', client.info);
-            return res.status(503).json({ 
-                status: "error", 
-                pesan: "WhatsApp client belum siap. Silakan scan QR code terlebih dahulu.",
-                debug: {
-                    clientStatus,
-                    hasInfo: !!client.info,
-                    isConnected: clientStatus === 'ready'
-                }
-            });
-        }
-
-        // Cek apakah nomor terdaftar di WhatsApp
-        console.log('🔍 Checking if number is registered...');
-        const user = await client.isRegisteredUser(formattedNumber);
-
-        if (user) {
-            console.log('✅ Number registered, sending message...');
-            await client.sendMessage(formattedNumber, messageText);
-            console.log('✅ Message sent successfully!');
-            res.json({ 
-                status: "berhasil terkirim", 
-                pesan: messageText,
-                to: formattedNumber 
-            });
-        } else {
-            console.log('⚠️ Number not registered on WhatsApp');
-            res.json({ 
-                status: "gagal terkirim", 
-                pesan: 'nomor wa tidak terdaftar' 
-            });
-        }
-    } catch (error) {
-        console.error('❌ API Error:', error);
-        res.status(500).json({ 
-            status: 'error', 
-            pesan: 'server error',
-            detail: process.env.NODE_ENV === 'development' ? error.message : undefined,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    if (!client || clientStatus !== 'ready') {
+        console.error('❌ Client not ready. Status:', clientStatus);
+        return res.status(503).json({
+            status: "error",
+            pesan: "WhatsApp client belum siap. Buka http://localhost:5001 untuk scan QR.",
+            clientStatus
         });
+    }
+
+    try {
+        console.log('📤 Sending message...');
+        await client.sendMessage(formattedNumber, messageText);
+        console.log('✅ Message sent successfully!');
+        res.json({ status: "berhasil terkirim", pesan: messageText, to: formattedNumber });
+    } catch (error) {
+        console.error('❌ Send Error:', error.message);
+
+        // Jika frame detached → auto reconnect
+        if (error.message && error.message.includes('detached Frame')) {
+            console.log('⚠️ Detached Frame! Reconnecting in 5s...');
+            broadcastStatus('not ready', 'Frame detached, reconnecting...');
+            setTimeout(() => {
+                if (client) client.destroy().catch(() => {});
+                client = createClient();
+            }, 5000);
+            return res.status(503).json({
+                status: "error",
+                pesan: "WhatsApp terputus, sedang reconnect. Coba lagi dalam 30 detik."
+            });
+        }
+
+        res.status(500).json({ status: "error", pesan: "Gagal kirim: " + error.message });
     }
 };
 

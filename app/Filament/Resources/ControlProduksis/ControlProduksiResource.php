@@ -706,7 +706,14 @@ class ControlProduksiResource extends Resource
                     ->modalDescription('Tindakan ini akan menghapus seluruh penugasan kerja untuk item ini secara permanen. Status pengerjaan item akan kembali ke Belum Diatur.')
                     ->modalSubmitActionLabel('Ya, Hapus')
                     ->action(function (OrderItem $record) {
+                        // Hapus task produksi
                         $record->productionTasks()->delete();
+                        
+                        // Hapus WorkOrder terkait agar statusnya bersih
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->delete();
                         
                         $record->refresh();
                         if ($order = $record->order) {

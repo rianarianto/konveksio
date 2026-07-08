@@ -73,7 +73,7 @@ class ListOrders extends ListRecords
                             ->label('Deadline')
                             ->required()
                             ->native(false)
-                            ->minDate(now()),
+                            ->minDate(now()->startOfDay()),
 
                         Toggle::make('is_express')
                             ->label('Pesanan Express')

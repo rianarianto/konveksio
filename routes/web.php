@@ -40,6 +40,10 @@ Route::get('/payroll/{payroll}/print', [\App\Http\Controllers\PayrollController:
     ->middleware(['web', 'auth'])
     ->name('payroll.print');
 
+// ─── Download SPK Produksi (akses publik untuk pekerja) ──────────────────────
+Route::get('/tugas/{wo}/spk', [\App\Http\Controllers\PDFController::class, 'downloadSpk'])
+    ->name('work.task.spk');
+
 // ─── Halaman Tugas Tukang (akses publik via token, tanpa login) ──────────────
 Route::get('/tugas', [WorkTaskController::class, 'index'])
     ->name('work.task');
@@ -48,3 +52,8 @@ Route::get('/tugas', [WorkTaskController::class, 'index'])
 Route::get('/worker/{token}', function (string $token) {
     return view('worker-dashboard', ['token' => $token]);
 })->name('worker.dashboard');
+
+// ─── Keuangan Worker (Dompet & Pengajuan Kasbon) ─────────────────────────────
+Route::get('/worker/{token}/keuangan', function (string $token) {
+    return view('worker-finance', ['token' => $token]);
+})->name('worker.finance');
