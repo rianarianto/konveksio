@@ -223,6 +223,32 @@
 
 
     {{-- ── SECTION: TUGAS SAYA ── --}}
+    @php
+        $isQcTask = in_array(strtoupper($myTask->stage_name ?? ''), ['QC_PREP', 'QC_PERSIAPAN', 'QC_REVIEW', 'QC_FINISHING', 'QC_AKHIR']);
+        $displayTaskQty = $isQcTask ? $totalQty : $myTask->quantity;
+        
+        // Buat default instruksi per tahapan jika deskripsi kosong
+        $defaultInstructions = '';
+        if (empty($myTask->description)) {
+            $stageUpper = strtoupper($myTask->stage_name ?? '');
+            if (str_contains($stageUpper, 'PREP') || str_contains($stageUpper, 'PERSIAPAN')) {
+                $defaultInstructions = 'Periksa kesiapan bahan utama, kesesuaian warna, dan kelengkapan aksesoris pendukung (kancing/saku/kerah) sebelum produksi dimulai.';
+            } elseif (str_contains($stageUpper, 'POTONG') || str_contains($stageUpper, 'CUTTING')) {
+                $defaultInstructions = 'Potong bahan utama sesuai pola pola spesifikasi gender, panjang lengan, dan model potongan (tunik/standar). Pastikan toleransi jahitan aman.';
+            } elseif (str_contains($stageUpper, 'SABLON') || str_contains($stageUpper, 'BORDIR') || str_contains($stageUpper, 'DECORATION')) {
+                $defaultInstructions = 'Kerjakan aplikasi bordir/sablon pada titik lokasi yang telah ditentukan (dada/lengan/punggung) sesuai teknik aplikasi yang diminta.';
+            } elseif (str_contains($stageUpper, 'JAHIT') || str_contains($stageUpper, 'SEWING')) {
+                $defaultInstructions = 'Jahit potongan bahan dengan rapi. Pasang saku, kancing, atau kerah sesuai detail model spesifikasi. Gunakan benang warna senada.';
+            } elseif (str_contains($stageUpper, 'KANCING') || str_contains($stageUpper, 'BUTTON')) {
+                $defaultInstructions = 'Pasang kancing atau pelubang kancing pada posisi tengah yang simetris sesuai spesifikasi model kancing.';
+            } elseif (str_contains($stageUpper, 'FINISHING')) {
+                $defaultInstructions = 'Lakukan pembersihan sisa benang, penyetrikaan uap, lipat rapi, dan packing plastik bening sesuai standar pengiriman.';
+            } else {
+                $defaultInstructions = 'Kerjakan pengerjaan tahapan ini sesuai dengan rincian model spesifikasi pesanan di bawah.';
+            }
+        }
+    @endphp
+
     @if($myTask)
     <div class="section-title-bar">🔧 TUGAS KAMU</div>
     <div class="card card-task-highlight">
@@ -231,10 +257,10 @@
             <div class="task-detail-value">{{ strtoupper(str_replace('_', ' ', $myTask->stage_name)) }}</div>
         </div>
         <div class="task-detail-row">
-            <div class="task-detail-label">Qty Kamu</div>
-            <div class="task-detail-value text-purple"><strong>{{ $myTask->quantity }} pcs</strong></div>
+            <div class="task-detail-label">Qty Tugas</div>
+            <div class="task-detail-value text-purple"><strong>{{ $displayTaskQty }} pcs</strong></div>
         </div>
-        @if(!empty($myTask->size_quantities))
+        @if(!$isQcTask && !empty($myTask->size_quantities))
         <div class="task-detail-row">
             <div class="task-detail-label">Rincian Ukuran</div>
             <div class="task-detail-value">
@@ -316,12 +342,14 @@
         </div>
         @endif
         @endif
-        @if($myTask->description)
-        <div class="task-detail-row">
-            <div class="task-detail-label">Instruksi</div>
-            <div class="task-detail-value text-note">{{ $myTask->description }}</div>
+        
+        <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left;">
+            <div class="task-detail-label" style="margin-bottom: 4px;">Instruksi Kerja</div>
+            <div class="task-detail-value text-note" style="text-align: left; width: 100%;">
+                {{ $myTask->description ?: $defaultInstructions }}
+            </div>
         </div>
-        @endif
+        
         @if($myTask->is_revision)
         <div class="revision-notice">
             🔧 Ini adalah tugas REVISI — perbaiki sesuai catatan QC
