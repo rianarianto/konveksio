@@ -10,8 +10,22 @@ use Illuminate\Support\Facades\Log;
 class NotificationHelper
 {
     /**
+     * Format nama tahap jadi label yang rapi untuk pesan WA.
+     */
+    protected static function formatStageLabel(string $stage): string
+    {
+        $map = [
+            'QC_PERSIAPAN' => 'QC Persiapan',
+            'QC_PREP'      => 'QC Persiapan',
+            'QC_REVIEW'    => 'QC Review',
+            'CREATED'      => 'Dibuat',
+            'COMPLETED'    => 'Selesai',
+        ];
+        return $map[strtoupper($stage)] ?? str_replace('_', ' ', $stage);
+    }
+
+    /**
      * Kirim notifikasi WhatsApp ke pekerja terkait setelah perubahan status WO.
-     * Berjalan di latar belakang (async via dispatch closure).
      */
     public static function notify(
         WorkOrder $wo,
@@ -22,19 +36,20 @@ class NotificationHelper
         // Load relasi yang dibutuhkan
         $wo->loadMissing('orderItem.order.customer', 'shop');
 
-        // Tentukan tahap yang sedang aktif
-        $stageName = ($newStatus === WorkOrder::STATUS_QC_REVIEW)
-            ? ($wo->current_review_stage ?? $newStatus)
-            : $newStatus;
-
-        if ($newStatus === WorkOrder::STATUS_QC_PREP) {
-            $stageName = 'QC_PERSIAPAN';
-        }
+        // Tentukan tahap yang sedang aktif (untuk cari ProductionTask)
+        $stageName = match (true) {
+            $newStatus === WorkOrder::STATUS_QC_PREP   => 'QC_PERSIAPAN',
+            $newStatus === WorkOrder::STATUS_QC_REVIEW => $wo->current_review_stage ?? $newStatus,
+            default                                    => $newStatus,
+        };
 
         // Ambil semua task untuk WO ini di tahap tersebut
         $groupItemIds = $wo->orderItem
             ? $wo->orderItem->getItemsInGroup()->pluck('id')
             : [$wo->order_item_id];
+
+        $groupItems = \App\Models\OrderItem::whereIn('id', $groupItemIds)->get();
+        $totalQty   = $groupItems->sum('quantity');
 
         $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
             ->whereIn('order_item_id', $groupItemIds)
@@ -47,40 +62,37 @@ class NotificationHelper
 
         if ($workers->isEmpty()) {
             Log::info("[WA-Bot] Tidak ada pekerja untuk WO {$wo->wo_number} → Status: {$newStatus}");
-            return;
+            // Lanjut cek QC_REVIEW notification di bawah
         }
 
-        // Label untuk pesan WA
-        if ($newStatus === WorkOrder::STATUS_QC_PREP) {
-            $label = 'QC Persiapan';
-        } elseif ($newStatus === WorkOrder::STATUS_QC_REVIEW) {
-            $label = 'QC ' . ($wo->current_review_stage ?? '');
-        } else {
-            $label = $newStatus;
-        }
+        // Label tahap yang rapi
+        $label = match (true) {
+            $newStatus === WorkOrder::STATUS_QC_PREP   => 'QC Persiapan',
+            $newStatus === WorkOrder::STATUS_QC_REVIEW => 'QC ' . self::formatStageLabel($wo->current_review_stage ?? ''),
+            default                                    => self::formatStageLabel($newStatus),
+        };
 
-        $produk = $wo->orderItem->product_name ?? '-';
-        $qty    = $wo->orderItem->quantity ?? '-';
+        $produk   = $wo->orderItem->product_name ?? '-';
         $customer = $wo->orderItem->order->customer->name ?? '-';
+        $deadline = $wo->orderItem->order->deadline
+            ? \Carbon\Carbon::parse($wo->orderItem->order->deadline)->format('d M Y')
+            : '-';
 
-        // Deteksi tahap sebelumnya & siapa pekerja yang menyelesaikannya
+        // Info tahap sebelumnya (hanya tampil jika bukan tahap pertama / bukan CREATED)
         $prevStageInfo = '';
         $prevStageCode = $wo->getPreviousStatus();
-        if ($prevStageCode && $prevStageCode !== WorkOrder::STATUS_CREATED) {
-            $prevLabel = $prevStageCode;
-            if ($prevStageCode === WorkOrder::STATUS_QC_PREP) {
-                $prevLabel = 'QC Persiapan';
-            } elseif ($prevStageCode === WorkOrder::STATUS_QC_REVIEW) {
-                $prevLabel = 'QC ' . ($wo->current_review_stage ?? '');
-            }
+        if ($prevStageCode && !in_array($prevStageCode, [WorkOrder::STATUS_CREATED, $newStatus])) {
+            $prevLabel = match (true) {
+                $prevStageCode === WorkOrder::STATUS_QC_PREP   => 'QC Persiapan',
+                $prevStageCode === WorkOrder::STATUS_QC_REVIEW => 'QC Review',
+                default                                        => self::formatStageLabel($prevStageCode),
+            };
 
-            // Cari siapa pekerjanya di ProductionTask
-            $prevStageNameForQuery = $prevStageCode;
-            if ($prevStageCode === WorkOrder::STATUS_QC_PREP) {
-                $prevStageNameForQuery = 'QC_PERSIAPAN';
-            } elseif ($prevStageCode === WorkOrder::STATUS_QC_REVIEW) {
-                $prevStageNameForQuery = $wo->current_review_stage;
-            }
+            $prevStageNameForQuery = match (true) {
+                $prevStageCode === WorkOrder::STATUS_QC_PREP   => 'QC_PERSIAPAN',
+                $prevStageCode === WorkOrder::STATUS_QC_REVIEW => $wo->current_review_stage,
+                default                                        => $prevStageCode,
+            };
 
             $prevTask = \App\Models\ProductionTask::withoutGlobalScopes()
                 ->whereIn('order_item_id', $groupItemIds)
@@ -88,23 +100,41 @@ class NotificationHelper
                 ->with('assignedTo')
                 ->first();
 
-            $prevWorkerName = null;
-            if ($prevTask && $prevTask->assignedTo) {
-                $prevWorkerName = $prevTask->assignedTo->name;
-            } elseif ($prevStageCode === WorkOrder::STATUS_QC_PREP || $prevStageCode === WorkOrder::STATUS_QC_REVIEW) {
-                // QC worker di WO
-                if ($wo->qc_worker_id) {
-                    $qcWorker = \App\Models\Worker::find($wo->qc_worker_id);
-                    if ($qcWorker) {
-                        $prevWorkerName = $qcWorker->name;
-                    }
-                }
+            $prevWorkerName = $prevTask?->assignedTo?->name;
+            if (!$prevWorkerName && in_array($prevStageCode, [WorkOrder::STATUS_QC_PREP, WorkOrder::STATUS_QC_REVIEW])) {
+                $prevWorkerName = $wo->qc_worker_id
+                    ? \App\Models\Worker::find($wo->qc_worker_id)?->name
+                    : null;
             }
 
             if ($prevWorkerName) {
-                $prevStageInfo = "✅ *Selesai Sebelumnya:* Tahap *{$prevLabel}* oleh *{$prevWorkerName}*\n";
+                $prevStageInfo = "\n✅ *Diselesaikan:* Tahap *{$prevLabel}* oleh *{$prevWorkerName}*";
             } else {
-                $prevStageInfo = "✅ *Selesai Sebelumnya:* Tahap *{$prevLabel}*\n";
+                $prevStageInfo = "\n✅ *Diselesaikan:* Tahap *{$prevLabel}*";
+            }
+        }
+
+        // Rincian ukuran dari task worker ini
+        $rincianUkuran = '';
+        $firstTask = $tasks->first();
+        if ($firstTask && !empty($firstTask->size_quantities)) {
+            $parts = [];
+            foreach ($firstTask->size_quantities as $sz => $qty) {
+                if (!str_starts_with($sz, '_') && $qty > 0) {
+                    $parts[] = "{$sz}: {$qty}";
+                }
+            }
+            if (!empty($parts)) {
+                $rincianUkuran = "\n• Rincian: " . implode(', ', $parts);
+            }
+        }
+
+        // Dapatkan ID worker tahap sebelumnya
+        $prevWorkerId = null;
+        if (isset($prevStageCode) && $prevStageCode) {
+            $prevWorkerId = $prevTask?->assigned_to;
+            if (!$prevWorkerId && in_array($prevStageCode, [WorkOrder::STATUS_QC_PREP, WorkOrder::STATUS_QC_REVIEW])) {
+                $prevWorkerId = $wo->qc_worker_id;
             }
         }
 
@@ -112,28 +142,41 @@ class NotificationHelper
         foreach ($workers as $worker) {
             if (!$worker->phone) continue;
 
+            // Jika worker tahap baru sama dengan worker tahap sebelumnya, lewati (karena dia yang menyelesaikan)
+            if ($prevWorkerId && $worker->id === $prevWorkerId) {
+                Log::info("[WA-Bot] Lewati notifikasi ke {$worker->name} karena dia yang menyelesaikan tahap sebelumnya.");
+                continue;
+            }
+
             $phone = $worker->phone;
             $link  = url("/tugas?wo_id={$wo->id}&token={$wo->token}&wt={$worker->portal_token}");
 
+            // Qty untuk worker ini (dari task-nya)
+            $workerTask = $tasks->firstWhere('assigned_to', $worker->id);
+            $workerQty  = $workerTask?->quantity ?? $totalQty;
+
             if ($isReject) {
-                $pesan = "⚠️ *PENOLAKAN QC — {$wo->wo_number}*\n\n"
+                $pesan = "⚠️ *REVISI QC — {$wo->wo_number}*\n\n"
                     . "Halo {$worker->name},\n"
-                    . "Tugas Anda pada tahap *{$label}* ditolak oleh QC.\n\n"
+                    . "Hasil kerja Anda pada tahap *{$label}* perlu diperbaiki.\n\n"
                     . "📋 *Detail:*\n"
-                    . "• Produk: {$produk} ({$qty} pcs)\n"
+                    . "• Produk: {$produk}\n"
                     . "• Pelanggan: {$customer}\n"
+                    . "• Total Qty: {$totalQty} pcs (bagian Anda: {$workerQty} pcs){$rincianUkuran}\n"
+                    . "• Deadline: {$deadline}\n"
                     . "• Alasan: {$rejectReason}\n\n"
-                    . "Silakan perbaiki dan kirim ulang.\n"
+                    . "Silakan perbaiki dan selesaikan kembali.\n"
                     . "🔗 {$link}";
             } else {
                 $pesan = "🔥 *TUGAS SIAP DIKERJAKAN — {$wo->wo_number}*\n\n"
                     . "Halo {$worker->name},\n"
-                    . "Antrian tugas Anda untuk tahap *{$label}* kini sudah siap dikerjakan.\n\n"
-                    . $prevStageInfo
-                    . "\n📋 *Detail:*\n"
-                    . "• Produk: {$produk} ({$qty} pcs)\n"
-                    . "• Pelanggan: {$customer}\n\n"
-                    . "Silakan klik link di bawah untuk mulai mengerjakan tugas ini:\n"
+                    . "Tugas Anda untuk tahap *{$label}* kini siap dikerjakan.{$prevStageInfo}\n\n"
+                    . "📋 *Detail:*\n"
+                    . "• Produk: {$produk}\n"
+                    . "• Pelanggan: {$customer}\n"
+                    . "• Total Qty: {$totalQty} pcs (bagian Anda: {$workerQty} pcs){$rincianUkuran}\n"
+                    . "• Deadline: {$deadline}\n\n"
+                    . "Buka portal tugas Anda:\n"
                     . "🔗 {$link}";
             }
 
@@ -148,23 +191,24 @@ class NotificationHelper
         }
 
         // Notifikasi khusus ke QC Worker saat WO masuk QC_REVIEW
-        // (QC worker tidak punya ProductionTask, jadi tidak masuk loop di atas)
         if ($newStatus === WorkOrder::STATUS_QC_REVIEW && !$isReject) {
             $qcWorker = $wo->qc_worker_id ? Worker::find($wo->qc_worker_id) : null;
 
             if ($qcWorker && $qcWorker->phone) {
-                $reviewStageLabel = $wo->current_review_stage ?? 'produksi';
+                $reviewStageLabel = self::formatStageLabel($wo->current_review_stage ?? 'produksi');
                 $qcLink = $qcWorker->portal_token
                     ? url("/worker/{$qcWorker->portal_token}")
                     : url("/tugas?wo_id={$wo->id}&token={$wo->token}&wt={$qcWorker->portal_token}");
 
                 $qcPesan = "🔍 *PERLU REVIEW QC — {$wo->wo_number}*\n\n"
                     . "Halo {$qcWorker->name},\n"
-                    . "Tahap *{$reviewStageLabel}* telah selesai dikerjakan dan menunggu review QC Anda.\n\n"
+                    . "Tahap *{$reviewStageLabel}* telah selesai dikerjakan dan menunggu verifikasi QC Anda.\n\n"
                     . "📋 *Detail:*\n"
-                    . "• Produk: {$produk} ({$qty} pcs)\n"
-                    . "• Pelanggan: {$customer}\n\n"
-                    . "Silakan buka portal untuk melakukan review:\n"
+                    . "• Produk: {$produk}\n"
+                    . "• Pelanggan: {$customer}\n"
+                    . "• Total Qty: {$totalQty} pcs\n"
+                    . "• Deadline: {$deadline}\n\n"
+                    . "Silakan buka portal untuk melakukan verifikasi:\n"
                     . "🔗 {$qcLink}";
 
                 try {
@@ -193,9 +237,13 @@ class NotificationHelper
         $customer = $item->order?->customer?->name ?? '-';
         $deadline = $item->order?->deadline ? \Carbon\Carbon::parse($item->order->deadline)->format('d M Y') : '-';
 
-        // Ambil semua production tasks dengan pekerja, unik per pekerja
+        // Hitung total qty seluruh group (untuk ditampilkan di QC_PERSIAPAN)
+        $groupItemIds = $item->getItemsInGroup()->pluck('id');
+        $totalGroupQty = \App\Models\OrderItem::whereIn('id', $groupItemIds)->sum('quantity');
+
+        // Ambil semua production tasks dari seluruh group (QC_PERSIAPAN bisa di item lain dalam group)
         $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
-            ->where('order_item_id', $item->id)
+            ->whereIn('order_item_id', $groupItemIds)
             ->with('assignedTo')
             ->get();
 
@@ -215,9 +263,13 @@ class NotificationHelper
                 : url('/');
 
             // Rincian tugas per tahap
+            // QC_PERSIAPAN: tampilkan total qty group (bukan qty task individual yg hanya 1 item)
             $rincian = '';
             foreach ($workerTaskList as $task) {
-                $rincian .= "• {$task->stage_name}: {$task->quantity} pcs — Rp " . number_format($task->wage_amount, 0, ',', '.') . "\n";
+                $displayQty = ($task->stage_name === 'QC_PERSIAPAN')
+                    ? $totalGroupQty
+                    : $task->quantity;
+                $rincian .= "• {$task->stage_name}: {$displayQty} pcs — Rp " . number_format($task->wage_amount, 0, ',', '.') . "\n";
             }
 
             $pesan = "📋 *PENUGASAN PRODUKSI — {$produk}*\n\n"

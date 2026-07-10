@@ -154,8 +154,15 @@ class WorkOrder extends Model
         if ($this->status === self::STATUS_CREATED) return 'Dibuat';
         if ($this->status === self::STATUS_COMPLETED) return 'Selesai';
         if ($this->status === self::STATUS_QC_PREP) return 'QC Persiapan';
-        if ($this->status === self::STATUS_QC_REVIEW) return 'QC ' . ($this->current_review_stage ?? '');
-        return $this->status; // nama tahap langsung (Potong, Jahit, dll)
+        if ($this->status === self::STATUS_QC_REVIEW) {
+            $stage = $this->current_review_stage ?? '';
+            if (strtoupper($stage) === 'QC_PERSIAPAN' || strtoupper($stage) === 'QC_PREP') {
+                return 'QC Persiapan';
+            }
+            return 'QC ' . str_replace('_', ' ', $stage);
+        }
+        if ($this->status === 'QC_PERSIAPAN') return 'QC Persiapan';
+        return str_replace('_', ' ', $this->status); // nama tahap langsung (Potong, Jahit, dll)
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────

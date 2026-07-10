@@ -2,15 +2,13 @@
     {{-- ── HEADER ── --}}
     <header class="app-header">
         <div class="header-left">
-            @php $wtToken = request()->query('wt'); @endphp
-            @if($wtToken)
-            <a href="{{ route('worker.dashboard', ['token' => $wtToken]) }}" class="back-btn">
+            @if($this->wt)
+            <a href="{{ route('worker.dashboard', ['token' => $this->wt]) }}" class="back-btn" style="margin-right: 12px; padding: 6px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; border-radius: 50%; width: 32px; height: 32px; color: #374151;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <path d="M19 12H5M12 5l-7 7 7 7"/>
                 </svg>
-                <span>Dashboard</span>
             </a>
-            @else
+            @endif
             <div class="header-brand">
                 <div class="brand-icon">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -19,7 +17,6 @@
                 </div>
                 <span class="brand-name">Konveksio</span>
             </div>
-            @endif
         </div>
 
         @if($wo)
@@ -38,21 +35,7 @@
     @else
     {{-- ── WORKER GREETING ── --}}
     @php
-        // Resolve viewer worker dari wtToken (URL param) atau fallback WO worker cols
-        $wtToken = request()->query('wt');
-        $worker = null;
-        if ($wtToken) {
-            $worker = \App\Models\Worker::withoutGlobalScopes()->where('portal_token', $wtToken)->first();
-        }
-        if (!$worker) {
-            $workerCols = ['cutting_worker_id', 'sewing_worker_id', 'decoration_worker_id', 'button_worker_id', 'finishing_worker_id'];
-            foreach ($workerCols as $col) {
-                if ($wo->$col) {
-                    $worker = \App\Models\Worker::find($wo->$col);
-                    if ($worker) break;
-                }
-            }
-        }
+        $worker = $this->worker;
         $workerName = $worker?->name ?? 'Pekerja';
         $isCompleted = $wo->isCompleted();
         $isQcStage = $wo->isInQcStage();
@@ -155,11 +138,30 @@
             }
         }
 
-        // Tugas spesifik worker ini untuk WO ini
-        $myTask = \App\Models\ProductionTask::withoutGlobalScopes()
+        // Cek tahap sekarang
+        $expectedStage = $wo->status;
+        if ($wo->status === \App\Models\WorkOrder::STATUS_QC_PREP) {
+            $expectedStage = 'QC_PERSIAPAN';
+        } elseif ($wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
+            $expectedStage = $wo->current_review_stage;
+        }
+
+        // Cari task aktif worker ini di tahap sekarang
+        $myActiveTask = null;
+        if ($worker) {
+            $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItems->pluck('id'))
+                ->where('stage_name', $expectedStage)
+                ->where('assigned_to', $worker->id)
+                ->first();
+        }
+
+        $isMyActiveStage = $myActiveTask ? true : false;
+        // Fallback untuk backward compatibility
+        $myTask = $myActiveTask ?: (\App\Models\ProductionTask::withoutGlobalScopes()
             ->where('order_item_id', $wo->order_item_id)
             ->where('assigned_to', $worker?->id)
-            ->first();
+            ->first());
     @endphp
 
     <div class="greeting-bar">
@@ -567,6 +569,12 @@
     </div>
 
     {{-- ── AKSI UTAMA ── --}}
+    @error('aksi')
+    <div class="alert-error" style="margin: 12px 16px; padding: 12px; background-color: #fee2e2; border: 1px solid #fca5a5; color: #b91c1c; border-radius: 8px; font-size: 14px; font-weight: 500;">
+        ⚠️ {{ $message }}
+    </div>
+    @enderror
+
     @if($isCompleted)
     <div class="action-banner banner-green">
         <span>✅ Work Order ini sudah selesai!</span>
@@ -574,6 +582,7 @@
 
     @elseif($isQcStage)
     {{-- QC Actions --}}
+    @if($worker?->id === $wo->qc_worker_id && $isMyActiveStage)
     <div class="action-card">
         @if($wo->status === 'QC_PREP')
         {{-- QC Persiapan: hanya approve (tidak ada reject) --}}
@@ -642,41 +651,66 @@
         @endif
         @endif
     </div>
+    @else
+    <div class="action-banner banner-gray">
+        @if($myTask && $myTask->status === 'done')
+            <span>✅ Tugas {{ str_replace('_', ' ', $myTask->stage_name) }} selesai & masuk tahap QC</span>
+        @else
+            <span>🔍 Menunggu verifikasi dari Petugas QC...</span>
+        @endif
+    </div>
+    @endif
 
     @elseif($isWorkerStage)
     {{-- Tukang Actions --}}
-    <div class="action-card">
-        <div class="action-title">🔧 Tugas Anda: {{ $statusLabel }}</div>
-
-        @if(!$wo->started_at)
-        <button wire:click="mulaiKerjakan"
-                wire:loading.attr="disabled"
-                class="btn btn-primary btn-full btn-lg">
-            <span wire:loading.remove wire:target="mulaiKerjakan">🔥 Mulai Kerjakan</span>
-            <span wire:loading wire:target="mulaiKerjakan">⏳ Memulai...</span>
-        </button>
-        @else
-        <div class="started-info">
-            ⏱️ Dimulai: {{ $wo->started_at?->format('d M Y, H:i') }}
+    @if($isMyActiveStage)
+        @if($myActiveTask && $myActiveTask->status === 'done')
+        <div class="action-banner banner-green">
+            <span>✅ Tugas {{ str_replace('_', ' ', $myActiveTask->stage_name) }} selesai & masuk tahap QC</span>
         </div>
-        <button wire:click="selesaiKerjakan"
-                wire:loading.attr="disabled"
-                class="btn btn-success btn-full btn-lg">
-            <span wire:loading.remove wire:target="selesaiKerjakan">✅ Selesai & Kirim ke QC</span>
-            <span wire:loading wire:target="selesaiKerjakan">⏳ Memproses...</span>
-        </button>
+        @else
+        <div class="action-card">
+            <div class="action-title">🔧 Tugas Anda: {{ $statusLabel }}</div>
+
+            @if($myActiveTask && $myActiveTask->status === 'pending')
+            <button wire:click="mulaiKerjakan"
+                    wire:loading.attr="disabled"
+                    class="btn btn-primary btn-full btn-lg">
+                <span wire:loading.remove wire:target="mulaiKerjakan">
+                    {{ $wo->status === 'QC_PERSIAPAN' ? '🔥 Mulai QC Persiapan' : '🔥 Mulai Kerjakan' }}
+                </span>
+                <span wire:loading wire:target="mulaiKerjakan">⏳ Memulai...</span>
+            </button>
+            @else
+            <div class="started-info">
+                ⏱️ Dimulai: {{ $myActiveTask?->updated_at?->format('d M Y, H:i') }}
+            </div>
+            <button wire:click="selesaiKerjakan"
+                    wire:loading.attr="disabled"
+                    class="btn btn-success btn-full btn-lg">
+                <span wire:loading.remove wire:target="selesaiKerjakan">
+                    {{ $wo->status === 'QC_PERSIAPAN' ? '✅ Selesai & Lanjutkan' : '✅ Selesai & Kirim ke QC' }}
+                </span>
+                <span wire:loading wire:target="selesaiKerjakan">⏳ Memproses...</span>
+            </button>
+            @endif
+        </div>
+        @endif
+    @else
+    <div class="action-banner banner-gray">
+        @if($myTask && $myTask->status === 'done')
+            <span>✅ Tugas Anda pada tahap {{ str_replace('_', ' ', $myTask->stage_name) }} telah selesai dikerjakan!</span>
+        @else
+            <span>⏳ Menunggu giliran tugas Anda atau Anda tidak bertugas di tahap ini.</span>
         @endif
     </div>
+    @endif
 
     @elseif($wo->status === 'CREATED')
     <div class="action-banner banner-gray">
         <span>⏳ Menunggu persetujuan QC Persiapan...</span>
     </div>
     @endif
-
-    @error('aksi')
-    <div class="alert-error">{{ $message }}</div>
-    @enderror
 
 
 

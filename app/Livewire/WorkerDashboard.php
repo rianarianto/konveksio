@@ -185,9 +185,9 @@ class WorkerDashboard extends Component
             return;
         }
 
-        // Auto-advance WO if at CREATED (before first stage)
+        // Auto-advance WO if at CREATED (before first stage), tanpa notifikasi
         if ($wo->status === WorkOrder::STATUS_CREATED) {
-            app(WorkOrderService::class)->advance($wo->id);
+            app(WorkOrderService::class)->advanceSilent($wo->id);
             $wo = $wo->fresh();
         }
 
@@ -380,13 +380,21 @@ class WorkerDashboard extends Component
         $this->reviewWoId = null;
     }
 
+    // Selected tasks for rejection
+    public array $selectedTaskIds = [];
+
     /**
-     * Reject QC Review - return to previous stage with reason.
+     * Reject QC Review - return to previous stage with reason for selected workers.
      */
     public function rejectQCReview(int $woId): void
     {
         if (empty(trim($this->rejectReason))) {
             $this->addError('rejectReason', 'Alasan revisi wajib diisi.');
+            return;
+        }
+
+        if (empty($this->selectedTaskIds)) {
+            $this->addError('rejectTasks', 'Pilih minimal satu pekerja untuk direvisi.');
             return;
         }
 
@@ -396,28 +404,41 @@ class WorkerDashboard extends Component
             return;
         }
 
-        app(WorkOrderService::class)->rejectQC($wo->id, $this->rejectReason);
-        
-        // Mark task back to pending for revision (worker needs to click "Mulai Perbaikan")
         $prevStage = $wo->current_review_stage;
-        if ($prevStage) {
-            $task = ProductionTask::withoutGlobalScopes()
-                ->where('order_item_id', $wo->order_item_id)
-                ->where('stage_name', $prevStage)
-                ->first();
-            if ($task) {
-                $task->update([
-                    'status' => 'pending',
-                    'completed_at' => null,
-                    'is_revision' => true,
-                ]);
-            }
+        if (!$prevStage) {
+            $this->addError('qc', 'Tahap sebelumnya tidak ditemukan.');
+            return;
         }
-        
+
+        // Ambil tasks yang dipilih untuk direvisi
+        $tasksToReject = ProductionTask::withoutGlobalScopes()
+            ->whereIn('id', $this->selectedTaskIds)
+            ->get();
+
+        foreach ($tasksToReject as $task) {
+            $task->update([
+                'status' => 'pending',
+                'completed_at' => null,
+                'is_revision' => true,
+            ]);
+
+            // Kirim notifikasi WA penolakan ke worker spesifik
+            \App\Helpers\NotificationHelper::notifyTaskRejected($task, $this->rejectReason, $wo);
+        }
+
+        // Pindahkan status WO kembali ke tahap review agar antrean tertahan
+        $wo->update([
+            'status' => $prevStage,
+            'current_review_stage' => null,
+            'reject_reason' => $this->rejectReason,
+            'stage_entered_at' => now(),
+        ]);
+
         $this->syncOrderStatus($wo);
-        session()->flash('success', '🔧 Revisi dikirim. Pekerja akan memperbaiki pekerjaan.');
+        session()->flash('success', '🔧 Revisi dikirim ke pekerja terpilih.');
         $this->reviewWoId = null;
         $this->rejectReason = '';
+        $this->selectedTaskIds = [];
     }
 
     /**
@@ -427,6 +448,7 @@ class WorkerDashboard extends Component
     {
         $this->reviewWoId = $woId;
         $this->rejectReason = '';
+        $this->selectedTaskIds = [];
         $this->resetErrorBag();
     }
 
@@ -437,6 +459,7 @@ class WorkerDashboard extends Component
     {
         $this->reviewWoId = null;
         $this->rejectReason = '';
+        $this->selectedTaskIds = [];
         $this->resetErrorBag();
     }
 

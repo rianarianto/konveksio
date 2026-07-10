@@ -53,7 +53,10 @@
     </div>
 
     @foreach($qcReviews as $wo)
-    <div class="card task-card task-review">
+    @if($wo)
+    <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
+    @endif
+    <div class="card task-card task-review" style="cursor:pointer;">
         <div class="task-header">
             <div class="task-info">
                 <div class="task-stage task-stage-review">Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}</div>
@@ -62,13 +65,13 @@
             </div>
         </div>
         <div class="review-actions-inline">
-            <button wire:click="approveQCReview({{ $wo->id }})"
+            <button wire:click.prevent.stop="approveQCReview({{ $wo->id }})"
                     wire:loading.attr="disabled"
                     class="btn btn-success btn-sm">
                 <span wire:loading.remove wire:target="approveQCReview({{ $wo->id }})">✅ Lanjutkan</span>
                 <span wire:loading wire:target="approveQCReview({{ $wo->id }})">⏳</span>
             </button>
-            <button wire:click="openReview({{ $wo->id }})"
+            <button wire:click.prevent.stop="openReview({{ $wo->id }})"
                     class="btn btn-danger btn-sm">
                 🔧 Revisi
             </button>
@@ -82,6 +85,16 @@
     @if($reviewWoId)
     @php
         $reviewWo = \App\Models\WorkOrder::withoutGlobalScopes()->with(['orderItem.order.customer'])->find($reviewWoId);
+        
+        $groupItemIds = $reviewWo->orderItem
+            ? $reviewWo->orderItem->getItemsInGroup()->pluck('id')
+            : [$reviewWo->order_item_id];
+            
+        $reviewTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->whereIn('order_item_id', $groupItemIds)
+            ->where('stage_name', $reviewWo->current_review_stage)
+            ->with('assignedTo')
+            ->get();
     @endphp
     <div class="modal-overlay" wire:click.self="closeReview">
         <div class="modal-content">
@@ -97,7 +110,23 @@
                     <div class="review-customer">{{ $reviewWo?->orderItem?->order?->customer?->name ?? '-' }}</div>
                 </div>
 
-                <div class="reject-section">
+                <div class="reject-section" style="margin-top: 16px;">
+                    <label class="reject-label" style="font-weight: 600; display: block; margin-bottom: 8px;">Pilih Pekerja yang Perlu Revisi:</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                        @foreach($reviewTasks as $task)
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0;">
+                            <input type="checkbox" wire:model="selectedTaskIds" value="{{ $task->id }}" style="width: 16px; height: 16px; accent-color: #ef4444;">
+                            <span style="font-size: 14px; color: #374151; font-weight: 500;">
+                                <strong>{{ $task->assignedTo?->name ?? 'Tanpa Pekerja' }}</strong> 
+                                ({{ $task->quantity }} pcs)
+                            </span>
+                        </label>
+                        @endforeach
+                    </div>
+                    @error('rejectTasks')
+                    <span class="field-error" style="color: #b91c1c; font-size: 13px; display: block; margin-bottom: 8px;">⚠️ {{ $message }}</span>
+                    @enderror
+
                     <label class="reject-label">Alasan Revisi (wajib):</label>
                     <textarea wire:model="rejectReason" 
                               class="reject-textarea" 
@@ -109,7 +138,8 @@
                     
                     <button wire:click="rejectQCReview({{ $reviewWoId }})"
                             wire:loading.attr="disabled"
-                            class="btn btn-danger btn-full">
+                            class="btn btn-danger btn-full"
+                            style="margin-top: 12px;">
                         <span wire:loading.remove wire:target="rejectQCReview({{ $reviewWoId }})">🔧 Kirim Revisi</span>
                         <span wire:loading wire:target="rejectQCReview({{ $reviewWoId }})">Memproses...</span>
                     </button>

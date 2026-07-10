@@ -767,7 +767,7 @@
                             <div class="task-row {{ $rowClass }}">
                                 <div class="task-left">
                                     <div class="task-stage">
-                                        {{ $task->stage_name }}
+                                        {{ str_replace('_', ' ', $task->stage_name) }}
                                         <span style="font-weight:600;font-size:16px;color:#d1dbea;margin-left:6px;">&mdash;
                                             {{ $task->assignedTo?->name ?? '—' }}</span>
                                     </div>

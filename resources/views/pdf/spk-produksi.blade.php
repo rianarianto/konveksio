@@ -362,7 +362,7 @@
             <tbody>
                 @foreach($record->productionTasks as $task)
                     <tr>
-                        <td class="text-bold" style="background: #f9fafb;">{{ strtoupper($task->stage_name) }}</td>
+                        <td class="text-bold" style="background: #f9fafb;">{{ strtoupper(str_replace('_', ' ', $task->stage_name)) }}</td>
                         <td class="text-bold">{{ $task->assignedTo->name ?? 'BELUM ADA' }}</td>
                         <td>
                             <span style="font-size: 10pt; font-weight: bold;">{{ $task->quantity }} pcs</span>

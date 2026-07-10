@@ -384,7 +384,7 @@
                                                     if ($itemTasks->count() > 0) {
                                                         $activeItemTask = $itemTasks->whereIn('status', ['in_progress', 'pending', 'antrian'])->first();
                                                         if ($activeItemTask) {
-                                                            $statusLabels[] = $activeItemTask->stage_name;
+                                                             $statusLabels[] = str_replace('_', ' ', $activeItemTask->stage_name);
                                                         } elseif ($itemTasks->where('status', 'done')->count() == $itemTasks->count()) {
                                                             $statusLabels[] = 'Selesai';
                                                         } else {

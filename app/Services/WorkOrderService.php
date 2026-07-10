@@ -77,8 +77,59 @@ class WorkOrderService
             $wo->update($updateData);
             $wo->refresh();
 
-            // Kirim notifikasi WA
-            NotificationHelper::notify($wo, $nextStatus);
+            // Kirim notifikasi WA (async, tidak blocking)
+            $woId2 = $wo->id;
+            $status2 = $nextStatus;
+            dispatch(function () use ($woId2, $status2) {
+                $wo = WorkOrder::withoutGlobalScopes()->find($woId2);
+                if ($wo) {
+                    NotificationHelper::notify($wo, $status2);
+                }
+            })->afterResponse();
+
+            return $wo;
+        });
+    }
+
+    /**
+     * Advance tanpa kirim notifikasi WA (untuk auto-advance internal).
+     */
+    public function advanceSilent(int $woId): WorkOrder
+    {
+        return DB::transaction(function () use ($woId) {
+            $wo = WorkOrder::lockForUpdate()->findOrFail($woId);
+
+            $now = now();
+
+            $nextStatus = $wo->getNextStatus();
+            if (!$nextStatus) {
+                return $wo;
+            }
+
+            $updateData = ['status' => $nextStatus, 'stage_entered_at' => $now];
+
+            if ($wo->status === WorkOrder::STATUS_CREATED && !$wo->started_at) {
+                $updateData['started_at'] = $now;
+            }
+
+            if ($nextStatus === WorkOrder::STATUS_COMPLETED) {
+                $updateData['completed_at'] = $now;
+            }
+
+            $stages = $wo->stage_sequence ?? [];
+            $idx = array_search($nextStatus, $stages);
+            if ($idx !== false) {
+                $updateData['current_stage_index'] = $idx;
+            }
+
+            if ($nextStatus === WorkOrder::STATUS_QC_REVIEW) {
+                $updateData['current_review_stage'] = $wo->status;
+            } else {
+                $updateData['current_review_stage'] = null;
+            }
+
+            $wo->update($updateData);
+            $wo->refresh();
 
             return $wo;
         });
@@ -135,9 +186,9 @@ class WorkOrderService
     /**
      * Mulai mengerjakan tugas (worker stage).
      */
-    public function startTask(int $woId): WorkOrder
+    public function startTask(int $woId, ?int $workerId = null): WorkOrder
     {
-        return DB::transaction(function () use ($woId) {
+        return DB::transaction(function () use ($woId, $workerId) {
             $wo = WorkOrder::lockForUpdate()->findOrFail($woId);
 
             if (!$wo->started_at) {
@@ -156,9 +207,12 @@ class WorkOrderService
 
             // Sync ProductionTask ke in_progress
             if ($isValidWorkerStage) {
-                $task = $this->getProductionTaskForStage($wo, $stageName);
+                $task = $this->getProductionTaskForStage($wo, $stageName, $workerId);
                 if ($task && $task->status === 'pending') {
-                    $task->update(['status' => 'in_progress']);
+                    $task->update([
+                        'status'      => 'in_progress',
+                        'is_revision' => false,
+                    ]);
                 }
             }
 
@@ -170,10 +224,12 @@ class WorkOrderService
     /**
      * Cari ProductionTask yang match nama tahap.
      */
-    protected function getProductionTaskForStage(WorkOrder $wo, string $stageName): ?\App\Models\ProductionTask
+    protected function getProductionTaskForStage(WorkOrder $wo, string $stageName, ?int $workerId = null): ?\App\Models\ProductionTask
     {
-        $workerCol = WorkOrder::resolveWorkerColumnForStage($stageName);
-        $workerId = $workerCol ? $wo->$workerCol : null;
+        if (!$workerId) {
+            $workerCol = WorkOrder::resolveWorkerColumnForStage($stageName);
+            $workerId = $workerCol ? $wo->$workerCol : null;
+        }
 
         $groupItemIds = $wo->orderItem
             ? $wo->orderItem->getItemsInGroup()->pluck('id')

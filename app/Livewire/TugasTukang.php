@@ -16,6 +16,9 @@ class TugasTukang extends Component
     // Props
     public int    $woId;
     public string $token;
+    
+    #[\Livewire\Attributes\Url]
+    public ?string $wt = null;
 
     // State
     public string $activeTab    = 'tugas';    // 'tugas' | 'akunting'
@@ -37,6 +40,7 @@ class TugasTukang extends Component
     {
         $this->woId  = $woId;
         $this->token = $token;
+        $this->wt    = request()->query('wt');
         $this->loadWorkOrder();
     }
 
@@ -68,7 +72,28 @@ class TugasTukang extends Component
             return;
         }
 
-        app(WorkOrderService::class)->startTask($this->wo->id);
+        $worker = $this->resolveCurrentWorker();
+        $currentStageName = $this->wo->status;
+        if ($this->wo->status === WorkOrder::STATUS_QC_PREP) {
+            $currentStageName = 'QC_PERSIAPAN';
+        }
+
+        $groupItemIds = $this->wo->orderItem
+            ? $this->wo->orderItem->getItemsInGroup()->pluck('id')
+            : [$this->wo->order_item_id];
+
+        $task = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->whereIn('order_item_id', $groupItemIds)
+            ->where('stage_name', $currentStageName)
+            ->where('assigned_to', $worker?->id)
+            ->first();
+
+        if (!$task) {
+            $this->addError('aksi', 'Anda tidak bertugas di tahap ini.');
+            return;
+        }
+
+        app(WorkOrderService::class)->startTask($this->wo->id, $worker?->id);
         $this->syncOrderStatus();
         $this->loadWorkOrder();
         $this->dispatch('refreshed');
@@ -85,6 +110,7 @@ class TugasTukang extends Component
 
         // Find and mark the current worker's task as done
         $worker = $this->resolveCurrentWorker();
+        $task = null;
         if ($worker) {
             $groupItemIds = $this->wo->orderItem
                 ? $this->wo->orderItem->getItemsInGroup()->pluck('id')
@@ -95,11 +121,14 @@ class TugasTukang extends Component
                 ->where('stage_name', $this->wo->status)
                 ->where('assigned_to', $worker->id)
                 ->first();
-            
-            if ($task) {
-                $task->update(['status' => 'done', 'completed_at' => now()]);
-            }
         }
+
+        if (!$task) {
+            $this->addError('aksi', 'Anda tidak bertugas di tahap ini atau tugas sudah selesai.');
+            return;
+        }
+
+        $task->update(['status' => 'done', 'completed_at' => now()]);
 
         app(WorkOrderService::class)->advance($this->wo->id);
         $this->syncOrderStatus();
@@ -116,6 +145,25 @@ class TugasTukang extends Component
         if (!$this->wo->isInQcStage()) {
             $this->addError('aksi', 'Tidak dalam tahap QC.');
             return;
+        }
+
+        $worker = $this->resolveCurrentWorker();
+        if (!$worker || $worker->id !== $this->wo->qc_worker_id) {
+            $this->addError('aksi', 'Hanya Petugas QC yang dapat melakukan verifikasi.');
+            return;
+        }
+
+        // Mark QC_PERSIAPAN task as done if it exists and current status is QC_PREP
+        if ($this->wo->status === WorkOrder::STATUS_QC_PREP) {
+            $groupItemIds = $this->wo->orderItem
+                ? $this->wo->orderItem->getItemsInGroup()->pluck('id')
+                : [$this->wo->order_item_id];
+
+            \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('stage_name', 'QC_PERSIAPAN')
+                ->where('assigned_to', $worker->id)
+                ->update(['status' => 'done', 'completed_at' => now()]);
         }
 
         app(WorkOrderService::class)->approveQC($this->wo->id);
@@ -135,6 +183,12 @@ class TugasTukang extends Component
         ]);
 
         $this->ensureValidWo();
+
+        $worker = $this->resolveCurrentWorker();
+        if (!$worker || $worker->id !== $this->wo->qc_worker_id) {
+            $this->addError('aksi', 'Hanya Petugas QC yang dapat melakukan verifikasi.');
+            return;
+        }
 
         $proofPath = null;
         if ($this->rejectProof) {
@@ -239,7 +293,15 @@ class TugasTukang extends Component
     {
         if (!$this->wo) return null;
 
-        // Cari worker dari salah satu relasi yang ada
+        if ($this->wt) {
+            $worker = \App\Models\Worker::withoutGlobalScopes()
+                ->where('portal_token', $this->wt)
+                ->where('is_active', true)
+                ->first();
+            if ($worker) return $worker;
+        }
+
+        // Fallback (only if no wt is provided/valid, for backward compatibility)
         $workerCols = [
             'cutting_worker_id', 'sewing_worker_id', 'decoration_worker_id',
             'button_worker_id', 'finishing_worker_id',
@@ -253,6 +315,11 @@ class TugasTukang extends Component
         }
 
         return null;
+    }
+
+    public function getWorkerProperty(): ?\App\Models\Worker
+    {
+        return $this->resolveCurrentWorker();
     }
 
     public function getWorkerAttribute(): ?\App\Models\Worker

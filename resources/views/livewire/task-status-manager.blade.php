@@ -45,7 +45,7 @@
                     @endphp
                     <tr style="background: {{ $showStageLabel ? 'transparent' : $theme['bg'] }} !important">
                         <td style="padding:10px 14px; font-weight:700; color: {{ $theme['text'] }}; font-size:13px; border-bottom:1px solid #e5e7eb; background: {{ $theme['bg'] }} !important; border-left:4px solid {{ $theme['border'] }};">
-                            {!! $showStageLabel ? e($task->stage_name) : '↳' !!}
+                            {!! $showStageLabel ? e(str_replace('_', ' ', $task->stage_name)) : '↳' !!}
                         </td>
                         <td style="padding:10px 14px; font-size:13px; color:#374151; border-bottom:1px solid #e5e7eb;">
                             {{ $task->assignedTo?->name ?? 'Tidak Diketahui' }}

@@ -1321,8 +1321,14 @@ class AturTugasProduksi extends Page
 
         Notification::make()->title('Berhasil Diatur')->success()->send();
 
-        // Kirim notifikasi WhatsApp ke semua pekerja
-        \App\Helpers\NotificationHelper::notifyAllWorkers($item);
+        // Kirim notifikasi WhatsApp ke semua pekerja (async, tidak blocking)
+        $itemId = $item->id;
+        dispatch(function () use ($itemId) {
+            $item = \App\Models\OrderItem::find($itemId);
+            if ($item) {
+                \App\Helpers\NotificationHelper::notifyAllWorkers($item);
+            }
+        })->afterResponse();
 
         $this->redirect(ControlProduksiResource::getUrl('index'));
     }
