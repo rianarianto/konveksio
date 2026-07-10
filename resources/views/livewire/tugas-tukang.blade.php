@@ -146,7 +146,6 @@
             $expectedStage = $wo->current_review_stage;
         }
 
-        // Cari task aktif worker ini di tahap sekarang
         $myActiveTask = null;
         if ($worker) {
             $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
@@ -154,14 +153,20 @@
                 ->where('stage_name', $expectedStage)
                 ->where('assigned_to', $worker->id)
                 ->first();
+
+            // Buat virtual task dinamis untuk Petugas QC saat di tahap QC_REVIEW
+            if (!$myActiveTask && $wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW && $wo->qc_worker_id === $worker->id) {
+                $myActiveTask = new \App\Models\ProductionTask([
+                    'stage_name'  => 'QC_' . $wo->current_review_stage,
+                    'quantity'    => $totalQty,
+                    'description' => 'Periksa hasil pengerjaan tahap ' . str_replace('_', ' ', $wo->current_review_stage) . '. Berikan persetujuan per-pekerja di panel QC Review bawah atau kirim revisi jika ada kesalahan.',
+                    'status'      => 'in_progress',
+                ]);
+            }
         }
 
         $isMyActiveStage = $myActiveTask ? true : false;
-        // Fallback untuk backward compatibility
-        $myTask = $myActiveTask ?: (\App\Models\ProductionTask::withoutGlobalScopes()
-            ->where('order_item_id', $wo->order_item_id)
-            ->where('assigned_to', $worker?->id)
-            ->first());
+        $myTask = $myActiveTask;
     @endphp
 
     <div class="greeting-bar">
@@ -235,6 +240,7 @@
 
 
     {{-- ── SECTION: TUGAS SAYA ── --}}
+    @if($myTask)
     @php
         $isQcTask = in_array(strtoupper($myTask->stage_name ?? ''), ['QC_PREP', 'QC_PERSIAPAN', 'QC_REVIEW', 'QC_FINISHING', 'QC_AKHIR']);
         $displayTaskQty = $isQcTask ? $totalQty : $myTask->quantity;
@@ -261,7 +267,6 @@
         }
     @endphp
 
-    @if($myTask)
     <div class="section-title-bar">🔧 TUGAS KAMU</div>
     <div class="card card-task-highlight">
         <div class="task-detail-row">
@@ -324,47 +329,96 @@
             }
         @endphp
 
-        @if(!empty($taskCustomRecipients))
-        <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left;">
-            <div class="task-detail-label" style="margin-bottom: 4px;">📐 Ukuran Custom Tugas Anda</div>
-            <div style="width: 100%;">
-                @foreach($taskCustomRecipients as $c)
-                <div class="recipient-custom-row" style="padding: 2px 0;">
-                    <span class="recipient-nama" style="font-size:11px;">• {{ $c['nama'] }}</span>
-                    @if($c['ukuran_badan'])
-                    <span class="recipient-ukuran" style="font-size:10px; color:#4B5563;">({{ $c['ukuran_badan'] }})</span>
-                    @endif
-                </div>
-                @endforeach
-            </div>
-        </div>
         @endif
 
-        @if(!empty($taskStandardRecipients))
-        <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left;">
-            <div class="task-detail-label" style="margin-bottom: 4px;">👤 Penerima Tugas Anda</div>
-            <div style="width: 100%;">
-                @foreach($taskStandardRecipients as $sz => $names)
-                <div class="recipient-row" style="font-size:11px; margin-bottom: 2px;">
-                    <span class="recipient-size" style="font-size:10px; padding:0 3px; min-width:20px;">{{ $sz }}</span>
-                    <span class="recipient-names">{{ implode(', ', $names) }}</span>
-                </div>
-                @endforeach
-            </div>
-        </div>
-        @endif
-        @endif
-        
-        <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left;">
-            <div class="task-detail-label" style="margin-bottom: 4px;">Instruksi Kerja</div>
+        <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left; width: 100%;">
+            <div class="task-detail-label" style="margin-bottom: 6px;">Instruksi Kerja</div>
             <div class="task-detail-value text-note" style="text-align: left; width: 100%;">
-                {{ $myTask->description ?: $defaultInstructions }}
+                @php
+                    $rawText = $myTask->description ?: $defaultInstructions;
+                @endphp
+                @if(str_contains($rawText, '|'))
+                    @php
+                        $parts = explode('|', $rawText);
+                        $firstPart = trim($parts[0]);
+                        $hasTitle = false;
+                        $titleText = '';
+                        $firstItemText = '';
+                        
+                        if (str_contains($firstPart, ':') && !preg_match('/^[SMLXS|CUSTOM|XL|XXL]+.*:/i', $firstPart)) {
+                            $titlePos = strpos($firstPart, ':');
+                            $titleText = substr($firstPart, 0, $titlePos + 1);
+                            $firstItemText = trim(substr($firstPart, $titlePos + 1));
+                            $hasTitle = true;
+                        }
+                    @endphp
+
+                    @if($hasTitle)
+                        <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">{{ $titleText }}</div>
+                        <ul class="instruction-list">
+                            @if(!empty($firstItemText))
+                            <li class="instruction-item">
+                                <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                                {{ $firstItemText }}
+                            </li>
+                            @endif
+                            @for($i = 1; $i < count($parts); $i++)
+                                @if(trim($parts[$i]))
+                                <li class="instruction-item">
+                                    <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                                    {!! nl2br(e(trim($parts[$i]))) !!}
+                                </li>
+                                @endif
+                            @endfor
+                        </ul>
+                    @else
+                        <ul class="instruction-list">
+                            @foreach($parts as $part)
+                                @if(trim($part))
+                                <li class="instruction-item">
+                                    <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                                    {!! nl2br(e(trim($part))) !!}
+                                </li>
+                                @endif
+                            @endforeach
+                        </ul>
+                    @endif
+                @else
+                    <div class="instruction-plain-text">
+                        {!! nl2br(e($rawText)) !!}
+                    </div>
+                @endif
+
+                {{-- Gabungkan List Ukuran Custom di bawah instruksi agar rapi --}}
+                @if(!empty($taskCustomRecipients))
+                    <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-top: 14px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Pembagian Size Custom :</div>
+                    <ul class="instruction-list">
+                        @foreach($taskCustomRecipients as $c)
+                        <li class="instruction-item">
+                            <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                            <span style="font-weight: 600; color: #1e293b;">{{ $c['nama'] }}</span>
+                            @if($c['ukuran_badan'])
+                            <div style="font-size: 13px; color: #475569; margin-top: 2px;">({{ $c['ukuran_badan'] }})</div>
+                            @endif
+                        </li>
+                        @endforeach
+                    </ul>
+                @endif
             </div>
         </div>
         
         @if($myTask->is_revision)
-        <div class="revision-notice">
-            🔧 Ini adalah tugas REVISI — perbaiki sesuai catatan QC
+        <div class="revision-notice" style="background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 12px; padding: 12px; margin-top: 12px;">
+            <div style="font-weight: 700; color: #991B1B; display: flex; align-items: center; gap: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
+                <span>🔧</span> Tugas Revisi
+            </div>
+            @if($wo->reject_reason)
+            <div style="margin-top: 6px; font-size: 13px; color: #7F1D1D; font-weight: 500; line-height: 1.4; background: #FFF; padding: 8px 10px; border-radius: 8px; border: 1px solid #FEE2E2;">
+                <strong>Catatan QC:</strong> {{ $wo->reject_reason }}
+            </div>
+            @else
+            <div style="margin-top: 4px; font-size: 12px; color: #7F1D1D;">Perbaiki pengerjaan sesuai arahan QC.</div>
+            @endif
         </div>
         @endif
     </div>
@@ -582,9 +636,8 @@
 
     @elseif($isQcStage)
     {{-- QC Actions --}}
-    @if($worker?->id === $wo->qc_worker_id && $isMyActiveStage)
+    @if($worker?->id === $wo->qc_worker_id && $isMyActiveStage && $wo->status === 'QC_PREP')
     <div class="action-card">
-        @if($wo->status === 'QC_PREP')
         {{-- QC Persiapan: hanya approve (tidak ada reject) --}}
         <div class="action-title">📋 QC Persiapan Bahan & Peralatan</div>
         <p class="action-desc">Pastikan semua bahan dan peralatan sudah siap sebelum produksi dimulai. Tekan Approve untuk melanjutkan ke tahap produksi.</p>
@@ -595,65 +648,14 @@
             <span wire:loading.remove wire:target="approveQC">✅ Approve & Mulai Produksi</span>
             <span wire:loading wire:target="approveQC">⏳ Memproses...</span>
         </button>
-        @else
-        {{-- QC Review: approve + reject --}}
-        <div class="action-title">⚙️ Verifikasi QC — {{ $statusLabel }}</div>
-        <p class="action-desc">Periksa hasil pengerjaan. Tekan Approve jika sudah sesuai standar, atau Reject jika perlu diperbaiki.</p>
-
-        <div class="reject-info">
-            @if($wo->reject_reason)
-            <div class="alert-reject">
-                <strong>⚠️ Catatan Penolakan Sebelumnya:</strong><br>
-                {{ $wo->reject_reason }}
-            </div>
-            @endif
-        </div>
-
-        <button wire:click="approveQC"
-                wire:loading.attr="disabled"
-                class="btn btn-primary btn-full">
-            <span wire:loading.remove wire:target="approveQC">✅ Approve & Lanjutkan</span>
-            <span wire:loading wire:target="approveQC">⏳ Memproses...</span>
-        </button>
-
-        @if(!$showRejectForm)
-        <button wire:click="$set('showRejectForm', true)"
-                class="btn btn-outline btn-full mt-sm">
-            ❌ Reject / Kembalikan
-        </button>
-        @else
-        {{-- Form Reject --}}
-        <div class="reject-form">
-            <label class="form-label">Alasan Penolakan <span class="required">*</span></label>
-            <textarea wire:model="rejectReason"
-                      class="form-textarea"
-                      placeholder="Jelaskan kenapa hasil ini perlu diperbaiki..."
-                      rows="3"></textarea>
-            @error('rejectReason') <span class="form-error">{{ $message }}</span> @enderror
-
-            <label class="form-label mt-sm">Foto Bukti (Opsional)</label>
-            <input type="file" wire:model="rejectProof" class="form-file" accept="image/*">
-            @error('rejectProof') <span class="form-error">{{ $message }}</span> @enderror
-
-            <div class="btn-row mt-sm">
-                <button wire:click="rejectQC"
-                        wire:loading.attr="disabled"
-                        class="btn btn-danger btn-half">
-                    <span wire:loading.remove wire:target="rejectQC">Kirim Reject</span>
-                    <span wire:loading wire:target="rejectQC">⏳...</span>
-                </button>
-                <button wire:click="$set('showRejectForm', false)"
-                        class="btn btn-outline btn-half">
-                    Batal
-                </button>
-            </div>
-        </div>
-        @endif
-        @endif
     </div>
+    @elseif($worker?->id === $wo->qc_worker_id && $wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW)
+        {{-- Sembunyikan panel bulk approve di atas karena sudah digantikan per-worker review panel di bawah --}}
     @else
     <div class="action-banner banner-gray">
-        @if($myTask && $myTask->status === 'done')
+        @if($wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW)
+            <span>🔍 Sedang dalam verifikasi hasil pekerjaan oleh Petugas QC...</span>
+        @elseif($myTask && $myTask->status === 'done')
             <span>✅ Tugas {{ str_replace('_', ' ', $myTask->stage_name) }} selesai & masuk tahap QC</span>
         @else
             <span>🔍 Menunggu verifikasi dari Petugas QC...</span>
@@ -673,11 +675,18 @@
             <div class="action-title">🔧 Tugas Anda: {{ $statusLabel }}</div>
 
             @if($myActiveTask && $myActiveTask->status === 'pending')
+            @php $isRevision = $myActiveTask->is_revision ?? false; @endphp
             <button wire:click="mulaiKerjakan"
                     wire:loading.attr="disabled"
-                    class="btn btn-primary btn-full btn-lg">
+                    class="btn {{ $isRevision ? 'btn-warning' : 'btn-primary' }} btn-full btn-lg">
                 <span wire:loading.remove wire:target="mulaiKerjakan">
-                    {{ $wo->status === 'QC_PERSIAPAN' ? '🔥 Mulai QC Persiapan' : '🔥 Mulai Kerjakan' }}
+                    @if($wo->status === 'QC_PERSIAPAN')
+                        🔥 Mulai QC Persiapan
+                    @elseif($isRevision)
+                        🔧 Mulai Perbaikan
+                    @else
+                        🔥 Mulai Kerjakan
+                    @endif
                 </span>
                 <span wire:loading wire:target="mulaiKerjakan">⏳ Memulai...</span>
             </button>
@@ -689,7 +698,21 @@
                     wire:loading.attr="disabled"
                     class="btn btn-success btn-full btn-lg">
                 <span wire:loading.remove wire:target="selesaiKerjakan">
-                    {{ $wo->status === 'QC_PERSIAPAN' ? '✅ Selesai & Lanjutkan' : '✅ Selesai & Kirim ke QC' }}
+                    @php
+                        $nextStatus = $wo->getNextStatus();
+                        if ($wo->status === 'QC_PERSIAPAN') {
+                            $btnLabel = '✅ Selesai & Lanjutkan';
+                        } elseif ($nextStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
+                            $btnLabel = '✅ Selesai & Kirim ke QC';
+                        } elseif ($nextStatus === \App\Models\WorkOrder::STATUS_COMPLETED) {
+                            $btnLabel = '✅ Selesai & Tandai Selesai';
+                        } elseif ($nextStatus) {
+                            $btnLabel = '✅ Selesai & Lanjut ke ' . str_replace('_', ' ', $nextStatus);
+                        } else {
+                            $btnLabel = '✅ Selesai';
+                        }
+                    @endphp
+                    {{ $btnLabel }}
                 </span>
                 <span wire:loading wire:target="selesaiKerjakan">⏳ Memproses...</span>
             </button>
@@ -725,10 +748,10 @@
             ->get();
     @endphp
 
-    <div style="margin: 0 16px 16px;">
-        <div style="font-size:13px;font-weight:700;color:#9333ea;text-transform:uppercase;
-                    letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-            <span>🔍</span> QC Review — {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}
+    <div class="action-card" style="margin-top: 16px; margin-bottom: 24px; border: 1.5px solid #FDBA74; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.08);">
+        <div style="font-size:14px;font-weight:800;color:#EA580C;text-transform:uppercase;
+                    letter-spacing:0.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px;">
+            <span>🔍</span> QC Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}
         </div>
 
         <div style="display:flex;flex-direction:column;gap:8px;">
@@ -1044,7 +1067,7 @@
 .task-detail-value.text-note {
     font-weight: 500;
     color: #4B5563;
-    font-style: italic;
+    font-style: normal;
 }
 .revision-notice {
     margin-top: 8px;
@@ -1216,6 +1239,89 @@
 .stage-name { font-size: 13px; font-weight: 600; color: #374151; }
 .stage-current .stage-name { color: #6600CC; font-weight: 700; }
 
+/* ── Modal ── */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10000;
+    padding: 16px;
+}
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #E5E7EB;
+}
+.modal-header h3 { font-size: 18px; font-weight: 800; margin: 0; }
+.modal-close {
+    background: none; border: none; font-size: 24px;
+    color: #9CA3AF; cursor: pointer; padding: 0; line-height: 1;
+}
+.modal-body { padding: 20px; }
+.review-info {
+    background: #F9FAFB;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+}
+.review-stage { font-weight: 700; color: #EA580C; font-size: 14px; }
+.review-product { font-weight: 600; color: #111827; font-size: 15px; margin-top: 4px; }
+.review-customer { font-size: 12px; color: #6B7280; margin-top: 2px; }
+.reject-section { margin-top: 8px; }
+.reject-label { font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 8px; }
+.reject-textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #D1D5DB;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    resize: none;
+    margin-bottom: 12px;
+}
+.reject-textarea:focus { outline: none; border-color: #8000FF; }
+
+
+/* ── Instruction Typography & Lists ── */
+.instruction-list {
+    margin: 0;
+    padding-left: 0;
+    list-style-type: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+.instruction-item {
+    position: relative;
+    padding-left: 20px;
+    color: #374151;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.instruction-pin {
+    position: absolute;
+    left: 0;
+    color: #8000FF;
+    font-size: 13px;
+}
+.instruction-plain-text {
+    color: #374151;
+    padding-left: 4px;
+    white-space: pre-line;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
 /* ── Action Card ── */
 .action-card {
     background: white;
@@ -1252,6 +1358,8 @@
 .btn-success:not(:disabled):hover { background: #15803D; }
 .btn-danger   { background: #DC2626; color: white; }
 .btn-danger:not(:disabled):hover { background: #B91C1C; }
+.btn-warning  { background: #EA580C; color: white; }
+.btn-warning:not(:disabled):hover { background: #C2410C; }
 .btn-outline  { background: white; color: #374151; border: 1.5px solid #E5E7EB; }
 .btn-outline:hover { border-color: #8000FF; color: #8000FF; }
 .btn-half { flex: 1; }

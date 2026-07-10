@@ -138,55 +138,57 @@ class NotificationHelper
             }
         }
 
-        // Kirim notifikasi ke tiap worker
-        foreach ($workers as $worker) {
-            if (!$worker->phone) continue;
+        // Kirim notifikasi ke tiap worker (kecuali jika WO masuk tahap QC_REVIEW, karena itu ditangani khusus ke Petugas QC di bawah)
+        if ($newStatus !== WorkOrder::STATUS_QC_REVIEW) {
+            foreach ($workers as $worker) {
+                if (!$worker->phone) continue;
 
-            // Jika worker tahap baru sama dengan worker tahap sebelumnya, lewati (karena dia yang menyelesaikan)
-            if ($prevWorkerId && $worker->id === $prevWorkerId) {
-                Log::info("[WA-Bot] Lewati notifikasi ke {$worker->name} karena dia yang menyelesaikan tahap sebelumnya.");
-                continue;
-            }
+                // Jika worker tahap baru sama dengan worker tahap sebelumnya, lewati (karena dia yang menyelesaikan)
+                if ($prevWorkerId && $worker->id === $prevWorkerId) {
+                    Log::info("[WA-Bot] Lewati notifikasi ke {$worker->name} karena dia yang menyelesaikan tahap sebelumnya.");
+                    continue;
+                }
 
-            $phone = $worker->phone;
-            $link  = url("/tugas?wo_id={$wo->id}&token={$wo->token}&wt={$worker->portal_token}");
+                $phone = $worker->phone;
+                $link  = url("/tugas?wo_id={$wo->id}&token={$wo->token}&wt={$worker->portal_token}");
 
-            // Qty untuk worker ini (dari task-nya)
-            $workerTask = $tasks->firstWhere('assigned_to', $worker->id);
-            $workerQty  = $workerTask?->quantity ?? $totalQty;
+                // Qty untuk worker ini (dari task-nya)
+                $workerTask = $tasks->firstWhere('assigned_to', $worker->id);
+                $workerQty  = $workerTask?->quantity ?? $totalQty;
 
-            if ($isReject) {
-                $pesan = "⚠️ *REVISI QC — {$wo->wo_number}*\n\n"
-                    . "Halo {$worker->name},\n"
-                    . "Hasil kerja Anda pada tahap *{$label}* perlu diperbaiki.\n\n"
-                    . "📋 *Detail:*\n"
-                    . "• Produk: {$produk}\n"
-                    . "• Pelanggan: {$customer}\n"
-                    . "• Total Qty: {$totalQty} pcs (bagian Anda: {$workerQty} pcs){$rincianUkuran}\n"
-                    . "• Deadline: {$deadline}\n"
-                    . "• Alasan: {$rejectReason}\n\n"
-                    . "Silakan perbaiki dan selesaikan kembali.\n"
-                    . "🔗 {$link}";
-            } else {
-                $pesan = "🔥 *TUGAS SIAP DIKERJAKAN — {$wo->wo_number}*\n\n"
-                    . "Halo {$worker->name},\n"
-                    . "Tugas Anda untuk tahap *{$label}* kini siap dikerjakan.{$prevStageInfo}\n\n"
-                    . "📋 *Detail:*\n"
-                    . "• Produk: {$produk}\n"
-                    . "• Pelanggan: {$customer}\n"
-                    . "• Total Qty: {$totalQty} pcs (bagian Anda: {$workerQty} pcs){$rincianUkuran}\n"
-                    . "• Deadline: {$deadline}\n\n"
-                    . "Buka portal tugas Anda:\n"
-                    . "🔗 {$link}";
-            }
+                if ($isReject) {
+                    $pesan = "⚠️ *REVISI QC — {$wo->wo_number}*\n\n"
+                        . "Halo {$worker->name},\n"
+                        . "Hasil kerja Anda pada tahap *{$label}* perlu diperbaiki.\n\n"
+                        . "📋 *Detail:*\n"
+                        . "• Produk: {$produk}\n"
+                        . "• Pelanggan: {$customer}\n"
+                        . "• Total Qty: {$totalQty} pcs (bagian Anda: {$workerQty} pcs){$rincianUkuran}\n"
+                        . "• Deadline: {$deadline}\n"
+                        . "• Alasan: {$rejectReason}\n\n"
+                        . "Silakan perbaiki dan selesaikan kembali.\n"
+                        . "🔗 {$link}";
+                } else {
+                    $pesan = "🔥 *TUGAS SIAP DIKERJAKAN — {$wo->wo_number}*\n\n"
+                        . "Halo {$worker->name},\n"
+                        . "Tugas Anda untuk tahap *{$label}* kini siap dikerjakan.{$prevStageInfo}\n\n"
+                        . "📋 *Detail:*\n"
+                        . "• Produk: {$produk}\n"
+                        . "• Pelanggan: {$customer}\n"
+                        . "• Total Qty: {$totalQty} pcs (bagian Anda: {$workerQty} pcs){$rincianUkuran}\n"
+                        . "• Deadline: {$deadline}\n\n"
+                        . "Buka portal tugas Anda:\n"
+                        . "🔗 {$link}";
+                }
 
-            try {
-                Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                    'nohp'  => $phone,
-                    'pesan' => $pesan,
-                ]);
-            } catch (\Exception $e) {
-                Log::error('[WA-Bot] Gagal mengirim pesan: ' . $e->getMessage());
+                try {
+                    Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
+                        'nohp'  => $phone,
+                        'pesan' => $pesan,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('[WA-Bot] Gagal mengirim pesan: ' . $e->getMessage());
+                }
             }
         }
 
