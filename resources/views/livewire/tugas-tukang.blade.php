@@ -337,106 +337,67 @@
             <div class="task-detail-value text-note" style="text-align: left; width: 100%;">
                 @php
                     $rawText = $myTask->description ?: $defaultInstructions;
+                    $hasCustom = !empty($taskCustomRecipients);
 
-                    // Pisahkan teks instruksi murni dari list ukuran (yang mengandung pipe |)
-                    // Ambil hanya bagian sebelum "|" jika ada, sebagai kalimat instruksi
-                    $instructionOnlyText = '';
-                    if (str_contains($rawText, '|')) {
-                        $firstPart = trim(explode('|', $rawText)[0]);
-                        // Kalau ada title "Pembagian Ukuran:" di depan, strip-kan
+                    // Cek apakah rawText berisi list pipe-separated (size breakdown)
+                    $hasPipe = str_contains($rawText, '|');
+
+                    // Ekstrak title dan items dari rawText
+                    $parsedTitle = '';
+                    $parsedItems = [];
+                    if ($hasPipe) {
+                        $parts = array_map('trim', explode('|', $rawText));
+                        $firstPart = $parts[0];
                         if (str_contains($firstPart, ':')) {
                             $colonPos = strpos($firstPart, ':');
-                            $afterColon = trim(substr($firstPart, $colonPos + 1));
-                            // Kalau setelah titik dua adalah item size (S, M, L, dst), berarti tidak ada kalimat instruksi
-                            if (!preg_match('/^\s*[SMLX]/', $afterColon)) {
-                                $instructionOnlyText = $afterColon;
-                            }
+                            $parsedTitle = trim(substr($firstPart, 0, $colonPos + 1));
+                            $firstItem = trim(substr($firstPart, $colonPos + 1));
+                            if (!empty($firstItem)) $parsedItems[] = $firstItem;
+                        } else {
+                            $parsedItems[] = $firstPart;
                         }
-                    } else {
-                        $instructionOnlyText = $rawText;
+                        for ($i = 1; $i < count($parts); $i++) {
+                            if (trim($parts[$i])) $parsedItems[] = trim($parts[$i]);
+                        }
+                        // Kalau ada custom, filter baris yang mengandung "CUSTOM:" dari list toko
+                        if ($hasCustom) {
+                            $parsedItems = array_filter($parsedItems, fn($item) =>
+                                !preg_match('/^CUSTOM\s*:/i', $item)
+                            );
+                        }
                     }
 
-                    $hasStandard = !empty($taskStandardRecipients);
-                    $hasCustom   = !empty($taskCustomRecipients);
+                    // Teks instruksi murni (bukan list ukuran) — rawText tanpa pipe
+                    $instructionOnlyText = !$hasPipe ? $rawText : '';
                 @endphp
 
-                {{-- Teks kalimat instruksi (bukan list ukuran) --}}
+                {{-- Kalimat instruksi biasa (tidak ada pipe/list) --}}
                 @if(!empty($instructionOnlyText))
-                    <div class="instruction-plain-text" style="margin-bottom: {{ ($hasStandard || $hasCustom) ? '12px' : '0' }};">
+                    <div class="instruction-plain-text" style="margin-bottom: {{ $hasCustom ? '12px' : '0' }};">
                         {!! nl2br(e($instructionOnlyText)) !!}
                     </div>
                 @endif
 
-                {{-- Pembagian Size Toko: tampil hanya jika ada standard recipients --}}
-                @if($hasStandard)
-                    <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
-                        Pembagian Size {{ $hasCustom ? 'Toko' : '' }} :
-                    </div>
+                {{-- List ukuran dari rawText (Pembagian Ukuran / Size Toko) --}}
+                @if($hasPipe && !empty($parsedItems))
+                    @if(!empty($parsedTitle))
+                        <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            {{ $parsedTitle }}
+                        </div>
+                    @endif
                     <ul class="instruction-list">
-                        @foreach($taskStandardRecipients as $size => $names)
+                        @foreach($parsedItems as $item)
                         <li class="instruction-item">
                             <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
-                            <span style="font-weight: 600; color: #1e293b;">{{ $size }}</span>
-                            @if(!empty($names))
-                                <span style="color:#64748b; font-size:13px;"> — {{ implode(', ', $names) }}</span>
-                            @endif
+                            {!! nl2br(e($item)) !!}
                         </li>
                         @endforeach
                     </ul>
-                @elseif(!$hasCustom)
-                    {{-- Fallback: parse dari rawText jika tidak ada data recipients sama sekali --}}
-                    @if(str_contains($rawText, '|'))
-                        @php
-                            $parts = explode('|', $rawText);
-                            $firstPart = trim($parts[0]);
-                            $hasTitle = false;
-                            $titleText = '';
-                            $firstItemText = '';
-                            if (str_contains($firstPart, ':')) {
-                                $titlePos = strpos($firstPart, ':');
-                                $titleText = substr($firstPart, 0, $titlePos + 1);
-                                $firstItemText = trim(substr($firstPart, $titlePos + 1));
-                                $hasTitle = true;
-                            }
-                        @endphp
-                        @if($hasTitle)
-                            <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">{{ $titleText }}</div>
-                            <ul class="instruction-list">
-                                @if(!empty($firstItemText))
-                                <li class="instruction-item">
-                                    <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
-                                    {{ $firstItemText }}
-                                </li>
-                                @endif
-                                @for($i = 1; $i < count($parts); $i++)
-                                    @if(trim($parts[$i]))
-                                    <li class="instruction-item">
-                                        <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
-                                        {!! nl2br(e(trim($parts[$i]))) !!}
-                                    </li>
-                                    @endif
-                                @endfor
-                            </ul>
-                        @else
-                            <ul class="instruction-list">
-                                @foreach($parts as $part)
-                                    @if(trim($part))
-                                    <li class="instruction-item">
-                                        <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
-                                        {!! nl2br(e(trim($part))) !!}
-                                    </li>
-                                    @endif
-                                @endforeach
-                            </ul>
-                        @endif
-                    @elseif(!empty($rawText) && empty($instructionOnlyText))
-                        <div class="instruction-plain-text">{!! nl2br(e($rawText)) !!}</div>
-                    @endif
                 @endif
 
-                {{-- Detail Size Custom: tampil hanya jika ada custom recipients --}}
+                {{-- Detail Size Custom: hanya jika ada custom recipients --}}
                 @if($hasCustom)
-                    <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-top: {{ $hasStandard ? '14px' : '0' }}; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-top: {{ ($hasPipe && !empty($parsedItems)) ? '14px' : '0' }}; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
                         Detail Size Custom :
                     </div>
                     <ul class="instruction-list">
@@ -453,6 +414,7 @@
                 @endif
             </div>
         </div>
+
 
         
         @if($myTask->is_revision)
