@@ -136,7 +136,102 @@ class WorkOrderService
     }
 
     /**
-     * QC Approve: meneruskan ke divisi berikutnya dari status QC.
+     * QC Approve per-task: set qc_approved=true, lalu cek apakah semua task stage sudah disetujui.
+     * Jika semua approved → advance WO ke tahap berikutnya.
+     * Return: ['advanced' => bool, 'wo' => WorkOrder]
+     */
+    public function approveTask(int $taskId): array
+    {
+        return DB::transaction(function () use ($taskId) {
+            $task = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->lockForUpdate()
+                ->with('orderItem')
+                ->findOrFail($taskId);
+
+            // Tandai task ini sudah disetujui QC
+            $task->update([
+                'qc_approved'    => true,
+                'qc_reviewed_at' => now(),
+            ]);
+
+            // Cari WO terkait
+            $wo = WorkOrder::withoutGlobalScopes()
+                ->where('order_item_id', $task->order_item_id)
+                ->where('status', WorkOrder::STATUS_QC_REVIEW)
+                ->first();
+
+            if (!$wo) {
+                return ['advanced' => false, 'wo' => null];
+            }
+
+            // Cek apakah semua task di stage ini sudah qc_approved
+            $groupItemIds = $task->orderItem
+                ? $task->orderItem->getItemsInGroup()->pluck('id')
+                : [$task->order_item_id];
+
+            $unapprovedCount = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('stage_name', $wo->current_review_stage)
+                ->where(fn($q) => $q->where('qc_approved', false)->orWhereNull('qc_approved'))
+                ->count();
+
+            if ($unapprovedCount === 0) {
+                // Semua approved → advance WO
+                $this->advance($wo->id);
+                return ['advanced' => true, 'wo' => $wo->fresh()];
+            }
+
+            return ['advanced' => false, 'wo' => $wo->fresh()];
+        });
+    }
+
+    /**
+     * QC Reject per-task: kembalikan task spesifik ke pending (revisi),
+     * dan kembalikan WO ke tahap yang sedang di-review jika masih di qc_review.
+     */
+    public function rejectTask(int $taskId, string $reason): \App\Models\ProductionTask
+    {
+        return DB::transaction(function () use ($taskId, $reason) {
+            $task = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->lockForUpdate()
+                ->with('orderItem')
+                ->findOrFail($taskId);
+
+            // Reset task ke pending + tandai revisi
+            $task->update([
+                'status'         => 'pending',
+                'is_revision'    => true,
+                'qc_approved'    => false,
+                'qc_reviewed_at' => now(),
+                'completed_at'   => null,
+            ]);
+
+            // Kembalikan WO ke tahap sebelumnya (jika masih di qc_review)
+            $wo = WorkOrder::withoutGlobalScopes()
+                ->where('order_item_id', $task->order_item_id)
+                ->where('status', WorkOrder::STATUS_QC_REVIEW)
+                ->first();
+
+            if ($wo && $wo->current_review_stage) {
+                $prevStage = $wo->current_review_stage;
+                $wo->update([
+                    'status'               => $prevStage,
+                    'current_review_stage' => null,
+                    'reject_reason'        => $reason,
+                    'stage_entered_at'     => now(),
+                ]);
+            }
+
+            // Kirim notifikasi WA ke worker yang direvisi
+            \App\Helpers\NotificationHelper::notifyTaskRejected($task, $reason, $wo ?? WorkOrder::withoutGlobalScopes()->where('order_item_id', $task->order_item_id)->first());
+
+            return $task->fresh();
+        });
+    }
+
+    /**
+     * QC Approve legacy: meneruskan ke divisi berikutnya dari status QC.
+     * @deprecated Gunakan approveTask() untuk per-task approval
      */
     public function approveQC(int $woId): WorkOrder
     {
@@ -144,7 +239,8 @@ class WorkOrderService
     }
 
     /**
-     * QC Reject: mengembalikan status ke tahap yang sedang di-review.
+     * QC Reject legacy: mengembalikan status ke tahap yang sedang di-review.
+     * @deprecated Gunakan rejectTask() untuk per-task rejection
      */
     public function rejectQC(int $woId, string $reason, ?string $proofImagePath = null): WorkOrder
     {
@@ -167,16 +263,15 @@ class WorkOrderService
             }
 
             $wo->update([
-                'status'             => $prevStatus,
+                'status'               => $prevStatus,
                 'current_review_stage' => null,
-                'reject_reason'      => $reason,
-                'reject_proof_image' => $proofImagePath,
-                'stage_entered_at'   => now(),
+                'reject_reason'        => $reason,
+                'reject_proof_image'   => $proofImagePath,
+                'stage_entered_at'     => now(),
             ]);
 
             $wo->refresh();
 
-            // Kirim notifikasi WA penolakan
             NotificationHelper::notify($wo, $prevStatus, isReject: true, rejectReason: $reason);
 
             return $wo;

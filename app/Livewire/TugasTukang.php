@@ -327,8 +327,92 @@ class TugasTukang extends Component
         return $this->resolveCurrentWorker();
     }
 
+    // ── QC Per-Task (untuk QC worker di halaman detail) ────────────────────
+
+    public ?int $qcRejectTaskId = null;
+    public string $qcRejectReason = '';
+
+    /**
+     * QC: Approve task spesifik dari halaman detail.
+     */
+    public function approveTask(int $taskId): void
+    {
+        $task = \App\Models\ProductionTask::withoutGlobalScopes()->find($taskId);
+        if (!$task) return;
+
+        $wo = WorkOrder::withoutGlobalScopes()
+            ->where('order_item_id', $task->order_item_id)
+            ->where('status', WorkOrder::STATUS_QC_REVIEW)
+            ->first();
+
+        if (!$wo || $wo->qc_worker_id !== $this->worker?->id) {
+            $this->addError('aksi', 'Tidak memiliki akses QC untuk task ini.');
+            return;
+        }
+
+        $result = app(WorkOrderService::class)->approveTask($taskId);
+        $this->loadWorkOrder();
+
+        if ($result['advanced']) {
+            session()->flash('success', '✅ Semua pekerjaan disetujui! Pesanan lanjut ke tahap berikutnya.');
+        } else {
+            session()->flash('success', '✅ Pekerjaan disetujui. Menunggu review worker lainnya.');
+        }
+    }
+
+    /**
+     * QC: Buka modal revisi untuk task spesifik.
+     */
+    public function openTaskReject(int $taskId): void
+    {
+        $this->qcRejectTaskId = $taskId;
+        $this->qcRejectReason = '';
+        $this->resetErrorBag('qcRejectReason');
+    }
+
+    /**
+     * QC: Tutup modal revisi task.
+     */
+    public function closeTaskReject(): void
+    {
+        $this->qcRejectTaskId = null;
+        $this->qcRejectReason = '';
+        $this->resetErrorBag('qcRejectReason');
+    }
+
+    /**
+     * QC: Reject task spesifik — kirim kembali ke worker untuk diperbaiki.
+     */
+    public function rejectTask(int $taskId): void
+    {
+        if (empty(trim($this->qcRejectReason))) {
+            $this->addError('qcRejectReason', 'Alasan revisi wajib diisi.');
+            return;
+        }
+
+        $task = \App\Models\ProductionTask::withoutGlobalScopes()->with('assignedTo')->find($taskId);
+        if (!$task) return;
+
+        $wo = WorkOrder::withoutGlobalScopes()
+            ->where('order_item_id', $task->order_item_id)
+            ->first();
+
+        if (!$wo || $wo->qc_worker_id !== $this->worker?->id) {
+            $this->addError('aksi', 'Tidak memiliki akses QC untuk task ini.');
+            return;
+        }
+
+        app(WorkOrderService::class)->rejectTask($taskId, $this->qcRejectReason);
+        $this->loadWorkOrder();
+
+        session()->flash('success', '🔧 Revisi dikirim ke ' . ($task->assignedTo?->name ?? 'pekerja') . '.');
+        $this->qcRejectTaskId = null;
+        $this->qcRejectReason = '';
+    }
+
     public function render()
     {
         return view('livewire.tugas-tukang');
     }
 }
+

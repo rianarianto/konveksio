@@ -53,101 +53,112 @@
     </div>
 
     @foreach($qcReviews as $wo)
-    @if($wo)
-    <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
-    @endif
-    <div class="card task-card task-review" style="cursor:pointer;">
-        <div class="task-header">
-            <div class="task-info">
-                <div class="task-stage task-stage-review">Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}</div>
-                <div class="task-product">{{ $wo->orderItem?->product_name ?? '-' }}</div>
-                <div class="task-customer">{{ $wo->orderItem?->order?->customer?->name ?? '-' }} • {{ $wo->orderItem ? $wo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs</div>
+    <div class="card task-card task-review">
+        {{-- Header WO --}}
+        <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}"
+           style="text-decoration:none;color:inherit;display:block;">
+            <div class="task-header" style="margin-bottom:12px;">
+                <div class="task-info">
+                    <div class="task-stage task-stage-review">Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}</div>
+                    <div class="task-product">{{ $wo->orderItem?->product_name ?? '-' }}</div>
+                    <div class="task-customer">
+                        {{ $wo->orderItem?->order?->customer?->name ?? '-' }} •
+                        {{ $wo->orderItem ? $wo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs
+                        @if($wo->orderItem?->order?->is_express)
+                        <span class="express-badge">⚡ Express</span>
+                        @endif
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="review-actions-inline">
-            <button wire:click.prevent.stop="approveQCReview({{ $wo->id }})"
-                    wire:loading.attr="disabled"
-                    class="btn btn-success btn-sm">
-                <span wire:loading.remove wire:target="approveQCReview({{ $wo->id }})">✅ Lanjutkan</span>
-                <span wire:loading wire:target="approveQCReview({{ $wo->id }})">⏳</span>
-            </button>
-            <button wire:click.prevent.stop="openReview({{ $wo->id }})"
-                    class="btn btn-danger btn-sm">
-                🔧 Revisi
-            </button>
+        </a>
+
+        {{-- Per-worker rows --}}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            @foreach($wo->reviewTasks as $rTask)
+            @php $isApproved = $rTask->qc_approved ?? false; @endphp
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        background:{{ $isApproved ? '#f0fdf4' : '#fefce8' }};
+                        border:1px solid {{ $isApproved ? '#86efac' : '#fde68a' }};
+                        border-radius:10px;padding:10px 12px;gap:8px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:14px;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        {{ $rTask->assignedTo?->name ?? 'Tanpa Pekerja' }}
+                    </div>
+                    <div style="font-size:12px;color:#64748b;">{{ $rTask->quantity }} pcs</div>
+                </div>
+                @if($isApproved)
+                <span style="font-size:12px;font-weight:600;color:#16a34a;
+                             background:#dcfce7;border-radius:20px;padding:4px 10px;
+                             white-space:nowrap;">✅ Disetujui</span>
+                @else
+                <div style="display:flex;gap:6px;flex-shrink:0;">
+                    <button wire:click="approveTask({{ $rTask->id }})"
+                            wire:loading.attr="disabled"
+                            style="font-size:12px;font-weight:600;color:#fff;
+                                   background:#22c55e;border:none;border-radius:8px;
+                                   padding:6px 12px;cursor:pointer;white-space:nowrap;">
+                        <span wire:loading.remove wire:target="approveTask({{ $rTask->id }})">✅ Setujui</span>
+                        <span wire:loading wire:target="approveTask({{ $rTask->id }})">⏳</span>
+                    </button>
+                    <button wire:click="openTaskReview({{ $rTask->id }})"
+                            style="font-size:12px;font-weight:600;color:#fff;
+                                   background:#ef4444;border:none;border-radius:8px;
+                                   padding:6px 12px;cursor:pointer;white-space:nowrap;">
+                        🔧 Revisi
+                    </button>
+                </div>
+                @endif
+            </div>
+            @endforeach
         </div>
     </div>
-    @if($wo)</a>@endif
     @endforeach
     @endif
 
-    {{-- QC Review Modal (only for reject reason input) --}}
-    @if($reviewWoId)
+    {{-- Modal Revisi Per Task --}}
+    @if($reviewTaskId)
     @php
-        $reviewWo = \App\Models\WorkOrder::withoutGlobalScopes()->with(['orderItem.order.customer'])->find($reviewWoId);
-        
-        $groupItemIds = $reviewWo->orderItem
-            ? $reviewWo->orderItem->getItemsInGroup()->pluck('id')
-            : [$reviewWo->order_item_id];
-            
-        $reviewTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-            ->whereIn('order_item_id', $groupItemIds)
-            ->where('stage_name', $reviewWo->current_review_stage)
-            ->with('assignedTo')
-            ->get();
+        $reviewTask = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->with(['assignedTo', 'orderItem.order.customer'])
+            ->find($reviewTaskId);
     @endphp
-    <div class="modal-overlay" wire:click.self="closeReview">
+    @if($reviewTask)
+    <div class="modal-overlay" wire:click.self="closeTaskReview">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Revisi Pekerjaan</h3>
-                <button wire:click="closeReview" class="modal-close">&times;</button>
+                <button wire:click="closeTaskReview" class="modal-close">&times;</button>
             </div>
-            
             <div class="modal-body">
                 <div class="review-info">
-                    <div class="review-stage">Review: {{ str_replace('_', ' ', $reviewWo?->current_review_stage ?? '') }}</div>
-                    <div class="review-product">{{ $reviewWo?->orderItem?->product_name ?? '-' }}</div>
-                    <div class="review-customer">{{ $reviewWo?->orderItem?->order?->customer?->name ?? '-' }}</div>
+                    <div class="review-stage">{{ $reviewTask->assignedTo?->name ?? 'Tanpa Pekerja' }}</div>
+                    <div class="review-product">{{ $reviewTask->orderItem?->product_name ?? '-' }} ({{ $reviewTask->quantity }} pcs)</div>
+                    <div class="review-customer">{{ $reviewTask->orderItem?->order?->customer?->name ?? '-' }}</div>
                 </div>
-
-                <div class="reject-section" style="margin-top: 16px;">
-                    <label class="reject-label" style="font-weight: 600; display: block; margin-bottom: 8px;">Pilih Pekerja yang Perlu Revisi:</label>
-                    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb;">
-                        @foreach($reviewTasks as $task)
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0;">
-                            <input type="checkbox" wire:model="selectedTaskIds" value="{{ $task->id }}" style="width: 16px; height: 16px; accent-color: #ef4444;">
-                            <span style="font-size: 14px; color: #374151; font-weight: 500;">
-                                <strong>{{ $task->assignedTo?->name ?? 'Tanpa Pekerja' }}</strong> 
-                                ({{ $task->quantity }} pcs)
-                            </span>
-                        </label>
-                        @endforeach
-                    </div>
-                    @error('rejectTasks')
-                    <span class="field-error" style="color: #b91c1c; font-size: 13px; display: block; margin-bottom: 8px;">⚠️ {{ $message }}</span>
-                    @enderror
-
+                <div class="reject-section" style="margin-top:16px;">
                     <label class="reject-label">Alasan Revisi (wajib):</label>
-                    <textarea wire:model="rejectReason" 
-                              class="reject-textarea" 
-                              placeholder="Tuliskan alasan revisi..."
+                    <textarea wire:model="rejectReason"
+                              class="reject-textarea"
+                              placeholder="Tuliskan alasan revisi untuk {{ $reviewTask->assignedTo?->name ?? 'pekerja' }}..."
                               rows="3"></textarea>
                     @error('rejectReason')
                     <span class="field-error">{{ $message }}</span>
                     @enderror
-                    
-                    <button wire:click="rejectQCReview({{ $reviewWoId }})"
+                    <button wire:click="rejectTask({{ $reviewTaskId }})"
                             wire:loading.attr="disabled"
                             class="btn btn-danger btn-full"
-                            style="margin-top: 12px;">
-                        <span wire:loading.remove wire:target="rejectQCReview({{ $reviewWoId }})">🔧 Kirim Revisi</span>
-                        <span wire:loading wire:target="rejectQCReview({{ $reviewWoId }})">Memproses...</span>
+                            style="margin-top:12px;">
+                        <span wire:loading.remove wire:target="rejectTask({{ $reviewTaskId }})">🔧 Kirim Revisi</span>
+                        <span wire:loading wire:target="rejectTask({{ $reviewTaskId }})">Memproses...</span>
                     </button>
                 </div>
             </div>
         </div>
     </div>
     @endif
+    @endif
+
+
 
     {{-- ── SEDANG DIKERJAKAN ── --}}
     @if($tasks['in_progress']->count() > 0)

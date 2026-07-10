@@ -16,9 +16,8 @@ class WorkerDashboard extends Component
     // Selected task for detail view
     public ?int $selectedTaskId = null;
 
-    // QC Review state
-    public ?int $reviewWoId = null;
-    public string $rejectReason = '';
+
+
 
     public function mount(string $token): void
     {
@@ -346,7 +345,8 @@ class WorkerDashboard extends Component
     }
 
     /**
-     * Get WOs that need QC Review (assigned to this worker as QC).
+     * Get WOs yang perlu QC Review (assigned to this worker as QC).
+     * Hanya tampilkan WO yang masih ada task belum di-approve.
      */
     public function getQcReviewsProperty(): \Illuminate\Support\Collection
     {
@@ -354,120 +354,126 @@ class WorkerDashboard extends Component
             return collect();
         }
 
-        return WorkOrder::withoutGlobalScopes()
+        $wos = WorkOrder::withoutGlobalScopes()
             ->where('status', WorkOrder::STATUS_QC_REVIEW)
             ->where('qc_worker_id', $this->worker->id)
-            ->with(['orderItem.order.customer', 'orderItem.productionTasks'])
+            ->with(['orderItem.order.customer'])
             ->orderBy('stage_entered_at', 'asc')
+            ->get();
+
+        // Attach tasks per WO untuk ditampilkan di view
+        foreach ($wos as $wo) {
+            $wo->setRelation('reviewTasks', $this->getReviewTasksForWo($wo));
+        }
+
+        return $wos;
+    }
+
+    /**
+     * Ambil semua task di stage yang sedang di-review untuk WO ini.
+     */
+    public function getReviewTasksForWo(WorkOrder $wo): \Illuminate\Support\Collection
+    {
+        $groupItemIds = $wo->orderItem
+            ? $wo->orderItem->getItemsInGroup()->pluck('id')
+            : [$wo->order_item_id];
+
+        return ProductionTask::withoutGlobalScopes()
+            ->whereIn('order_item_id', $groupItemIds)
+            ->where('stage_name', $wo->current_review_stage)
+            ->with('assignedTo')
             ->get();
     }
 
+    // ── QC Per-Task Properties ─────────────────────────────────────────────
+    public ?int $reviewTaskId = null;
+    public string $rejectReason = '';
+
     /**
-     * Approve QC Review - advance to next stage.
+     * QC Approve task spesifik.
+     * Jika semua task di stage sudah approved → WO advance otomatis.
      */
-    public function approveQCReview(int $woId): void
+    public function approveTask(int $taskId): void
     {
-        $wo = WorkOrder::withoutGlobalScopes()->find($woId);
-        if (!$wo || $wo->qc_worker_id !== $this->worker?->id) {
-            $this->addError('qc', 'Tidak memiliki akses.');
+        $task = ProductionTask::withoutGlobalScopes()->find($taskId);
+        if (!$task) {
+            $this->addError('qc', 'Task tidak ditemukan.');
             return;
         }
 
-        app(WorkOrderService::class)->approveQC($wo->id);
+        // Verifikasi akses QC
+        $wo = WorkOrder::withoutGlobalScopes()
+            ->where('order_item_id', $task->order_item_id)
+            ->where('status', WorkOrder::STATUS_QC_REVIEW)
+            ->first();
+
+        if (!$wo || $wo->qc_worker_id !== $this->worker?->id) {
+            $this->addError('qc', 'Tidak memiliki akses QC untuk task ini.');
+            return;
+        }
+
+        $result = app(WorkOrderService::class)->approveTask($taskId);
+
         $this->syncOrderStatus($wo);
-        
-        session()->flash('success', '✅ QC Approved! Pesanan lanjut ke tahap berikutnya.');
-        $this->reviewWoId = null;
+
+        if ($result['advanced']) {
+            session()->flash('success', '✅ Semua pekerjaan disetujui! Pesanan lanjut ke tahap berikutnya.');
+        } else {
+            session()->flash('success', '✅ Pekerjaan disetujui. Menunggu review worker lainnya.');
+        }
     }
 
-    // Selected tasks for rejection
-    public array $selectedTaskIds = [];
+    /**
+     * Buka modal revisi untuk task spesifik.
+     */
+    public function openTaskReview(int $taskId): void
+    {
+        $this->reviewTaskId = $taskId;
+        $this->rejectReason = '';
+        $this->resetErrorBag();
+    }
 
     /**
-     * Reject QC Review - return to previous stage with reason for selected workers.
+     * Tutup modal revisi task.
      */
-    public function rejectQCReview(int $woId): void
+    public function closeTaskReview(): void
+    {
+        $this->reviewTaskId = null;
+        $this->rejectReason = '';
+        $this->resetErrorBag();
+    }
+
+    /**
+     * QC Reject task spesifik — kembalikan ke worker untuk diperbaiki.
+     */
+    public function rejectTask(int $taskId): void
     {
         if (empty(trim($this->rejectReason))) {
             $this->addError('rejectReason', 'Alasan revisi wajib diisi.');
             return;
         }
 
-        if (empty($this->selectedTaskIds)) {
-            $this->addError('rejectTasks', 'Pilih minimal satu pekerja untuk direvisi.');
+        $task = ProductionTask::withoutGlobalScopes()->find($taskId);
+        if (!$task) {
+            $this->addError('qc', 'Task tidak ditemukan.');
             return;
         }
 
-        $wo = WorkOrder::withoutGlobalScopes()->find($woId);
+        // Verifikasi akses QC
+        $wo = WorkOrder::withoutGlobalScopes()
+            ->where('order_item_id', $task->order_item_id)
+            ->first();
+
         if (!$wo || $wo->qc_worker_id !== $this->worker?->id) {
-            $this->addError('qc', 'Tidak memiliki akses.');
+            $this->addError('qc', 'Tidak memiliki akses QC untuk task ini.');
             return;
         }
 
-        $prevStage = $wo->current_review_stage;
-        if (!$prevStage) {
-            $this->addError('qc', 'Tahap sebelumnya tidak ditemukan.');
-            return;
-        }
-
-        // Ambil tasks yang dipilih untuk direvisi
-        $tasksToReject = ProductionTask::withoutGlobalScopes()
-            ->whereIn('id', $this->selectedTaskIds)
-            ->get();
-
-        foreach ($tasksToReject as $task) {
-            $task->update([
-                'status' => 'pending',
-                'completed_at' => null,
-                'is_revision' => true,
-            ]);
-
-            // Kirim notifikasi WA penolakan ke worker spesifik
-            \App\Helpers\NotificationHelper::notifyTaskRejected($task, $this->rejectReason, $wo);
-        }
-
-        // Pindahkan status WO kembali ke tahap review agar antrean tertahan
-        $wo->update([
-            'status' => $prevStage,
-            'current_review_stage' => null,
-            'reject_reason' => $this->rejectReason,
-            'stage_entered_at' => now(),
-        ]);
+        app(WorkOrderService::class)->rejectTask($taskId, $this->rejectReason);
 
         $this->syncOrderStatus($wo);
-        session()->flash('success', '🔧 Revisi dikirim ke pekerja terpilih.');
-        $this->reviewWoId = null;
+        session()->flash('success', '🔧 Revisi dikirim ke ' . ($task->assignedTo->name ?? 'pekerja') . '.');
+        $this->reviewTaskId = null;
         $this->rejectReason = '';
-        $this->selectedTaskIds = [];
-    }
-
-    /**
-     * Open review modal for a WO.
-     */
-    public function openReview(int $woId): void
-    {
-        $this->reviewWoId = $woId;
-        $this->rejectReason = '';
-        $this->selectedTaskIds = [];
-        $this->resetErrorBag();
-    }
-
-    /**
-     * Close review modal.
-     */
-    public function closeReview(): void
-    {
-        $this->reviewWoId = null;
-        $this->rejectReason = '';
-        $this->selectedTaskIds = [];
-        $this->resetErrorBag();
-    }
-
-    /**
-     * Get review stage name for display.
-     */
-    public function getReviewStageLabel(WorkOrder $wo): string
-    {
-        return $wo->current_review_stage ?? 'Unknown';
     }
 }

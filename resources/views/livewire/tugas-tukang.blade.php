@@ -714,12 +714,118 @@
 
 
 
+    {{-- ── QC REVIEW SECTION (hanya untuk QC worker di halaman detail) ── --}}
+    @if($wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW && $worker && $wo->qc_worker_id === $worker->id)
+    @php
+        $qcGroupItemIds = $orderItem ? $orderItem->getItemsInGroup()->pluck('id') : collect([$wo->order_item_id]);
+        $qcReviewTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->whereIn('order_item_id', $qcGroupItemIds)
+            ->where('stage_name', $wo->current_review_stage)
+            ->with('assignedTo')
+            ->get();
+    @endphp
+
+    <div style="margin: 0 16px 16px;">
+        <div style="font-size:13px;font-weight:700;color:#9333ea;text-transform:uppercase;
+                    letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+            <span>🔍</span> QC Review — {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            @foreach($qcReviewTasks as $qcTask)
+            @php $isApproved = $qcTask->qc_approved ?? false; @endphp
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        background:{{ $isApproved ? '#f0fdf4' : '#fefce8' }};
+                        border:1px solid {{ $isApproved ? '#86efac' : '#fde68a' }};
+                        border-radius:12px;padding:12px 14px;gap:8px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:14px;color:#1e293b;">
+                        {{ $qcTask->assignedTo?->name ?? 'Tanpa Pekerja' }}
+                    </div>
+                    <div style="font-size:12px;color:#64748b;margin-top:2px;">
+                        {{ $qcTask->quantity }} pcs
+                        @if($qcTask->is_revision)
+                        <span style="margin-left:4px;font-size:11px;font-weight:600;color:#dc2626;
+                                     background:#fee2e2;border-radius:10px;padding:2px 6px;">Revisi</span>
+                        @endif
+                    </div>
+                </div>
+                @if($isApproved)
+                <span style="font-size:12px;font-weight:600;color:#16a34a;
+                             background:#dcfce7;border-radius:20px;padding:5px 12px;
+                             white-space:nowrap;flex-shrink:0;">✅ Disetujui</span>
+                @else
+                <div style="display:flex;gap:6px;flex-shrink:0;">
+                    <button wire:click="approveTask({{ $qcTask->id }})"
+                            wire:loading.attr="disabled"
+                            style="font-size:12px;font-weight:600;color:#fff;background:#22c55e;
+                                   border:none;border-radius:8px;padding:7px 14px;cursor:pointer;white-space:nowrap;">
+                        <span wire:loading.remove wire:target="approveTask({{ $qcTask->id }})">✅ Setujui</span>
+                        <span wire:loading wire:target="approveTask({{ $qcTask->id }})">⏳</span>
+                    </button>
+                    <button wire:click="openTaskReject({{ $qcTask->id }})"
+                            style="font-size:12px;font-weight:600;color:#fff;background:#ef4444;
+                                   border:none;border-radius:8px;padding:7px 14px;cursor:pointer;white-space:nowrap;">
+                        🔧 Revisi
+                    </button>
+                </div>
+                @endif
+            </div>
+            @endforeach
+        </div>
+    </div>
+
+    {{-- Modal Revisi Task dari halaman detail --}}
+    @if($qcRejectTaskId)
+    @php
+        $rejectingTask = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->with(['assignedTo', 'orderItem.order.customer'])
+            ->find($qcRejectTaskId);
+    @endphp
+    @if($rejectingTask)
+    <div class="modal-overlay" wire:click.self="closeTaskReject">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Revisi Pekerjaan</h3>
+                <button wire:click="closeTaskReject" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="review-info">
+                    <div class="review-stage">{{ $rejectingTask->assignedTo?->name ?? 'Tanpa Pekerja' }}</div>
+                    <div class="review-product">{{ $rejectingTask->orderItem?->product_name ?? '-' }} ({{ $rejectingTask->quantity }} pcs)</div>
+                    <div class="review-customer">{{ $rejectingTask->orderItem?->order?->customer?->name ?? '-' }}</div>
+                </div>
+                <div class="reject-section" style="margin-top:16px;">
+                    <label class="reject-label">Alasan Revisi (wajib):</label>
+                    <textarea wire:model="qcRejectReason"
+                              class="reject-textarea"
+                              placeholder="Tuliskan alasan revisi untuk {{ $rejectingTask->assignedTo?->name ?? 'pekerja' }}..."
+                              rows="3"></textarea>
+                    @error('qcRejectReason')
+                    <span class="field-error">{{ $message }}</span>
+                    @enderror
+                    <button wire:click="rejectTask({{ $qcRejectTaskId }})"
+                            wire:loading.attr="disabled"
+                            class="btn btn-danger btn-full"
+                            style="margin-top:12px;">
+                        <span wire:loading.remove wire:target="rejectTask({{ $qcRejectTaskId }})">🔧 Kirim Revisi</span>
+                        <span wire:loading wire:target="rejectTask({{ $qcRejectTaskId }})">Memproses...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+    @endif
+    @endif
+
     {{-- ── FOOTER ── --}}
     <footer class="app-footer">
         <p>© {{ date('Y') }} Konveksio · Portal Produksi</p>
     </footer>
 
     @endif {{-- end $wo check --}}
+
 
 <style>
 /* ── Layout ── */
