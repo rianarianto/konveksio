@@ -277,6 +277,7 @@
             <div class="task-detail-label">Qty Tugas</div>
             <div class="task-detail-value text-purple"><strong>{{ $displayTaskQty }} pcs</strong></div>
         </div>
+        @php $taskCustomRecipients = []; $taskStandardRecipients = []; @endphp
         @if(!$isQcTask && !empty($myTask->size_quantities))
         <div class="task-detail-row">
             <div class="task-detail-label">Rincian Ukuran</div>
@@ -336,62 +337,108 @@
             <div class="task-detail-value text-note" style="text-align: left; width: 100%;">
                 @php
                     $rawText = $myTask->description ?: $defaultInstructions;
-                @endphp
-                @if(str_contains($rawText, '|'))
-                    @php
-                        $parts = explode('|', $rawText);
-                        $firstPart = trim($parts[0]);
-                        $hasTitle = false;
-                        $titleText = '';
-                        $firstItemText = '';
-                        
-                        if (str_contains($firstPart, ':') && !preg_match('/^[SMLXS|CUSTOM|XL|XXL]+.*:/i', $firstPart)) {
-                            $titlePos = strpos($firstPart, ':');
-                            $titleText = substr($firstPart, 0, $titlePos + 1);
-                            $firstItemText = trim(substr($firstPart, $titlePos + 1));
-                            $hasTitle = true;
-                        }
-                    @endphp
 
-                    @if($hasTitle)
-                        <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">{{ $titleText }}</div>
-                        <ul class="instruction-list">
-                            @if(!empty($firstItemText))
-                            <li class="instruction-item">
-                                <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
-                                {{ $firstItemText }}
-                            </li>
-                            @endif
-                            @for($i = 1; $i < count($parts); $i++)
-                                @if(trim($parts[$i]))
-                                <li class="instruction-item">
-                                    <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
-                                    {!! nl2br(e(trim($parts[$i]))) !!}
-                                </li>
-                                @endif
-                            @endfor
-                        </ul>
-                    @else
-                        <ul class="instruction-list">
-                            @foreach($parts as $part)
-                                @if(trim($part))
-                                <li class="instruction-item">
-                                    <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
-                                    {!! nl2br(e(trim($part))) !!}
-                                </li>
-                                @endif
-                            @endforeach
-                        </ul>
-                    @endif
-                @else
-                    <div class="instruction-plain-text">
-                        {!! nl2br(e($rawText)) !!}
+                    // Pisahkan teks instruksi murni dari list ukuran (yang mengandung pipe |)
+                    // Ambil hanya bagian sebelum "|" jika ada, sebagai kalimat instruksi
+                    $instructionOnlyText = '';
+                    if (str_contains($rawText, '|')) {
+                        $firstPart = trim(explode('|', $rawText)[0]);
+                        // Kalau ada title "Pembagian Ukuran:" di depan, strip-kan
+                        if (str_contains($firstPart, ':')) {
+                            $colonPos = strpos($firstPart, ':');
+                            $afterColon = trim(substr($firstPart, $colonPos + 1));
+                            // Kalau setelah titik dua adalah item size (S, M, L, dst), berarti tidak ada kalimat instruksi
+                            if (!preg_match('/^\s*[SMLX]/', $afterColon)) {
+                                $instructionOnlyText = $afterColon;
+                            }
+                        }
+                    } else {
+                        $instructionOnlyText = $rawText;
+                    }
+
+                    $hasStandard = !empty($taskStandardRecipients);
+                    $hasCustom   = !empty($taskCustomRecipients);
+                @endphp
+
+                {{-- Teks kalimat instruksi (bukan list ukuran) --}}
+                @if(!empty($instructionOnlyText))
+                    <div class="instruction-plain-text" style="margin-bottom: {{ ($hasStandard || $hasCustom) ? '12px' : '0' }};">
+                        {!! nl2br(e($instructionOnlyText)) !!}
                     </div>
                 @endif
 
-                {{-- Gabungkan List Ukuran Custom di bawah instruksi agar rapi --}}
-                @if(!empty($taskCustomRecipients))
-                    <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-top: 14px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Pembagian Size Custom :</div>
+                {{-- Pembagian Size Toko: tampil hanya jika ada standard recipients --}}
+                @if($hasStandard)
+                    <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Pembagian Size {{ $hasCustom ? 'Toko' : '' }} :
+                    </div>
+                    <ul class="instruction-list">
+                        @foreach($taskStandardRecipients as $size => $names)
+                        <li class="instruction-item">
+                            <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                            <span style="font-weight: 600; color: #1e293b;">{{ $size }}</span>
+                            @if(!empty($names))
+                                <span style="color:#64748b; font-size:13px;"> — {{ implode(', ', $names) }}</span>
+                            @endif
+                        </li>
+                        @endforeach
+                    </ul>
+                @elseif(!$hasCustom)
+                    {{-- Fallback: parse dari rawText jika tidak ada data recipients sama sekali --}}
+                    @if(str_contains($rawText, '|'))
+                        @php
+                            $parts = explode('|', $rawText);
+                            $firstPart = trim($parts[0]);
+                            $hasTitle = false;
+                            $titleText = '';
+                            $firstItemText = '';
+                            if (str_contains($firstPart, ':')) {
+                                $titlePos = strpos($firstPart, ':');
+                                $titleText = substr($firstPart, 0, $titlePos + 1);
+                                $firstItemText = trim(substr($firstPart, $titlePos + 1));
+                                $hasTitle = true;
+                            }
+                        @endphp
+                        @if($hasTitle)
+                            <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">{{ $titleText }}</div>
+                            <ul class="instruction-list">
+                                @if(!empty($firstItemText))
+                                <li class="instruction-item">
+                                    <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                                    {{ $firstItemText }}
+                                </li>
+                                @endif
+                                @for($i = 1; $i < count($parts); $i++)
+                                    @if(trim($parts[$i]))
+                                    <li class="instruction-item">
+                                        <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                                        {!! nl2br(e(trim($parts[$i]))) !!}
+                                    </li>
+                                    @endif
+                                @endfor
+                            </ul>
+                        @else
+                            <ul class="instruction-list">
+                                @foreach($parts as $part)
+                                    @if(trim($part))
+                                    <li class="instruction-item">
+                                        <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                                        {!! nl2br(e(trim($part))) !!}
+                                    </li>
+                                    @endif
+                                @endforeach
+                            </ul>
+                        @endif
+                    @elseif(!empty($rawText) && empty($instructionOnlyText))
+                        <div class="instruction-plain-text">{!! nl2br(e($rawText)) !!}</div>
+                    @endif
+                @endif
+
+                {{-- Detail Size Custom: tampil hanya jika ada custom recipients --}}
+                @if($hasCustom)
+                    <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-top: {{ $hasStandard ? '14px' : '0' }}; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Detail Size Custom :
+                    </div>
                     <ul class="instruction-list">
                         @foreach($taskCustomRecipients as $c)
                         <li class="instruction-item">
@@ -406,6 +453,7 @@
                 @endif
             </div>
         </div>
+
         
         @if($myTask->is_revision)
         <div class="revision-notice" style="background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 12px; padding: 12px; margin-top: 12px;">
