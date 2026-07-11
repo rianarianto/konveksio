@@ -85,13 +85,22 @@ class AturTugasProduksi extends Page
             $workerRows = [];
             foreach ($tasks as $task) {
                 $wagePerPcs = $task->quantity > 0 ? (int) ($task->wage_amount / $task->quantity) : 0;
+                // Strip baris yang di-generate otomatis agar tidak double saat re-save
+                $rawDesc = $task->description ?? '';
+                $cleanDescLines = array_filter(
+                    explode("\n", $rawDesc),
+                    fn($line) => !str_starts_with(trim($line), 'Pembagian Ukuran:')
+                              && !str_starts_with(trim($line), 'Baju Custom:')
+                );
+                $cleanDesc = trim(implode("\n", $cleanDescLines));
+
                 $workerRow = [
                     'id' => $task->id,
                     'worker_id' => $task->assigned_to,
                     'quantity' => $task->quantity,
                     'wage_per_pcs' => $wagePerPcs,
                     'wage_custom_per_pcs' => $task->size_quantities['_wage_custom'] ?? $wagePerPcs,
-                    'description' => $task->description,
+                    'description' => $cleanDesc,
                 ];
 
                 if (is_array($task->size_quantities)) {
