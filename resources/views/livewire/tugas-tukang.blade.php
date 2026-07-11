@@ -164,6 +164,15 @@
                     ->whereIn('status', ['pending', 'in_progress'])
                     ->first();
             }
+
+            // 3. Jika tidak ada, cari task terakhir milik worker ini pada WO ini (untuk menampilkan riwayat tugas selesai)
+            if (!$myActiveTask) {
+                $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItems->pluck('id'))
+                    ->where('assigned_to', $worker->id)
+                    ->orderBy('id', 'desc')
+                    ->first();
+            }
             
             // Buat virtual task dinamis untuk Petugas QC saat di tahap QC_REVIEW
             if (!$myActiveTask && $wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW && $wo->qc_worker_id === $worker->id) {
@@ -624,6 +633,9 @@
                 if ($currentStatus === 'QC_REVIEW') {
                     $currentStatus = $wo->current_review_stage;
                     if ($currentStatus === 'QC_PERSIAPAN') { $currentStatus = 'QC_PREP'; }
+                }
+                if ($currentStatus === 'QC_AKHIR') {
+                    $currentStatus = end($normalizedStages) ?: 'COMPLETED';
                 }
                 
                 $currentIdx = array_search($currentStatus, $allStages);

@@ -80,6 +80,7 @@ class NotificationHelper
 
         // Info tahap sebelumnya (hanya tampil jika bukan tahap pertama / bukan CREATED)
         $prevStageInfo = '';
+        $prevTask = null;
         $prevStageCode = $wo->getPreviousStatus();
         if ($prevStageCode && !in_array($prevStageCode, [WorkOrder::STATUS_CREATED, $newStatus])) {
             $prevLabel = match (true) {
