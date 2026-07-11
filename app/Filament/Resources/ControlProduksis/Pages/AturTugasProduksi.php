@@ -241,6 +241,8 @@ class AturTugasProduksi extends Page
                                             Toggle::make('has_qc_prep')
                                                 ->label('QC Persiapan & QC Akhir')
                                                 ->default(true)
+                                                ->disabled()
+                                                ->dehydrated() // Agar value true tetap dikirim ke database meski disabled di UI
                                                 ->inline(false),
                                         ]),
 
