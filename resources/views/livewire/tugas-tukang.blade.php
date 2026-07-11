@@ -164,24 +164,33 @@
                     ->whereIn('status', ['pending', 'in_progress'])
                     ->first();
             }
+            
+            // 3. Buat virtual task dinamis untuk Petugas QC saat di tahap QC_REVIEW atau QC_AKHIR
+            if (!$myActiveTask && $wo->qc_worker_id === $worker->id) {
+                if ($wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
+                    $myActiveTask = new \App\Models\ProductionTask([
+                        'stage_name'  => 'QC_' . $wo->current_review_stage,
+                        'quantity'    => $totalQty,
+                        'description' => 'Periksa hasil pengerjaan tahap ' . str_replace('_', ' ', $wo->current_review_stage) . '. Berikan persetujuan per-pekerja di panel QC Review bawah atau kirim revisi jika ada kesalahan.',
+                        'status'      => 'in_progress',
+                    ]);
+                } elseif ($wo->status === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
+                    $myActiveTask = new \App\Models\ProductionTask([
+                        'stage_name'  => 'QC_AKHIR',
+                        'quantity'    => $totalQty,
+                        'description' => 'Lakukan verifikasi final untuk seluruh tahapan produksi. Berikan persetujuan pada panel QC Akhir di bawah atau kirim revisi jika diperlukan.',
+                        'status'      => 'in_progress',
+                    ]);
+                }
+            }
 
-            // 3. Jika tidak ada, cari task terakhir milik worker ini pada WO ini (untuk menampilkan riwayat tugas selesai)
+            // 4. Jika tidak ada, cari task terakhir milik worker ini pada WO ini (untuk menampilkan riwayat tugas selesai)
             if (!$myActiveTask) {
                 $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
                     ->whereIn('order_item_id', $groupItems->pluck('id'))
                     ->where('assigned_to', $worker->id)
                     ->orderBy('id', 'desc')
                     ->first();
-            }
-            
-            // Buat virtual task dinamis untuk Petugas QC saat di tahap QC_REVIEW
-            if (!$myActiveTask && $wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW && $wo->qc_worker_id === $worker->id) {
-                $myActiveTask = new \App\Models\ProductionTask([
-                    'stage_name'  => 'QC_' . $wo->current_review_stage,
-                    'quantity'    => $totalQty,
-                    'description' => 'Periksa hasil pengerjaan tahap ' . str_replace('_', ' ', $wo->current_review_stage) . '. Berikan persetujuan per-pekerja di panel QC Review bawah atau kirim revisi jika ada kesalahan.',
-                    'status'      => 'in_progress',
-                ]);
             }
         }
 
