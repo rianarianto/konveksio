@@ -53,11 +53,10 @@
     </div>
 
     @foreach($qcReviews as $wo)
-    <div class="card task-card task-review">
-        {{-- Header WO --}}
+    <div class="card task-card task-review" style="border:1.5px solid #fbbf24;">
         <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}"
            style="text-decoration:none;color:inherit;display:block;">
-            <div class="task-header" style="margin-bottom:12px;">
+            <div class="task-header" style="margin-bottom:0;">
                 <div class="task-info">
                     <div class="task-stage task-stage-review">Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}</div>
                     <div class="task-product">{{ $wo->orderItem?->product_name ?? '-' }}</div>
@@ -70,38 +69,10 @@
                     </div>
                 </div>
             </div>
-        </a>
-
-        {{-- Per-worker rows --}}
-        <div style="display:flex;flex-direction:column;gap:8px;">
-            @foreach($wo->reviewTasks as $rTask)
-            @php $isApproved = $rTask->qc_approved ?? false; @endphp
-            <div style="display:flex;align-items:center;justify-content:space-between;
-                        background:{{ $isApproved ? '#f0fdf4' : '#fefce8' }};
-                        border:1px solid {{ $isApproved ? '#86efac' : '#fde68a' }};
-                        border-radius:10px;padding:10px 12px;gap:8px;">
-                <div style="flex:1;min-width:0;">
-                    <div style="font-weight:600;font-size:14px;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                        {{ $rTask->assignedTo?->name ?? 'Tanpa Pekerja' }}
-                    </div>
-                    <div style="font-size:12px;color:#64748b;">{{ $rTask->quantity }} pcs</div>
-                </div>
-                @if($isApproved)
-                <span style="font-size:12px;font-weight:600;color:#16a34a;
-                             background:#dcfce7;border-radius:20px;padding:4px 10px;
-                             white-space:nowrap;">✅ Disetujui</span>
-                @else
-                <span style="font-size:11px;font-weight:600;color:#64748b;
-                             background:#f1f5f9;border-radius:20px;padding:4px 10px;
-                             white-space:nowrap;">Menunggu QC</span>
-                @endif
+            <div style="margin-top:12px;text-align:center;">
+                <span style="font-size:11px;font-weight:600;color:#3b82f6;">👆 Buka Detail untuk Proses QC</span>
             </div>
-            @endforeach
-        </div>
-        
-        <div style="margin-top:12px;text-align:center;">
-            <span style="font-size:11px;font-weight:600;color:#3b82f6;">👆 Buka Detail untuk Proses QC</span>
-        </div>
+        </a>
     </div>
     @endforeach
     @endif
@@ -121,7 +92,7 @@
     <div class="card task-card" style="border:1.5px solid #C084FC;">
         <a href="{{ route('work.task', ['wo_id' => $qaWo->id, 'token' => $qaWo->token, 'wt' => $worker->portal_token]) }}"
            style="text-decoration:none;color:inherit;display:block;">
-            <div class="task-header" style="margin-bottom:12px;">
+            <div class="task-header" style="margin-bottom:0;">
                 <div class="task-info">
                     <div class="task-stage" style="background:#F3E8FF;color:#7C3AED;">QC Akhir</div>
                     <div class="task-product">{{ $qaWo->orderItem?->product_name ?? '-' }}</div>
@@ -131,52 +102,10 @@
                     </div>
                 </div>
             </div>
+            <div style="margin-top:12px;text-align:center;">
+                <span style="font-size:11px;font-weight:600;color:#7C3AED;">👆 Buka Detail untuk Proses QC Akhir</span>
+            </div>
         </a>
-
-        {{-- Per-stage task rows --}}
-        @foreach($qaWo->allTasks as $stageName => $stageTasks)
-        <div style="margin-bottom:10px;">
-            <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">
-                {{ str_replace('_', ' ', $stageName) }}
-            </div>
-            @foreach($stageTasks as $qaTask)
-            @php
-                $qaWoStages  = $qaWo->stage_sequence ?? [];
-                $isLastStage = end($qaWoStages) === $qaTask->stage_name;
-                $hasQcAkhir  = $qaWo->has_qc_selesai ?? true;
-
-                $qaApproved = $qaTask->qc_approved ?? false;
-                $qaHasOwnQc = ($qaTask->wajib_qc ?? false) && !($isLastStage && $hasQcAkhir);
-                $qaDone     = $qaTask->status === 'done';
-            @endphp
-            <div style="display:flex;align-items:center;justify-content:space-between;
-                        background:{{ $qaApproved ? '#f0fdf4' : ($qaHasOwnQc ? '#f8fafc' : '#fefce8') }};
-                        border:1px solid {{ $qaApproved ? '#86efac' : ($qaHasOwnQc ? '#e2e8f0' : '#fde68a') }};
-                        border-radius:10px;padding:10px 12px;gap:8px;margin-bottom:4px;">
-                <div style="flex:1;min-width:0;">
-                    <div style="font-weight:600;font-size:13px;color:#1e293b;">{{ $qaTask->assignedTo?->name ?? 'Tanpa Pekerja' }}</div>
-                    <div style="font-size:12px;color:#64748b;">{{ $qaTask->quantity }} pcs
-                        @if($qaHasOwnQc)<span style="margin-left:4px;font-size:10px;font-weight:600;color:#2563eb;background:#dbeafe;border-radius:8px;padding:1px 5px;">Sudah QC</span>@endif
-                        @if(!$qaDone && !($qaTask->is_revision ?? false))<span style="margin-left:4px;font-size:10px;font-weight:600;color:#d97706;background:#fef3c7;border-radius:8px;padding:1px 5px;">Dalam Revisi</span>@endif
-                    </div>
-                </div>
-                @if($qaApproved || $qaHasOwnQc)
-                    <span style="font-size:11px;font-weight:600;color:{{ $qaHasOwnQc ? '#2563eb' : '#16a34a' }};background:{{ $qaHasOwnQc ? '#dbeafe' : '#dcfce7' }};border-radius:20px;padding:4px 10px;white-space:nowrap;">
-                        {{ $qaHasOwnQc ? '✅ Sudah QC' : '✅ OK' }}
-                    </span>
-                @elseif(!$qaDone)
-                    <span style="font-size:11px;font-weight:600;color:#d97706;background:#fef3c7;border-radius:20px;padding:4px 10px;white-space:nowrap;">⏳ Revisi</span>
-                @else
-                    <span style="font-size:11px;font-weight:600;color:#64748b;background:#f1f5f9;border-radius:20px;padding:4px 10px;white-space:nowrap;">Menunggu QC</span>
-                @endif
-            </div>
-            @endforeach
-        </div>
-        @endforeach
-
-        <div style="margin-top:12px;text-align:center;">
-            <span style="font-size:11px;font-weight:600;color:#7C3AED;">👆 Buka Detail untuk Proses QC Akhir</span>
-        </div>
     </div>
     @endforeach
     @endif
@@ -197,18 +126,15 @@
     <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
     @endif
     <div class="card task-card" style="cursor:pointer;">
-        <div class="task-header">
+        <div class="task-header" style="justify-content: space-between; align-items: center;">
             <div class="task-info">
                 <div class="task-stage">{{ str_replace('_', ' ', $task->stage_name) }}</div>
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
                 <div class="task-customer">{{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs</div>
             </div>
-            <button wire:click.prevent="selesaiKerjakan({{ $task->id }})"
-                    wire:loading.attr="disabled"
-                    class="btn btn-success btn-sm">
-                <span wire:loading.remove wire:target="selesaiKerjakan({{ $task->id }})">✅ Selesai</span>
-                <span wire:loading wire:target="selesaiKerjakan({{ $task->id }})">⏳</span>
-            </button>
+            <div style="font-size:11px;font-weight:600;color:#22c55e;background:#dcfce7;border-radius:20px;padding:4px 10px;white-space:nowrap;">
+                ⚡ Sedang Dikerjakan
+            </div>
         </div>
     </div>
     @if($wo)</a>@endif
@@ -235,7 +161,7 @@
     <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
     @endif
     <div class="card task-card {{ $canStart ? ($isRevision ? 'task-revision' : 'task-ready') : '' }}" style="cursor:pointer;">
-        <div class="task-header">
+        <div class="task-header" style="justify-content: space-between; align-items: center;">
             <div class="task-info">
                 <div class="task-stage {{ $isRevision ? 'task-stage-revision' : '' }}">
                     {{ str_replace('_', ' ', $task->stage_name) }}
@@ -251,18 +177,17 @@
                     @endif
                 </div>
             </div>
-            @if($canStart)
-            <button wire:click.prevent="mulaiKerjakan({{ $task->id }})"
-                    wire:loading.attr="disabled"
-                    class="btn {{ $isRevision ? 'btn-warning' : 'btn-primary' }} btn-sm">
-                <span wire:loading.remove wire:target="mulaiKerjakan({{ $task->id }})">
-                    {{ $isRevision ? '🔧 Mulai Perbaikan' : '🔥 Mulai' }}
-                </span>
-                <span wire:loading wire:target="mulaiKerjakan({{ $task->id }})">⏳</span>
-            </button>
-            @else
-            <span class="btn btn-locked btn-sm">🔒</span>
-            @endif
+            <div>
+                @if($canStart)
+                    <span style="font-size:11px;font-weight:600;color:{{ $isRevision ? '#d97706' : '#2563eb' }};background:{{ $isRevision ? '#fef3c7' : '#dbeafe' }};border-radius:20px;padding:4px 10px;white-space:nowrap;">
+                        {{ $isRevision ? '🔧 Perbaikan' : '👉 Siap' }}
+                    </span>
+                @else
+                    <span style="font-size:11px;font-weight:600;color:#94a3b8;background:#f1f5f9;border-radius:20px;padding:4px 10px;white-space:nowrap;">
+                        🔒 Terkunci
+                    </span>
+                @endif
+            </div>
         </div>
 
         {{-- Stage Progress --}}
