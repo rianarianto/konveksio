@@ -91,71 +91,19 @@
                              background:#dcfce7;border-radius:20px;padding:4px 10px;
                              white-space:nowrap;">✅ Disetujui</span>
                 @else
-                <div style="display:flex;gap:6px;flex-shrink:0;">
-                    <button wire:click="approveTask({{ $rTask->id }})"
-                            wire:loading.attr="disabled"
-                            style="font-size:12px;font-weight:600;color:#fff;
-                                   background:#22c55e;border:none;border-radius:8px;
-                                   padding:6px 12px;cursor:pointer;white-space:nowrap;">
-                        <span wire:loading.remove wire:target="approveTask({{ $rTask->id }})">✅ Setujui</span>
-                        <span wire:loading wire:target="approveTask({{ $rTask->id }})">⏳</span>
-                    </button>
-                    <button wire:click="openTaskReview({{ $rTask->id }})"
-                            style="font-size:12px;font-weight:600;color:#fff;
-                                   background:#ef4444;border:none;border-radius:8px;
-                                   padding:6px 12px;cursor:pointer;white-space:nowrap;">
-                        🔧 Revisi
-                    </button>
-                </div>
+                <span style="font-size:11px;font-weight:600;color:#64748b;
+                             background:#f1f5f9;border-radius:20px;padding:4px 10px;
+                             white-space:nowrap;">Menunggu QC</span>
                 @endif
             </div>
             @endforeach
         </div>
-    </div>
-    @endforeach
-    @endif
-
-    {{-- Modal Revisi Per Task --}}
-    @if($reviewTaskId)
-    @php
-        $reviewTask = \App\Models\ProductionTask::withoutGlobalScopes()
-            ->with(['assignedTo', 'orderItem.order.customer'])
-            ->find($reviewTaskId);
-    @endphp
-    @if($reviewTask)
-    <div class="modal-overlay" wire:click.self="closeTaskReview">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Revisi Pekerjaan</h3>
-                <button wire:click="closeTaskReview" class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="review-info">
-                    <div class="review-stage">{{ $reviewTask->assignedTo?->name ?? 'Tanpa Pekerja' }}</div>
-                    <div class="review-product">{{ $reviewTask->orderItem?->product_name ?? '-' }} ({{ $reviewTask->quantity }} pcs)</div>
-                    <div class="review-customer">{{ $reviewTask->orderItem?->order?->customer?->name ?? '-' }}</div>
-                </div>
-                <div class="reject-section" style="margin-top:16px;">
-                    <label class="reject-label">Alasan Revisi (wajib):</label>
-                    <textarea wire:model="rejectReason"
-                              class="reject-textarea"
-                              placeholder="Tuliskan alasan revisi untuk {{ $reviewTask->assignedTo?->name ?? 'pekerja' }}..."
-                              rows="3"></textarea>
-                    @error('rejectReason')
-                    <span class="field-error">{{ $message }}</span>
-                    @enderror
-                    <button wire:click="rejectTask({{ $reviewTaskId }})"
-                            wire:loading.attr="disabled"
-                            class="btn btn-danger btn-full"
-                            style="margin-top:12px;">
-                        <span wire:loading.remove wire:target="rejectTask({{ $reviewTaskId }})">🔧 Kirim Revisi</span>
-                        <span wire:loading wire:target="rejectTask({{ $reviewTaskId }})">Memproses...</span>
-                    </button>
-                </div>
-            </div>
+        
+        <div style="margin-top:12px;text-align:center;">
+            <span style="font-size:11px;font-weight:600;color:#3b82f6;">👆 Buka Detail untuk Proses QC</span>
         </div>
     </div>
-    @endif
+    @endforeach
     @endif
 
 
@@ -219,84 +167,18 @@
                 @elseif(!$qaDone)
                     <span style="font-size:11px;font-weight:600;color:#d97706;background:#fef3c7;border-radius:20px;padding:4px 10px;white-space:nowrap;">⏳ Revisi</span>
                 @else
-                    <div style="display:flex;gap:5px;flex-shrink:0;">
-                        <button wire:click="approveQcAkhir({{ $qaWo->id }})" wire:loading.attr="disabled"
-                                style="font-size:11px;font-weight:600;color:#fff;background:#22c55e;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;">
-                            <span wire:loading.remove wire:target="approveQcAkhir({{ $qaWo->id }})">✅</span>
-                            <span wire:loading wire:target="approveQcAkhir({{ $qaWo->id }})">⏳</span>
-                        </button>
-                        <button wire:click="openQcAkhirReject({{ $qaTask->id }})"
-                                style="font-size:11px;font-weight:600;color:#fff;background:#ef4444;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;">🔧</button>
-                    </div>
+                    <span style="font-size:11px;font-weight:600;color:#64748b;background:#f1f5f9;border-radius:20px;padding:4px 10px;white-space:nowrap;">Menunggu QC</span>
                 @endif
             </div>
             @endforeach
         </div>
         @endforeach
 
-        {{-- Serahkan ke Admin --}}
-        @php
-            $qaAllOk = $qaWo->allTasks->flatten()->every(function($t) use ($qaWo) {
-                $qaWoStages = $qaWo->stage_sequence ?? [];
-                $isLastStage = end($qaWoStages) === $t->stage_name;
-                $hasQcAkhir = $qaWo->has_qc_selesai ?? true;
-                $hasOwnQc = ($t->wajib_qc ?? false) && !($isLastStage && $hasQcAkhir);
-                return ($t->qc_approved ?? false) || $hasOwnQc;
-            });
-            $qaHasPending = $qaWo->allTasks->flatten()->contains(fn($t) => $t->status !== 'done');
-        @endphp
-        @if($qaAllOk && !$qaHasPending)
-        <button wire:click="approveQcAkhir({{ $qaWo->id }})" wire:loading.attr="disabled"
-                class="btn btn-success btn-full" style="margin-top:8px;">
-            <span wire:loading.remove wire:target="approveQcAkhir({{ $qaWo->id }})">✅ Serahkan ke Admin</span>
-            <span wire:loading wire:target="approveQcAkhir({{ $qaWo->id }})">⏳</span>
-        </button>
-        @endif
-    </div>
-    @endforeach
-
-    {{-- Modal Revisi QC Akhir --}}
-    @if($qcAkhirRejectTaskId)
-    @php
-        $qaModalTask = \App\Models\ProductionTask::withoutGlobalScopes()
-            ->with(['assignedTo', 'orderItem.order.customer'])
-            ->find($qcAkhirRejectTaskId);
-    @endphp
-    @if($qaModalTask)
-    <div class="modal-overlay" wire:click.self="closeQcAkhirReject">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>🔧 Revisi QC Akhir</h3>
-                <button wire:click="closeQcAkhirReject" class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="review-info">
-                    <div class="review-stage">{{ $qaModalTask->assignedTo?->name ?? 'Tanpa Pekerja' }}</div>
-                    <div class="review-product">{{ $qaModalTask->orderItem?->product_name ?? '-' }} ({{ $qaModalTask->quantity }} pcs) — Tahap: {{ str_replace('_', ' ', $qaModalTask->stage_name) }}</div>
-                    <div class="review-customer">{{ $qaModalTask->orderItem?->order?->customer?->name ?? '-' }}</div>
-                </div>
-                <div class="reject-section" style="margin-top:16px;">
-                    <label class="reject-label">Alasan Revisi (wajib):</label>
-                    <textarea wire:model="rejectReasonAkhir"
-                              class="reject-textarea"
-                              placeholder="Alasan untuk {{ $qaModalTask->assignedTo?->name ?? 'pekerja' }}..."
-                              rows="3"></textarea>
-                    @error('rejectReasonAkhir')
-                    <span class="field-error">{{ $message }}</span>
-                    @enderror
-                    <button wire:click="rejectTaskQcAkhir({{ $qcAkhirRejectTaskId }})"
-                            wire:loading.attr="disabled"
-                            class="btn btn-danger btn-full"
-                            style="margin-top:12px;">
-                        <span wire:loading.remove wire:target="rejectTaskQcAkhir({{ $qcAkhirRejectTaskId }})">🔧 Kirim Revisi</span>
-                        <span wire:loading wire:target="rejectTaskQcAkhir({{ $qcAkhirRejectTaskId }})">Memproses...</span>
-                    </button>
-                </div>
-            </div>
+        <div style="margin-top:12px;text-align:center;">
+            <span style="font-size:11px;font-weight:600;color:#7C3AED;">👆 Buka Detail untuk Proses QC Akhir</span>
         </div>
     </div>
-    @endif
-    @endif
+    @endforeach
     @endif
 
     {{-- ── SEDANG DIKERJAKAN ── --}}

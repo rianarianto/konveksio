@@ -858,6 +858,7 @@
         $qaGroupItemIds = $orderItem ? $orderItem->getItemsInGroup()->pluck('id') : collect([$wo->order_item_id]);
         $qaAllTasks = \App\Models\ProductionTask::withoutGlobalScopes()
             ->whereIn('order_item_id', $qaGroupItemIds)
+            ->where('stage_name', '!=', 'QC_PERSIAPAN')
             ->with('assignedTo')
             ->get()
             ->groupBy('stage_name');
