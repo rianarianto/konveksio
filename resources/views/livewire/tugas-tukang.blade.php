@@ -698,11 +698,11 @@
         @endif
     </div>
     @else
-    <div class="action-banner banner-gray">
-        @if($wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW)
-            <span>🔍 Sedang dalam verifikasi hasil pekerjaan oleh Petugas QC...</span>
-        @elseif($myTask && $myTask->status === 'done')
+    <div class="action-banner banner-green">
+        @if($myTask && $myTask->status === 'done')
             <span>✅ Tugas {{ str_replace('_', ' ', $myTask->stage_name) }} selesai & masuk tahap QC</span>
+        @elseif($wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW)
+            <span>🔍 Sedang dalam verifikasi hasil pekerjaan oleh Petugas QC...</span>
         @else
             <span>🔍 Menunggu verifikasi dari Petugas QC...</span>
         @endif
