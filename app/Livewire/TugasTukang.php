@@ -124,6 +124,7 @@ class TugasTukang extends Component
             ->whereIn('order_item_id', $groupItemIds)
             ->where('assigned_to', $worker?->id)
             ->where('status', 'in_progress')
+            ->where(fn($q) => $q->where('stage_name', $this->wo->status)->orWhere('is_revision', true))
             ->first();
 
         // Kalau tidak ada task in_progress yang revision, fallback ke logic lama

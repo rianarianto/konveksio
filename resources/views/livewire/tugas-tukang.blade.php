@@ -148,19 +148,20 @@
 
         $myActiveTask = null;
         if ($worker) {
-            // Cari task milik worker ini untuk WO ini yang statusnya pending atau in_progress (revisi)
+            // 1. Cari task yang sesuai dengan stage aktif WO saat ini
             $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
                 ->whereIn('order_item_id', $groupItems->pluck('id'))
+                ->where('stage_name', $expectedStage)
                 ->where('assigned_to', $worker->id)
-                ->whereIn('status', ['pending', 'in_progress'])
                 ->first();
 
+            // 2. Jika tidak ada, cari apakah ada task revisi yang aktif untuk worker ini
             if (!$myActiveTask) {
-                // Fallback ke status WO sekarang
                 $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
                     ->whereIn('order_item_id', $groupItems->pluck('id'))
-                    ->where('stage_name', $expectedStage)
                     ->where('assigned_to', $worker->id)
+                    ->where('is_revision', true)
+                    ->whereIn('status', ['pending', 'in_progress'])
                     ->first();
             }
             
