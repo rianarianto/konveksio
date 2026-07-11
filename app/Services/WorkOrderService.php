@@ -407,8 +407,17 @@ class WorkOrderService
                 ->with('orderItem')
                 ->findOrFail($taskId);
 
-            // Pastikan tahap ini tidak punya wajib_qc (tidak boleh revisi dari QC Akhir)
-            if ($task->wajib_qc) {
+            // Kembalikan WO ke stage task tersebut untuk mengecek apakah ini tahap terakhir
+            $wo = WorkOrder::withoutGlobalScopes()
+                ->where('order_item_id', $task->order_item_id)
+                ->where('status', WorkOrder::STATUS_QC_AKHIR)
+                ->first();
+
+            $isLastStage = $wo && (end($wo->stage_sequence) === $task->stage_name);
+            $hasQcAkhir = $wo && ($wo->has_qc_selesai ?? true);
+
+            // Pastikan tahap ini tidak punya wajib_qc (kecuali tahap terakhir yang QC Review-nya di-skip oleh QC Akhir)
+            if ($task->wajib_qc && !($isLastStage && $hasQcAkhir)) {
                 throw new \RuntimeException('Tahap ini sudah memiliki QC Review sendiri, tidak bisa direvisi dari QC Akhir.');
             }
 
@@ -421,12 +430,6 @@ class WorkOrderService
                 'qc_reviewed_at'  => now(),
                 'completed_at'    => null,
             ]);
-
-            // Kembalikan WO ke stage task tersebut
-            $wo = WorkOrder::withoutGlobalScopes()
-                ->where('order_item_id', $task->order_item_id)
-                ->where('status', WorkOrder::STATUS_QC_AKHIR)
-                ->first();
 
             if ($wo) {
                 $wo->update([

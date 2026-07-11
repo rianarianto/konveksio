@@ -193,8 +193,11 @@
             </div>
             @foreach($stageTasks as $qaTask)
             @php
+                $isLastStage = end($qaWo->stage_sequence) === $qaTask->stage_name;
+                $hasQcAkhir  = $qaWo->has_qc_selesai ?? true;
+
                 $qaApproved = $qaTask->qc_approved ?? false;
-                $qaHasOwnQc = $qaTask->wajib_qc ?? false;
+                $qaHasOwnQc = ($qaTask->wajib_qc ?? false) && !($isLastStage && $hasQcAkhir);
                 $qaDone     = $qaTask->status === 'done';
             @endphp
             <div style="display:flex;align-items:center;justify-content:space-between;
@@ -232,7 +235,12 @@
 
         {{-- Serahkan ke Admin --}}
         @php
-            $qaAllOk = $qaWo->allTasks->flatten()->every(fn($t) => ($t->qc_approved ?? false) || ($t->wajib_qc ?? false));
+            $qaAllOk = $qaWo->allTasks->flatten()->every(function($t) use ($qaWo) {
+                $isLastStage = end($qaWo->stage_sequence) === $t->stage_name;
+                $hasQcAkhir = $qaWo->has_qc_selesai ?? true;
+                $hasOwnQc = ($t->wajib_qc ?? false) && !($isLastStage && $hasQcAkhir);
+                return ($t->qc_approved ?? false) || $hasOwnQc;
+            });
             $qaHasPending = $qaWo->allTasks->flatten()->contains(fn($t) => $t->status !== 'done');
         @endphp
         @if($qaAllOk && !$qaHasPending)

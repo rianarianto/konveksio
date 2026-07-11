@@ -887,8 +887,11 @@
                 <div style="display:flex;flex-direction:column;gap:6px;">
                     @foreach($stageTasks as $qaTask)
                     @php
+                        $isLastStage  = end($wo->stage_sequence) === $qaTask->stage_name;
+                        $hasQcAkhir   = $wo->has_qc_selesai ?? true;
+                        
                         $qaApproved   = $qaTask->qc_approved ?? false;
-                        $qaHasOwnQc   = $qaTask->wajib_qc ?? false;  // tahap ini punya QC Review sendiri
+                        $qaHasOwnQc   = ($qaTask->wajib_qc ?? false) && !($isLastStage && $hasQcAkhir); // Bypass "Sudah QC" jika tahap terakhir
                         $qaDone       = $qaTask->status === 'done';
                         $qaRevision   = $qaTask->is_revision ?? false;
                     @endphp
@@ -946,9 +949,12 @@
         {{-- Tombol Serahkan ke Admin (semua approved & tidak ada revisi pending) --}}
         @if(!$qaHasPendingRevision)
         @php
-            $qaAllApproved = $qaAllTasks->flatten()->every(
-                fn($t) => ($t->qc_approved ?? false) || ($t->wajib_qc ?? false)
-            );
+            $qaAllApproved = $qaAllTasks->flatten()->every(function($t) use ($wo) {
+                $isLastStage = end($wo->stage_sequence) === $t->stage_name;
+                $hasQcAkhir = $wo->has_qc_selesai ?? true;
+                $hasOwnQc = ($t->wajib_qc ?? false) && !($isLastStage && $hasQcAkhir);
+                return ($t->qc_approved ?? false) || $hasOwnQc;
+            });
         @endphp
         @if($qaAllApproved)
         <div style="margin-top:16px;">

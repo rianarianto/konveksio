@@ -228,7 +228,15 @@ class WorkOrder extends Model
             ->where('stage_name', $stageName)
             ->first();
 
-        return $task ? (bool) $task->wajib_qc : false;
+        $wajib = $task ? (bool) $task->wajib_qc : false;
+
+        // SKIP QC Review jika ini adalah tahap terakhir DAN QC Akhir aktif
+        $stages = $this->stage_sequence ?? [];
+        if (end($stages) === $stageName && ($this->has_qc_selesai ?? true)) {
+            return false;
+        }
+
+        return $wajib;
     }
 
     /**
