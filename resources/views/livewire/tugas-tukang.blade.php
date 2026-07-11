@@ -723,8 +723,12 @@
             <button wire:click="mulaiKerjakan"
                     wire:loading.attr="disabled"
                     class="btn {{ $isRevision ? 'btn-warning' : 'btn-primary' }} btn-full btn-lg">
-                <span wire:loading.remove wire:target="mulaiKerjakan">
-                    @if($wo->status === 'QC_PERSIAPAN')
+                 <span wire:loading.remove wire:target="mulaiKerjakan">
+                    @php
+                        $stageName = strtoupper($myActiveTask->stage_name ?? '');
+                        $isQcPrep = in_array($stageName, ['QC_PREP', 'QC_PERSIAPAN']);
+                    @endphp
+                    @if($isQcPrep)
                         🔥 Mulai QC Persiapan
                     @elseif($isRevision)
                         🔧 Mulai Perbaikan
@@ -744,7 +748,8 @@
                 <span wire:loading.remove wire:target="selesaiKerjakan">
                     @php
                         $nextStatus = $wo->getNextStatus();
-                        if ($wo->status === 'QC_PERSIAPAN') {
+                        $isActiveTaskQcPrep = in_array(strtoupper($myActiveTask->stage_name ?? ''), ['QC_PREP', 'QC_PERSIAPAN']);
+                        if ($isActiveTaskQcPrep) {
                             $btnLabel = '✅ Selesai & Lanjutkan';
                         } elseif ($nextStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
                             $btnLabel = '✅ Selesai & Kirim ke QC';
