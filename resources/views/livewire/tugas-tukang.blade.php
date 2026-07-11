@@ -369,25 +369,20 @@
                         for ($i = 1; $i < count($parts); $i++) {
                             if (trim($parts[$i])) $parsedItems[] = trim($parts[$i]);
                         }
-                        // Kalau ada custom, filter baris yang mengandung "CUSTOM:" dari list toko
                         if ($hasCustom) {
                             $parsedItems = array_filter($parsedItems, fn($item) =>
                                 !preg_match('/^CUSTOM\s*:/i', $item)
                             );
                         }
                     }
-                    // Pisahkan teks catatan admin murni dengan teks 'Pembagian Ukuran' yang digenerate sistem
-                    $adminNote = '';
-                    $sizeListText = '';
 
+                    // Ekstrak Catatan Tambahan Admin
+                    $adminNote = '';
                     if ($hasPipe) {
-                        // Cari baris yang mengandung "Pembagian Ukuran:"
                         $lines = explode("\n", $rawText);
                         $adminLines = [];
                         foreach ($lines as $line) {
-                            if (str_contains($line, 'Pembagian Ukuran:')) {
-                                $sizeListText = $line;
-                            } else {
+                            if (!str_contains($line, 'Pembagian Ukuran:')) {
                                 $adminLines[] = $line;
                             }
                         }
@@ -395,42 +390,22 @@
                     } else {
                         $adminNote = $rawText;
                     }
-
-                    // Parse title dan items dari $sizeListText jika ada
-                    $parsedTitle = '';
-                    $parsedItems = [];
-                    if (!empty($sizeListText) && str_contains($sizeListText, '|')) {
-                        $parts = array_map('trim', explode('|', $sizeListText));
-                        $firstPart = $parts[0];
-                        if (str_contains($firstPart, ':')) {
-                            $colonPos = strpos($firstPart, ':');
-                            $parsedTitle = trim(substr($firstPart, 0, $colonPos + 1));
-                            $firstItem = trim(substr($firstPart, $colonPos + 1));
-                            if (!empty($firstItem)) $parsedItems[] = $firstItem;
-                        } else {
-                            $parsedItems[] = $firstPart;
-                        }
-                        for ($i = 1; $i < count($parts); $i++) {
-                            if (trim($parts[$i])) $parsedItems[] = trim($parts[$i]);
-                        }
-                        if ($hasCustom) {
-                            $parsedItems = array_filter($parsedItems, fn($item) =>
-                                !preg_match('/^CUSTOM\s*:/i', $item)
-                            );
-                        }
-                    }
                 @endphp
+            </div>
+        </div>
 
-                {{-- Catatan Khusus Admin --}}
-                @if(!empty($adminNote))
-                    <div style="background: #F0FDF4; border-left: 4px solid #10B981; padding: 10px 12px; border-radius: 4px; margin-bottom: 14px;">
-                        <div style="font-weight: 800; color: #047857; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📝 Catatan Admin:</div>
-                        <div style="font-size: 13px; color: #065F46; line-height: 1.5; font-weight: 500;">
-                            {!! nl2br(e($adminNote)) !!}
-                        </div>
-                    </div>
-                @endif
+        @if(!empty($adminNote))
+        <div class="task-detail-row">
+            <div class="task-detail-label">Catatan Tambahan</div>
+            <div class="task-detail-value font-bold" style="color: #374151;">
+                {!! nl2br(e($adminNote)) !!}
+            </div>
+        </div>
+        @endif
 
+        <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left; width: 100%;">
+            <div class="task-detail-label" style="margin-bottom: 6px;">Instruksi Kerja</div>
+            <div class="task-detail-value text-note" style="text-align: left; width: 100%;">
                 {{-- List ukuran dari rawText (Pembagian Ukuran / Size Toko) --}}
                 @if(!empty($parsedItems))
                     @if(!empty($parsedTitle))
