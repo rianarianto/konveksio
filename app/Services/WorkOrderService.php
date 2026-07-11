@@ -241,6 +241,7 @@ class WorkOrderService
                 ->first();
 
             if ($wo) {
+                $wo->update(['reject_reason' => $reason]);
                 $worker = \App\Models\Worker::find($task->assigned_to);
                 if ($worker && $worker->phone) {
                     $link = url("/tugas?wo_id={$wo->id}&token={$wo->token}&wt={$worker->portal_token}");
@@ -544,6 +545,7 @@ class WorkOrderService
             ]);
 
             if ($wo) {
+                $wo->update(['reject_reason' => $reason]);
                 // Kirim notifikasi WA ke worker
                 $worker = \App\Models\Worker::find($task->assigned_to);
                 if ($worker && $worker->phone) {
