@@ -459,6 +459,26 @@ class TugasTukang extends Component
     }
 
     /**
+     * QC Akhir: Approve satu task spesifik. Jika semua task sudah disetujui → advance ke COMPLETED.
+     */
+    public function approveTaskQcAkhir(int $taskId): void
+    {
+        $this->ensureValidWo();
+
+        if ($this->wo->qc_worker_id && $this->wo->qc_worker_id !== $this->worker?->id) {
+            $this->addError('aksi', 'Hanya Petugas QC yang dapat melakukan QC Akhir.');
+            return;
+        }
+
+        $result = app(WorkOrderService::class)->approveTaskQcAkhir($taskId);
+        $this->loadWorkOrder();
+
+        if ($result['advanced']) {
+            session()->flash('success', '✅ QC Akhir selesai! Pesanan telah diserahkan ke admin.');
+        }
+    }
+
+    /**
      * QC Akhir: Buka modal revisi task tertentu.
      */
     public function openQcAkhirReject(int $taskId): void

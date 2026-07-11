@@ -420,7 +420,85 @@ class WorkOrderService
                 if ($wo) NotificationHelper::notify($wo, WorkOrder::STATUS_COMPLETED);
             })->afterResponse();
 
-            return ['advanced' => true, 'wo' => $wo];
+        });
+    }
+
+    /**
+     * QC Akhir: Approve satu task. Jika semua task eligible sudah approved → advance ke COMPLETED.
+     */
+    public function approveTaskQcAkhir(int $taskId): array
+    {
+        return DB::transaction(function () use ($taskId) {
+            $task = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->lockForUpdate()
+                ->with('orderItem')
+                ->findOrFail($taskId);
+
+            // Tandai task ini approved
+            $task->update([
+                'qc_approved'    => true,
+                'qc_reviewed_at' => now(),
+            ]);
+
+            $wo = WorkOrder::withoutGlobalScopes()
+                ->where('order_item_id', $task->order_item_id)
+                ->where('status', WorkOrder::STATUS_QC_AKHIR)
+                ->first();
+
+            if (!$wo) {
+                return ['advanced' => false, 'wo' => null];
+            }
+
+            $groupItemIds = $task->orderItem
+                ? $task->orderItem->getItemsInGroup()->pluck('id')
+                : [$task->order_item_id];
+
+            // Cek apakah masih ada task yang belum approved (yang eligible: done, tidak punya QC sendiri)
+            $stages = $wo->stage_sequence ?? [];
+            $lastStage = end($stages);
+            $hasQcAkhir = $wo->has_qc_selesai ?? true;
+
+            $pendingApproval = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('stage_name', '!=', 'QC_PERSIAPAN')
+                ->where('status', 'done')
+                ->where(function ($q) {
+                    $q->where('qc_approved', false)->orWhereNull('qc_approved');
+                })
+                ->get()
+                ->filter(function ($t) use ($lastStage, $hasQcAkhir) {
+                    // Hanya task yang tidak punya QC Review sendiri yang harus di-approve di QC Akhir
+                    $hasOwnQc = ($t->wajib_qc ?? false) && !($t->stage_name === $lastStage && $hasQcAkhir);
+                    return !$hasOwnQc; // eligible untuk QC Akhir
+                });
+
+            // Cek juga tidak ada revisi yang pending
+            $hasPendingRevision = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('stage_name', '!=', 'QC_PERSIAPAN')
+                ->where('status', '!=', 'done')
+                ->exists();
+
+            if ($pendingApproval->isEmpty() && !$hasPendingRevision) {
+                // Semua approved → advance ke COMPLETED
+                $wo->update([
+                    'status'               => WorkOrder::STATUS_COMPLETED,
+                    'completed_at'         => now(),
+                    'stage_entered_at'     => now(),
+                    'current_review_stage' => null,
+                ]);
+                $wo->refresh();
+
+                $woId2 = $wo->id;
+                dispatch(function () use ($woId2) {
+                    $wo = WorkOrder::withoutGlobalScopes()->find($woId2);
+                    if ($wo) NotificationHelper::notify($wo, WorkOrder::STATUS_COMPLETED);
+                })->afterResponse();
+
+                return ['advanced' => true, 'wo' => $wo];
+            }
+
+            return ['advanced' => false, 'wo' => $wo->fresh()];
         });
     }
 

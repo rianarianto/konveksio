@@ -961,10 +961,10 @@
                             </span>
                         @else
                             <div style="display:flex;gap:6px;flex-shrink:0;">
-                                <button wire:click="approveQcAkhir" wire:loading.attr="disabled"
+                                <button wire:click="approveTaskQcAkhir({{ $qaTask->id }})" wire:loading.attr="disabled"
                                         style="font-size:12px;font-weight:600;color:#fff;background:#22c55e;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;white-space:nowrap;">
-                                    <span wire:loading.remove wire:target="approveQcAkhir">✅ Setujui</span>
-                                    <span wire:loading wire:target="approveQcAkhir">⏳</span>
+                                    <span wire:loading.remove wire:target="approveTaskQcAkhir({{ $qaTask->id }})">✅ Setujui</span>
+                                    <span wire:loading wire:target="approveTaskQcAkhir({{ $qaTask->id }})">⏳</span>
                                 </button>
                                 <button wire:click="openQcAkhirReject({{ $qaTask->id }})"
                                         style="font-size:12px;font-weight:600;color:#fff;background:#ef4444;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;white-space:nowrap;">
