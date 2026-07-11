@@ -671,6 +671,26 @@
     </div>
     @elseif($worker?->id === $wo->qc_worker_id && $wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW)
         {{-- Sembunyikan panel bulk approve di atas karena sudah digantikan per-worker review panel di bawah --}}
+    @elseif($myActiveTask && ($myActiveTask->is_revision ?? false) && in_array($myActiveTask->status, ['pending', 'in_progress']))
+    {{-- Worker punya revision task — tampilkan action card meski WO sedang di tahap QC --}}
+    <div class="action-card" style="margin-top:16px;">
+        <div class="action-title">🔧 Tugas Anda: {{ $myActiveTask->is_revision ? 'Perlu Perbaikan' : $statusLabel }}</div>
+        <div class="action-desc" style="margin-bottom:12px;font-size:13px;color:#64748b;">
+            Tahap: <strong>{{ str_replace('_', ' ', $myActiveTask->stage_name) }}</strong> — {{ $myActiveTask->quantity }} pcs
+        </div>
+        @if($myActiveTask->status === 'pending')
+        <button wire:click="mulaiKerjakan" wire:loading.attr="disabled" class="btn btn-warning btn-full btn-lg">
+            <span wire:loading.remove wire:target="mulaiKerjakan">🔧 Mulai Perbaikan</span>
+            <span wire:loading wire:target="mulaiKerjakan">⏳ Memulai...</span>
+        </button>
+        @else
+        <div class="started-info">⏱️ Dimulai: {{ $myActiveTask->updated_at?->format('d M Y, H:i') }}</div>
+        <button wire:click="selesaiKerjakan" wire:loading.attr="disabled" class="btn btn-success btn-full btn-lg">
+            <span wire:loading.remove wire:target="selesaiKerjakan">✅ Selesai Perbaikan</span>
+            <span wire:loading wire:target="selesaiKerjakan">⏳ Memproses...</span>
+        </button>
+        @endif
+    </div>
     @else
     <div class="action-banner banner-gray">
         @if($wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW)
@@ -682,6 +702,7 @@
         @endif
     </div>
     @endif
+
 
     @elseif($isWorkerStage)
     {{-- Tukang Actions --}}
@@ -935,8 +956,8 @@
                                 {{ $qaHasOwnQc ? '✅ Sudah QC' : '✅ Disetujui' }}
                             </span>
                         @elseif(!$qaDone)
-                            <span style="font-size:12px;font-weight:600;color:#d97706;background:#fef3c7;border-radius:20px;padding:5px 12px;white-space:nowrap;flex-shrink:0;">
-                                ⏳ Menunggu
+                            <span style="font-size:12px;font-weight:600;color:#dc2626;background:#fee2e2;border-radius:20px;padding:5px 12px;white-space:nowrap;flex-shrink:0;">
+                                🔧 Dalam Revisi
                             </span>
                         @else
                             <div style="display:flex;gap:6px;flex-shrink:0;">
