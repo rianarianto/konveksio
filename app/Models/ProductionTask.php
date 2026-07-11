@@ -26,6 +26,7 @@ class ProductionTask extends Model
         'qc_approved',
         'qc_reviewed_at',
         'completed_at',
+        'revision_source',
     ];
 
     protected $casts = [
@@ -39,6 +40,7 @@ class ProductionTask extends Model
         'qc_approved'     => 'boolean',
         'completed_at'    => 'datetime',
         'qc_reviewed_at'  => 'datetime',
+        'revision_source' => 'string',
     ];
 
     protected static function booted(): void

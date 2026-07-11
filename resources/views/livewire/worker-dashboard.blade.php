@@ -160,6 +160,135 @@
 
 
 
+
+    {{-- ── QC AKHIR (untuk QC workers) ── --}}
+    @if($qcAkhir->count() > 0)
+    <div class="section-header">
+        <span class="section-dot" style="background:#7C3AED;"></span>
+        <span class="section-title">QC Akhir — Verifikasi Final</span>
+        <span class="section-count">{{ $qcAkhir->count() }}</span>
+    </div>
+
+    @foreach($qcAkhir as $qaWo)
+    <div class="card task-card" style="border:1.5px solid #C084FC;">
+        <a href="{{ route('work.task', ['wo_id' => $qaWo->id, 'token' => $qaWo->token, 'wt' => $worker->portal_token]) }}"
+           style="text-decoration:none;color:inherit;display:block;">
+            <div class="task-header" style="margin-bottom:12px;">
+                <div class="task-info">
+                    <div class="task-stage" style="background:#F3E8FF;color:#7C3AED;">QC Akhir</div>
+                    <div class="task-product">{{ $qaWo->orderItem?->product_name ?? '-' }}</div>
+                    <div class="task-customer">
+                        {{ $qaWo->orderItem?->order?->customer?->name ?? '-' }} •
+                        {{ $qaWo->orderItem ? $qaWo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs
+                    </div>
+                </div>
+            </div>
+        </a>
+
+        {{-- Per-stage task rows --}}
+        @foreach($qaWo->allTasks as $stageName => $stageTasks)
+        <div style="margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">
+                {{ str_replace('_', ' ', $stageName) }}
+            </div>
+            @foreach($stageTasks as $qaTask)
+            @php
+                $qaApproved = $qaTask->qc_approved ?? false;
+                $qaHasOwnQc = $qaTask->wajib_qc ?? false;
+                $qaDone     = $qaTask->status === 'done';
+            @endphp
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        background:{{ $qaApproved ? '#f0fdf4' : ($qaHasOwnQc ? '#f8fafc' : '#fefce8') }};
+                        border:1px solid {{ $qaApproved ? '#86efac' : ($qaHasOwnQc ? '#e2e8f0' : '#fde68a') }};
+                        border-radius:10px;padding:10px 12px;gap:8px;margin-bottom:4px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:13px;color:#1e293b;">{{ $qaTask->assignedTo?->name ?? 'Tanpa Pekerja' }}</div>
+                    <div style="font-size:12px;color:#64748b;">{{ $qaTask->quantity }} pcs
+                        @if($qaHasOwnQc)<span style="margin-left:4px;font-size:10px;font-weight:600;color:#2563eb;background:#dbeafe;border-radius:8px;padding:1px 5px;">Sudah QC</span>@endif
+                        @if(!$qaDone && !($qaTask->is_revision ?? false))<span style="margin-left:4px;font-size:10px;font-weight:600;color:#d97706;background:#fef3c7;border-radius:8px;padding:1px 5px;">Dalam Revisi</span>@endif
+                    </div>
+                </div>
+                @if($qaApproved || $qaHasOwnQc)
+                    <span style="font-size:11px;font-weight:600;color:{{ $qaHasOwnQc ? '#2563eb' : '#16a34a' }};background:{{ $qaHasOwnQc ? '#dbeafe' : '#dcfce7' }};border-radius:20px;padding:4px 10px;white-space:nowrap;">
+                        {{ $qaHasOwnQc ? '✅ Sudah QC' : '✅ OK' }}
+                    </span>
+                @elseif(!$qaDone)
+                    <span style="font-size:11px;font-weight:600;color:#d97706;background:#fef3c7;border-radius:20px;padding:4px 10px;white-space:nowrap;">⏳ Revisi</span>
+                @else
+                    <div style="display:flex;gap:5px;flex-shrink:0;">
+                        <button wire:click="approveQcAkhir({{ $qaWo->id }})" wire:loading.attr="disabled"
+                                style="font-size:11px;font-weight:600;color:#fff;background:#22c55e;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;">
+                            <span wire:loading.remove wire:target="approveQcAkhir({{ $qaWo->id }})">✅</span>
+                            <span wire:loading wire:target="approveQcAkhir({{ $qaWo->id }})">⏳</span>
+                        </button>
+                        <button wire:click="openQcAkhirReject({{ $qaTask->id }})"
+                                style="font-size:11px;font-weight:600;color:#fff;background:#ef4444;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;">🔧</button>
+                    </div>
+                @endif
+            </div>
+            @endforeach
+        </div>
+        @endforeach
+
+        {{-- Serahkan ke Admin --}}
+        @php
+            $qaAllOk = $qaWo->allTasks->flatten()->every(fn($t) => ($t->qc_approved ?? false) || ($t->wajib_qc ?? false));
+            $qaHasPending = $qaWo->allTasks->flatten()->contains(fn($t) => $t->status !== 'done');
+        @endphp
+        @if($qaAllOk && !$qaHasPending)
+        <button wire:click="approveQcAkhir({{ $qaWo->id }})" wire:loading.attr="disabled"
+                class="btn btn-success btn-full" style="margin-top:8px;">
+            <span wire:loading.remove wire:target="approveQcAkhir({{ $qaWo->id }})">✅ Serahkan ke Admin</span>
+            <span wire:loading wire:target="approveQcAkhir({{ $qaWo->id }})">⏳</span>
+        </button>
+        @endif
+    </div>
+    @endforeach
+
+    {{-- Modal Revisi QC Akhir --}}
+    @if($qcAkhirRejectTaskId)
+    @php
+        $qaModalTask = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->with(['assignedTo', 'orderItem.order.customer'])
+            ->find($qcAkhirRejectTaskId);
+    @endphp
+    @if($qaModalTask)
+    <div class="modal-overlay" wire:click.self="closeQcAkhirReject">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔧 Revisi QC Akhir</h3>
+                <button wire:click="closeQcAkhirReject" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="review-info">
+                    <div class="review-stage">{{ $qaModalTask->assignedTo?->name ?? 'Tanpa Pekerja' }}</div>
+                    <div class="review-product">{{ $qaModalTask->orderItem?->product_name ?? '-' }} ({{ $qaModalTask->quantity }} pcs) — Tahap: {{ str_replace('_', ' ', $qaModalTask->stage_name) }}</div>
+                    <div class="review-customer">{{ $qaModalTask->orderItem?->order?->customer?->name ?? '-' }}</div>
+                </div>
+                <div class="reject-section" style="margin-top:16px;">
+                    <label class="reject-label">Alasan Revisi (wajib):</label>
+                    <textarea wire:model="rejectReasonAkhir"
+                              class="reject-textarea"
+                              placeholder="Alasan untuk {{ $qaModalTask->assignedTo?->name ?? 'pekerja' }}..."
+                              rows="3"></textarea>
+                    @error('rejectReasonAkhir')
+                    <span class="field-error">{{ $message }}</span>
+                    @enderror
+                    <button wire:click="rejectTaskQcAkhir({{ $qcAkhirRejectTaskId }})"
+                            wire:loading.attr="disabled"
+                            class="btn btn-danger btn-full"
+                            style="margin-top:12px;">
+                        <span wire:loading.remove wire:target="rejectTaskQcAkhir({{ $qcAkhirRejectTaskId }})">🔧 Kirim Revisi</span>
+                        <span wire:loading wire:target="rejectTaskQcAkhir({{ $qcAkhirRejectTaskId }})">Memproses...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+    @endif
+    @endif
+
     {{-- ── SEDANG DIKERJAKAN ── --}}
     @if($tasks['in_progress']->count() > 0)
     <div class="section-header">

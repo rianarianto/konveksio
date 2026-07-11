@@ -33,6 +33,7 @@ class WorkOrder extends Model
         'has_qc_prep',
         'has_qc_selesai',
         'qc_worker_id',
+        'revision_return_stage',
     ];
 
     protected $casts = [
@@ -52,6 +53,7 @@ class WorkOrder extends Model
     public const STATUS_COMPLETED = 'COMPLETED';
     public const STATUS_QC_REVIEW = 'QC_REVIEW';
     public const STATUS_QC_PREP = 'QC_PREP';
+    public const STATUS_QC_AKHIR = 'QC_AKHIR';
 
     /**
      * Mapping keyword nama tahap → kolom worker WorkOrder.
@@ -140,7 +142,16 @@ class WorkOrder extends Model
 
     public function isInQcStage(): bool
     {
-        return $this->status === self::STATUS_QC_REVIEW || $this->status === self::STATUS_QC_PREP;
+        return in_array($this->status, [
+            self::STATUS_QC_REVIEW,
+            self::STATUS_QC_PREP,
+            self::STATUS_QC_AKHIR,
+        ]);
+    }
+
+    public function isInQcAkhirStage(): bool
+    {
+        return $this->status === self::STATUS_QC_AKHIR;
     }
 
     public function isInWorkerStage(): bool
@@ -260,7 +271,16 @@ class WorkOrder extends Model
         if ($this->status === self::STATUS_QC_REVIEW) {
             $reviewIdx = array_search($this->current_review_stage, $stages);
             $nextIdx = ($reviewIdx !== false) ? $reviewIdx + 1 : 0;
-            return $stages[$nextIdx] ?? self::STATUS_COMPLETED;
+            if (isset($stages[$nextIdx])) {
+                return $stages[$nextIdx];
+            }
+            // Tidak ada tahap berikutnya → QC_AKHIR atau COMPLETED
+            return ($this->has_qc_selesai ?? true) ? self::STATUS_QC_AKHIR : self::STATUS_COMPLETED;
+        }
+
+        // QC_AKHIR → COMPLETED
+        if ($this->status === self::STATUS_QC_AKHIR) {
+            return self::STATUS_COMPLETED;
         }
 
         // COMPLETED → sudah selesai
@@ -277,9 +297,14 @@ class WorkOrder extends Model
             return self::STATUS_QC_REVIEW;
         }
 
-        // Kalau tidak, lanjut ke tahap berikutnya atau COMPLETED
+        // Lanjut ke tahap berikutnya
         $nextIdx = $currentIdx + 1;
-        return $stages[$nextIdx] ?? self::STATUS_COMPLETED;
+        if (isset($stages[$nextIdx])) {
+            return $stages[$nextIdx];
+        }
+
+        // Tahap terakhir selesai → QC_AKHIR (jika has_qc_selesai) atau COMPLETED
+        return ($this->has_qc_selesai ?? true) ? self::STATUS_QC_AKHIR : self::STATUS_COMPLETED;
     }
 
     /**

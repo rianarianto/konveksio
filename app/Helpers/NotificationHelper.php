@@ -138,8 +138,8 @@ class NotificationHelper
             }
         }
 
-        // Kirim notifikasi ke tiap worker (kecuali jika WO masuk tahap QC_REVIEW, karena itu ditangani khusus ke Petugas QC di bawah)
-        if ($newStatus !== WorkOrder::STATUS_QC_REVIEW) {
+        // Kirim notifikasi ke tiap worker (kecuali jika WO masuk tahap QC_REVIEW atau QC_AKHIR, karena itu ditangani khusus ke Petugas QC di bawah)
+        if ($newStatus !== WorkOrder::STATUS_QC_REVIEW && $newStatus !== WorkOrder::STATUS_QC_AKHIR) {
             foreach ($workers as $worker) {
                 if (!$worker->phone) continue;
 
@@ -223,6 +223,35 @@ class NotificationHelper
                 }
             } else {
                 Log::info("[WA-Bot] QC Review: tidak ada QC worker atau nomor HP untuk WO {$wo->wo_number}");
+            }
+        }
+
+        // Notifikasi khusus ke QC Worker saat WO masuk QC_AKHIR
+        if ($newStatus === WorkOrder::STATUS_QC_AKHIR && !$isReject) {
+            $qcWorker = $wo->qc_worker_id ? Worker::find($wo->qc_worker_id) : null;
+
+            if ($qcWorker && $qcWorker->phone) {
+                $qcLink = url("/worker/{$qcWorker->portal_token}");
+
+                $qcPesan = "🏁 *QC AKHIR PERLU DILAKUKAN — {$wo->wo_number}*\n\n"
+                    . "Halo {$qcWorker->name},\n"
+                    . "Semua tahap produksi telah selesai. Silakan lakukan *Verifikasi QC Akhir* sebelum pesanan diserahkan ke admin.\n\n"
+                    . "📋 *Detail:*\n"
+                    . "• Produk: {$produk}\n"
+                    . "• Pelanggan: {$customer}\n"
+                    . "• Total Qty: {$totalQty} pcs\n"
+                    . "• Deadline: {$deadline}\n\n"
+                    . "Buka portal QC Akhir:\n"
+                    . "🔗 {$qcLink}";
+
+                try {
+                    Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
+                        'nohp'  => $qcWorker->phone,
+                        'pesan' => $qcPesan,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('[WA-Bot] Gagal kirim notif QC Akhir: ' . $e->getMessage());
+                }
             }
         }
     }

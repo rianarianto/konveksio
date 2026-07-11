@@ -37,7 +37,34 @@ class WorkOrderService
                 
                 // If there are still pending/in_progress tasks, don't advance yet
                 if ($pendingTasks->count() > 0) {
-                    // Just return the WO without advancing
+                    return $wo;
+                }
+
+                // Jika ada task di stage ini yang berasal dari revisi QC_AKHIR,
+                // setelah selesai harus kembali ke QC_AKHIR bukan alur normal
+                $hasQcAkhirRevision = $allTasksForStage
+                    ->contains(fn($t) => $t->revision_source === 'qc_akhir');
+
+                if ($hasQcAkhirRevision) {
+                    // Reset revision_source tasks
+                    \App\Models\ProductionTask::withoutGlobalScopes()
+                        ->whereIn('order_item_id', $groupItemIds)
+                        ->where('stage_name', $currentStage)
+                        ->update(['revision_source' => null]);
+
+                    $wo->update([
+                        'status'               => WorkOrder::STATUS_QC_AKHIR,
+                        'current_review_stage' => null,
+                        'stage_entered_at'     => $now,
+                    ]);
+                    $wo->refresh();
+
+                    $woId2 = $wo->id;
+                    dispatch(function () use ($woId2) {
+                        $wo = WorkOrder::withoutGlobalScopes()->find($woId2);
+                        if ($wo) NotificationHelper::notify($wo, WorkOrder::STATUS_QC_AKHIR);
+                    })->afterResponse();
+
                     return $wo;
                 }
             }
@@ -313,6 +340,109 @@ class WorkOrderService
 
             $wo->refresh();
             return $wo;
+        });
+    }
+
+    /**
+     * QC Akhir: Approve semua task WO → advance ke COMPLETED.
+     * Return: ['advanced' => bool, 'wo' => WorkOrder]
+     */
+    public function approveQcAkhir(int $woId): array
+    {
+        return DB::transaction(function () use ($woId) {
+            $wo = WorkOrder::withoutGlobalScopes()->lockForUpdate()->findOrFail($woId);
+
+            if (!$wo->isInQcAkhirStage()) {
+                return ['advanced' => false, 'wo' => $wo];
+            }
+
+            $groupItemIds = $wo->orderItem
+                ? $wo->orderItem->getItemsInGroup()->pluck('id')
+                : [$wo->order_item_id];
+
+            // Tandai semua task QC-Akhir-eligible sebagai qc_approved
+            // (hanya stage yang tidak punya wajib_qc=true, atau semua jika tidak ada pengecualian)
+            \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('status', 'done')
+                ->whereNull('qc_approved')
+                ->orWhere(function ($q) use ($groupItemIds) {
+                    $q->whereIn('order_item_id', $groupItemIds)
+                      ->where('status', 'done')
+                      ->where('qc_approved', false);
+                })
+                ->update([
+                    'qc_approved'    => true,
+                    'qc_reviewed_at' => now(),
+                ]);
+
+            // Advance ke COMPLETED
+            $wo->update([
+                'status'       => WorkOrder::STATUS_COMPLETED,
+                'completed_at' => now(),
+                'stage_entered_at' => now(),
+                'current_review_stage' => null,
+            ]);
+            $wo->refresh();
+
+            $woId2 = $wo->id;
+            dispatch(function () use ($woId2) {
+                $wo = WorkOrder::withoutGlobalScopes()->find($woId2);
+                if ($wo) NotificationHelper::notify($wo, WorkOrder::STATUS_COMPLETED);
+            })->afterResponse();
+
+            return ['advanced' => true, 'wo' => $wo];
+        });
+    }
+
+    /**
+     * QC Akhir Reject per-task: kirim task tertentu kembali ke stage-nya untuk revisi.
+     * Hanya boleh untuk tahap yang tidak punya wajib_qc=true (tidak ada QC_REVIEW sendiri).
+     */
+    public function rejectTaskQcAkhir(int $taskId, string $reason): \App\Models\ProductionTask
+    {
+        return DB::transaction(function () use ($taskId, $reason) {
+            $task = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->lockForUpdate()
+                ->with('orderItem')
+                ->findOrFail($taskId);
+
+            // Pastikan tahap ini tidak punya wajib_qc (tidak boleh revisi dari QC Akhir)
+            if ($task->wajib_qc) {
+                throw new \RuntimeException('Tahap ini sudah memiliki QC Review sendiri, tidak bisa direvisi dari QC Akhir.');
+            }
+
+            // Reset task ke pending, tandai sebagai revisi dari qc_akhir
+            $task->update([
+                'status'          => 'pending',
+                'is_revision'     => true,
+                'revision_source' => 'qc_akhir',
+                'qc_approved'     => false,
+                'qc_reviewed_at'  => now(),
+                'completed_at'    => null,
+            ]);
+
+            // Kembalikan WO ke stage task tersebut
+            $wo = WorkOrder::withoutGlobalScopes()
+                ->where('order_item_id', $task->order_item_id)
+                ->where('status', WorkOrder::STATUS_QC_AKHIR)
+                ->first();
+
+            if ($wo) {
+                $wo->update([
+                    'status'               => $task->stage_name,
+                    'current_review_stage' => null,
+                    'reject_reason'        => $reason,
+                    'stage_entered_at'     => now(),
+                ]);
+            }
+
+            // Kirim notifikasi ke worker yang direvisi
+            \App\Helpers\NotificationHelper::notifyTaskRejected(
+                $task, $reason, $wo ?? WorkOrder::withoutGlobalScopes()->where('order_item_id', $task->order_item_id)->first()
+            );
+
+            return $task->fresh();
         });
     }
 

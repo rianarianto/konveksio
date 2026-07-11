@@ -410,6 +410,87 @@ class TugasTukang extends Component
         $this->qcRejectReason = '';
     }
 
+    // ── QC Akhir ─────────────────────────────────────────────────────────────
+
+    public ?int    $qcAkhirRejectTaskId = null;
+    public string  $qcAkhirRejectReason = '';
+
+    /**
+     * QC Akhir: Approve seluruh WO → COMPLETED.
+     */
+    public function approveQcAkhir(): void
+    {
+        $this->ensureValidWo();
+
+        if (!$this->wo->isInQcAkhirStage()) {
+            $this->addError('aksi', 'WO tidak dalam tahap QC Akhir.');
+            return;
+        }
+
+        if ($this->wo->qc_worker_id && $this->wo->qc_worker_id !== $this->worker?->id) {
+            $this->addError('aksi', 'Hanya Petugas QC yang dapat melakukan QC Akhir.');
+            return;
+        }
+
+        $result = app(WorkOrderService::class)->approveQcAkhir($this->wo->id);
+        $this->loadWorkOrder();
+
+        if ($result['advanced']) {
+            session()->flash('success', '✅ QC Akhir selesai! Pesanan telah diserahkan ke admin.');
+        }
+    }
+
+    /**
+     * QC Akhir: Buka modal revisi task tertentu.
+     */
+    public function openQcAkhirReject(int $taskId): void
+    {
+        $this->qcAkhirRejectTaskId = $taskId;
+        $this->qcAkhirRejectReason = '';
+        $this->resetErrorBag('qcAkhirRejectReason');
+    }
+
+    /**
+     * QC Akhir: Tutup modal revisi.
+     */
+    public function closeQcAkhirReject(): void
+    {
+        $this->qcAkhirRejectTaskId = null;
+        $this->qcAkhirRejectReason = '';
+        $this->resetErrorBag('qcAkhirRejectReason');
+    }
+
+    /**
+     * QC Akhir: Kirim task kembali ke worker untuk revisi.
+     */
+    public function rejectTaskQcAkhir(int $taskId): void
+    {
+        if (empty(trim($this->qcAkhirRejectReason))) {
+            $this->addError('qcAkhirRejectReason', 'Alasan revisi wajib diisi.');
+            return;
+        }
+
+        if ($this->wo->qc_worker_id && $this->wo->qc_worker_id !== $this->worker?->id) {
+            $this->addError('aksi', 'Hanya Petugas QC yang dapat melakukan QC Akhir.');
+            return;
+        }
+
+        $task = \App\Models\ProductionTask::withoutGlobalScopes()->with('assignedTo')->find($taskId);
+        if (!$task) return;
+
+        try {
+            app(WorkOrderService::class)->rejectTaskQcAkhir($taskId, $this->qcAkhirRejectReason);
+        } catch (\RuntimeException $e) {
+            $this->addError('aksi', $e->getMessage());
+            return;
+        }
+
+        $this->loadWorkOrder();
+        session()->flash('success', '🔧 Revisi QC Akhir dikirim ke ' . ($task->assignedTo?->name ?? 'pekerja') . '.');
+        $this->qcAkhirRejectTaskId = null;
+        $this->qcAkhirRejectReason = '';
+    }
+
     public function render()
     {
         return view('livewire.tugas-tukang');

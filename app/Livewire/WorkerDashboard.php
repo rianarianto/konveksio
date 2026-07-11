@@ -339,8 +339,9 @@ class WorkerDashboard extends Component
     public function render()
     {
         return view('livewire.worker-dashboard', [
-            'tasks' => $this->tasks,
+            'tasks'     => $this->tasks,
             'qcReviews' => $this->qcReviews,
+            'qcAkhir'   => $this->qcAkhir,
         ]);
     }
 
@@ -475,5 +476,98 @@ class WorkerDashboard extends Component
         session()->flash('success', '🔧 Revisi dikirim ke ' . ($task->assignedTo->name ?? 'pekerja') . '.');
         $this->reviewTaskId = null;
         $this->rejectReason = '';
+    }
+
+    // ── QC Akhir ─────────────────────────────────────────────────────────────
+
+    public ?int   $qcAkhirRejectTaskId = null;
+    public string $rejectReasonAkhir   = '';
+
+    /**
+     * Get WOs in QC_AKHIR status for this QC worker.
+     */
+    public function getQcAkhirProperty(): \Illuminate\Support\Collection
+    {
+        if (!$this->worker) return collect();
+
+        return WorkOrder::withoutGlobalScopes()
+            ->where('status', WorkOrder::STATUS_QC_AKHIR)
+            ->where('qc_worker_id', $this->worker->id)
+            ->with(['orderItem.order.customer'])
+            ->orderBy('stage_entered_at', 'asc')
+            ->get()
+            ->each(function ($wo) {
+                $groupItemIds = $wo->orderItem
+                    ? $wo->orderItem->getItemsInGroup()->pluck('id')
+                    : collect([$wo->order_item_id]);
+                $wo->setRelation('allTasks', ProductionTask::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItemIds)
+                    ->with('assignedTo')
+                    ->get()
+                    ->groupBy('stage_name'));
+            });
+    }
+
+    public function approveQcAkhir(int $woId): void
+    {
+        $wo = WorkOrder::withoutGlobalScopes()->find($woId);
+        if (!$wo || $wo->qc_worker_id !== $this->worker?->id) {
+            $this->addError('qc', 'Tidak memiliki akses QC Akhir.');
+            return;
+        }
+
+        $result = app(WorkOrderService::class)->approveQcAkhir($woId);
+        $this->syncOrderStatus($wo->fresh());
+
+        if ($result['advanced']) {
+            session()->flash('success', '✅ QC Akhir selesai! Pesanan diserahkan ke admin.');
+        }
+    }
+
+    public function openQcAkhirReject(int $taskId): void
+    {
+        $this->qcAkhirRejectTaskId = $taskId;
+        $this->rejectReasonAkhir   = '';
+        $this->resetErrorBag();
+    }
+
+    public function closeQcAkhirReject(): void
+    {
+        $this->qcAkhirRejectTaskId = null;
+        $this->rejectReasonAkhir   = '';
+        $this->resetErrorBag();
+    }
+
+    public function rejectTaskQcAkhir(int $taskId): void
+    {
+        if (empty(trim($this->rejectReasonAkhir))) {
+            $this->addError('rejectReasonAkhir', 'Alasan revisi wajib diisi.');
+            return;
+        }
+
+        $task = ProductionTask::withoutGlobalScopes()->with('assignedTo')->find($taskId);
+        if (!$task) return;
+
+        $wo = WorkOrder::withoutGlobalScopes()
+            ->where('order_item_id', $task->order_item_id)
+            ->where('status', WorkOrder::STATUS_QC_AKHIR)
+            ->first();
+
+        if (!$wo || $wo->qc_worker_id !== $this->worker?->id) {
+            $this->addError('qc', 'Tidak memiliki akses QC Akhir.');
+            return;
+        }
+
+        try {
+            app(WorkOrderService::class)->rejectTaskQcAkhir($taskId, $this->rejectReasonAkhir);
+        } catch (\RuntimeException $e) {
+            $this->addError('qc', $e->getMessage());
+            return;
+        }
+
+        $this->syncOrderStatus($wo);
+        session()->flash('success', '🔧 Revisi QC Akhir dikirim ke ' . ($task->assignedTo?->name ?? 'pekerja') . '.');
+        $this->qcAkhirRejectTaskId = null;
+        $this->rejectReasonAkhir   = '';
     }
 }
