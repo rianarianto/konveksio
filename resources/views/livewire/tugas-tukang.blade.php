@@ -377,19 +377,64 @@
                         }
                     }
 
-                    // Teks instruksi murni (bukan list ukuran) — rawText tanpa pipe
-                    $instructionOnlyText = !$hasPipe ? $rawText : '';
+                @php
+                    // Pisahkan teks catatan admin murni dengan teks 'Pembagian Ukuran' yang digenerate sistem
+                    $adminNote = '';
+                    $sizeListText = '';
+
+                    if ($hasPipe) {
+                        // Cari baris yang mengandung "Pembagian Ukuran:"
+                        $lines = explode("\n", $rawText);
+                        $adminLines = [];
+                        foreach ($lines as $line) {
+                            if (str_contains($line, 'Pembagian Ukuran:')) {
+                                $sizeListText = $line;
+                            } else {
+                                $adminLines[] = $line;
+                            }
+                        }
+                        $adminNote = trim(implode("\n", $adminLines));
+                    } else {
+                        $adminNote = $rawText;
+                    }
+
+                    // Parse title dan items dari $sizeListText jika ada
+                    $parsedTitle = '';
+                    $parsedItems = [];
+                    if (!empty($sizeListText) && str_contains($sizeListText, '|')) {
+                        $parts = array_map('trim', explode('|', $sizeListText));
+                        $firstPart = $parts[0];
+                        if (str_contains($firstPart, ':')) {
+                            $colonPos = strpos($firstPart, ':');
+                            $parsedTitle = trim(substr($firstPart, 0, $colonPos + 1));
+                            $firstItem = trim(substr($firstPart, $colonPos + 1));
+                            if (!empty($firstItem)) $parsedItems[] = $firstItem;
+                        } else {
+                            $parsedItems[] = $firstPart;
+                        }
+                        for ($i = 1; $i < count($parts); $i++) {
+                            if (trim($parts[$i])) $parsedItems[] = trim($parts[$i]);
+                        }
+                        if ($hasCustom) {
+                            $parsedItems = array_filter($parsedItems, fn($item) =>
+                                !preg_match('/^CUSTOM\s*:/i', $item)
+                            );
+                        }
+                    }
                 @endphp
 
-                {{-- Kalimat instruksi biasa (tidak ada pipe/list) --}}
-                @if(!empty($instructionOnlyText))
-                    <div class="instruction-plain-text" style="margin-bottom: {{ $hasCustom ? '12px' : '0' }};">
-                        {!! nl2br(e($instructionOnlyText)) !!}
+                {{-- Catatan Khusus Admin --}}
+                @if(!empty($adminNote))
+                    <div style="background: #F0FDF4; border-left: 4px solid #10B981; padding: 10px 12px; border-radius: 4px; margin-bottom: 14px;">
+                        <div style="font-weight: 800; color: #047857; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📝 Catatan Admin:</div>
+                        <div style="font-size: 13px; color: #065F46; line-height: 1.5; font-weight: 500;">
+                            {!! nl2br(e($adminNote)) !!}
+                        </div>
                     </div>
                 @endif
 
                 {{-- List ukuran dari rawText (Pembagian Ukuran / Size Toko) --}}
-                @if($hasPipe && !empty($parsedItems))
+                @if(!empty($parsedItems))
                     @if(!empty($parsedTitle))
                         <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
                             {{ $parsedTitle }}
