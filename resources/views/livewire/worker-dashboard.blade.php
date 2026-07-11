@@ -56,8 +56,8 @@
     <div class="card task-card task-review" style="border:1.5px solid #fbbf24;">
         <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}"
            style="text-decoration:none;color:inherit;display:block;">
-            <div class="task-header" style="margin-bottom:0;">
-                <div class="task-info">
+            <div class="task-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:0;">
+                <div class="task-info" style="flex:1;">
                     <div class="task-stage task-stage-review">Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}</div>
                     <div class="task-product">{{ $wo->orderItem?->product_name ?? '-' }}</div>
                     <div class="task-customer">
@@ -68,9 +68,14 @@
                         @endif
                     </div>
                 </div>
-            </div>
-            <div style="margin-top:12px;text-align:center;">
-                <span style="font-size:11px;font-weight:600;color:#3b82f6;">👆 Buka Detail untuk Proses QC</span>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
+                    <span style="font-size:11px; font-weight:700; color:#d97706; background:#fef3c7; border-radius:20px; padding:4px 10px; white-space:nowrap;">
+                        🔍 Perlu Review
+                    </span>
+                    <span class="btn btn-warning btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; background:#f59e0b; color:white; font-weight:600; cursor:pointer;">
+                        Buka Detail
+                    </span>
+                </div>
             </div>
         </a>
     </div>
@@ -92,18 +97,23 @@
     <div class="card task-card" style="border:1.5px solid #C084FC;">
         <a href="{{ route('work.task', ['wo_id' => $qaWo->id, 'token' => $qaWo->token, 'wt' => $worker->portal_token]) }}"
            style="text-decoration:none;color:inherit;display:block;">
-            <div class="task-header" style="margin-bottom:0;">
-                <div class="task-info">
-                    <div class="task-stage" style="background:#F3E8FF;color:#7C3AED;">QC Akhir</div>
+            <div class="task-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:0;">
+                <div class="task-info" style="flex:1;">
+                    <div class="task-stage" style="background:#F3E8FF;color:#7C3AED; display:inline-block; padding:2px 8px; border-radius:6px; font-weight:700; font-size:12px; margin-bottom:4px;">QC Akhir</div>
                     <div class="task-product">{{ $qaWo->orderItem?->product_name ?? '-' }}</div>
                     <div class="task-customer">
                         {{ $qaWo->orderItem?->order?->customer?->name ?? '-' }} •
                         {{ $qaWo->orderItem ? $qaWo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs
                     </div>
                 </div>
-            </div>
-            <div style="margin-top:12px;text-align:center;">
-                <span style="font-size:11px;font-weight:600;color:#7C3AED;">👆 Buka Detail untuk Proses QC Akhir</span>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
+                    <span style="font-size:11px; font-weight:700; color:#7c3aed; background:#f3e8ff; border-radius:20px; padding:4px 10px; white-space:nowrap;">
+                        🏁 QC Akhir
+                    </span>
+                    <span class="btn btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; background:#7c3aed; color:white; font-weight:600; cursor:pointer;">
+                        Buka Detail
+                    </span>
+                </div>
             </div>
         </a>
     </div>
@@ -125,15 +135,20 @@
     @if($wo)
     <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
     @endif
-    <div class="card task-card" style="cursor:pointer;">
-        <div class="task-header" style="justify-content: space-between; align-items: center;">
-            <div class="task-info">
-                <div class="task-stage">{{ str_replace('_', ' ', $task->stage_name) }}</div>
+    <div class="card task-card" style="cursor:pointer; border-left: 4px solid #10B981;">
+        <div class="task-header" style="display:flex; justify-content: space-between; align-items: center; gap:12px;">
+            <div class="task-info" style="flex:1;">
+                <div class="task-stage" style="color:#10B981; font-weight:700;">{{ str_replace('_', ' ', $task->stage_name) }}</div>
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
                 <div class="task-customer">{{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs</div>
             </div>
-            <div style="font-size:11px;font-weight:600;color:#22c55e;background:#dcfce7;border-radius:20px;padding:4px 10px;white-space:nowrap;">
-                ⚡ Sedang Dikerjakan
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
+                <span style="font-size:11px;font-weight:700;color:#047857;background:#d1fae5;border-radius:20px;padding:4px 10px;white-space:nowrap;">
+                    ⚡ Dikerjakan
+                </span>
+                <span class="btn btn-success btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; background:#10b981; color:white; font-weight:600; cursor:pointer;">
+                    Buka Detail
+                </span>
             </div>
         </div>
     </div>
@@ -161,8 +176,8 @@
     <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
     @endif
     <div class="card task-card {{ $canStart ? ($isRevision ? 'task-revision' : 'task-ready') : '' }}" style="cursor:pointer;">
-        <div class="task-header" style="justify-content: space-between; align-items: center;">
-            <div class="task-info">
+        <div class="task-header" style="display:flex; justify-content: space-between; align-items: center; gap:12px;">
+            <div class="task-info" style="flex:1;">
                 <div class="task-stage {{ $isRevision ? 'task-stage-revision' : '' }}">
                     {{ str_replace('_', ' ', $task->stage_name) }}
                     @if($isRevision)
@@ -177,13 +192,16 @@
                     @endif
                 </div>
             </div>
-            <div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
                 @if($canStart)
-                    <span style="font-size:11px;font-weight:600;color:{{ $isRevision ? '#d97706' : '#2563eb' }};background:{{ $isRevision ? '#fef3c7' : '#dbeafe' }};border-radius:20px;padding:4px 10px;white-space:nowrap;">
-                        {{ $isRevision ? '🔧 Perbaikan' : '👉 Siap' }}
+                    <span style="font-size:11px;font-weight:700;color:{{ $isRevision ? '#b91c1c' : '#1d4ed8' }};background:{{ $isRevision ? '#fee2e2' : '#dbeafe' }};border-radius:20px;padding:4px 10px;white-space:nowrap;">
+                        {{ $isRevision ? '🔧 Perlu Perbaikan' : '👉 Siap Kerja' }}
+                    </span>
+                    <span class="btn btn-primary btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer;">
+                        Buka Detail
                     </span>
                 @else
-                    <span style="font-size:11px;font-weight:600;color:#94a3b8;background:#f1f5f9;border-radius:20px;padding:4px 10px;white-space:nowrap;">
+                    <span style="font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:20px;padding:4px 10px;white-space:nowrap;">
                         🔒 Terkunci
                     </span>
                 @endif
