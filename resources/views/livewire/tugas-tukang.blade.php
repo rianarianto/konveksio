@@ -346,46 +346,36 @@
             $rawText = $myTask->description ?: $defaultInstructions;
             $hasCustom = !empty($taskCustomRecipients);
 
-            // Cek apakah rawText berisi list pipe-separated (size breakdown)
-            $hasPipe = str_contains($rawText, '|');
+            // Pisahkan per baris: admin note vs baris "Pembagian Ukuran:"
+            $allLines = explode("\n", $rawText);
+            $adminNoteLines = [];
+            $sizeBreakdownLine = '';
+            foreach ($allLines as $line) {
+                if (str_starts_with(trim($line), 'Pembagian Ukuran:')) {
+                    $sizeBreakdownLine = trim($line);
+                } else {
+                    $adminNoteLines[] = $line;
+                }
+            }
+            $adminNote = trim(implode("\n", $adminNoteLines));
 
-            // Ekstrak title dan items dari rawText
+            // Parse items dari baris "Pembagian Ukuran: S (...) | L (...)"
+            $hasPipe = !empty($sizeBreakdownLine) && str_contains($sizeBreakdownLine, '|');
             $parsedTitle = '';
             $parsedItems = [];
-            if ($hasPipe) {
-                $parts = array_map('trim', explode('|', $rawText));
-                $firstPart = $parts[0];
-                if (str_contains($firstPart, ':')) {
-                    $colonPos = strpos($firstPart, ':');
-                    $parsedTitle = trim(substr($firstPart, 0, $colonPos + 1));
-                    $firstItem = trim(substr($firstPart, $colonPos + 1));
-                    if (!empty($firstItem)) $parsedItems[] = $firstItem;
-                } else {
-                    $parsedItems[] = $firstPart;
-                }
-                for ($i = 1; $i < count($parts); $i++) {
-                    if (trim($parts[$i])) $parsedItems[] = trim($parts[$i]);
+            if (!empty($sizeBreakdownLine)) {
+                $colonPos = strpos($sizeBreakdownLine, ':');
+                $parsedTitle = trim(substr($sizeBreakdownLine, 0, $colonPos + 1));
+                $afterColon = trim(substr($sizeBreakdownLine, $colonPos + 1));
+                $parts = array_map('trim', explode('|', $afterColon));
+                foreach ($parts as $part) {
+                    if (trim($part)) $parsedItems[] = trim($part);
                 }
                 if ($hasCustom) {
                     $parsedItems = array_filter($parsedItems, fn($item) =>
                         !preg_match('/^CUSTOM\s*:/i', $item)
                     );
                 }
-            }
-
-            // Ekstrak Catatan Tambahan Admin
-            $adminNote = '';
-            if ($hasPipe) {
-                $lines = explode("\n", $rawText);
-                $adminLines = [];
-                foreach ($lines as $line) {
-                    if (!str_contains($line, 'Pembagian Ukuran:')) {
-                        $adminLines[] = $line;
-                    }
-                }
-                $adminNote = trim(implode("\n", $adminLines));
-            } else {
-                $adminNote = $rawText;
             }
         @endphp
 
