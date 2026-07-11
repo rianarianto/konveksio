@@ -148,12 +148,22 @@
 
         $myActiveTask = null;
         if ($worker) {
+            // Cari task milik worker ini untuk WO ini yang statusnya pending atau in_progress (revisi)
             $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
                 ->whereIn('order_item_id', $groupItems->pluck('id'))
-                ->where('stage_name', $expectedStage)
                 ->where('assigned_to', $worker->id)
+                ->whereIn('status', ['pending', 'in_progress'])
                 ->first();
 
+            if (!$myActiveTask) {
+                // Fallback ke status WO sekarang
+                $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItems->pluck('id'))
+                    ->where('stage_name', $expectedStage)
+                    ->where('assigned_to', $worker->id)
+                    ->first();
+            }
+            
             // Buat virtual task dinamis untuk Petugas QC saat di tahap QC_REVIEW
             if (!$myActiveTask && $wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW && $wo->qc_worker_id === $worker->id) {
                 $myActiveTask = new \App\Models\ProductionTask([

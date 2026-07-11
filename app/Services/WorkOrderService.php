@@ -69,6 +69,11 @@ class WorkOrderService
                 }
             }
 
+            // Jika sedang di tahap QC Review atau QC Akhir, jangan auto-advance saat worker menyelesaikan revisi
+            if ($wo->status === WorkOrder::STATUS_QC_REVIEW || $wo->status === WorkOrder::STATUS_QC_AKHIR) {
+                return $wo;
+            }
+
             $nextStatus = $wo->getNextStatus();
 
             if (!$nextStatus) {
@@ -224,35 +229,39 @@ class WorkOrderService
                 ->with('orderItem')
                 ->findOrFail($taskId);
 
-            // Reset task ke pending + tandai revisi
             $task->update([
-                'status'         => 'pending',
-                'is_revision'    => true,
-                'qc_approved'    => false,
-                'qc_reviewed_at' => now(),
-                'completed_at'   => null,
+                'status'      => 'pending',
+                'is_revision' => true,
+                'qc_approved' => false,
             ]);
 
-            // Kembalikan WO ke tahap sebelumnya (jika masih di qc_review)
+            // Cukup kirim notifikasi WA ke worker
             $wo = WorkOrder::withoutGlobalScopes()
                 ->where('order_item_id', $task->order_item_id)
-                ->where('status', WorkOrder::STATUS_QC_REVIEW)
                 ->first();
 
-            if ($wo && $wo->current_review_stage) {
-                $prevStage = $wo->current_review_stage;
-                $wo->update([
-                    'status'               => $prevStage,
-                    'current_review_stage' => null,
-                    'reject_reason'        => $reason,
-                    'stage_entered_at'     => now(),
-                ]);
+            if ($wo) {
+                $worker = \App\Models\Worker::find($task->assigned_to);
+                if ($worker && $worker->phone) {
+                    $link = url("/tugas?wo_id={$wo->id}&token={$wo->token}&wt={$worker->portal_token}");
+                    $pesan = "⚠️ *REVISI QC — {$wo->wo_number}*\n\n"
+                        . "Halo {$worker->name},\n"
+                        . "Hasil kerja Anda pada tahap *{$task->stage_name}* perlu diperbaiki.\n\n"
+                        . "📋 *Alasan:* {$reason}\n\n"
+                        . "Silakan perbaiki dan selesaikan kembali.\n"
+                        . "🔗 {$link}";
+                    try {
+                        \Illuminate\Support\Facades\Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
+                            'nohp'  => $worker->phone,
+                            'pesan' => $pesan,
+                        ]);
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error('[WA-Bot] Gagal kirim notif revisi: ' . $e->getMessage());
+                    }
+                }
             }
 
-            // Kirim notifikasi WA ke worker yang direvisi
-            \App\Helpers\NotificationHelper::notifyTaskRejected($task, $reason, $wo ?? WorkOrder::withoutGlobalScopes()->where('order_item_id', $task->order_item_id)->first());
-
-            return $task->fresh();
+            return $task;
         });
     }
 
@@ -315,6 +324,26 @@ class WorkOrderService
 
             if (!$wo->started_at) {
                 $wo->update(['started_at' => now()]);
+            }
+
+            // Cek jika worker punya revision task yang pending
+            $groupItemIds = $wo->orderItem
+                ? $wo->orderItem->getItemsInGroup()->pluck('id')
+                : [$wo->order_item_id];
+
+            $revisionTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('assigned_to', $workerId)
+                ->where('is_revision', true)
+                ->where('status', 'pending')
+                ->first();
+
+            if ($revisionTask) {
+                $revisionTask->update([
+                    'status'      => 'in_progress',
+                ]);
+                $wo->refresh();
+                return $wo;
             }
 
             // Determine the actual stage name for task lookup
@@ -437,18 +466,26 @@ class WorkOrderService
             ]);
 
             if ($wo) {
-                $wo->update([
-                    'status'               => $task->stage_name,
-                    'current_review_stage' => null,
-                    'reject_reason'        => $reason,
-                    'stage_entered_at'     => now(),
-                ]);
+                // Kirim notifikasi WA ke worker
+                $worker = \App\Models\Worker::find($task->assigned_to);
+                if ($worker && $worker->phone) {
+                    $link = url("/tugas?wo_id={$wo->id}&token={$wo->token}&wt={$worker->portal_token}");
+                    $pesan = "⚠️ *REVISI QC AKHIR — {$wo->wo_number}*\n\n"
+                        . "Halo {$worker->name},\n"
+                        . "Hasil kerja Anda pada tahap *{$task->stage_name}* perlu diperbaiki (Revisi QC Akhir).\n\n"
+                        . "📋 *Alasan:* {$reason}\n\n"
+                        . "Silakan perbaiki dan selesaikan kembali.\n"
+                        . "🔗 {$link}";
+                    try {
+                        \Illuminate\Support\Facades\Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
+                            'nohp'  => $worker->phone,
+                            'pesan' => $pesan,
+                        ]);
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error('[WA-Bot] Gagal kirim notif revisi QC akhir: ' . $e->getMessage());
+                    }
+                }
             }
-
-            // Kirim notifikasi ke worker yang direvisi
-            \App\Helpers\NotificationHelper::notifyTaskRejected(
-                $task, $reason, $wo ?? WorkOrder::withoutGlobalScopes()->where('order_item_id', $task->order_item_id)->first()
-            );
 
             return $task->fresh();
         });

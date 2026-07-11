@@ -70,6 +70,11 @@ class WorkerDashboard extends Component
             return false;
         }
 
+        // Special case: task is a revision - always startable
+        if ($task->is_revision && $task->status === 'pending') {
+            return true;
+        }
+
         // Special case: QC_PREP status matches QC_PERSIAPAN task
         if ($wo->status === WorkOrder::STATUS_QC_PREP && $task->stage_name === 'QC_PERSIAPAN') {
             return true;

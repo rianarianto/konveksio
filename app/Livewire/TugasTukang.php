@@ -67,26 +67,37 @@ class TugasTukang extends Component
     {
         $this->ensureValidWo();
 
-        if ($this->wo->status !== WorkOrder::STATUS_CREATED && !$this->wo->isInWorkerStage()) {
-            $this->addError('aksi', 'Anda tidak bisa memulai tugas ini saat ini.');
-            return;
-        }
-
         $worker = $this->resolveCurrentWorker();
-        $currentStageName = $this->wo->status;
-        if ($this->wo->status === WorkOrder::STATUS_QC_PREP) {
-            $currentStageName = 'QC_PERSIAPAN';
-        }
-
         $groupItemIds = $this->wo->orderItem
             ? $this->wo->orderItem->getItemsInGroup()->pluck('id')
             : [$this->wo->order_item_id];
 
+        // Cek jika worker punya revision task yang pending
         $task = \App\Models\ProductionTask::withoutGlobalScopes()
             ->whereIn('order_item_id', $groupItemIds)
-            ->where('stage_name', $currentStageName)
             ->where('assigned_to', $worker?->id)
+            ->where('is_revision', true)
+            ->where('status', 'pending')
             ->first();
+
+        if (!$task) {
+            // Logika validasi normal
+            if ($this->wo->status !== WorkOrder::STATUS_CREATED && !$this->wo->isInWorkerStage()) {
+                $this->addError('aksi', 'Anda tidak bisa memulai tugas ini saat ini.');
+                return;
+            }
+
+            $currentStageName = $this->wo->status;
+            if ($this->wo->status === WorkOrder::STATUS_QC_PREP) {
+                $currentStageName = 'QC_PERSIAPAN';
+            }
+
+            $task = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('stage_name', $currentStageName)
+                ->where('assigned_to', $worker?->id)
+                ->first();
+        }
 
         if (!$task) {
             $this->addError('aksi', 'Anda tidak bertugas di tahap ini.');
@@ -103,24 +114,31 @@ class TugasTukang extends Component
     {
         $this->ensureValidWo();
 
-        if (!$this->wo->isInWorkerStage()) {
-            $this->addError('aksi', 'Tugas ini tidak bisa diselesaikan saat ini.');
-            return;
-        }
-
-        // Find and mark the current worker's task as done
+        // Cari revisi task terlebih dahulu
         $worker = $this->resolveCurrentWorker();
-        $task = null;
-        if ($worker) {
-            $groupItemIds = $this->wo->orderItem
-                ? $this->wo->orderItem->getItemsInGroup()->pluck('id')
-                : [$this->wo->order_item_id];
-            
-            $task = \App\Models\ProductionTask::withoutGlobalScopes()
-                ->whereIn('order_item_id', $groupItemIds)
-                ->where('stage_name', $this->wo->status)
-                ->where('assigned_to', $worker->id)
-                ->first();
+        $groupItemIds = $this->wo->orderItem
+            ? $this->wo->orderItem->getItemsInGroup()->pluck('id')
+            : [$this->wo->order_item_id];
+
+        $task = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->whereIn('order_item_id', $groupItemIds)
+            ->where('assigned_to', $worker?->id)
+            ->where('status', 'in_progress')
+            ->first();
+
+        // Kalau tidak ada task in_progress yang revision, fallback ke logic lama
+        if (!$task) {
+            if (!$this->wo->isInWorkerStage()) {
+                $this->addError('aksi', 'Tugas ini tidak bisa diselesaikan saat ini.');
+                return;
+            }
+            if ($worker) {
+                $task = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItemIds)
+                    ->where('stage_name', $this->wo->status)
+                    ->where('assigned_to', $worker->id)
+                    ->first();
+            }
         }
 
         if (!$task) {
