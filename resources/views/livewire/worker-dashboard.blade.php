@@ -61,6 +61,7 @@
                     <div class="task-stage task-stage-review">Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}</div>
                     <div class="task-product">{{ $wo->orderItem?->product_name ?? '-' }}</div>
                     <div class="task-customer">
+                        <span class="mono" style="font-weight:600;color:#475569;">{{ $wo->orderItem?->order?->order_number ?? '-' }}</span> •
                         {{ $wo->orderItem?->order?->customer?->name ?? '-' }} •
                         {{ $wo->orderItem ? $wo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs
                         @if($wo->orderItem?->order?->is_express)
@@ -186,6 +187,7 @@
                 </div>
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
                 <div class="task-customer">
+                    <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
                     {{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
                     @if($task->orderItem?->order?->is_express)
                     <span class="express-badge">⚡ Express</span>
