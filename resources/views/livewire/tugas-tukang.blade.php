@@ -178,6 +178,19 @@
 
         $isMyActiveStage = $myActiveTask ? true : false;
         $myTask = $myActiveTask;
+
+        $nextStageLabel = 'selesai dikerjakan';
+        if ($myTask) {
+            if ($myTask->wajib_qc) {
+                $nextStageLabel = 'masuk tahap QC';
+            } else {
+                $stages = $wo->stage_sequence ?? [];
+                $currentIdx = array_search($myTask->stage_name, $stages);
+                if ($currentIdx !== false && isset($stages[$currentIdx + 1])) {
+                    $nextStageLabel = 'masuk tahap ' . str_replace('_', ' ', $stages[$currentIdx + 1]);
+                }
+            }
+        }
     @endphp
 
     <div class="greeting-bar">
@@ -700,7 +713,7 @@
     @else
     <div class="action-banner banner-green">
         @if($myTask && $myTask->status === 'done')
-            <span>✅ Tugas {{ str_replace('_', ' ', $myTask->stage_name) }} selesai & masuk tahap QC</span>
+            <span>✅ Tugas {{ str_replace('_', ' ', $myTask->stage_name) }} selesai & {{ $nextStageLabel }}</span>
         @elseif($wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW)
             <span>🔍 Sedang dalam verifikasi hasil pekerjaan oleh Petugas QC...</span>
         @else
@@ -715,7 +728,7 @@
     @if($isMyActiveStage)
         @if($myActiveTask && $myActiveTask->status === 'done')
         <div class="action-banner banner-green">
-            <span>✅ Tugas {{ str_replace('_', ' ', $myActiveTask->stage_name) }} selesai & masuk tahap QC</span>
+            <span>✅ Tugas {{ str_replace('_', ' ', $myActiveTask->stage_name) }} selesai & {{ $nextStageLabel }}</span>
         </div>
         @else
         <div class="action-card">
