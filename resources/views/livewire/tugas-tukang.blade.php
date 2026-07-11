@@ -342,57 +342,52 @@
 
         @endif
 
-        <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left; width: 100%;">
-            <div class="task-detail-label" style="margin-bottom: 6px;">Instruksi Kerja</div>
-            <div class="task-detail-value text-note" style="text-align: left; width: 100%;">
-                @php
-                    $rawText = $myTask->description ?: $defaultInstructions;
-                    $hasCustom = !empty($taskCustomRecipients);
+        @php
+            $rawText = $myTask->description ?: $defaultInstructions;
+            $hasCustom = !empty($taskCustomRecipients);
 
-                    // Cek apakah rawText berisi list pipe-separated (size breakdown)
-                    $hasPipe = str_contains($rawText, '|');
+            // Cek apakah rawText berisi list pipe-separated (size breakdown)
+            $hasPipe = str_contains($rawText, '|');
 
-                    // Ekstrak title dan items dari rawText
-                    $parsedTitle = '';
-                    $parsedItems = [];
-                    if ($hasPipe) {
-                        $parts = array_map('trim', explode('|', $rawText));
-                        $firstPart = $parts[0];
-                        if (str_contains($firstPart, ':')) {
-                            $colonPos = strpos($firstPart, ':');
-                            $parsedTitle = trim(substr($firstPart, 0, $colonPos + 1));
-                            $firstItem = trim(substr($firstPart, $colonPos + 1));
-                            if (!empty($firstItem)) $parsedItems[] = $firstItem;
-                        } else {
-                            $parsedItems[] = $firstPart;
-                        }
-                        for ($i = 1; $i < count($parts); $i++) {
-                            if (trim($parts[$i])) $parsedItems[] = trim($parts[$i]);
-                        }
-                        if ($hasCustom) {
-                            $parsedItems = array_filter($parsedItems, fn($item) =>
-                                !preg_match('/^CUSTOM\s*:/i', $item)
-                            );
-                        }
+            // Ekstrak title dan items dari rawText
+            $parsedTitle = '';
+            $parsedItems = [];
+            if ($hasPipe) {
+                $parts = array_map('trim', explode('|', $rawText));
+                $firstPart = $parts[0];
+                if (str_contains($firstPart, ':')) {
+                    $colonPos = strpos($firstPart, ':');
+                    $parsedTitle = trim(substr($firstPart, 0, $colonPos + 1));
+                    $firstItem = trim(substr($firstPart, $colonPos + 1));
+                    if (!empty($firstItem)) $parsedItems[] = $firstItem;
+                } else {
+                    $parsedItems[] = $firstPart;
+                }
+                for ($i = 1; $i < count($parts); $i++) {
+                    if (trim($parts[$i])) $parsedItems[] = trim($parts[$i]);
+                }
+                if ($hasCustom) {
+                    $parsedItems = array_filter($parsedItems, fn($item) =>
+                        !preg_match('/^CUSTOM\s*:/i', $item)
+                    );
+                }
+            }
+
+            // Ekstrak Catatan Tambahan Admin
+            $adminNote = '';
+            if ($hasPipe) {
+                $lines = explode("\n", $rawText);
+                $adminLines = [];
+                foreach ($lines as $line) {
+                    if (!str_contains($line, 'Pembagian Ukuran:')) {
+                        $adminLines[] = $line;
                     }
-
-                    // Ekstrak Catatan Tambahan Admin
-                    $adminNote = '';
-                    if ($hasPipe) {
-                        $lines = explode("\n", $rawText);
-                        $adminLines = [];
-                        foreach ($lines as $line) {
-                            if (!str_contains($line, 'Pembagian Ukuran:')) {
-                                $adminLines[] = $line;
-                            }
-                        }
-                        $adminNote = trim(implode("\n", $adminLines));
-                    } else {
-                        $adminNote = $rawText;
-                    }
-                @endphp
-            </div>
-        </div>
+                }
+                $adminNote = trim(implode("\n", $adminLines));
+            } else {
+                $adminNote = $rawText;
+            }
+        @endphp
 
         @if(!empty($adminNote))
         <div class="task-detail-row">
