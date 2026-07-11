@@ -347,18 +347,20 @@
             $rawText = $myTask->description ?: $defaultInstructions;
             $hasCustom = !empty($taskCustomRecipients);
 
+            $isQcTask = in_array(strtoupper($myTask->stage_name ?? ''), ['QC_PREP', 'QC_PERSIAPAN', 'QC_AKHIR']) || str_starts_with(strtoupper($myTask->stage_name ?? ''), 'QC_');
+
             // Pisahkan per baris: admin note vs baris "Pembagian Ukuran:"
             $allLines = explode("\n", $rawText);
             $adminNoteLines = [];
             $sizeBreakdownLine = '';
             foreach ($allLines as $line) {
-                if (str_starts_with(trim($line), 'Pembagian Ukuran:')) {
+                if (!$isQcTask && str_starts_with(trim($line), 'Pembagian Ukuran:')) {
                     $sizeBreakdownLine = trim($line);
                 } else {
                     $adminNoteLines[] = $line;
                 }
             }
-            $adminNote = trim(implode("\n", $adminNoteLines));
+            $adminNote = $isQcTask ? '' : trim(implode("\n", $adminNoteLines));
 
             // Parse items dari baris "Pembagian Ukuran: S (...) | L (...)"
             $hasPipe = !empty($sizeBreakdownLine) && str_contains($sizeBreakdownLine, '|');
@@ -373,9 +375,7 @@
                     if (trim($part)) $parsedItems[] = trim($part);
                 }
                 if ($hasCustom) {
-                    $parsedItems = array_filter($parsedItems, fn($item) =>
-                        !preg_match('/^CUSTOM\s*:/i', $item)
-                    );
+                    $parsedItems = array_filter($parsedItems, fn($item) => !str_contains($item, 'CUSTOM'));
                 }
             }
         @endphp
@@ -407,6 +407,8 @@
                         </li>
                         @endforeach
                     </ul>
+                @else
+                    {!! nl2br(e($rawText)) !!}
                 @endif
 
                 {{-- Detail Size Custom: hanya jika ada custom recipients --}}
