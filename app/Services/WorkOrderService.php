@@ -12,9 +12,9 @@ class WorkOrderService
     /**
      * Memajukan status WO ke tahap berikutnya (dinamis berdasarkan stage_sequence).
      */
-    public function advance(int $woId): WorkOrder
+    public function advance(int $woId, bool $fromQcApproval = false): WorkOrder
     {
-        return DB::transaction(function () use ($woId) {
+        return DB::transaction(function () use ($woId, $fromQcApproval) {
             $wo = WorkOrder::lockForUpdate()->findOrFail($woId);
 
             $now = now();
@@ -70,7 +70,7 @@ class WorkOrderService
             }
 
             // Jika sedang di tahap QC Review atau QC Akhir, jangan auto-advance saat worker menyelesaikan revisi
-            if ($wo->status === WorkOrder::STATUS_QC_REVIEW || $wo->status === WorkOrder::STATUS_QC_AKHIR) {
+            if (($wo->status === WorkOrder::STATUS_QC_REVIEW || $wo->status === WorkOrder::STATUS_QC_AKHIR) && !$fromQcApproval) {
                 return $wo;
             }
 
@@ -209,7 +209,7 @@ class WorkOrderService
 
             if ($unapprovedCount === 0) {
                 // Semua approved → advance WO
-                $this->advance($wo->id);
+                $this->advance($wo->id, true);
                 return ['advanced' => true, 'wo' => $wo->fresh()];
             }
 
