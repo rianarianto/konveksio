@@ -376,8 +376,6 @@
                             );
                         }
                     }
-
-                @php
                     // Pisahkan teks catatan admin murni dengan teks 'Pembagian Ukuran' yang digenerate sistem
                     $adminNote = '';
                     $sizeListText = '';
