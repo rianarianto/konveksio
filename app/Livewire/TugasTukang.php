@@ -147,9 +147,15 @@ class TugasTukang extends Component
             return;
         }
 
+        $wasRevision = (bool) $task->is_revision;
         $task->update(['status' => 'done', 'completed_at' => now()]);
 
         app(WorkOrderService::class)->advance($this->wo->id);
+
+        if ($wasRevision) {
+            \App\Helpers\NotificationHelper::notifyRevisionResubmitted($task, $this->wo);
+        }
+
         $this->syncOrderStatus();
         $this->loadWorkOrder();
         $this->dispatch('refreshed');
