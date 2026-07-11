@@ -1237,13 +1237,17 @@ class AturTugasProduksi extends Page
         }
 
         if (!$workOrder && $item->order) {
+            $initialStatus = $hasQcPrep ? \App\Models\WorkOrder::STATUS_QC_PREP : ($stageSequence[0] ?? \App\Models\WorkOrder::STATUS_COMPLETED);
             $workOrder = \App\Models\WorkOrder::create([
                 'shop_id' => $item->order->shop_id,
                 'order_item_id' => $item->id,
                 'stage_sequence' => $stageSequence,
+                'status' => $initialStatus,
                 'is_express' => $isExpress,
                 'has_qc_prep' => $hasQcPrep,
                 'qc_worker_id' => $qcWorkerId,
+                'stage_entered_at' => now(),
+                'started_at' => now(),
             ]);
         }
 
