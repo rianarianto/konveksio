@@ -823,10 +823,18 @@
                         @endif
                     </div>
                 </div>
+                @php
+                    $isRevising = $qcTask->is_revision && in_array($qcTask->status, ['pending', 'in_progress']);
+                @endphp
+
                 @if($isApproved)
                 <span style="font-size:12px;font-weight:600;color:#16a34a;
                              background:#dcfce7;border-radius:20px;padding:5px 12px;
                              white-space:nowrap;flex-shrink:0;">✅ Disetujui</span>
+                @elseif($isRevising)
+                <span style="font-size:12px;font-weight:600;color:#dc2626;
+                             background:#fee2e2;border-radius:20px;padding:5px 12px;
+                             white-space:nowrap;flex-shrink:0;">⏳ Sedang Direvisi</span>
                 @else
                 <div style="display:flex;gap:6px;flex-shrink:0;">
                     <button wire:click="approveTask({{ $qcTask->id }})"
