@@ -239,7 +239,8 @@ class AturTugasProduksi extends Page
                                                 ->searchable()
                                                 ->nullable(),
                                             Toggle::make('has_qc_prep')
-                                                ->label('QC Persiapan')
+                                                ->label('QC Persiapan & QC Akhir')
+                                                ->helperText('Aktifkan QC di awal (persiapan bahan) dan QC di akhir (verifikasi final sebelum selesai).')
                                                 ->default(true)
                                                 ->inline(false),
                                         ]),
