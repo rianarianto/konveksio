@@ -887,7 +887,8 @@
                 <div style="display:flex;flex-direction:column;gap:6px;">
                     @foreach($stageTasks as $qaTask)
                     @php
-                        $isLastStage  = end($wo->stage_sequence) === $qaTask->stage_name;
+                        $woStages     = $wo->stage_sequence ?? [];
+                        $isLastStage  = end($woStages) === $qaTask->stage_name;
                         $hasQcAkhir   = $wo->has_qc_selesai ?? true;
                         
                         $qaApproved   = $qaTask->qc_approved ?? false;
@@ -950,7 +951,8 @@
         @if(!$qaHasPendingRevision)
         @php
             $qaAllApproved = $qaAllTasks->flatten()->every(function($t) use ($wo) {
-                $isLastStage = end($wo->stage_sequence) === $t->stage_name;
+                $woStages = $wo->stage_sequence ?? [];
+                $isLastStage = end($woStages) === $t->stage_name;
                 $hasQcAkhir = $wo->has_qc_selesai ?? true;
                 $hasOwnQc = ($t->wajib_qc ?? false) && !($isLastStage && $hasQcAkhir);
                 return ($t->qc_approved ?? false) || $hasOwnQc;

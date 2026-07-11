@@ -413,8 +413,13 @@ class WorkOrderService
                 ->where('status', WorkOrder::STATUS_QC_AKHIR)
                 ->first();
 
-            $isLastStage = $wo && (end($wo->stage_sequence) === $task->stage_name);
-            $hasQcAkhir = $wo && ($wo->has_qc_selesai ?? true);
+            $isLastStage = false;
+            $hasQcAkhir = false;
+            if ($wo) {
+                $woStages = $wo->stage_sequence ?? [];
+                $isLastStage = (end($woStages) === $task->stage_name);
+                $hasQcAkhir = $wo->has_qc_selesai ?? true;
+            }
 
             // Pastikan tahap ini tidak punya wajib_qc (kecuali tahap terakhir yang QC Review-nya di-skip oleh QC Akhir)
             if ($task->wajib_qc && !($isLastStage && $hasQcAkhir)) {
