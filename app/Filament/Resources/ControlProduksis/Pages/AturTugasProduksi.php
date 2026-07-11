@@ -82,17 +82,18 @@ class AturTugasProduksi extends Page
             
             $firstTask = $tasks->first();
             
+            // Clean description at stage level
+            $rawDesc = $firstTask->description ?? '';
+            $cleanDescLines = array_filter(
+                explode("\n", $rawDesc),
+                fn($line) => !str_starts_with(trim($line), 'Pembagian Ukuran:')
+                          && !str_starts_with(trim($line), 'Baju Custom:')
+            );
+            $cleanDesc = trim(implode("\n", $cleanDescLines));
+
             $workerRows = [];
             foreach ($tasks as $task) {
                 $wagePerPcs = $task->quantity > 0 ? (int) ($task->wage_amount / $task->quantity) : 0;
-                // Strip baris yang di-generate otomatis agar tidak double saat re-save
-                $rawDesc = $task->description ?? '';
-                $cleanDescLines = array_filter(
-                    explode("\n", $rawDesc),
-                    fn($line) => !str_starts_with(trim($line), 'Pembagian Ukuran:')
-                              && !str_starts_with(trim($line), 'Baju Custom:')
-                );
-                $cleanDesc = trim(implode("\n", $cleanDescLines));
 
                 $workerRow = [
                     'id' => $task->id,
@@ -100,7 +101,6 @@ class AturTugasProduksi extends Page
                     'quantity' => $task->quantity,
                     'wage_per_pcs' => $wagePerPcs,
                     'wage_custom_per_pcs' => $task->size_quantities['_wage_custom'] ?? $wagePerPcs,
-                    'description' => $cleanDesc,
                 ];
 
                 if (is_array($task->size_quantities)) {
@@ -139,6 +139,7 @@ class AturTugasProduksi extends Page
             $tasksForRepeater[(string) Str::uuid()] = [
                 'stage_name' => $stageName,
                 'wajib_qc' => $firstTask->wajib_qc ?? true,
+                'description' => $cleanDesc,
                 'workers' => $workerRows,
             ];
         }
@@ -371,6 +372,12 @@ class AturTugasProduksi extends Page
                                                         ->live()
                                                         ->default(true),
                                                 ]),
+
+                                            Textarea::make('description')
+                                                ->label('Catatan Instruksi')
+                                                ->rows(2)
+                                                ->columnSpanFull()
+                                                ->placeholder('Catatan instruksi ini berlaku untuk seluruh pekerja di tahap ini...'),
 
                                             \Filament\Schemas\Components\Actions::make([
                                                     \Filament\Actions\Action::make('autoDistribute')
@@ -681,11 +688,6 @@ class AturTugasProduksi extends Page
                                                                 })
                                                                 ->visible(fn (Get $get) => (str_contains(strtolower($get('../../stage_name')), 'potong') || str_contains(strtolower($get('../../stage_name')), 'jahit')) && (int) ($get('CUSTOM') ?? 0) > 0),
                                                         ]),
-
-                                                    Textarea::make('description')
-                                                        ->label('Catatan Instruksi')
-                                                        ->rows(2)
-                                                        ->columnSpanFull(),
                                                 ])
                                                 ->columnSpanFull()
                                                 ->addActionLabel('+ Tambah Pekerja')
@@ -1190,7 +1192,7 @@ class AturTugasProduksi extends Page
                     $descStrings[] = 'Baju Custom: ' . implode(', ', $workerCustomNames);
                 }
                 
-                $baseDesc = $wItem['description'] ?? '';
+                $baseDesc = $taskItem['description'] ?? '';
                 if (!empty($descStrings)) {
                     $baseDesc = trim($baseDesc . "\n" . implode("\n", $descStrings));
                 }
