@@ -2,7 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Slip Upah - {{ $payroll->worker->name }}</title>
+    @php
+        $isMonthly = ($payroll->note === 'Gaji Bulanan' || $payroll->productionTasks->isEmpty());
+    @endphp
+    <title>Slip {{ $isMonthly ? 'Gaji' : 'Upah' }} - {{ $payroll->worker->name }}</title>
     <style>
         body {
             font-family: 'Helvetica', 'Arial', sans-serif;
@@ -30,7 +33,7 @@
             margin: 5px 0 0;
             font-size: 10px;
             color: #666;
-        }
+            }
         .info-table {
             width: 100%;
             margin-bottom: 20px;
@@ -96,7 +99,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>SLIP UPAH KARYAWAN</h1>
+            <h1>SLIP {{ $isMonthly ? 'GAJI KARYAWAN BULANAN' : 'UPAH KARYAWAN BORONGAN' }}</h1>
             <p>{{ $payroll->shop->name }}</p>
         </div>
 
@@ -115,6 +118,7 @@
             </tr>
         </table>
 
+        @if(!$isMonthly)
         <table class="content-table">
             <thead>
                 <tr>
@@ -202,14 +206,37 @@
                 @endforeach
             </tbody>
         </table>
+        @else
+        <table class="content-table">
+            <thead>
+                <tr>
+                    <th>Deskripsi / Rincian</th>
+                    <th style="text-align: right; width: 200px;">Nominal</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Gaji Bulanan Tetap (Periode Pembayaran {{ $payroll->payment_date->format('F Y') }})</td>
+                    <td style="text-align: right; font-weight: bold;">Rp {{ number_format($payroll->total_wage, 0, ',', '.') }}</td>
+                </tr>
+            </tbody>
+        </table>
+        @endif
 
         <table width="100%">
             <tr>
-                <td width="60%"></td>
+                <td width="60%">
+                    @if(!empty($payroll->note))
+                        <div style="font-size: 11px; color: #666; margin-top: 10px;">
+                            <strong>Catatan:</strong><br>
+                            {{ $payroll->note }}
+                        </div>
+                    @endif
+                </td>
                 <td width="40%">
                     <table class="totals-table">
                         <tr>
-                            <td class="label">Total Upah Kotor</td>
+                            <td class="label">Total {{ $isMonthly ? 'Gaji' : 'Upah' }} Kotor</td>
                             <td class="value">Rp {{ number_format($payroll->total_wage, 0, ',', '.') }}</td>
                         </tr>
                         @if($payroll->kasbon_deduction > 0)
