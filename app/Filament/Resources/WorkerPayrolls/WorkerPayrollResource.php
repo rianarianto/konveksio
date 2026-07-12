@@ -37,6 +37,7 @@ class WorkerPayrollResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->where('wage_type', 'piece_rate')
             ->with(['productionTasks' => function ($query) {
                 $query->where('status', 'done')->where('is_paid', false)->with('orderItem');
             }])

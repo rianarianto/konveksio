@@ -1132,7 +1132,13 @@ class AturTugasProduksi extends Page
                 
                 $customQty = (int) ($sizeQuantities['CUSTOM'] ?? 0);
                 $standardQty = $quantity - $customQty;
-                $totalWage = ($standardQty * $wagePerPcs) + ($customQty * $wageCustomPerPcs);
+                
+                $worker = \App\Models\Worker::find($workerId);
+                if ($worker && $worker->wage_type === 'monthly') {
+                    $totalWage = 0;
+                } else {
+                    $totalWage = ($standardQty * $wagePerPcs) + ($customQty * $wageCustomPerPcs);
+                }
 
                 if ($customQty > 0) {
                     $sizeQuantities['_wage_custom'] = $wageCustomPerPcs;
