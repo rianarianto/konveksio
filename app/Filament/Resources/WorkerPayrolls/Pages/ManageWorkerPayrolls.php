@@ -12,12 +12,12 @@ class ManageWorkerPayrolls extends ManageRecords
     public function getTabs(): array
     {
         return [
-            'borongan' => \Filament\Resources\Components\Tab::make('Upah Borongan')
+            'borongan' => \Filament\Schemas\Components\Tabs\Tab::make('Upah Borongan')
                 ->modifyQueryUsing(fn ($query) => $query
                     ->where('wage_type', 'piece_rate')
                     ->whereHas('productionTasks', fn($q) => $q->where('status', 'done')->where('is_paid', false))
                 ),
-            'bulanan' => \Filament\Resources\Components\Tab::make('Gaji Bulanan')
+            'bulanan' => \Filament\Schemas\Components\Tabs\Tab::make('Gaji Bulanan')
                 ->modifyQueryUsing(fn ($query) => $query
                     ->where('wage_type', 'monthly')
                 ),
