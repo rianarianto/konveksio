@@ -326,7 +326,12 @@ class WorkerPayrollResource extends Resource
                         ])
                         ->send();
                 });
-            }),
+            })
+            ->modalSubmitAction(fn (\Filament\Actions\StaticAction $action) => $action
+                ->extraAttributes([
+                    'onclick' => "return confirm('Apakah Anda yakin data pembayaran sudah benar dan ingin memprosesnya?')"
+                ])
+            ),
 
             Action::make('detail')
             ->label('Rincian')
