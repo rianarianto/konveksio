@@ -37,11 +37,9 @@ class WorkerPayrollResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('wage_type', 'piece_rate')
             ->with(['productionTasks' => function ($query) {
                 $query->where('status', 'done')->where('is_paid', false)->with('orderItem');
-            }])
-            ->whereHas('productionTasks', fn($q) => $q->where('status', 'done')->where('is_paid', false));
+            }]);
     }
 
     public static function table(Table $table): Table
@@ -56,6 +54,7 @@ class WorkerPayrollResource extends Resource
 
             TextColumn::make('pesanan_count')
             ->label('Jml Pesanan')
+            ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
             ->state(function (Worker $record): int {
             return $record->productionTasks
                 ->where('status', 'done')
@@ -67,6 +66,7 @@ class WorkerPayrollResource extends Resource
 
             TextColumn::make('items_count')
             ->label('Jml Item')
+            ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
             ->state(function (Worker $record): int {
             return $record->productionTasks
                 ->where('status', 'done')
@@ -78,6 +78,7 @@ class WorkerPayrollResource extends Resource
 
             TextColumn::make('total_pcs')
             ->label('Total Pcs')
+            ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
             ->state(function (Worker $record): int {
             return (int)$record->productionTasks
                 ->where('status', 'done')
@@ -88,13 +89,16 @@ class WorkerPayrollResource extends Resource
             ->color('info'),
 
             TextColumn::make('total_wage')
-            ->label('Total Nominal Upah')
-            ->state(function (Worker $record): int {
-            return (int)$record->productionTasks
-                ->where('status', 'done')
-                ->where('is_paid', false)
-                ->sum('wage_amount');
-        })
+            ->label('Total Nominal')
+            ->state(function (Worker $record, $livewire): int {
+                if (($livewire->activeTab ?? 'borongan') === 'bulanan') {
+                    return (int) $record->base_salary;
+                }
+                return (int) $record->productionTasks
+                    ->where('status', 'done')
+                    ->where('is_paid', false)
+                    ->sum('wage_amount');
+            })
             ->money('IDR')
             ->weight('bold')
             ->color('success'),
@@ -106,131 +110,149 @@ class WorkerPayrollResource extends Resource
 
             TextColumn::make('net_wage')
             ->label('Upah Bersih')
-            ->state(function (Worker $record): int {
-            $totalWage = (int)$record->productionTasks
-                ->where('status', 'done')
-                ->where('is_paid', false)
-                ->sum('wage_amount');
-
-            return max(0, $totalWage - $record->current_cash_advance);
-        })
+            ->state(function (Worker $record, $livewire): int {
+                $totalWage = 0;
+                if (($livewire->activeTab ?? 'borongan') === 'bulanan') {
+                    $totalWage = (int) $record->base_salary;
+                } else {
+                    $totalWage = (int) $record->productionTasks
+                        ->where('status', 'done')
+                        ->where('is_paid', false)
+                        ->sum('wage_amount');
+                }
+                return max(0, $totalWage - $record->current_cash_advance);
+            })
             ->money('IDR')
             ->weight('bold')
             ->color('primary'),
         ])
             ->actions([
             Action::make('pay_all')
-            ->label('Bayar Upah')
+            ->label(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'bulanan' ? 'Bayar Gaji' : 'Bayar Upah')
             ->icon('heroicon-o-banknotes')
             ->color('success')
             ->visible(fn() => auth()->user()->role === 'owner')
             ->requiresConfirmation()
-            ->modalHeading('Bayar Semua Upah Selesai')
-            ->modalDescription(function (Worker $record) {
-            $totalWage = (int)$record->productionTasks()
-                ->where('status', 'done')
-                ->where('is_paid', false)
-                ->selectRaw('SUM(wage_amount) as total')
-                ->value('total') ?? 0;
+            ->modalHeading(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'bulanan' ? 'Bayar Gaji Bulanan' : 'Bayar Semua Upah Selesai')
+            ->modalDescription(function (Worker $record, $livewire) {
+                $totalWage = 0;
+                if (($livewire->activeTab ?? 'borongan') === 'bulanan') {
+                    $totalWage = (int) $record->base_salary;
+                } else {
+                    $totalWage = (int) $record->productionTasks()
+                        ->where('status', 'done')
+                        ->where('is_paid', false)
+                        ->selectRaw('SUM(wage_amount) as total')
+                        ->value('total') ?? 0;
+                }
 
-            $kasbon = (int)$record->current_cash_advance;
-            $netWage = max(0, $totalWage - $kasbon);
+                $kasbon = (int)$record->current_cash_advance;
+                $netWage = max(0, $totalWage - $kasbon);
 
-            $desc = "Total Upah: Rp " . number_format($totalWage, 0, ',', '.') . "\n";
-            if ($kasbon > 0) {
-                $desc .= "Potongan Kasbon: Rp " . number_format($kasbon, 0, ',', '.') . "\n";
-                $desc .= "Jumlah Dibayarkan: Rp " . number_format($netWage, 0, ',', '.') . "\n\n";
+                $desc = "Total Gaji/Upah: Rp " . number_format($totalWage, 0, ',', '.') . "\n";
+                if ($kasbon > 0) {
+                    $desc .= "Potongan Kasbon: Rp " . number_format($kasbon, 0, ',', '.') . "\n";
+                    $desc .= "Jumlah Dibayarkan: Rp " . number_format($netWage, 0, ',', '.') . "\n\n";
 
-                if ($kasbon > $totalWage) {
-                    $desc .= "⚠️ Upah tidak mencukupi untuk melunasi kasbon. Sisa kasbon akan berkurang Rp " . number_format($totalWage, 0, ',', '.') . ".";
+                    if ($kasbon > $totalWage) {
+                        $desc .= "⚠️ Gaji/Upah tidak mencukupi untuk melunasi kasbon. Sisa kasbon akan berkurang Rp " . number_format($totalWage, 0, ',', '.') . ".";
+                    }
+                    else {
+                        $desc .= "✅ Kasbon akan dianggap LUNAS.";
+                    }
                 }
                 else {
-                    $desc .= "✅ Kasbon akan dianggap LUNAS.";
-                }
-            }
-            else {
-                $desc .= "Apakah Anda yakin ingin membayar seluruh upah selesai?";
-            }
-
-            return new \Illuminate\Support\HtmlString(nl2br(e($desc)));
-        })
-            ->action(function (Worker $record) {
-            DB::transaction(function () use ($record) {
-                $unpaidTasks = $record->productionTasks()
-                    ->where('status', 'done')
-                    ->where('is_paid', false)
-                    ->get();
-
-                if ($unpaidTasks->isEmpty())
-                    return;
-
-                $totalWage = 0;
-                foreach ($unpaidTasks as $task) {
-                    $totalWage += $task->wage_amount;
+                    $desc .= "Apakah Anda yakin ingin membayar?";
                 }
 
-                $kasbonBefore = (int)$record->current_cash_advance;
-                $deduction = min($totalWage, $kasbonBefore);
-                $netToPay = $totalWage - $deduction;
+                return new \Illuminate\Support\HtmlString(nl2br(e($desc)));
+            })
+            ->action(function (Worker $record, $livewire) {
+                DB::transaction(function () use ($record, $livewire) {
+                    $isMonthly = (($livewire->activeTab ?? 'borongan') === 'bulanan');
 
-                // 1. Create Employee Payroll Record
-                $payroll = WorkerPayroll::create([
-                    'shop_id' => $record->shop_id,
-                    'worker_id' => $record->id,
-                    'total_wage' => $totalWage,
-                    'kasbon_deduction' => $deduction,
-                    'net_amount' => $netToPay,
-                    'payment_date' => now(),
-                    'recorded_by' => auth()->id(),
-                ]);
+                    if ($isMonthly) {
+                        $totalWage = (int) $record->base_salary;
+                    } else {
+                        $unpaidTasks = $record->productionTasks()
+                            ->where('status', 'done')
+                            ->where('is_paid', false)
+                            ->get();
 
-                // 2. Update Tasks
-                foreach ($unpaidTasks as $task) {
-                    $task->update([
-                        'is_paid' => true,
-                        'worker_payroll_id' => $payroll->id,
-                    ]);
-                }
+                        if ($unpaidTasks->isEmpty())
+                            return;
 
-                // 3. Handle Cash Advance / Kasbon
-                $record->decrement('current_cash_advance', $deduction);
+                        $totalWage = 0;
+                        foreach ($unpaidTasks as $task) {
+                            $totalWage += $task->wage_amount;
+                        }
+                    }
 
-                if ($netToPay > 0) {
-                    Expense::create([
+                    $kasbonBefore = (int)$record->current_cash_advance;
+                    $deduction = min($totalWage, $kasbonBefore);
+                    $netToPay = $totalWage - $deduction;
+
+                    // 1. Create Employee Payroll Record
+                    $payroll = WorkerPayroll::create([
                         'shop_id' => $record->shop_id,
-                        'keperluan' => "Upah Borongan (Net): {$record->name} (#{$payroll->id})",
-                        'amount' => $netToPay,
-                        'expense_date' => now(),
-                        'note' => 'Gaji / Upah',
+                        'worker_id' => $record->id,
+                        'total_wage' => $totalWage,
+                        'kasbon_deduction' => $deduction,
+                        'net_amount' => $netToPay,
+                        'payment_date' => now(),
                         'recorded_by' => auth()->id(),
+                        'note' => $isMonthly ? 'Gaji Bulanan' : 'Upah Borongan',
                     ]);
-                }
 
-                if ($deduction > 0) {
-                    $record->cashAdvances()->create([
-                        'shop_id' => $record->shop_id,
-                        'amount' => $deduction,
-                        'type' => 'repayment',
-                        'date' => now(),
-                        'description' => "Potong dari upah borongan (#{$payroll->id})",
-                        'recorded_by' => auth()->id(),
-                    ]);
-                }
+                    // 2. Update Tasks (only for piece-rate)
+                    if (!$isMonthly) {
+                        foreach ($unpaidTasks as $task) {
+                            $task->update([
+                                'is_paid' => true,
+                                'worker_payroll_id' => $payroll->id,
+                            ]);
+                        }
+                    }
 
-                Notification::make()
-                    ->success()
-                    ->title('Pembayaran Selesai')
-                    ->body("Upah Rp " . number_format($totalWage, 0, ',', '.') . " diproses.")
-                    ->actions([
-                        Action::make('print_slip')
-                            ->label('Cetak Slip')
-                            ->color('success')
-                            ->icon('heroicon-o-printer')
-                            ->url(route('payroll.print', $payroll->id), shouldOpenInNewTab: true)
-                    ])
-                    ->send();
-            });
-        }),
+                    // 3. Handle Cash Advance / Kasbon
+                    $record->decrement('current_cash_advance', $deduction);
+
+                    if ($netToPay > 0) {
+                        Expense::create([
+                            'shop_id' => $record->shop_id,
+                            'keperluan' => ($isMonthly ? "Gaji Bulanan (Net): " : "Upah Borongan (Net): ") . "{$record->name} (#{$payroll->id})",
+                            'amount' => $netToPay,
+                            'expense_date' => now(),
+                            'note' => 'Gaji / Upah',
+                            'recorded_by' => auth()->id(),
+                        ]);
+                    }
+
+                    if ($deduction > 0) {
+                        $record->cashAdvances()->create([
+                            'shop_id' => $record->shop_id,
+                            'amount' => $deduction,
+                            'type' => 'repayment',
+                            'date' => now(),
+                            'description' => "Potong dari " . ($isMonthly ? 'gaji bulanan' : 'upah borongan') . " (#{$payroll->id})",
+                            'recorded_by' => auth()->id(),
+                        ]);
+                    }
+
+                    Notification::make()
+                        ->success()
+                        ->title('Pembayaran Selesai')
+                        ->body(($isMonthly ? "Gaji " : "Upah ") . "Rp " . number_format($totalWage, 0, ',', '.') . " diproses.")
+                        ->actions([
+                            Action::make('print_slip')
+                                ->label('Cetak Slip')
+                                ->color('success')
+                                ->icon('heroicon-o-printer')
+                                ->url(route('payroll.print', $payroll->id), shouldOpenInNewTab: true)
+                        ])
+                        ->send();
+                });
+            }),
 
             Action::make('detail')
             ->label('Rincian')
