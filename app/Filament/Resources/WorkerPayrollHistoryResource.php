@@ -55,21 +55,6 @@ class WorkerPayrollHistoryResource extends Resource
                     ->sortable()
                     ->weight('bold'),
 
-                TextColumn::make('rincian_pekerjaan')
-                    ->label('Rincian Pekerjaan')
-                    ->state(function (WorkerPayroll $record) {
-                        $tasks = $record->productionTasks()->with('orderItem')->get();
-                        
-                        $summary = $tasks->groupBy(fn($t) => $t->orderItem->product_name ?? 'Item')
-                            ->map(fn($group, $name) => $group->sum('quantity') . 'x ' . $name)
-                            ->implode(', ');
-                            
-                        return $summary ?: '-';
-                    })
-                    ->wrap()
-                    ->size('xs')
-                    ->color('gray'),
-
                 TextColumn::make('total_wage')
                     ->label('Upah Kotor')
                     ->money('IDR')
