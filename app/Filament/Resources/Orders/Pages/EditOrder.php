@@ -26,9 +26,10 @@ class EditOrder extends EditRecord
      * it dispatches this event so we can refresh the form fields.
      */
     #[On('refreshOrderSummary')]
-    public function handleRefreshOrderSummary(int $subtotal): void
+    public function handleRefreshOrderSummary(?int $subtotal = null): void
     {
         $this->record->refresh();
+        $subtotal = $subtotal ?? (int) ($this->record->subtotal ?? 0);
         $this->data['subtotal'] = $subtotal;
 
         // Recalculate total price
@@ -45,6 +46,38 @@ class EditOrder extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('deliver_order')
+                ->label('Serahkan Pesanan')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->form([
+                    \Filament\Forms\Components\FileUpload::make('pickup_proof')
+                        ->label('Foto Bukti Pengambilan / Penyerahan')
+                        ->image()
+                        ->extraInputAttributes(['capture' => 'camera'])
+                        ->disk('public')
+                        ->directory('pickup-proofs')
+                        ->required(),
+                    \Filament\Forms\Components\Textarea::make('pickup_note')
+                        ->label('Catatan Penyerahan')
+                        ->rows(3)
+                        ->placeholder('Masukkan nama pengambil, kurir, atau info lainnya jika ada...'),
+                ])
+                ->action(function (array $data): void {
+                    $this->record->update([
+                        'status' => 'selesai',
+                        'pickup_proof' => $data['pickup_proof'],
+                        'pickup_note' => $data['pickup_note'] ?? null,
+                        'pickup_at' => now(),
+                    ]);
+                    \Filament\Notifications\Notification::make()
+                        ->title('Pesanan Telah Diserahkan!')
+                        ->body("Pesanan #{$this->record->order_number} telah selesai dan diserahkan.")
+                        ->success()
+                        ->send();
+                    $this->redirect(OrderResource::getUrl('edit', ['record' => $this->record]));
+                })
+                ->visible(fn(): bool => $this->record->status === 'siap_diambil'),
             Action::make('print_receipt')
                 ->label('Cetak Kuitansi')
                 ->icon('heroicon-o-printer')

@@ -25,8 +25,9 @@ class WorkerPayrollResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
-    protected static ?string $navigationLabel = 'Pembayaran Upah';
-    protected static ?string $modelLabel = 'Pembayaran Upah';
+    protected static ?string $navigationLabel = 'Bayar Gaji & Upah';
+    protected static ?string $modelLabel = 'Bayar Gaji & Upah';
+    protected static ?string $pluralModelLabel = 'Bayar Gaji & Upah';
     protected static ?string $slug = 'worker-payroll';
     protected static string|\UnitEnum|null $navigationGroup = 'KARYAWAN';
     protected static ?int $navigationSort = 2;

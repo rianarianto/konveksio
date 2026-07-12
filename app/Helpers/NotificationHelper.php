@@ -255,6 +255,82 @@ class NotificationHelper
                 }
             }
         }
+
+        // Notifikasi khusus ke Admin/Owner saat WO selesai (STATUS_COMPLETED)
+        if ($newStatus === WorkOrder::STATUS_COMPLETED && !$isReject) {
+            // 1. WhatsApp notification to Admin (from Worker settings with name containing 'admin')
+            $adminWorker = \App\Models\Worker::withoutGlobalScopes()
+                ->where('shop_id', $wo->shop_id)
+                ->where('name', 'like', '%admin%')
+                ->where('is_active', true)
+                ->first();
+
+            if ($adminWorker && $adminWorker->phone) {
+                $pesanAdmin = "✅ *WORK ORDER SELESAI — {$wo->wo_number}*\n\n"
+                    . "Halo Admin ({$adminWorker->name}),\n"
+                    . "Work Order *{$wo->wo_number}* telah selesai diproduksi. Seluruh tahap QC telah disetujui.\n\n"
+                    . "📋 *Detail:*\n"
+                    . "• Produk: {$produk}\n"
+                    . "• Pelanggan: {$customer}\n"
+                    . "• Total Qty: {$totalQty} pcs\n"
+                    . "• Deadline: {$deadline}\n\n"
+                    . "Silakan cek di dashboard admin.";
+
+                try {
+                    Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
+                        'nohp'  => $adminWorker->phone,
+                        'pesan' => $pesanAdmin,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('[WA-Bot] Gagal kirim notif WO Selesai ke Admin WA: ' . $e->getMessage());
+                }
+            }
+
+            // 2. WhatsApp notification to Owner (from Shop settings)
+            $shop = $wo->shop;
+            if ($shop && $shop->phone) {
+                $pesanOwner = "✅ *WORK ORDER SELESAI — {$wo->wo_number}*\n\n"
+                    . "Halo Owner,\n"
+                    . "Work Order *{$wo->wo_number}* telah selesai diproduksi. Seluruh tahap QC telah disetujui.\n\n"
+                    . "📋 *Detail:*\n"
+                    . "• Produk: {$produk}\n"
+                    . "• Pelanggan: {$customer}\n"
+                    . "• Total Qty: {$totalQty} pcs\n"
+                    . "• Deadline: {$deadline}\n\n"
+                    . "Silakan pantau perkembangan order di sistem.";
+
+                try {
+                    Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
+                        'nohp'  => $shop->phone,
+                        'pesan' => $pesanOwner,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('[WA-Bot] Gagal kirim notif WO Selesai ke Owner WA: ' . $e->getMessage());
+                }
+            }
+
+            // 3. Database/System notification to admin & owner users in this shop
+            $recipients = \App\Models\User::where(function ($q) use ($wo) {
+                    $q->where('shop_id', $wo->shop_id)
+                      ->orWhere('role', 'owner');
+                })
+                ->whereIn('role', ['owner', 'admin'])
+                ->get();
+
+            if ($recipients->isNotEmpty()) {
+                try {
+                    \Filament\Notifications\Notification::make()
+                        ->title('Work Order Selesai!')
+                        ->body("Work Order **{$wo->wo_number}** untuk produk **{$produk}** telah selesai.")
+                        ->success()
+                        ->icon('heroicon-o-check-badge')
+                        ->iconColor('success')
+                        ->sendToDatabase($recipients);
+                } catch (\Exception $e) {
+                    Log::error('[Notification] Gagal kirim database notification: ' . $e->getMessage());
+                }
+            }
+        }
     }
 
     /**

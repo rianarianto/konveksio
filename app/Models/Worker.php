@@ -139,4 +139,12 @@ class Worker extends Model implements HasTenants
     {
         return $this->morphMany(CashAdvance::class, 'cash_advanceable');
     }
+
+    /**
+     * Riwayat slip gaji/upah yang dibayarkan ke tukang ini.
+     */
+    public function payrolls(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(WorkerPayroll::class);
+    }
 }

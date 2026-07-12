@@ -306,7 +306,7 @@ class TugasTukang extends Component
         $anyInProgress = $wos->some(fn($wo) => !$wo->isCompleted() && $wo->status !== WorkOrder::STATUS_CREATED);
 
         $newStatus = 'antrian';
-        if ($allCompleted) $newStatus = 'selesai';
+        if ($allCompleted) $newStatus = 'siap_diambil';
         elseif ($anyInProgress) $newStatus = 'diproses';
 
         if ($order->status !== $newStatus) {

@@ -333,7 +333,7 @@ class WorkerDashboard extends Component
         $anyInProgress = $wos->some(fn($w) => !$w->isCompleted() && $w->status !== WorkOrder::STATUS_CREATED);
 
         $newStatus = 'antrian';
-        if ($allCompleted) $newStatus = 'selesai';
+        if ($allCompleted) $newStatus = 'siap_diambil';
         elseif ($anyInProgress) $newStatus = 'diproses';
 
         if ($order->status !== $newStatus) {

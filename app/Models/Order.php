@@ -24,6 +24,9 @@ class Order extends Model
         'discount',
         'total_price',
         'notes',
+        'pickup_proof',
+        'pickup_note',
+        'pickup_at',
     ];
 
     protected $casts = [
@@ -36,6 +39,7 @@ class Order extends Model
         'shipping_cost' => 'integer',
         'discount'    => 'integer',
         'total_price' => 'integer',
+        'pickup_at'   => 'datetime',
     ];
 
     protected static function booted(): void

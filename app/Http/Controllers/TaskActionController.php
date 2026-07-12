@@ -102,7 +102,7 @@ class TaskActionController extends Controller
 
         $newStatus = 'antrian';
         if ($allCompleted) {
-            $newStatus = 'selesai';
+            $newStatus = 'siap_diambil';
         } elseif ($anyInProgress) {
             $newStatus = 'diproses';
         }
@@ -112,14 +112,14 @@ class TaskActionController extends Controller
             $order->update(['status' => $newStatus]);
 
             // Notifikasi admin kalau produksi selesai
-            if ($newStatus === 'selesai' && $oldStatus !== 'selesai') {
+            if ($newStatus === 'siap_diambil' && $oldStatus !== 'siap_diambil') {
                 $recipients = \App\Models\User::where('shop_id', $order->shop_id)
                     ->whereIn('role', ['owner', 'admin'])
                     ->get();
 
                 Notification::make()
-                    ->title('Produksi Selesai!')
-                    ->body("Pesanan **{$order->order_number}** atas nama **{$order->customer->name}** telah selesai diproduksi dan siap diproses lebih lanjut.")
+                    ->title('Produksi Selesai & Siap Diambil!')
+                    ->body("Pesanan **{$order->order_number}** atas nama **{$order->customer->name}** telah selesai diproduksi dan siap diambil.")
                     ->success()
                     ->icon('heroicon-o-check-badge')
                     ->iconColor('success')

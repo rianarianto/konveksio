@@ -36,10 +36,10 @@ class TaskStatusManager extends \Livewire\Component
             $allTasksDone = $allTasks->isNotEmpty() && $allTasks->every(fn($t) => $t->status === 'done');
             
             if ($allTasksDone) {
-                $order->update(['status' => 'selesai']);
+                $order->update(['status' => 'siap_diambil']);
                 \Filament\Notifications\Notification::make()
-                    ->title('Produksi Selesai!')
-                    ->body('Seluruh tahapan untuk pesanan ini telah selesai. Status pesanan otomatis diubah menjadi SELESAI.')
+                    ->title('Produksi Selesai & Siap Diambil!')
+                    ->body('Seluruh tahapan untuk pesanan ini telah selesai. Status pesanan otomatis diubah menjadi SIAP DIAMBIL.')
                     ->success()
                     ->persistent()
                     ->send();
@@ -49,9 +49,9 @@ class TaskStatusManager extends \Livewire\Component
         } elseif ($action === 'undo') {
             $task->update(['status' => 'in_progress', 'completed_at' => null]);
             
-            // Revert Order status to 'diproses' if it was 'selesai'
+            // Revert Order status to 'diproses' if it was 'selesai' or 'siap_diambil'
             $order = $task->orderItem->order;
-            if ($order->status === 'selesai') {
+            if ($order->status === 'selesai' || $order->status === 'siap_diambil') {
                 $order->update(['status' => 'diproses']);
             }
             

@@ -18,11 +18,11 @@ class WorkerPayrollHistoryResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
-    protected static ?string $navigationLabel = 'Riwayat Gaji';
+    protected static ?string $navigationLabel = 'Riwayat Slip Gaji';
 
-    protected static ?string $modelLabel = 'Riwayat Gaji';
+    protected static ?string $modelLabel = 'Riwayat Slip Gaji';
 
-    protected static ?string $pluralModelLabel = 'Riwayat Gaji';
+    protected static ?string $pluralModelLabel = 'Riwayat Slip Gaji';
 
     protected static string|\UnitEnum|null $navigationGroup = 'KARYAWAN';
 

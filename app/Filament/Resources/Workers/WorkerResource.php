@@ -16,6 +16,8 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use App\Filament\Resources\Workers\RelationManagers\ProductionTasksRelationManager;
+use App\Filament\Resources\Workers\RelationManagers\CashAdvancesRelationManager;
+use App\Filament\Resources\Workers\RelationManagers\PayrollsRelationManager;
 
 class WorkerResource extends Resource
 {
@@ -24,6 +26,12 @@ class WorkerResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    protected static ?string $navigationLabel = 'Daftar Karyawan';
+
+    protected static ?string $modelLabel = 'Daftar Karyawan';
+
+    protected static ?string $pluralModelLabel = 'Daftar Karyawan';
 
     protected static string|\UnitEnum|null $navigationGroup = 'KARYAWAN';
 
@@ -53,6 +61,8 @@ class WorkerResource extends Resource
     {
         return [
             ProductionTasksRelationManager::class,
+            CashAdvancesRelationManager::class,
+            PayrollsRelationManager::class,
         ];
     }
 

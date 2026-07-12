@@ -68,6 +68,23 @@
                 Edit
             </a>
 
+            {{-- Serahkan Pesanan --}}
+            @if($record->status === 'siap_diambil')
+            <button x-on:click.stop="open = false; $wire.mountTableAction('deliver_order', '{{ $record->id }}')"
+                style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#16a34a; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
+                onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='transparent'">
+                <div
+                    style="width:22px; height:22px; background:#f0fdf4; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                </div>
+                Serahkan Pesanan
+            </button>
+            @endif
+
             {{-- Retur Barang --}}
             <button x-on:click.stop="open = false; $wire.mountTableAction('create_return', '{{ $record->id }}')"
                 style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ea580c; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"

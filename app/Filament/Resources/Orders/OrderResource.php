@@ -503,6 +503,46 @@ class OrderResource extends Resource
 
                         ]),
 
+                    // Section 5: Bukti Penyerahan
+                    Section::make('Bukti Penyerahan / Pengambilan')
+                        ->schema([
+                            Group::make([
+                                Placeholder::make('pickup_at_display')
+                                    ->label('Tanggal & Waktu Pengambilan')
+                                    ->content(fn (?Order $record) => $record?->pickup_at ? $record->pickup_at->format('d M Y, H:i') . ' WIB' : '-'),
+                                
+                                Placeholder::make('pickup_note_display')
+                                    ->label('Catatan Penyerahan')
+                                    ->content(fn (?Order $record) => $record?->pickup_note ?: '-'),
+                            ])->columns(2),
+
+                            FileUpload::make('pickup_proof')
+                                ->label('Foto Bukti Pengambilan')
+                                ->image()
+                                ->disk('public')
+                                ->directory('pickup-proofs')
+                                ->disabled()
+                                ->dehydrated(false)
+                                ->openable()
+                                ->downloadable()
+                                ->previewable()
+                                ->getUploadedFileUsing(function (string $file): ?array {
+                                    $disk = Storage::disk('public');
+                                    if (!$disk->exists($file)) {
+                                        return null;
+                                    }
+                                    return [
+                                        'name' => basename($file),
+                                        'size' => $disk->size($file),
+                                        'type' => 'image/jpeg',
+                                        'url' => asset('storage/' . $file),
+                                    ];
+                                })
+                                ->columnSpanFull(),
+                        ])
+                        ->visible(fn (?Order $record) => $record?->status === 'selesai')
+                        ->collapsible(),
+
                 ])
                 ->columnSpanFull(),
             ])
@@ -916,43 +956,35 @@ class OrderResource extends Resource
                             $catBadge = '<div style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; background:' . $firstCat[1] . '; color:' . $firstCat[2] . ';">' . $firstCat[0] . '</div>';
 
                             // Combined Progress & Status
-                            $totalTasks = 0;
-                            $doneTasks = 0;
-                            $statusLabels = [];
+                            $groupTasks = $itemsGroup->flatMap->productionTasks;
+                            $totalTasks = $groupTasks->count();
+                            $doneTasks = $groupTasks->where('status', 'done')->count();
 
-                            foreach ($itemsGroup as $item) {
-                                $itemTasks = $item->productionTasks;
-                                $totalTasks += $itemTasks->count();
-                                $doneTasks += $itemTasks->where('status', 'done')->count();
-
-                                if ($itemTasks->count() > 0) {
-                                    $activeItemTask = $itemTasks->whereIn('status', ['in_progress', 'pending', 'antrian'])->first();
-                                    if ($activeItemTask) {
-                                        $statusLabels[] = $activeItemTask->stage_name ?: ($activeItemTask->nama_tugas ?: 'Proses');
-                                    } elseif ($itemTasks->where('status', 'done')->count() == $itemTasks->count()) {
-                                        $statusLabels[] = 'Selesai';
-                                    } else {
-                                        $statusLabels[] = 'Antrian';
-                                    }
+                            if ($totalTasks > 0) {
+                                $activeTask = $groupTasks->whereIn('status', ['in_progress', 'pending', 'antrian'])->first();
+                                if ($activeTask) {
+                                    $displayStatusText = $activeTask->stage_name ?: ($activeTask->nama_tugas ?: 'Proses');
+                                } elseif ($doneTasks == $totalTasks) {
+                                    $displayStatusText = ($record->status === 'selesai') ? 'Selesai' : 'Siap Diambil';
                                 } else {
-                                    if ($record->status === 'batal') {
-                                        $statusLabels[] = 'Batal';
-                                    } else {
-                                        $statusLabels[] = 'Belum Diatur';
-                                    }
+                                    $displayStatusText = 'Antrian';
+                                }
+                            } else {
+                                if ($record->status === 'batal') {
+                                    $displayStatusText = 'Batal';
+                                } else {
+                                    $displayStatusText = 'Belum Diatur';
                                 }
                             }
 
                             $pct = $totalTasks > 0 ? round(($doneTasks / $totalTasks) * 100) : 0;
-                            $uniqueStatusLabels = array_unique($statusLabels);
-                            $displayStatusText = count($uniqueStatusLabels) === 1 ? $uniqueStatusLabels[0] : (count($uniqueStatusLabels) > 1 ? 'Mix Status' : 'Belum Diatur');
-
-                            if ($totalTasks > 0 && $pct < 100 && $displayStatusText === 'Selesai') {
+                            if ($totalTasks > 0 && $pct < 100 && $displayStatusText === 'Siap Diambil') {
                                 $displayStatusText = 'Sebagian Selesai';
                             }
 
                             $statusBadge = match ($displayStatusText) {
-                                'Selesai' => '<span style="padding:2px 6px; border-radius:4px; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600;">SELESAI</span>',
+                                'Siap Diambil' => '<span style="padding:2px 6px; border-radius:4px; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600;">SIAP DIAMBIL</span>',
+                                'Selesai' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">SELESAI</span>',
                                 'Proses' => '<span style="padding:2px 6px; border-radius:4px; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600;">PROSES</span>',
                                 'Belum Diatur' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">BELUM DIATUR</span>',
                                 default => '<span style="padding:2px 6px; border-radius:4px; background:#fef3c7; color:#d97706; font-size:10px; font-weight:600;">'.strtoupper($displayStatusText).'</span>',
@@ -1037,6 +1069,38 @@ class OrderResource extends Resource
             ])
 
             ->actions([
+                Action::make('deliver_order')
+                    ->label('Serahkan Pesanan')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->form([
+                        \Filament\Forms\Components\FileUpload::make('pickup_proof')
+                            ->label('Foto Bukti Pengambilan / Penyerahan')
+                            ->image()
+                            ->extraInputAttributes(['capture' => 'camera'])
+                            ->disk('public')
+                            ->directory('pickup-proofs')
+                            ->required(),
+                        \Filament\Forms\Components\Textarea::make('pickup_note')
+                            ->label('Catatan Penyerahan')
+                            ->rows(3)
+                            ->placeholder('Masukkan nama pengambil, kurir, atau info lainnya jika ada...'),
+                    ])
+                    ->action(function (Order $record, array $data): void {
+                        $record->update([
+                            'status' => 'selesai',
+                            'pickup_proof' => $data['pickup_proof'],
+                            'pickup_note' => $data['pickup_note'] ?? null,
+                            'pickup_at' => now(),
+                        ]);
+                        Notification::make()
+                            ->title('Pesanan Telah Diserahkan!')
+                            ->body("Pesanan #{$record->order_number} telah selesai dan diserahkan.")
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(fn (Order $record): bool => $record->status === 'siap_diambil')
+                    ->extraAttributes(['class' => 'hidden']),
                 Action::make('create_return')
                     ->label('Retur Pesanan')
                     ->icon('heroicon-o-arrow-path')
