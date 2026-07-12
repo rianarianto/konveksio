@@ -138,6 +138,23 @@ class WorkerPayrollResource extends Resource
 
                 if ($isMonthly) {
                     return [
+                        \Filament\Forms\Components\Placeholder::make('summary')
+                            ->label('Ringkasan Pembayaran')
+                            ->content(function(Worker $record) {
+                                $total = (int) $record->base_salary;
+                                $kasbon = (int) $record->current_cash_advance;
+                                $net = max(0, $total - $kasbon);
+                                return new \Illuminate\Support\HtmlString("
+                                    <div style='background:#f3f4f6; padding:12px; border-radius:8px; border:1px solid #e5e7eb;'>
+                                        <table style='width:100%; border-collapse:collapse; font-size:13px;'>
+                                            <tr><td>Gaji Pokok Kotor:</td><td style='text-align:right; font-weight:bold;'>Rp " . number_format($total, 0, ',', '.') . "</td></tr>
+                                            <tr style='color:#ef4444;'><td>Potongan Kasbon:</td><td style='text-align:right;'>- Rp " . number_format(min($total, $kasbon), 0, ',', '.') . "</td></tr>
+                                            <tr style='border-top:1px solid #d1d5db; font-size:14px; font-weight:bold; color:#16a34a;'><td style='padding-top:6px;'>Gaji Bersih Diterima:</td><td style='text-align:right; padding-top:6px;'>Rp " . number_format($net, 0, ',', '.') . "</td></tr>
+                                        </table>
+                                    </div>
+                                ");
+                            })
+                            ->columnSpanFull(),
                         \Filament\Forms\Components\Select::make('salary_month')
                             ->label('Gaji Bulan')
                             ->options(function() {
@@ -168,6 +185,27 @@ class WorkerPayrollResource extends Resource
                     ];
                 } else {
                     return [
+                        \Filament\Forms\Components\Placeholder::make('summary')
+                            ->label('Ringkasan Pembayaran (Total Saat Ini)')
+                            ->content(function(Worker $record) {
+                                $total = (int) $record->productionTasks()
+                                    ->where('status', 'done')
+                                    ->where('is_paid', false)
+                                    ->sum('wage_amount');
+                                $kasbon = (int) $record->current_cash_advance;
+                                $net = max(0, $total - $kasbon);
+                                return new \Illuminate\Support\HtmlString("
+                                    <div style='background:#f3f4f6; padding:12px; border-radius:8px; border:1px solid #e5e7eb;'>
+                                        <table style='width:100%; border-collapse:collapse; font-size:13px;'>
+                                            <tr><td>Estimasi Upah Kotor:</td><td style='text-align:right; font-weight:bold;'>Rp " . number_format($total, 0, ',', '.') . "</td></tr>
+                                            <tr style='color:#ef4444;'><td>Potongan Kasbon:</td><td style='text-align:right;'>- Rp " . number_format(min($total, $kasbon), 0, ',', '.') . "</td></tr>
+                                            <tr style='border-top:1px solid #d1d5db; font-size:14px; font-weight:bold; color:#16a34a;'><td style='padding-top:6px;'>Estimasi Upah Bersih:</td><td style='text-align:right; padding-top:6px;'>Rp " . number_format($net, 0, ',', '.') . "</td></tr>
+                                        </table>
+                                        <div style='font-size:11px; color:#6b7280; margin-top:8px;'>* Nominal bersih final akan disesuaikan otomatis jika Anda membatasi tanggal pekerjaan di bawah.</div>
+                                    </div>
+                                ");
+                            })
+                            ->columnSpanFull(),
                         \Filament\Forms\Components\DatePicker::make('period_start')
                             ->label('Pekerjaan Dari Tanggal')
                             ->native(false)
