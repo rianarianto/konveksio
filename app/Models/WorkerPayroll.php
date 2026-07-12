@@ -18,6 +18,9 @@ class WorkerPayroll extends Model
         'payment_date',
         'recorded_by',
         'note',
+        'period_start',
+        'period_end',
+        'salary_month',
     ];
 
     protected $casts = [
@@ -25,6 +28,8 @@ class WorkerPayroll extends Model
         'kasbon_deduction' => 'decimal:2',
         'net_amount' => 'decimal:2',
         'payment_date' => 'date',
+        'period_start' => 'date',
+        'period_end' => 'date',
     ];
 
     protected static function booted(): void

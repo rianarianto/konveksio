@@ -105,10 +105,10 @@
 
         <table class="info-table">
             <tr>
-                <td width="15%">Nama</td>
-                <td width="35%">: <strong>{{ $payroll->worker->name }}</strong></td>
-                <td width="15%">No. Slip</td>
-                <td width="35%">: #PAY-{{ str_pad($payroll->id, 5, '0', STR_PAD_LEFT) }}</td>
+                <td width="20%">Nama</td>
+                <td width="30%">: <strong>{{ $payroll->worker->name }}</strong></td>
+                <td width="20%">No. Slip</td>
+                <td width="30%">: #PAY-{{ str_pad($payroll->id, 5, '0', STR_PAD_LEFT) }}</td>
             </tr>
             <tr>
                 <td>Tanggal Bayar</td>
@@ -116,6 +116,25 @@
                 <td>Pencatat</td>
                 <td>: {{ $payroll->recorder->name }}</td>
             </tr>
+            @if($isMonthly && $payroll->salary_month)
+            <tr>
+                <td>Gaji Bulan</td>
+                <td>: <strong>{{ \Carbon\Carbon::parse($payroll->salary_month . '-01')->translatedFormat('F Y') }}</strong></td>
+                <td>Periode Kerja</td>
+                <td>: {{ $payroll->period_start?->format('d M Y') }} s/d {{ $payroll->period_end?->format('d M Y') }}</td>
+            </tr>
+            @elseif(!$isMonthly && ($payroll->period_start || $payroll->period_end))
+            <tr>
+                <td>Periode Kerja</td>
+                <td colspan="3">: 
+                    @if($payroll->period_start && $payroll->period_end)
+                        {{ $payroll->period_start->format('d M Y') }} s/d {{ $payroll->period_end->format('d M Y') }}
+                    @elseif($payroll->period_end)
+                        s/d {{ $payroll->period_end->format('d M Y') }}
+                    @endif
+                </td>
+            </tr>
+            @endif
         </table>
 
         @if(!$isMonthly)

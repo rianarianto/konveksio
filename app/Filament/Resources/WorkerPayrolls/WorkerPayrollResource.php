@@ -132,55 +132,88 @@ class WorkerPayrollResource extends Resource
             ->icon('heroicon-o-banknotes')
             ->color('success')
             ->visible(fn() => auth()->user()->role === 'owner')
-            ->requiresConfirmation()
-            ->modalHeading(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'bulanan' ? 'Bayar Gaji Bulanan' : 'Bayar Semua Upah Selesai')
-            ->modalDescription(function (Worker $record, $livewire) {
-                $totalWage = 0;
-                if (($livewire->activeTab ?? 'borongan') === 'bulanan') {
-                    $totalWage = (int) $record->base_salary;
+            ->modalHeading(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'bulanan' ? 'Bayar Gaji Bulanan' : 'Bayar Upah Borongan')
+            ->form(function ($livewire) {
+                $isMonthly = (($livewire->activeTab ?? 'borongan') === 'bulanan');
+
+                if ($isMonthly) {
+                    return [
+                        \Filament\Forms\Components\Select::make('salary_month')
+                            ->label('Gaji Bulan')
+                            ->options(function() {
+                                $months = [];
+                                for ($i = 0; $i < 6; $i++) {
+                                    $date = now()->subMonths($i);
+                                    $key = $date->format('Y-m');
+                                    $label = $date->translatedFormat('F Y');
+                                    $months[$key] = $label;
+                                }
+                                return $months;
+                            })
+                            ->default(now()->format('Y-m'))
+                            ->required(),
+                        \Filament\Forms\Components\DatePicker::make('period_start')
+                            ->label('Periode Kerja Dari')
+                            ->native(false)
+                            ->default(now()->startOfMonth())
+                            ->required(),
+                        \Filament\Forms\Components\DatePicker::make('period_end')
+                            ->label('Periode Kerja Sampai')
+                            ->native(false)
+                            ->default(now()->endOfMonth())
+                            ->required(),
+                        \Filament\Forms\Components\Textarea::make('note')
+                            ->label('Catatan')
+                            ->placeholder('Masukkan keterangan tambahan jika ada...'),
+                    ];
                 } else {
-                    $totalWage = (int) $record->productionTasks()
-                        ->where('status', 'done')
-                        ->where('is_paid', false)
-                        ->selectRaw('SUM(wage_amount) as total')
-                        ->value('total') ?? 0;
+                    return [
+                        \Filament\Forms\Components\DatePicker::make('period_start')
+                            ->label('Pekerjaan Dari Tanggal')
+                            ->native(false)
+                            ->placeholder('Semua pekerjaan sebelumnya')
+                            ->helperText('Kosongkan jika ingin membayar seluruh pekerjaan yang belum dibayar.'),
+                        \Filament\Forms\Components\DatePicker::make('period_end')
+                            ->label('Pekerjaan Sampai Tanggal')
+                            ->native(false)
+                            ->default(now())
+                            ->required()
+                            ->helperText('Hanya pekerjaan yang diselesaikan sampai tanggal ini yang akan dibayar.'),
+                        \Filament\Forms\Components\Textarea::make('note')
+                            ->label('Catatan')
+                            ->placeholder('Masukkan keterangan tambahan jika ada...'),
+                    ];
                 }
-
-                $kasbon = (int)$record->current_cash_advance;
-                $netWage = max(0, $totalWage - $kasbon);
-
-                $desc = "Total Gaji/Upah: Rp " . number_format($totalWage, 0, ',', '.') . "\n";
-                if ($kasbon > 0) {
-                    $desc .= "Potongan Kasbon: Rp " . number_format($kasbon, 0, ',', '.') . "\n";
-                    $desc .= "Jumlah Dibayarkan: Rp " . number_format($netWage, 0, ',', '.') . "\n\n";
-
-                    if ($kasbon > $totalWage) {
-                        $desc .= "⚠️ Gaji/Upah tidak mencukupi untuk melunasi kasbon. Sisa kasbon akan berkurang Rp " . number_format($totalWage, 0, ',', '.') . ".";
-                    }
-                    else {
-                        $desc .= "✅ Kasbon akan dianggap LUNAS.";
-                    }
-                }
-                else {
-                    $desc .= "Apakah Anda yakin ingin membayar?";
-                }
-
-                return new \Illuminate\Support\HtmlString(nl2br(e($desc)));
             })
-            ->action(function (Worker $record, $livewire) {
-                DB::transaction(function () use ($record, $livewire) {
+            ->action(function (Worker $record, array $data, $livewire) {
+                DB::transaction(function () use ($record, $data, $livewire) {
                     $isMonthly = (($livewire->activeTab ?? 'borongan') === 'bulanan');
 
                     if ($isMonthly) {
                         $totalWage = (int) $record->base_salary;
                     } else {
-                        $unpaidTasks = $record->productionTasks()
-                            ->where('status', 'done')
-                            ->where('is_paid', false)
-                            ->get();
+                        $startDate = $data['period_start'] ?? null;
+                        $endDate = $data['period_end'] ?? now();
 
-                        if ($unpaidTasks->isEmpty())
+                        $query = $record->productionTasks()
+                            ->where('status', 'done')
+                            ->where('is_paid', false);
+
+                        if ($startDate) {
+                            $query->whereDate('completed_at', '>=', $startDate);
+                        }
+                        $query->whereDate('completed_at', '<=', $endDate);
+
+                        $unpaidTasks = $query->get();
+
+                        if ($unpaidTasks->isEmpty()) {
+                            Notification::make()
+                                ->danger()
+                                ->title('Pembayaran Gagal')
+                                ->body("Tidak ditemukan pekerjaan borongan selesai pada rentang tanggal tersebut.")
+                                ->send();
                             return;
+                        }
 
                         $totalWage = 0;
                         foreach ($unpaidTasks as $task) {
@@ -201,7 +234,10 @@ class WorkerPayrollResource extends Resource
                         'net_amount' => $netToPay,
                         'payment_date' => now(),
                         'recorded_by' => auth()->id(),
-                        'note' => $isMonthly ? 'Gaji Bulanan' : 'Upah Borongan',
+                        'note' => $data['note'] ?? ($isMonthly ? 'Gaji Bulanan' : 'Upah Borongan'),
+                        'period_start' => $data['period_start'] ?? null,
+                        'period_end' => $data['period_end'] ?? null,
+                        'salary_month' => $data['salary_month'] ?? null,
                     ]);
 
                     // 2. Update Tasks (only for piece-rate)
