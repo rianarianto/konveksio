@@ -65,6 +65,26 @@ class Order extends Model
             $actualExpressFee = $order->is_express ? $order->express_fee : 0;
             $order->total_price = max(0, $order->subtotal + $order->tax + $order->shipping_cost + $actualExpressFee - $order->discount);
         });
+
+        // Handle cancellation
+        static::updated(function ($order) {
+            if ($order->isDirty('status') && $order->status === 'batal') {
+                $orderItemIds = $order->orderItems()->pluck('id');
+                
+                // Delete pending and in_progress tasks
+                \App\Models\ProductionTask::whereIn('order_item_id', $orderItemIds)
+                    ->whereIn('status', ['pending', 'in_progress'])
+                    ->delete();
+                    
+                // Set wage_amount to 0 for done but unpaid tasks
+                \App\Models\ProductionTask::whereIn('order_item_id', $orderItemIds)
+                    ->where('status', 'done')
+                    ->where('is_paid', false)
+                    ->update([
+                        'wage_amount' => 0,
+                    ]);
+            }
+        });
     }
 
     protected static function generateOrderNumber(int $shopId): string
