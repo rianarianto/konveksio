@@ -466,6 +466,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Bulk Generate / Tambah Produk')
                     ->icon('heroicon-o-squares-plus')
                     ->color('primary')
+                    ->visible(fn() => in_array(auth()->user()->role, ['owner', 'admin']))
                     ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Tambahkan ke Pesanan'))
                     ->form(function () use ($sizeOptions, $bahanOptions, $categoryOptions, $genderOptions, $sleeveOptions, $pocketOptions, $buttonOptions, $collarOptions, $modelOptions, $tenantId) {
                         return [
@@ -1219,6 +1220,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Atur Opsi Spesifikasi')
                     ->icon('heroicon-o-cog-6-tooth')
                     ->color('gray')
+                    ->visible(fn() => in_array(auth()->user()->role, ['owner', 'admin']))
                     ->modalHeading('Atur Pilihan Spesifikasi Produk')
                     ->modalDescription('Ubah pilihan Lengan, Saku, Kancing, dan Kerah yang dapat dipilih saat input pesanan.')
                     ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Simpan Perubahan'))
@@ -1603,6 +1605,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Update Variasi (Massal)')
                     ->icon('heroicon-m-pencil-square')
                     ->color('warning')
+                    ->visible(fn () => (auth()->user()->role === 'owner' || (auth()->user()->role === 'admin' && !in_array($this->order->status, ['diproses', 'selesai']))))
                     ->form(function() use ($genderOptions, $sleeveOptions, $pocketOptions, $buttonOptions, $collarOptions, $modelOptions) {
                         return [
                             Section::make('Harga (Opsional)')
@@ -1612,7 +1615,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ->numeric()
                                         ->prefix('Rp')
                                         ->placeholder('Abaikan jika tidak diubah')
-                                ])->compact(),
+                                    ])->compact(),
                             Section::make('Spesifikasi & Desain')
                                 ->schema([
                                     Grid::make(3)->schema([
@@ -1646,12 +1649,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     })
                     ->action(function (Collection $records, array $data) {
                         foreach ($records as $record) {
-                            // 1. Update Harga (Berlaku untuk semua kategori)
                             if (isset($data['bulk_price']) && filled($data['bulk_price'])) {
                                 $record->update(['price' => $data['bulk_price']]);
                             }
 
-                            // 2. Update Spesifikasi (Hanya berlaku untuk produksi dan custom)
                             if (in_array($record->production_category, ['produksi', 'custom'])) {
                                 $details = $record->size_and_request_details ?? [];
                                 foreach (['gender', 'sleeve_model', 'pocket_model', 'button_model', 'collar_model', 'model', 'sablon_jenis', 'sablon_lokasi', 'sablon_keterangan'] as $field) {
@@ -1669,6 +1670,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         $this->refreshOrderData();
                     }),
                 DeleteBulkAction::make()
+                    ->visible(fn () => (auth()->user()->role === 'owner' || (auth()->user()->role === 'admin' && !in_array($this->order->status, ['diproses', 'selesai']))))
                     ->action(function (Collection $records) {
                         foreach ($records as $record) {
                             if ($record->size === 'Custom') {
