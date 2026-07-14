@@ -109,6 +109,7 @@
                 </svg>
                 Catatan / Keterangan Pesanan
             </h3>
+            @if(in_array(auth()->user()->role, ['owner', 'admin']))
             <div wire:loading wire:target="notes" class="text-xs text-indigo-500 flex items-center gap-1.5 animate-pulse">
                 <svg class="animate-spin h-3.5 w-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -122,13 +123,22 @@
                 </svg>
                 Tersimpan Otomatis
             </div>
+            @else
+            <div class="text-xs text-gray-400 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                Hanya Lihat
+            </div>
+            @endif
         </div>
         <textarea 
             wire:model.live.debounce.1000ms="notes"
+            @if(!in_array(auth()->user()->role, ['owner', 'admin'])) readonly @endif
             placeholder="Tulis catatan penting mengenai pengerjaan pesanan ini (misal: detail request bordir khusus, toleransi ukuran, dll)..."
             rows="3"
             style="padding: 8px !important; line-height: 1.6;"
-            class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 focus:border-indigo-500 focus:ring-indigo-500 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600 transition-colors"
+            class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 focus:border-indigo-500 focus:ring-indigo-500 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600 transition-colors {{ !in_array(auth()->user()->role, ['owner', 'admin']) ? 'opacity-80 cursor-not-allowed' : '' }}"
         ></textarea>
     </div>
 
