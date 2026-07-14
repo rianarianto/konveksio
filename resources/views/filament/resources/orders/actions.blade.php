@@ -55,6 +55,7 @@
             </a>
 
             {{-- Edit --}}
+            @if(in_array(auth()->user()->role, ['owner', 'admin']))
             <a href="{{ $editUrl }}"
                 style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#7c3aed; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
                 onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background='transparent'">
@@ -67,9 +68,10 @@
                 </div>
                 Edit
             </a>
+            @endif
 
             {{-- Serahkan Pesanan --}}
-            @if($record->status === 'siap_diambil')
+            @if($record->status === 'siap_diambil' && in_array(auth()->user()->role, ['owner', 'admin']))
             <button x-on:click.stop="open = false; $wire.mountTableAction('deliver_order', '{{ $record->id }}')"
                 style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#16a34a; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
                 onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='transparent'">
@@ -86,6 +88,7 @@
             @endif
 
             {{-- Retur Barang --}}
+            @if(in_array(auth()->user()->role, ['owner', 'admin']))
             <button x-on:click.stop="open = false; $wire.mountTableAction('create_return', '{{ $record->id }}')"
                 style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ea580c; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
                 onmouseover="this.style.background='#fff7ed'" onmouseout="this.style.background='transparent'">
@@ -99,6 +102,7 @@
                 </div>
                 Retur Barang
             </button>
+            @endif
 
             {{-- Delete --}}
             @if(auth()->user()->role === 'owner')
