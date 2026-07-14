@@ -379,6 +379,14 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 $ket = $details['sablon_keterangan'] ?? '-';
 
                                 $isProduksi = in_array($record->production_category, ['produksi', 'custom']);
+                                $isCustom = $record->size === 'Custom';
+                                $ld = $details['LD'] ?? '-';
+                                $pb = $details['PB'] ?? '-';
+                                $pl = $details['PL'] ?? '-';
+                                $lb = $details['LB'] ?? '-';
+                                $lp = $details['LP'] ?? '-';
+                                $lph = $details['LPh'] ?? '-';
+                                $note = $details['note'] ?? '-';
 
                                 return [
                                     Grid::make(2)->schema([
@@ -388,6 +396,22 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         Placeholder::make('button')->label('Kancing')->content("Kancing " . $button)->visible($isProduksi),
                                         Placeholder::make('collar')->label('Kerah')->content("Kerah " . $collar)->visible($isProduksi),
                                         Placeholder::make('model')->label('Model')->content($model)->visible($isProduksi),
+                                        
+                                        Section::make('Detail Ukuran Badan (Custom)')
+                                            ->visible($isCustom)
+                                            ->columnSpanFull()
+                                            ->columns(3)
+                                            ->compact()
+                                            ->schema([
+                                                Placeholder::make('ld_view')->label('LD')->content($ld ? $ld . " cm" : '-'),
+                                                Placeholder::make('pb_view')->label('PB')->content($pb ? $pb . " cm" : '-'),
+                                                Placeholder::make('pl_view')->label('PL')->content($pl ? $pl . " cm" : '-'),
+                                                Placeholder::make('lb_view')->label('LB')->content($lb ? $lb . " cm" : '-'),
+                                                Placeholder::make('lp_view')->label('LP')->content($lp ? $lp . " cm" : '-'),
+                                                Placeholder::make('lph_view')->label('LPh')->content($lph ? $lph . " cm" : '-'),
+                                                Placeholder::make('note_view')->label('Catatan Khusus')->content($note ?: '-')->columnSpanFull(),
+                                            ]),
+
                                         Section::make('Desain Sablon / Bordir')
                                             ->columnSpanFull()
                                             ->columns(2)
