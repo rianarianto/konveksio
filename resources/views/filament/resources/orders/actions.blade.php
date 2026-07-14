@@ -1,4 +1,8 @@
 @php
+    $canEdit = in_array(auth()->user()->role, ['owner', 'admin']);
+    $detailUrl = $canEdit
+        ? \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $record])
+        : \App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $record]);
     $editUrl = \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $record]);
     $receiptUrl = route('orders.receipt', ['order' => $record]);
 @endphp
@@ -23,7 +27,7 @@
             style="position:absolute; right:0; top:calc(100% + 5px); z-index:1000; width:165px; background:white; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding:6px;">
 
             {{-- Detail --}}
-            <a href="{{ $editUrl }}"
+            <a href="{{ $detailUrl }}"
                 style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#9333ea; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
                 onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background='transparent'">
                 <div
