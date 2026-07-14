@@ -262,8 +262,6 @@ class OrderResource extends Resource
                                 ->visible(fn(Get $get): bool => (bool) $get('is_express'))
                                 ->helperText('Biaya tambahan untuk layanan express')
                                 ->columnSpan(1),
-                                
-                            Hidden::make('status')->default('draft'),
                         ])
                         ->columns(3),
 

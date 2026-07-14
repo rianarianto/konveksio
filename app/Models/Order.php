@@ -51,6 +51,9 @@ class Order extends Model
             if (empty($order->order_number)) {
                 $order->order_number = static::generateOrderNumber($order->shop_id);
             }
+            if (empty($order->status)) {
+                $order->status = 'draft';
+            }
         });
 
         // Ensure financial fields are never null and recalculate total_price
