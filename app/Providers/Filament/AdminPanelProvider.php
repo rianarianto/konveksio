@@ -92,6 +92,10 @@ class AdminPanelProvider extends PanelProvider
                 fn() => view('filament.login-illustration'),
                 scopes: \App\Filament\Pages\Auth\CustomLogin::class,
             )
+            ->renderHook(
+                \Filament\View\PanelsRenderHook::USER_MENU_BEFORE,
+                fn() => view('filament.user-menu-before'),
+            )
             ->sidebarCollapsibleOnDesktop()
             ->icons([
                 'panels::sidebar.collapse-button' => 'heroicon-o-chevron-double-left',
