@@ -1332,14 +1332,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     ->nullable(),
                             ])->compact(),
 
-                        Section::make('Jumlah & Harga (Custom)')
+                        Section::make('Harga (Custom)')
                             ->visible(fn(OrderItem $record) => $record->size === 'Custom')
                             ->schema([
-                                Grid::make(2)->schema([
-                                    TextInput::make('edit_custom_qty')
-                                        ->label('Jumlah (Pcs)')
-                                        ->numeric()
-                                        ->required(),
+                                Grid::make(1)->schema([
                                     TextInput::make('edit_custom_price')
                                         ->label('Harga Satuan')
                                         ->numeric()
@@ -1475,44 +1471,11 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 'price' => $newPrice ?: $record->price,
                             ]);
                         } elseif ($record->size === 'Custom') {
-                            $itemsInGroup = $this->getItemsInGroup($record);
-                            $newQty = (int) ($data['edit_custom_qty'] ?? 1);
                             $newPrice = (int) ($data['edit_custom_price'] ?? 0);
-                            $currentCount = $itemsInGroup->count();
-
-                            if ($newQty > 0) {
-                                $i = 0;
-                                foreach ($itemsInGroup as $item) {
-                                    if ($i < $newQty) {
-                                        $item->update([
-                                            'price' => $newPrice ?: $item->price,
-                                            'size_and_request_details' => $newDetails,
-                                        ]);
-                                    } else {
-                                        $item->delete();
-                                    }
-                                    $i++;
-                                }
-
-                                if ($newQty > $currentCount) {
-                                    $needed = $newQty - $currentCount;
-                                    for ($k = 0; $k < $needed; $k++) {
-                                        $record->order->orderItems()->create([
-                                            'product_name' => $record->product_name,
-                                            'production_category' => $record->production_category,
-                                            'bahan_id' => $record->bahan_id,
-                                            'size' => 'Custom',
-                                            'price' => $newPrice ?: $record->price,
-                                            'quantity' => 1,
-                                            'size_and_request_details' => $newDetails,
-                                        ]);
-                                    }
-                                }
-                            } else {
-                                foreach ($itemsInGroup as $item) {
-                                    $item->delete();
-                                }
-                            }
+                            $record->update([
+                                'price' => $newPrice ?: $record->price,
+                                'size_and_request_details' => $newDetails,
+                            ]);
                         } else {
                             $itemsInGroup = $this->getItemsInGroup($record);
                             foreach ($sizeOptions as $key => $label) {
