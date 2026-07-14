@@ -389,7 +389,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 $note = $details['note'] ?? '-';
 
                                 return [
-                                    Grid::make(2)->schema([
+                                    Grid::make(['default' => 2, 'sm' => 2, 'md' => 3])->schema([
                                         Placeholder::make('gender')->label('Gender/Penerima')->content($gender)->visible($isProduksi),
                                         Placeholder::make('sleeve')->label('Lengan')->content("Lengan " . $sleeve)->visible($isProduksi),
                                         Placeholder::make('pocket')->label('Saku')->content($pocket)->visible($isProduksi),
@@ -400,7 +400,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         Section::make('Detail Ukuran Badan (Custom)')
                                             ->visible($isCustom)
                                             ->columnSpanFull()
-                                            ->columns(3)
+                                            ->columns(['default' => 3, 'sm' => 3, 'md' => 6])
                                             ->compact()
                                             ->schema([
                                                 Placeholder::make('ld_view')->label('LD')->content($ld ? $ld . " cm" : '-'),
@@ -414,7 +414,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                                         Section::make('Desain Sablon / Bordir')
                                             ->columnSpanFull()
-                                            ->columns(2)
+                                            ->columns(['default' => 2, 'sm' => 2, 'md' => 3])
                                             ->compact()
                                             ->schema([
                                                 Placeholder::make('sablon_jenis')->label('Teknik')->content($sablon),
