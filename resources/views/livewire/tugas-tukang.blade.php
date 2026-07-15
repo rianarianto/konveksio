@@ -184,18 +184,28 @@
                 }
             }
 
-            // 4. Jika tidak ada, cari task terakhir milik worker ini pada WO ini (untuk menampilkan riwayat tugas selesai)
+            // 4. Jika tidak ada, cari task terakhir milik worker ini yang sudah selesai (untuk menampilkan riwayat tugas selesai)
             if (!$myActiveTask) {
                 $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
                     ->whereIn('order_item_id', $groupItems->pluck('id'))
                     ->where('assigned_to', $worker->id)
+                    ->where('status', 'done')
                     ->orderBy('id', 'desc')
                     ->first();
             }
         }
 
+        $futureTask = null;
+        if (!$myActiveTask && $worker) {
+            $futureTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItems->pluck('id'))
+                ->where('assigned_to', $worker->id)
+                ->where('status', 'pending')
+                ->first();
+        }
+
         $isMyActiveStage = $myActiveTask ? true : false;
-        $myTask = $myActiveTask;
+        $myTask = $myActiveTask ?: $futureTask;
 
         $nextStageLabel = 'selesai dikerjakan';
         if ($myTask) {

@@ -78,7 +78,14 @@ class OrderResource extends Resource
 
     public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
     {
-        return in_array(auth()->user()->role, ['owner', 'admin']);
+        $role = auth()->user()->role;
+        if ($role === 'owner') {
+            return true;
+        }
+        if ($role === 'admin') {
+            return !in_array($record->status, ['diproses', 'selesai', 'siap_diambil']);
+        }
+        return false;
     }
 
     public static function canView(\Illuminate\Database\Eloquent\Model $record): bool
