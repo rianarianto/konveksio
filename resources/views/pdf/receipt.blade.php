@@ -176,6 +176,37 @@
             clear: both;
             display: table;
         }
+
+        /* Annex (Lampiran Spesifikasi) Styles */
+        .page-break {
+            page-break-before: always;
+        }
+        .annex-card {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+        .annex-card-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #111;
+            margin-bottom: 8px;
+            background: #f3eeff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            border-left: 3px solid #7F00FF;
+        }
+        .annex-grid {
+            width: 100%;
+            margin-bottom: 5px;
+            border-collapse: collapse;
+        }
+        .annex-grid td {
+            padding: 4px 0;
+            vertical-align: top;
+        }
     </style>
 </head>
 
@@ -404,6 +435,196 @@
             Kuitansi ini adalah bukti pembayaran yang sah.
         </div>
     </div>
+
+    @php
+        $receiptSpecGroups = [];
+        foreach ($order->orderItems as $item) {
+            $d = $item->size_and_request_details ?? [];
+            $isProduksi = in_array($item->production_category ?? 'produksi', ['produksi', 'custom']);
+            
+            if (!$isProduksi) {
+                $gen = 'UMUM';
+                $slv = '-';
+                $pck = '-';
+                $btn = '-';
+                $tun = '-';
+                $clr = '-';
+            } else {
+                $gen = $d['gender'] ?? 'L';
+                $slv = strtoupper($d['sleeve_model'] ?? 'PENDEK');
+                $pck = strtoupper(str_replace('_', ' ', $d['pocket_model'] ?? 'TANPA SAKU'));
+                $btn = strtoupper($d['button_model'] ?? 'BIASA');
+                $tun = !empty($d['is_tunic']) ? 'TUNIK' : 'STANDAR';
+                $clr = strtoupper($d['collar_model'] ?? 'BIASA');
+            }
+            
+            $sbList = [];
+            if (!empty($d['sablon_bordir'])) {
+                foreach ($d['sablon_bordir'] as $sb) {
+                    $ket = !empty($sb['keterangan']) ? " - " . strtoupper($sb['keterangan']) : "";
+                    $sbList[] = strtoupper($sb['jenis'] ?? '') . " (" . strtoupper($sb['lokasi'] ?? '') . $ket . ")";
+                }
+            } elseif (!empty($d['sablon_jenis'])) {
+                $ket = !empty($d['sablon_keterangan']) ? " - " . strtoupper($d['sablon_keterangan']) : "";
+                $sbList[] = strtoupper($d['sablon_jenis']) . " (" . strtoupper($d['sablon_lokasi'] ?? '-') . $ket . ")";
+            }
+            sort($sbList);
+            $sbStr = implode(' | ', $sbList);
+            
+            $reqList = [];
+            if (!empty($d['request_tambahan']) && is_array($d['request_tambahan'])) {
+                foreach ($d['request_tambahan'] as $rt) {
+                    $reqList[] = strtoupper($rt['jenis'] ?? '') . ": " . ($rt['keterangan'] ?? '');
+                }
+            }
+            sort($reqList);
+            $reqStr = implode(' | ', $reqList);
+
+            $gen = trim($gen);
+            $slv = trim($slv);
+            $pck = trim($pck);
+            $btn = trim($btn);
+            $tun = trim($tun);
+            $sbStr = trim($sbStr);
+            $reqStr = trim($reqStr);
+
+            $groupKey = "{$item->product_name}|{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|{$sbStr}|{$reqStr}";
+            
+            if (!isset($receiptSpecGroups[$groupKey])) {
+                $receiptSpecGroups[$groupKey] = [
+                    'product_name' => $item->product_name,
+                    'production_category' => $item->production_category,
+                    'gender' => $gen === 'UMUM' ? 'UMUM' : ($gen === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN'),
+                    'is_produksi' => $isProduksi,
+                    'sleeve' => $slv,
+                    'pocket' => $pck,
+                    'button' => $btn,
+                    'tunic' => $tun,
+                    'collar' => $clr,
+                    'sablon_bordir' => $sbList,
+                    'requests' => $reqList,
+                    'total_qty' => 0,
+                    'sizes' => [],
+                    'bahan' => $item->bahan ? ($item->bahan->material->name . ' - ' . $item->bahan->color_name) : null,
+                    'recipients' => ['standard' => [], 'custom' => []],
+                ];
+            }
+            
+            $receiptSpecGroups[$groupKey]['total_qty'] += $item->quantity;
+            $sz = strtoupper($item->size ?? 'TANPA_UKURAN');
+            $receiptSpecGroups[$groupKey]['sizes'][$sz] = ($receiptSpecGroups[$groupKey]['sizes'][$sz] ?? 0) + $item->quantity;
+
+            if (!empty($d['detail_custom'])) {
+                foreach ($d['detail_custom'] as $u) {
+                    $receiptSpecGroups[$groupKey]['recipients']['custom'][] = [
+                        'nama' => $u['nama'] ?? '-',
+                        'size' => $u['ukuran'] ?? 'Custom',
+                        'desc' => !empty($u['LD']) ? "LD:{$u['LD']} PB:{$u['PB']} PL:{$u['PL']} LB:{$u['LB']} LP:{$u['LP']} LPh:{$u['LPh']}" : ""
+                    ];
+                }
+            } elseif ($sz === 'CUSTOM') {
+                $m = [];
+                foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
+                    if (!empty($d[$mk])) $m[] = "$mk:{$d[$mk]}";
+                }
+                $receiptSpecGroups[$groupKey]['recipients']['custom'][] = [
+                    'nama' => $item->recipient_name ?? '-',
+                    'size' => 'Custom',
+                    'desc' => implode(' ', $m)
+                ];
+            } elseif (!empty($item->recipient_name)) {
+                $receiptSpecGroups[$groupKey]['recipients']['standard'][$sz][] = $item->recipient_name;
+            }
+        }
+    @endphp
+
+    @if(!empty($receiptSpecGroups))
+    <div class="page-break"></div>
+    <div class="container">
+        <div class="header clearfix">
+            <div style="float: left;">
+                <h1 class="shop-name">{{ $order->shop->name }}</h1>
+                <div class="shop-info">LAMPIRAN SPESIFIKASI PESANAN</div>
+            </div>
+            <div class="title-box">
+                <div class="info-value" style="color: #7F00FF; font-size: 16px;">
+                    Order #{{ $order->order_number }}
+                </div>
+            </div>
+        </div>
+
+        <div style="font-size: 11px; color: #666; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+            Lampiran ini berisi rincian spesifikasi produk, bahan, warna, dan ukuran resmi yang telah dikonfirmasi oleh customer untuk diproduksi.
+        </div>
+
+        @foreach($receiptSpecGroups as $group)
+            <div class="annex-card">
+                <div class="annex-card-title">
+                    {{ strtoupper($group['product_name']) }} ({{ $group['total_qty'] }} pcs)
+                </div>
+                
+                <table class="annex-grid" style="font-size: 10px; line-height: 1.5;">
+                    <tr>
+                        <td style="width: 130px; color: #666; font-weight: bold;">Kategori</td>
+                        <td>: {{ $group['production_category'] === 'custom' ? 'Konveksi (Custom)' : ($group['production_category'] === 'non_produksi' ? 'Non-Produksi (Katalog)' : 'Jasa Makloon') }}</td>
+                    </tr>
+                    @if($group['bahan'])
+                    <tr>
+                        <td style="color: #666; font-weight: bold;">Bahan & Warna Utama</td>
+                        <td>: <strong>{{ $group['bahan'] }}</strong></td>
+                    </tr>
+                    @endif
+                    @if($group['is_produksi'])
+                    <tr>
+                        <td style="color: #666; font-weight: bold;">Model & Potongan</td>
+                        <td>
+                            : Gender/JK: {{ $group['gender'] }} | Lengan: {{ $group['sleeve'] }} | Saku: {{ $group['pocket'] }} | Kancing: {{ $group['button'] }} | Kerah: {{ $group['collar'] }}
+                        </td>
+                    </tr>
+                    @endif
+                    @if(!empty($group['sablon_bordir']))
+                    <tr>
+                        <td style="color: #666; font-weight: bold;">Sablon / Bordir</td>
+                        <td>: {{ implode(' | ', $group['sablon_bordir']) }}</td>
+                    </tr>
+                    @endif
+                    @if(!empty($group['requests']))
+                    <tr>
+                        <td style="color: #666; font-weight: bold;">Request Khusus</td>
+                        <td>: {{ implode(' | ', $group['requests']) }}</td>
+                    </tr>
+                    @endif
+                    <tr>
+                        <td style="color: #666; font-weight: bold;">Rincian Ukuran</td>
+                        <td>
+                            : 
+                            @foreach($group['sizes'] as $sz => $q)
+                                <strong>{{ $sz }}</strong> ({{ $q }} pcs){{ !$loop->last ? ', ' : '' }}
+                            @endforeach
+                        </td>
+                    </tr>
+                    
+                    @if(!empty($group['recipients']['custom']))
+                    <tr>
+                        <td style="color: #666; font-weight: bold; vertical-align: top; padding-top: 5px;">Rincian Ukuran Custom</td>
+                        <td style="padding-top: 5px;">
+                            <table style="width: 100%; border: none; font-size: 9.5px; border-collapse: collapse;">
+                                @foreach($group['recipients']['custom'] as $cust)
+                                    <tr>
+                                        <td style="border: none; padding: 2px 0; color: #333;">
+                                            • <strong>{{ $cust['nama'] }}</strong> ({{ $cust['size'] }}): <span style="font-family: monospace; font-size: 9px; color: #555;">{{ $cust['desc'] }}</span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </table>
+                        </td>
+                    </tr>
+                    @endif
+                </table>
+            </div>
+        @endforeach
+    </div>
+    @endif
 </body>
 
 </html>
