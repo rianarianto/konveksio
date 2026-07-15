@@ -700,7 +700,7 @@ class ControlProduksiResource extends Resource
                     ->label('Hapus Semua Tugas')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
-                    ->visible(fn(OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin']) && $record->productionTasks()->exists())
+                    ->visible(fn(OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin', 'designer']) && $record->productionTasks()->exists())
                     ->disabled(fn(OrderItem $record) => auth()->user()->role !== 'owner' && $record->productionTasks()->where('status', 'done')->exists())
                     ->requiresConfirmation()
                     ->modalHeading('Hapus Semua Tugas Produksi?')
