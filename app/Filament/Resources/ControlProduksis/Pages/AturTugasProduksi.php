@@ -1300,6 +1300,28 @@ class AturTugasProduksi extends Page
             // Buat ProductionTask HANYA untuk QC_PERSIAPAN (QC worker perlu action)
             // QC setelah stage (QC_POTONG, QC_JAHIT, dll) = WO stage aja, bukan task
             if ($qcWorkerId && $hasQcPrep) {
+                $groupItems = \App\Models\OrderItem::whereIn('id', $groupItemIds)->get();
+                $totalGroupQty = $groupItems->sum('quantity');
+
+                $groupSizeQuantities = [];
+                $customNames = [];
+                foreach ($groupItems as $gi) {
+                    $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                    $groupSizeQuantities[$sz] = ($groupSizeQuantities[$sz] ?? 0) + $gi->quantity;
+                    if ($sz === 'CUSTOM' && !empty($gi->recipient_name)) {
+                        $customNames[] = $gi->recipient_name;
+                    }
+                }
+
+                $sizeBreakdown = [];
+                foreach ($groupSizeQuantities as $sz => $q) {
+                    $sizeBreakdown[] = "{$sz} ({$q})";
+                }
+                $qcDesc = 'Pembagian Ukuran: ' . implode(' | ', $sizeBreakdown);
+                if (!empty($customNames)) {
+                    $qcDesc .= "\nBaju Custom: " . implode(', ', $customNames);
+                }
+
                 $existingQcTask = \App\Models\ProductionTask::withoutGlobalScopes()
                     ->where('order_item_id', $item->id)
                     ->where('stage_name', 'QC_PERSIAPAN')
@@ -1309,7 +1331,9 @@ class AturTugasProduksi extends Page
                     \App\Models\ProductionTask::create([
                         'order_item_id' => $item->id,
                         'stage_name' => 'QC_PERSIAPAN',
-                        'quantity' => $item->quantity ?? 1,
+                        'quantity' => $totalGroupQty,
+                        'size_quantities' => $groupSizeQuantities,
+                        'description' => $qcDesc,
                         'assigned_to' => $qcWorkerId,
                         'assigned_by' => auth()->id(),
                         'status' => 'pending',
@@ -1318,7 +1342,12 @@ class AturTugasProduksi extends Page
                         'shop_id' => \Filament\Facades\Filament::getTenant()->id,
                     ]);
                 } else {
-                    $existingQcTask->update(['assigned_to' => $qcWorkerId]);
+                    $existingQcTask->update([
+                        'quantity' => $totalGroupQty,
+                        'size_quantities' => $groupSizeQuantities,
+                        'description' => $qcDesc,
+                        'assigned_to' => $qcWorkerId,
+                    ]);
                 }
             }
 
