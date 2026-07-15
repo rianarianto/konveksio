@@ -374,7 +374,22 @@
                                 @else - @endif
                             </div>
                         </td>
-                        <td style="font-style: italic; font-size: 8pt;">{{ $task->description ?: '-' }}</td>
+                        <td>
+                            @if($task->description)
+                                @php
+                                    $lines = explode("\n", $task->description);
+                                @endphp
+                                @foreach($lines as $line)
+                                    @if(str_starts_with(trim($line), 'Pembagian Ukuran:') || str_starts_with(trim($line), 'Baju Custom:'))
+                                        <div style="font-size: 7.5pt; color: #6b7280; margin-top: 3px;">{{ $line }}</div>
+                                    @else
+                                        <div style="font-size: 8pt; font-weight: bold; color: #1f2937; font-style: italic; margin-bottom: 2px;">{{ $line }}</div>
+                                    @endif
+                                @endforeach
+                            @else
+                                -
+                            @endif
+                        </td>
                     </tr>
                 @endforeach
             </tbody>
