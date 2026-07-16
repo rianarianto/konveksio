@@ -30,7 +30,7 @@ class PDFController extends Controller
         $pdfOutput = $pdf->output();
         return response($pdfOutput, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Content-Disposition' => 'inline',
         ]);
     }
 
@@ -181,7 +181,7 @@ class PDFController extends Controller
         $pdfOutput = $pdf->output();
         return response($pdfOutput, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Content-Disposition' => 'inline',
         ]);
     }
 }
