@@ -24,7 +24,6 @@ class PDFController extends Controller
             return response($pdfOutput, 200, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                'Content-Length' => strlen($pdfOutput),
             ]);
         }
 
@@ -32,7 +31,6 @@ class PDFController extends Controller
         return response($pdfOutput, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $filename . '"',
-            'Content-Length' => strlen($pdfOutput),
         ]);
     }
 
@@ -177,7 +175,6 @@ class PDFController extends Controller
             return response($pdfOutput, 200, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                'Content-Length' => strlen($pdfOutput),
             ]);
         }
 
@@ -185,7 +182,6 @@ class PDFController extends Controller
         return response($pdfOutput, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $filename . '"',
-            'Content-Length' => strlen($pdfOutput),
         ]);
     }
 }
