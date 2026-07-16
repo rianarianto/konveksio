@@ -1236,14 +1236,9 @@ class AturTugasProduksi extends Page
         $hasQcPrep = (bool) ($data['has_qc_prep'] ?? true);
         $qcWorkerId = $data['qc_worker_id'] ?? null;
 
-        // Build stage_sequence: QC_PERSIAPAN (if on) + production stages only
+        // Build stage_sequence: production stages only
         // QC after each stage handled by QC_REVIEW mechanism (not QC_ prefix stages)
         $stageSequence = [];
-        
-        // QC Persiapan di awal
-        if ($hasQcPrep) {
-            $stageSequence[] = 'QC_PERSIAPAN';
-        }
         
         // Tahap produksi saja (tanpa QC_ prefix)
         foreach ($tasksData as $taskData) {
