@@ -20,10 +20,17 @@ class PDFController extends Controller
         $filename = 'Kuitansi-' . str_replace('#', '', $order->order_number) . '.pdf';
 
         if ($request->query('download') == 1) {
-            return $pdf->download($filename);
+            $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+            $pdf->save($tempPath);
+            return response()->download($tempPath, $filename)->deleteFileAfterSend(true);
         }
 
-        return $pdf->stream($filename, ['Attachment' => false]);
+        $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+        $pdf->save($tempPath);
+        return response()->file($tempPath, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
     }
 
     public function downloadSpk(\App\Models\WorkOrder $wo, Request $request)
@@ -163,10 +170,17 @@ class PDFController extends Controller
         $filename = 'SPK-' . $record->order->order_number . '-' . \Illuminate\Support\Str::slug($record->product_name) . '.pdf';
 
         if ($request->query('download') == 1) {
-            return $pdf->download($filename);
+            $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+            $pdf->save($tempPath);
+            return response()->download($tempPath, $filename)->deleteFileAfterSend(true);
         }
 
-        return $pdf->stream($filename, ['Attachment' => false]);
+        $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+        $pdf->save($tempPath);
+        return response()->file($tempPath, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
     }
 }
 
