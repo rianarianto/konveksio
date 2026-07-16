@@ -29,6 +29,8 @@
 
         body {
             font-family: 'Rethink Sans', ui-sans-serif, system-ui, sans-serif;
+            font-variant-ligatures: none;
+            font-feature-settings: "liga" 0, "clig" 0;
             background: var(--gray-50);
             min-height: 100vh;
             color: var(--gray-900);
