@@ -140,10 +140,10 @@
     @if($wo)
     <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
     @endif
-    <div class="card task-card" style="cursor:pointer; border-left: 4px solid #10B981;">
+    <div class="card task-card task-working" style="cursor:pointer;">
         <div class="task-header" style="display:flex; justify-content: space-between; align-items: center; gap:12px;">
             <div class="task-info" style="flex:1;">
-                <div class="task-stage" style="color:#10B981; font-weight:700;">{{ str_replace('_', ' ', $task->stage_name) }}</div>
+                <div class="task-stage" style="color:#059669; font-weight:700;">{{ str_replace('_', ' ', $task->stage_name) }}</div>
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
                 <div class="task-customer">
                     <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
@@ -158,11 +158,31 @@
                 <span style="font-size:11px;font-weight:700;color:#047857;background:#d1fae5;border-radius:20px;padding:4px 10px;white-space:nowrap;">
                     ⚡ Dikerjakan
                 </span>
-                <span class="btn btn-success btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; background:#10b981; color:white; font-weight:600; cursor:pointer;">
+                <span class="btn btn-primary btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer;">
                     Buka Detail
                 </span>
             </div>
         </div>
+
+        {{-- Stage Progress --}}
+        @php
+            $progress = $this->getStageProgress($task);
+        @endphp
+        @if(count($progress) > 0)
+        <div class="stage-progress">
+            @foreach($progress as $stage)
+            <span class="stage-tag
+                @if($stage['status'] === 'done') stage-done
+                @elseif($stage['status'] === 'current') stage-current
+                @else stage-pending
+                @endif
+                @if($stage['is_task_stage']) stage-highlight
+                @endif">
+                {{ str_replace('_', ' ', $stage['name']) }}
+            </span>
+            @endforeach
+        </div>
+        @endif
     </div>
     @if($wo)</a>@endif
     @endforeach
@@ -280,6 +300,26 @@
             </div>
             <span class="done-check">✓</span>
         </div>
+
+        {{-- Stage Progress --}}
+        @php
+            $progress = $this->getStageProgress($task);
+        @endphp
+        @if(count($progress) > 0)
+        <div class="stage-progress">
+            @foreach($progress as $stage)
+            <span class="stage-tag
+                @if($stage['status'] === 'done') stage-done
+                @elseif($stage['status'] === 'current') stage-current
+                @else stage-pending
+                @endif
+                @if($stage['is_task_stage']) stage-highlight
+                @endif">
+                {{ str_replace('_', ' ', $stage['name']) }}
+            </span>
+            @endforeach
+        </div>
+        @endif
     </div>
     @if($wo)</a>@endif
     @endforeach
@@ -380,6 +420,7 @@
 }
 .task-card { transition: all 0.15s ease; }
 .task-ready { border-color: #BBF7D0; background: #F0FDF4; }
+.task-working { border-color: #A7F3D0; background: #ECFDF5; }
 .task-done { opacity: 0.6; }
 
 /* ── Task Layout ── */
