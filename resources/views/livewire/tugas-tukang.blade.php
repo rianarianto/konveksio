@@ -209,13 +209,21 @@
 
         $nextStageLabel = 'selesai dikerjakan';
         if ($myTask) {
-            if ($myTask->wajib_qc) {
-                $nextStageLabel = 'masuk tahap QC';
+            if ($myTask->status === 'done') {
+                if ($wo->status === \App\Models\WorkOrder::STATUS_COMPLETED) {
+                    $nextStageLabel = 'produksi telah selesai';
+                } else {
+                    $nextStageLabel = 'saat ini tahap ' . str_replace('_', ' ', $wo->status_label);
+                }
             } else {
-                $stages = $wo->stage_sequence ?? [];
-                $currentIdx = array_search($myTask->stage_name, $stages);
-                if ($currentIdx !== false && isset($stages[$currentIdx + 1])) {
-                    $nextStageLabel = 'masuk tahap ' . str_replace('_', ' ', $stages[$currentIdx + 1]);
+                if ($myTask->wajib_qc) {
+                    $nextStageLabel = 'masuk tahap QC';
+                } else {
+                    $stages = $wo->stage_sequence ?? [];
+                    $currentIdx = array_search($myTask->stage_name, $stages);
+                    if ($currentIdx !== false && isset($stages[$currentIdx + 1])) {
+                        $nextStageLabel = 'masuk tahap ' . str_replace('_', ' ', $stages[$currentIdx + 1]);
+                    }
                 }
             }
         }
