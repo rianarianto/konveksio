@@ -103,8 +103,12 @@
                     <div class="task-stage" style="background:#F3E8FF;color:#7C3AED; display:inline-block; padding:2px 8px; border-radius:6px; font-weight:700; font-size:12px; margin-bottom:4px;">QC Akhir</div>
                     <div class="task-product">{{ $qaWo->orderItem?->product_name ?? '-' }}</div>
                     <div class="task-customer">
+                        <span class="mono" style="font-weight:600;color:#475569;">{{ $qaWo->orderItem?->order?->order_number ?? '-' }}</span> •
                         {{ $qaWo->orderItem?->order?->customer?->name ?? '-' }} •
                         {{ $qaWo->orderItem ? $qaWo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs
+                        @if($qaWo->orderItem?->order?->is_express)
+                        <span class="express-badge">⚡ Express</span>
+                        @endif
                     </div>
                 </div>
                 <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
@@ -141,7 +145,14 @@
             <div class="task-info" style="flex:1;">
                 <div class="task-stage" style="color:#10B981; font-weight:700;">{{ str_replace('_', ' ', $task->stage_name) }}</div>
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
-                <div class="task-customer">{{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs</div>
+                <div class="task-customer">
+                    <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
+                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
+                    {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
+                    @if($task->orderItem?->order?->is_express)
+                    <span class="express-badge">⚡ Express</span>
+                    @endif
+                </div>
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
                 <span style="font-size:11px;font-weight:700;color:#047857;background:#d1fae5;border-radius:20px;padding:4px 10px;white-space:nowrap;">
@@ -256,7 +267,12 @@
                 <div class="task-stage">{{ str_replace('_', ' ', $task->stage_name) }}</div>
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
                 <div class="task-customer">
-                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
+                    <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
+                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
+                    {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
+                    @if($task->orderItem?->order?->is_express)
+                    <span class="express-badge">⚡ Express</span>
+                    @endif
                     @if($task->completed_at)
                     <span class="task-date">• {{ $task->completed_at->format('d M') }}</span>
                     @endif
