@@ -20,18 +20,10 @@ class PDFController extends Controller
         $filename = 'Kuitansi-' . str_replace('#', '', $order->order_number) . '.pdf';
 
         if ($request->query('download') == 1) {
-            $pdfOutput = $pdf->output();
-            return response($pdfOutput, 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-            ]);
+            return $pdf->download($filename);
         }
 
-        $pdfOutput = $pdf->output();
-        return response($pdfOutput, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline',
-        ]);
+        return $pdf->stream($filename, ['Attachment' => false]);
     }
 
     public function downloadSpk(\App\Models\WorkOrder $wo, Request $request)
@@ -171,18 +163,10 @@ class PDFController extends Controller
         $filename = 'SPK-' . $record->order->order_number . '-' . \Illuminate\Support\Str::slug($record->product_name) . '.pdf';
 
         if ($request->query('download') == 1) {
-            $pdfOutput = $pdf->output();
-            return response($pdfOutput, 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-            ]);
+            return $pdf->download($filename);
         }
 
-        $pdfOutput = $pdf->output();
-        return response($pdfOutput, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline',
-        ]);
+        return $pdf->stream($filename, ['Attachment' => false]);
     }
 }
 
