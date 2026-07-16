@@ -566,7 +566,7 @@
                 <table class="annex-grid" style="font-size: 10px; line-height: 1.5;">
                     <tr>
                         <td style="width: 130px; color: #666; font-weight: bold;">Kategori</td>
-                        <td>: {{ $group['production_category'] === 'custom' ? 'Konveksi (Custom)' : ($group['production_category'] === 'non_produksi' ? 'Non-Produksi (Katalog)' : 'Jasa Makloon') }}</td>
+                        <td>: {{ in_array($group['production_category'], ['produksi', 'custom']) ? 'Konveksi' : ($group['production_category'] === 'non_produksi' ? 'Non-Produksi (Katalog)' : 'Jasa Makloon') }}</td>
                     </tr>
                     @if($group['bahan'])
                     <tr>
