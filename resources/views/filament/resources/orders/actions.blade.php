@@ -1,6 +1,6 @@
 @php
-    $canEdit = in_array(auth()->user()->role, ['owner', 'admin']);
-    $detailUrl = $canEdit
+    $canEditRecord = \App\Filament\Resources\Orders\OrderResource::canEdit($record);
+    $detailUrl = $canEditRecord
         ? \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $record])
         : \App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $record]);
     $editUrl = \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $record]);
@@ -59,7 +59,7 @@
             </a>
 
             {{-- Edit --}}
-            @if(in_array(auth()->user()->role, ['owner', 'admin']))
+            @if($canEditRecord)
             <a href="{{ $editUrl }}"
                 style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#7c3aed; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
                 onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background='transparent'">
