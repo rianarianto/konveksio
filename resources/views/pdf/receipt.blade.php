@@ -558,69 +558,112 @@
         </div>
 
         @foreach($receiptSpecGroups as $group)
-            <div class="annex-card">
-                <div class="annex-card-title">
+            @php
+                $modelParts = [];
+                if ($group['is_produksi']) {
+                    if ($group['gender'] === 'LAKI-LAKI') $modelParts[] = 'Pria';
+                    elseif ($group['gender'] === 'PEREMPUAN') $modelParts[] = 'Wanita';
+                    
+                    if ($group['sleeve'] && $group['sleeve'] !== '-') {
+                        $modelParts[] = 'Lengan ' . ucwords(strtolower(str_replace('_', ' ', $group['sleeve'])));
+                    }
+                    if ($group['collar'] && $group['collar'] !== '-') {
+                        $modelParts[] = 'Kerah ' . ucwords(strtolower(str_replace('_', ' ', $group['collar'])));
+                    }
+                    if ($group['pocket'] && $group['pocket'] !== '-') {
+                        $modelParts[] = ucwords(strtolower(str_replace('_', ' ', $group['pocket'])));
+                    }
+                    if ($group['button'] && $group['button'] !== '-') {
+                        $modelParts[] = 'Kancing ' . ucwords(strtolower(str_replace('_', ' ', $group['button'])));
+                    }
+                    if ($group['tunic'] === 'TUNIK') {
+                        $modelParts[] = 'Model Tunik';
+                    }
+                }
+                $modelStr = implode('  ·  ', $modelParts);
+            @endphp
+
+            <div class="annex-card" style="border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; margin-bottom: 20px; background: #fff;">
+                <div class="annex-card-title" style="font-size: 13px; font-weight: bold; color: #7F00FF; background: #F3EEFF; padding: 6px 12px; border-radius: 4px; border-left: 4px solid #7F00FF; margin-bottom: 12px;">
                     {{ strtoupper($group['product_name']) }} ({{ $group['total_qty'] }} pcs)
                 </div>
                 
-                <table class="annex-grid" style="font-size: 10px; line-height: 1.5;">
-                    <tr>
-                        <td style="width: 130px; color: #666; font-weight: bold;">Kategori</td>
-                        <td>: {{ in_array($group['production_category'], ['produksi', 'custom']) ? 'Konveksi' : ($group['production_category'] === 'non_produksi' ? 'Non-Produksi (Katalog)' : 'Jasa Makloon') }}</td>
+                <table class="annex-grid" style="font-size: 10px; width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+                    <tr style="border-bottom: 1px solid #F3F4F6;">
+                        <td style="width: 140px; color: #6B7280; font-weight: bold; padding: 5px 0;">Kategori</td>
+                        <td style="padding: 5px 0; color: #111827;">{{ in_array($group['production_category'], ['produksi', 'custom']) ? 'Konveksi' : ($group['production_category'] === 'non_produksi' ? 'Non-Produksi (Katalog)' : 'Jasa Makloon') }}</td>
                     </tr>
                     @if($group['bahan'])
-                    <tr>
-                        <td style="color: #666; font-weight: bold;">Bahan & Warna Utama</td>
-                        <td>: <strong>{{ $group['bahan'] }}</strong></td>
+                    <tr style="border-bottom: 1px solid #F3F4F6;">
+                        <td style="color: #6B7280; font-weight: bold; padding: 5px 0;">Bahan & Warna Utama</td>
+                        <td style="padding: 5px 0; color: #111827; font-weight: bold;">{{ $group['bahan'] }}</td>
                     </tr>
                     @endif
-                    @if($group['is_produksi'])
-                    <tr>
-                        <td style="color: #666; font-weight: bold;">Model & Potongan</td>
-                        <td>
-                            : Gender/JK: {{ $group['gender'] }} | Lengan: {{ $group['sleeve'] }} | Saku: {{ $group['pocket'] }} | Kancing: {{ $group['button'] }} | Kerah: {{ $group['collar'] }}
-                        </td>
+                    @if(!empty($modelStr))
+                    <tr style="border-bottom: 1px solid #F3F4F6;">
+                        <td style="color: #6B7280; font-weight: bold; padding: 5px 0;">Model & Potongan</td>
+                        <td style="padding: 5px 0; color: #111827; font-weight: 500;">{{ $modelStr }}</td>
                     </tr>
                     @endif
                     @if(!empty($group['sablon_bordir']))
-                    <tr>
-                        <td style="color: #666; font-weight: bold;">Sablon / Bordir</td>
-                        <td>: {{ implode(' | ', $group['sablon_bordir']) }}</td>
+                    <tr style="border-bottom: 1px solid #F3F4F6;">
+                        <td style="color: #6B7280; font-weight: bold; padding: 5px 0;">Sablon / Bordir</td>
+                        <td style="padding: 5px 0; color: #111827;">{{ implode(', ', $group['sablon_bordir']) }}</td>
                     </tr>
                     @endif
                     @if(!empty($group['requests']))
-                    <tr>
-                        <td style="color: #666; font-weight: bold;">Request Khusus</td>
-                        <td>: {{ implode(' | ', $group['requests']) }}</td>
-                    </tr>
-                    @endif
-                    <tr>
-                        <td style="color: #666; font-weight: bold;">Rincian Ukuran</td>
-                        <td>
-                            : 
-                            @foreach($group['sizes'] as $sz => $q)
-                                <strong>{{ $sz }}</strong> ({{ $q }} pcs){{ !$loop->last ? ', ' : '' }}
-                            @endforeach
-                        </td>
-                    </tr>
-                    
-                    @if(!empty($group['recipients']['custom']))
-                    <tr>
-                        <td style="color: #666; font-weight: bold; vertical-align: top; padding-top: 5px;">Rincian Ukuran Custom</td>
-                        <td style="padding-top: 5px;">
-                            <table style="width: 100%; border: none; font-size: 9.5px; border-collapse: collapse;">
-                                @foreach($group['recipients']['custom'] as $cust)
-                                    <tr>
-                                        <td style="border: none; padding: 2px 0; color: #333;">
-                                            • <strong>{{ $cust['nama'] }}</strong> ({{ $cust['size'] }}): <span style="font-family: monospace; font-size: 9px; color: #555;">{{ $cust['desc'] }}</span>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </table>
-                        </td>
+                    <tr style="border-bottom: 1px solid #F3F4F6;">
+                        <td style="color: #6B7280; font-weight: bold; padding: 5px 0;">Request Khusus</td>
+                        <td style="padding: 5px 0; color: #111827;">{{ implode(', ', $group['requests']) }}</td>
                     </tr>
                     @endif
                 </table>
+
+                <!-- Rincian Ukuran Table -->
+                <div style="font-size: 10px; color: #6B7280; font-weight: bold; margin-bottom: 6px;">Rincian Ukuran & Jumlah :</div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #E5E7EB; text-align: center; margin-bottom: 14px;">
+                    <thead>
+                        <tr style="background: #F9FAFB; font-weight: bold; border-bottom: 1px solid #E5E7EB; color: #374151;">
+                            @foreach($group['sizes'] as $sz => $q)
+                                <th style="padding: 6px; border-right: 1px solid #E5E7EB; font-weight: bold;">{{ $sz }}</th>
+                            @endforeach
+                            <th style="padding: 6px; background: #F3EEFF; color: #7F00FF; font-weight: bold;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="color: #111827;">
+                            @foreach($group['sizes'] as $sz => $q)
+                                <td style="padding: 6px; border-right: 1px solid #E5E7EB;">{{ $q }} pcs</td>
+                            @endforeach
+                            <td style="padding: 6px; font-weight: bold; background: #F3EEFF; color: #7F00FF;">{{ $group['total_qty'] }} pcs</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Custom Measurements Table -->
+                @if(!empty($group['recipients']['custom']))
+                <div style="font-size: 10px; color: #6B7280; font-weight: bold; margin-bottom: 6px;">Detail Ukuran Custom :</div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 9.5px; border: 1px solid #E5E7EB;">
+                    <thead>
+                        <tr style="background: #F9FAFB; font-weight: bold; border-bottom: 1px solid #E5E7EB; color: #374151;">
+                            <th style="padding: 6px; text-align: left; border-right: 1px solid #E5E7EB; width: 30%;">Nama Penerima</th>
+                            <th style="padding: 6px; text-align: left;">Rincian Ukuran Badan (cm)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($group['recipients']['custom'] as $cust)
+                            <tr style="border-bottom: 1px solid #F3F4F6; color: #111827;">
+                                <td style="padding: 6px; font-weight: bold; border-right: 1px solid #E5E7EB;">
+                                    {{ $cust['nama'] }} <span style="font-weight: normal; color: #6B7280; font-size: 8.5px;">({{ $cust['size'] }})</span>
+                                </td>
+                                <td style="padding: 6px; font-family: monospace; color: #4B5563; letter-spacing: 0.5px;">
+                                    {{ str_replace(' ', '  |  ', $cust['desc']) }}
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                @endif
             </div>
         @endforeach
     </div>
