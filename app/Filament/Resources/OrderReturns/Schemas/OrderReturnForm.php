@@ -6,7 +6,6 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Get;
 use Filament\Schemas\Schema;
 
 class OrderReturnForm
@@ -40,7 +39,7 @@ class OrderReturnForm
         return array_merge($components, [
             Select::make('order_item_id')
                 ->label('Barang yang Diretur')
-                ->options(function (Get $get, $record) {
+                ->options(function ($get, $record) {
                     $orderId = $get('order_id');
                     if (!$orderId && $record) {
                         $orderId = $record->order_id;
@@ -89,8 +88,8 @@ class OrderReturnForm
                     'jahit' => 'Jahit',
                     'qc' => 'QC',
                 ])
-                ->visible(fn (Get $get) => $get('action_type') === 'repair')
-                ->required(fn (Get $get) => $get('action_type') === 'repair'),
+                ->visible(fn ($get) => $get('action_type') === 'repair')
+                ->required(fn ($get) => $get('action_type') === 'repair'),
             Select::make('status')
                 ->label('Status')
                 ->options([
