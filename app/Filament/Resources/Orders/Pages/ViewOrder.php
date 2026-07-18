@@ -69,7 +69,7 @@ class ViewOrder extends ViewRecord
         ];
     }
 
-    protected function mutateRecordDataBeforeFill(array $data): array
+    protected function mutateFormDataBeforeFill(array $data): array
     {
         $data['shop_id'] = Filament::getTenant()?->id;
 
