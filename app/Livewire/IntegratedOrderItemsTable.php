@@ -1301,7 +1301,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Edit Spesifikasi & Qty')
                     ->icon('heroicon-m-pencil-square')
                     ->color('primary')
-                    ->visible(fn (OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin']) && !$record->productionTasks()->exists())
+                    ->visible(fn (OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin']) && !\App\Models\ProductionTask::whereIn('order_item_id', $record->getItemsInGroup()->pluck('id'))->exists())
                     ->modalHeading(fn (OrderItem $record) => "Edit Item: " . $record->product_name)
                     ->modalWidth('4xl')
                     ->form([
@@ -1555,7 +1555,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->modalHeading(fn(OrderItem $record) => 'Rekam Ukuran Badan: ' . ($record->recipient_name ?: 'Orang'))
                     ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Simpan Ukuran'))
                     ->modalWidth('xl')
-                    ->visible(fn(OrderItem $record) => $record->size === 'Custom' && in_array(auth()->user()->role, ['owner', 'admin']) && !$record->productionTasks()->exists())
+                    ->visible(fn(OrderItem $record) => $record->size === 'Custom' && in_array(auth()->user()->role, ['owner', 'admin']) && !\App\Models\ProductionTask::whereIn('order_item_id', $record->getItemsInGroup()->pluck('id'))->exists())
                     ->form([
                         Grid::make(3)->schema([
                             TextInput::make('LD')->label('LD')->numeric()->suffix('cm'),
@@ -1579,7 +1579,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     }),
 
                 DeleteAction::make()
-                    ->visible(fn(OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin']) && !$record->productionTasks()->exists())
+                    ->visible(fn(OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin']) && !\App\Models\ProductionTask::whereIn('order_item_id', $record->getItemsInGroup()->pluck('id'))->exists())
                     ->action(function (OrderItem $record) {
                         if ($record->size === 'Custom') {
                             $record->delete();
