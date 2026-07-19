@@ -46,6 +46,8 @@ class OrderReturn extends Model
             $item = $return->orderItem;
             if (!$item) return;
 
+            $wo = $item->workOrder;
+
             if ($return->action_type === 'repair') {
                 $stageName = match($return->target_stage) {
                     'potong' => 'Potong',
@@ -71,6 +73,7 @@ class OrderReturn extends Model
                             'quantity' => $return->quantity,
                             'wage_amount' => 0,
                             'status' => 'pending',
+                            'is_revision' => true,
                             'assigned_to' => $task->assigned_to,
                             'note' => 'REVISI RETUR (Paid): ' . $return->reason,
                         ]);
@@ -78,6 +81,7 @@ class OrderReturn extends Model
                         // Reset status to pending for redo
                         $task->update([
                             'status' => 'pending',
+                            'is_revision' => true,
                             'note' => ($task->note ? $task->note . ' | ' : '') . 'REVISI RETUR: ' . $return->reason,
                         ]);
                     }
@@ -90,7 +94,18 @@ class OrderReturn extends Model
                         'quantity' => $return->quantity,
                         'wage_amount' => 0,
                         'status' => 'pending',
+                        'is_revision' => true,
                         'note' => 'REVISI RETUR (New): ' . $return->reason,
+                    ]);
+                }
+
+                // Revert WorkOrder status to target stage
+                if ($wo) {
+                    $idx = array_search($stageName, $wo->stage_sequence);
+                    $wo->update([
+                        'status' => $stageName,
+                        'current_stage_index' => $idx !== false ? $idx : 0,
+                        'stage_entered_at' => now(),
                     ]);
                 }
             } elseif ($return->action_type === 'remake') {
@@ -116,6 +131,22 @@ class OrderReturn extends Model
                         'note' => 'REMAKE RETUR: ' . $return->reason,
                     ]);
                 }
+
+                // Reset WorkOrder status to first stage
+                if ($wo && !empty($wo->stage_sequence)) {
+                    $firstStage = $wo->stage_sequence[0];
+                    $wo->update([
+                        'status' => $firstStage,
+                        'current_stage_index' => 0,
+                        'stage_entered_at' => now(),
+                    ]);
+                }
+            }
+
+            // Revert Order status to 'diproses' if it was 'selesai' or 'siap_diambil'
+            $order = $item->order;
+            if ($order && in_array($order->status, ['selesai', 'siap_diambil'])) {
+                $order->update(['status' => 'diproses']);
             }
         });
     }
