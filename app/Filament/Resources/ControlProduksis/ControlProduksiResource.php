@@ -188,8 +188,19 @@ class ControlProduksiResource extends Resource
                         default => 'gray',
                     })
                     ->description(function (OrderItem $record) {
-                        // Cek WorkOrder status dulu
-                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $groupItemIds = OrderItem::where('order_id', $record->order_id)
+                            ->where('product_name', $record->product_name)
+                            ->where('bahan_id', $record->bahan_id)
+                            ->where('production_category', $record->production_category)
+                            ->where(function($q) use ($record) {
+                                if ($record->size === 'Custom') {
+                                    $q->where('size', 'Custom');
+                                } else {
+                                    $q->where('size', '!=', 'Custom')->orWhereNull('size');
+                                }
+                            })
+                            ->pluck('id');
+                        
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
                             ->first();
