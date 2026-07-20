@@ -7,8 +7,8 @@
     $receiptUrl = route('orders.receipt', ['order' => $record]);
 @endphp
 
-<div style="display:flex; justify-content:center; width:100%;">
-    <div x-data="{ open: false }" style="position:relative; display:inline-block; text-align:left;">
+<div x-data="{ open: false }" style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%;">
+    <div style="position:relative; display:inline-block; text-align:left;">
         <button @click.stop="open = !open"
             style="padding:6px; background:#f3f4f6; color:#4b5563; border-radius:10px; border:1px solid #e5e7eb; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -127,8 +127,7 @@
                     Delete
                 </button>
             @endif
-        </div>
-        {{-- Spacer dinamis untuk mencegah dropdown terpotong di baris paling bawah --}}
-        <div x-show="open" style="height: 120px; pointer-events: none;" x-transition></div>
     </div>
+    {{-- Spacer dinamis diletakkan di luar pembungkus relatif agar tidak menggeser dropdown --}}
+    <div x-show="open" style="height: 120px; pointer-events: none;"></div>
 </div>
