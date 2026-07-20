@@ -1724,21 +1724,15 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
                         $hasTasks = \App\Models\ProductionTask::whereIn('order_item_id', $groupItemIds)->exists();
-                        
-                        $badgeHtml = $hasTasks 
-                            ? '<span style="background-color: #DEF7EC; color: #03543F; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 6px; margin-left: 10px; border: 1px solid #BCF0DA; display: inline-block; vertical-align: middle;">Aktif Produksi</span>'
-                            : '<span style="background-color: #FDF2F2; color: #9B1C1C; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 6px; margin-left: 10px; border: 1px solid #FBD5D5; display: inline-block; vertical-align: middle;">⚠️ Belum Ditugaskan</span>';
+                        $statusText = $hasTasks ? '' : ' ⚠️ [Belum Ditugaskan]';
 
                         if (in_array($record->production_category, ['non_produksi', 'jasa'])) {
-                            $titleText = "{$record->product_name} - {$categoryLabel}";
-                        } else {
-                            $sizeLabel = ($record->size === 'Custom') ? 'Ukur Badan' : 'Size Toko';
-                            $titleText = "{$record->product_name} ({$sizeLabel}) - {$categoryLabel}";
+                            return "{$record->product_name} - {$categoryLabel}{$statusText}";
                         }
                         
-                        return new \Illuminate\Support\HtmlString(
-                            '<span style="vertical-align: middle;">' . e($titleText) . '</span>' . $badgeHtml
-                        );
+                        $sizeLabel = ($record->size === 'Custom') ? 'Ukur Badan' : 'Size Toko';
+                        
+                        return "{$record->product_name} ({$sizeLabel}) - {$categoryLabel}{$statusText}";
                     })
                     ->collapsible(),
             ])

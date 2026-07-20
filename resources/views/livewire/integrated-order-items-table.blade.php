@@ -9,7 +9,42 @@
                 });
                 collapsed = true;
             }
-        })
+        });
+
+        const styleUnassignedGroups = () => {
+            document.querySelectorAll('.fi-ta-group-header').forEach(row => {
+                if (row.textContent.includes('[Belum Ditugaskan]')) {
+                    // Soft orange/yellow warning background
+                    row.style.setProperty('background-color', '#fffbeb', 'important');
+                    row.querySelectorAll('td, th').forEach(cell => {
+                        cell.style.setProperty('background-color', '#fffbeb', 'important');
+                        cell.style.setProperty('border-color', '#fef3c7', 'important');
+                    });
+                    const firstCell = row.querySelector('td:first-child, th:first-child');
+                    if (firstCell) {
+                        firstCell.style.setProperty('border-left', '4px solid #ea580c', 'important');
+                    }
+                    row.querySelectorAll('button, span, div').forEach(el => {
+                        el.style.setProperty('color', '#c2410c', 'important');
+                        el.style.setProperty('font-weight', '700', 'important');
+                    });
+                }
+            });
+        };
+
+        // Run initially
+        setTimeout(styleUnassignedGroups, 100);
+        setTimeout(styleUnassignedGroups, 300);
+
+        // Run on Livewire updates
+        if (typeof Livewire !== 'undefined') {
+            Livewire.hook('commit', ({ succeed }) => {
+                succeed(() => {
+                    setTimeout(styleUnassignedGroups, 50);
+                    setTimeout(styleUnassignedGroups, 150);
+                });
+            });
+        }
      ">
     <style>
         .fi-ta-table th {
