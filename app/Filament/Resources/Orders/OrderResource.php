@@ -1031,13 +1031,6 @@ class OrderResource extends Resource
 
                         return $html;
                     }),
-
-                // KOLOM 5: Aksi (Action)
-                TextColumn::make('actions')
-                    ->label('Aksi')
-                    ->alignCenter()
-                    ->view('filament.resources.orders.actions')
-                    ->extraCellAttributes(['style' => 'vertical-align:top; padding-top:16px; width: 100px; text-align: center;']),
             ])
 
             ->filters([
@@ -1073,55 +1066,86 @@ class OrderResource extends Resource
             ])
 
             ->actions([
-                Action::make('deliver_order')
-                    ->label('Serahkan Pesanan')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->form([
-                        \Filament\Forms\Components\FileUpload::make('pickup_proof')
-                            ->label('Foto Bukti Pengambilan / Penyerahan')
-                            ->image()
-                            ->extraInputAttributes(['capture' => 'camera'])
-                            ->disk('public')
-                            ->directory('pickup-proofs')
-                            ->required(),
-                        \Filament\Forms\Components\Textarea::make('pickup_note')
-                            ->label('Catatan Penyerahan')
-                            ->rows(3)
-                            ->placeholder('Masukkan nama pengambil, kurir, atau info lainnya jika ada...'),
-                    ])
-                    ->action(function (Order $record, array $data): void {
-                        $record->update([
-                            'status' => 'selesai',
-                            'pickup_proof' => $data['pickup_proof'],
-                            'pickup_note' => $data['pickup_note'] ?? null,
-                            'pickup_at' => now(),
-                        ]);
-                        Notification::make()
-                            ->title('Pesanan Telah Diserahkan!')
-                            ->body("Pesanan #{$record->order_number} telah selesai dan diserahkan.")
-                            ->success()
-                            ->send();
-                    })
-                    ->visible(fn (Order $record): bool => $record->status === 'siap_diambil')
-                    ->extraAttributes(['class' => 'hidden']),
-                Action::make('create_return')
-                    ->label('Retur Pesanan')
-                    ->icon('heroicon-o-arrow-path')
-                    ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
-                    ->action(function (Order $record, array $data): void {
-                        $record->returns()->create($data);
-                        Notification::make()
-                            ->title('Retur Berhasil Dicatat')
-                            ->success()
-                            ->send();
-                    })
-                    ->modalHeading('Catat Retur Pesanan')
-                    ->modalSubmitActionLabel('Simpan Retur')
-                    ->extraAttributes(['class' => 'hidden']),
-                DeleteAction::make()
-                    ->visible(fn() => auth()->user()->role === 'owner')
-                    ->extraAttributes(['class' => 'hidden']),
+                \Filament\Tables\Actions\ActionGroup::make([
+                    // Lihat Detail
+                    \Filament\Tables\Actions\Action::make('view_detail')
+                        ->label('Lihat Detail')
+                        ->icon('heroicon-o-eye')
+                        ->color('primary')
+                        ->url(fn (Order $record): string => \App\Filament\Resources\Orders\OrderResource::getUrl($record->status === 'produksi' || $record->status === 'draft' ? 'edit' : 'view', ['record' => $record])),
+
+                    // Kuitansi
+                    \Filament\Tables\Actions\Action::make('print_receipt')
+                        ->label('Kuitansi')
+                        ->icon('heroicon-o-document-text')
+                        ->color('success')
+                        ->url(fn (Order $record): string => route('orders.receipt', ['order' => $record]))
+                        ->openUrlInNewTab(),
+
+                    // Edit
+                    \Filament\Tables\Actions\Action::make('edit_record')
+                        ->label('Edit')
+                        ->icon('heroicon-o-pencil-square')
+                        ->color('warning')
+                        ->url(fn (Order $record): string => \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $record]))
+                        ->visible(fn (Order $record): bool => \App\Filament\Resources\Orders\OrderResource::canEdit($record)),
+
+                    // Serahkan Pesanan (deliver_order)
+                    \Filament\Tables\Actions\Action::make('deliver_order')
+                        ->label('Serahkan Pesanan')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->form([
+                            \Filament\Forms\Components\FileUpload::make('pickup_proof')
+                                ->label('Foto Bukti Pengambilan / Penyerahan')
+                                ->image()
+                                ->extraInputAttributes(['capture' => 'camera'])
+                                ->disk('public')
+                                ->directory('pickup-proofs')
+                                ->required(),
+                            \Filament\Forms\Components\Textarea::make('pickup_note')
+                                ->label('Catatan Penyerahan')
+                                ->rows(3)
+                                ->placeholder('Masukkan nama pengambil, kurir, atau info lainnya jika ada...'),
+                        ])
+                        ->action(function (Order $record, array $data): void {
+                            $record->update([
+                                'status' => 'selesai',
+                                'pickup_proof' => $data['pickup_proof'],
+                                'pickup_note' => $data['pickup_note'] ?? null,
+                                'pickup_at' => now(),
+                            ]);
+                            Notification::make()
+                                ->title('Pesanan Telah Diserahkan!')
+                                ->body("Pesanan #{$record->order_number} telah selesai dan diserahkan.")
+                                ->success()
+                                ->send();
+                        })
+                        ->visible(fn (Order $record): bool => $record->status === 'siap_diambil' && in_array(auth()->user()->role, ['owner', 'admin'])),
+
+                    // Retur Pesanan
+                    \Filament\Tables\Actions\Action::make('create_return')
+                        ->label('Retur Pesanan')
+                        ->icon('heroicon-o-arrow-path')
+                        ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
+                        ->action(function (Order $record, array $data): void {
+                            $record->returns()->create($data);
+                            Notification::make()
+                                ->title('Retur Berhasil Dicatat')
+                                ->success()
+                                ->send();
+                        })
+                        ->modalHeading('Catat Retur Pesanan')
+                        ->modalSubmitActionLabel('Simpan Retur')
+                        ->visible(fn (Order $record): bool => in_array(auth()->user()->role, ['owner', 'admin']) && ($record->status === 'selesai' || $record->status === 'siap_diambil')),
+
+                    // Delete
+                    \Filament\Tables\Actions\DeleteAction::make()
+                        ->visible(fn() => auth()->user()->role === 'owner'),
+                ])
+                ->icon('heroicon-m-ellipsis-vertical')
+                ->color('gray')
+                ->dropdown(true)
             ])
             ->recordUrl(null)
             ->recordAction(null)

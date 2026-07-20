@@ -124,10 +124,5 @@
                             <line x1="14" y1="11" x2="14" y2="17" />
                         </svg>
                     </div>
-                    Delete
-                </button>
-            @endif
     </div>
-    {{-- Spacer dinamis diletakkan di luar pembungkus relatif agar tidak menggeser dropdown --}}
-    <div x-show="open" style="height: 120px; pointer-events: none;"></div>
 </div>
