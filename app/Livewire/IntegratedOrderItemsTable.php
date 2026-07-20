@@ -1687,6 +1687,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
             ->groups([
                 \Filament\Tables\Grouping\Group::make('item_group_identity')
                     ->label('Kelompok Spesifikasi')
+                    ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
                         $categoryLabel = match ($record->production_category) {
                             'custom' => 'Produksi',
