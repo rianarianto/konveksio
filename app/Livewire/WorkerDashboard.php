@@ -90,6 +90,20 @@ class WorkerDashboard extends Component
 
         // WO harus di stage yang sama dengan task
         if ($wo->status === $task->stage_name) {
+            // Pengaman: Jika ini tahap pertama dan WO memiliki QC Persiapan,
+            // pastikan task QC_PERSIAPAN sudah berstatus 'done'.
+            if ($wo->has_qc_prep) {
+                $stages = $wo->stage_sequence ?? [];
+                if (!empty($stages) && $stages[0] === $task->stage_name) {
+                    $qcTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                        ->where('order_item_id', $task->order_item_id)
+                        ->where('stage_name', 'QC_PERSIAPAN')
+                        ->first();
+                    if ($qcTask && $qcTask->status !== 'done') {
+                        return false;
+                    }
+                }
+            }
             return true;
         }
 

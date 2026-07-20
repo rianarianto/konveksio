@@ -21,12 +21,46 @@ class TaskActionController extends Controller
         }
 
         $service = app(WorkOrderService::class);
-
-        match ($action) {
-            'start' => $service->startTask($this->getWorkOrderId($orderItem)),
-            'done'  => $service->advance($this->getWorkOrderId($orderItem)),
-            default => abort(400, 'Aksi tidak dikenal.'),
-        };
+ 
+        if ($action === 'start') {
+            $task->update([
+                'status' => 'in_progress',
+                'started_at' => now(),
+            ]);
+ 
+            $wo = $task->orderItem ? \App\Models\WorkOrder::withoutGlobalScopes()
+                ->whereIn('order_item_id', $task->orderItem->getItemsInGroup()->pluck('id'))
+                ->first() : null;
+ 
+            if ($wo) {
+                if (!$wo->started_at) {
+                    $wo->update(['started_at' => now()]);
+                }
+                // Jika status WO masih CREATED dan ini QC_PERSIAPAN, majukan ke QC_PREP
+                if ($task->stage_name === 'QC_PERSIAPAN' && $wo->status === \App\Models\WorkOrder::STATUS_CREATED) {
+                    $wo->update([
+                        'status' => \App\Models\WorkOrder::STATUS_QC_PREP,
+                        'stage_entered_at' => now(),
+                    ]);
+                }
+            }
+        } elseif ($action === 'done') {
+            $task->update([
+                'status' => 'done',
+                'completed_at' => now(),
+            ]);
+ 
+            // Jika QC_PERSIAPAN selesai, advance WO ke status pertama
+            if ($task->stage_name === 'QC_PERSIAPAN') {
+                $woId = $this->getWorkOrderId($orderItem);
+                $service->advance($woId, true); // fromQcApproval = true
+            } else {
+                $woId = $this->getWorkOrderId($orderItem);
+                $service->advance($woId);
+            }
+        } else {
+            abort(400, 'Aksi tidak dikenal.');
+        }
 
         // Sync Order status berdasarkan WorkOrder status
         $this->syncOrderStatus($orderItem);
