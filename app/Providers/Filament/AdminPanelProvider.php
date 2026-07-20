@@ -239,6 +239,15 @@ class AdminPanelProvider extends PanelProvider
                             display: none !important;
                         }
 
+                        /* Ensure actions cell has standard padding */
+                        .fi-ta-table th.fi-table-header-cell-actions,
+                        .fi-ta-table td.fi-table-cell-actions,
+                        .fi-ta-table th.fi-ta-actions-header-cell,
+                        .fi-ta-table td.fi-ta-actions-cell {
+                            padding-left: 24px !important;
+                            padding-right: 24px !important;
+                        }
+
                     </style>
                 '),
             )

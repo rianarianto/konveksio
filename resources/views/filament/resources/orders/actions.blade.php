@@ -7,7 +7,7 @@
     $receiptUrl = route('orders.receipt', ['order' => $record]);
 @endphp
 
-<div style="display:flex; justify-content:flex-end; width:100%; padding-right:16px;">
+<div style="display:flex; justify-content:flex-end; width:100%;">
     <div x-data="{ open: false }" style="position:relative; display:inline-block; text-align:left;">
         <button @click.stop="open = !open"
             style="padding:6px; background:#f3f4f6; color:#4b5563; border-radius:10px; border:1px solid #e5e7eb; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center;">
