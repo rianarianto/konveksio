@@ -1687,7 +1687,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
             ->groups([
                 \Filament\Tables\Grouping\Group::make('item_group_identity')
                     ->label('Kelompok Spesifikasi')
-                    ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
                         $categoryLabel = match ($record->production_category) {
                             'custom' => 'Produksi',
@@ -1698,15 +1697,17 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
                         $hasTasks = \App\Models\ProductionTask::whereIn('order_item_id', $groupItemIds)->exists();
-                        $statusText = $hasTasks ? '' : ' [UNASSIGNED]';
 
-                        if (in_array($record->production_category, ['non_produksi', 'jasa'])) {
-                            return "{$record->product_name} - {$categoryLabel}{$statusText}";
+                        $title = in_array($record->production_category, ['non_produksi', 'jasa'])
+                            ? "{$record->product_name} - {$categoryLabel}"
+                            : "{$record->product_name} (" . (($record->size === 'Custom') ? 'Ukur Badan' : 'Size Toko') . ") - {$categoryLabel}";
+
+                        if (!$hasTasks) {
+                            $badge = '<span class="unassigned-badge" style="background-color: #fdf2f2; color: #b91c1c; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 9999px; margin-left: 10px; border: 1px solid #fecaca; display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; box-shadow: 0 1px 2px rgba(0,0,0,0.02); line-height: 1.2;">⚠️ Belum Ditugaskan</span>';
+                            return new \Illuminate\Support\HtmlString("<span>" . e($title) . "</span>" . $badge);
                         }
-                        
-                        $sizeLabel = ($record->size === 'Custom') ? 'Ukur Badan' : 'Size Toko';
-                        
-                        return "{$record->product_name} ({$sizeLabel}) - {$categoryLabel}{$statusText}";
+
+                        return $title;
                     })
                     ->collapsible(),
             ])

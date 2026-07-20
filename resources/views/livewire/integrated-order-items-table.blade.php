@@ -189,49 +189,4 @@
 
     <x-filament-actions::modals />
 
-    <script>
-        function styleUnassignedGroups() {
-            document.querySelectorAll('.fi-ta-group-header').forEach(row => {
-                if (row.textContent.includes('[UNASSIGNED]')) {
-                    // Soft orange/yellow warning background
-                    row.style.setProperty('background-color', '#fffbeb', 'important');
-                    row.querySelectorAll('td, th').forEach(cell => {
-                        cell.style.setProperty('background-color', '#fffbeb', 'important');
-                        cell.style.setProperty('border-color', '#fef3c7', 'important');
-                    });
-                    const firstCell = row.querySelector('td:first-child, th:first-child');
-                    if (firstCell) {
-                        firstCell.style.setProperty('border-left', '4px solid #ea580c', 'important');
-                    }
-                    
-                    // Find the deepest element containing the [UNASSIGNED] tag
-                    const candidates = Array.from(row.querySelectorAll('span, button, div, td'));
-                    const titleEl = candidates.find(el => {
-                        return el.textContent.includes('[UNASSIGNED]') && 
-                               !Array.from(el.querySelectorAll('span, button, div')).some(child => child.textContent.includes('[UNASSIGNED]'));
-                    });
-                    
-                    if (titleEl) {
-                        const cleanText = titleEl.textContent.replace('[UNASSIGNED]', '').trim();
-                        titleEl.innerHTML = cleanText + ' <span style="background-color: #fdf2f2; color: #b91c1c; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 9999px; margin-left: 10px; border: 1px solid #fecaca; display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; box-shadow: 0 1px 2px rgba(0,0,0,0.02); line-height: 1.2;">⚠️ Belum Ditugaskan</span>';
-                    }
-                }
-            });
-        }
-
-        // Run initially
-        setTimeout(styleUnassignedGroups, 100);
-        setTimeout(styleUnassignedGroups, 300);
-
-        // Run on Livewire updates
-        if (typeof Livewire !== 'undefined' && !window.livewireHookRegisteredForSpecTable) {
-            window.livewireHookRegisteredForSpecTable = true;
-            Livewire.hook('commit', ({ succeed }) => {
-                succeed(() => {
-                    setTimeout(styleUnassignedGroups, 50);
-                    setTimeout(styleUnassignedGroups, 150);
-                });
-            });
-        }
-    </script>
 </div>

@@ -298,6 +298,20 @@ class AdminPanelProvider extends PanelProvider
                             background-color: #4b5563 !important;
                         }
 
+                        /* Style unassigned group headers dynamically via pure CSS has() */
+                        .fi-ta-table tr.fi-ta-group-header:has(.unassigned-badge) {
+                            background-color: #fffbeb !important;
+                        }
+                        .fi-ta-table tr.fi-ta-group-header:has(.unassigned-badge) td,
+                        .fi-ta-table tr.fi-ta-group-header:has(.unassigned-badge) th {
+                            background-color: #fffbeb !important;
+                            border-color: #fef3c7 !important;
+                        }
+                        .fi-ta-table tr.fi-ta-group-header:has(.unassigned-badge) td:first-child,
+                        .fi-ta-table tr.fi-ta-group-header:has(.unassigned-badge) th:first-child {
+                            border-left: 4px solid #ea580c !important;
+                        }
+
                     </style>
                 '),
             )
