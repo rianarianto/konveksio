@@ -106,7 +106,6 @@ class ControlProduksiResource extends Resource
                         'product_name',
                         'production_category',
                         'bahan_id',
-                        \Illuminate\Support\Facades\DB::raw("IF(size = 'Custom', 1, 0)"),
                         \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_jenis')), '')"),
                         \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_lokasi')), '')"),
                         \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_keterangan')), '')"),
@@ -132,9 +131,24 @@ class ControlProduksiResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->getStateUsing(fn(OrderItem $record): string => 
-                        $record->product_name . ($record->production_category === 'non_produksi' || $record->production_category === 'jasa' ? '' : ' (' . ($record->size === 'Custom' ? 'Ukur Badan' : 'Size Toko') . ')')
-                    )
+                    ->getStateUsing(function(OrderItem $record): string {
+                        $items = $record->getItemsInGroup();
+                        $hasCustom = $items->contains('size', 'Custom');
+                        $hasStandard = $items->contains(fn($item) => $item->size !== 'Custom');
+                        
+                        $suffix = '';
+                        if ($record->production_category !== 'non_produksi' && $record->production_category !== 'jasa') {
+                            if ($hasCustom && $hasStandard) {
+                                $suffix = ' (Standar & Custom)';
+                            } elseif ($hasCustom) {
+                                $suffix = ' (Ukur Badan)';
+                            } else {
+                                $suffix = ' (Size Toko)';
+                            }
+                        }
+                        
+                        return $record->product_name . $suffix;
+                    })
                     ->description(fn(OrderItem $record): string => match ($record->production_category) {
                         'custom' => '🧵 Produksi (Ukur Badan)',
                         'non_produksi' => '📦 Non-Produksi',
