@@ -248,7 +248,7 @@ class AturTugasProduksi extends Page
                                                 ->placeholder('Pilih Petugas QC')
                                                 ->options(\App\Models\Worker::pluck('name', 'id'))
                                                 ->searchable()
-                                                ->nullable(),
+                                                ->required(),
                                             Toggle::make('has_qc_prep')
                                                 ->label('QC Persiapan & QC Akhir')
                                                 ->default(true)
