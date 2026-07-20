@@ -1724,7 +1724,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
                         $hasTasks = \App\Models\ProductionTask::whereIn('order_item_id', $groupItemIds)->exists();
-                        $statusText = $hasTasks ? '' : ' ⚠️ [Belum Ditugaskan]';
+                        $statusText = $hasTasks ? '' : ' [UNASSIGNED]';
 
                         if (in_array($record->production_category, ['non_produksi', 'jasa'])) {
                             return "{$record->product_name} - {$categoryLabel}{$statusText}";

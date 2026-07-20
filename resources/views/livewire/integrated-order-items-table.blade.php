@@ -149,7 +149,7 @@
     <script>
         function styleUnassignedGroups() {
             document.querySelectorAll('.fi-ta-group-header').forEach(row => {
-                if (row.textContent.includes('⚠️ [Belum Ditugaskan]')) {
+                if (row.textContent.includes('[UNASSIGNED]')) {
                     // Soft orange/yellow warning background
                     row.style.setProperty('background-color', '#fffbeb', 'important');
                     row.querySelectorAll('td, th').forEach(cell => {
@@ -164,14 +164,14 @@
                     // Replace the plain text marker with a beautiful HTML badge
                     row.querySelectorAll('span, button, div, td').forEach(el => {
                         el.childNodes.forEach(node => {
-                            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('⚠️ [Belum Ditugaskan]')) {
+                            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('[UNASSIGNED]')) {
                                 const container = document.createElement('span');
                                 container.style.display = 'inline-flex';
                                 container.style.alignItems = 'center';
                                 container.style.verticalAlign = 'middle';
                                 
-                                const cleanText = node.textContent.replace('⚠️ [Belum Ditugaskan]', '').trim();
-                                container.innerHTML = cleanText + ' <span style="background-color: #f97316; color: #ffffff; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 6px; margin-left: 8px; border: 1px solid #ea580c; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">Belum Ditugaskan</span>';
+                                const cleanText = node.textContent.replace('[UNASSIGNED]', '').trim();
+                                container.innerHTML = cleanText + ' <span style="background-color: #fdf2f2; color: #b91c1c; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 9999px; margin-left: 10px; border: 1px solid #fecaca; display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; box-shadow: 0 1px 2px rgba(0,0,0,0.02); line-height: 1.2;">⚠️ Belum Ditugaskan</span>';
                                 
                                 node.parentNode.replaceChild(container, node);
                             }
