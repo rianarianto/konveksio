@@ -73,9 +73,9 @@
             ring: 1px #6366f1 !important;
         }
 
-        /* Prevent dropdown clipping in small tables by adding padding at the bottom of the content container */
+        /* Allow table container to display overflowing dropdowns without clipping */
         .fi-ta-content {
-            padding-bottom: 120px !important;
+            overflow: visible !important;
         }
         /* Ensure dropdown sits on top */
         .fi-dropdown-panel {

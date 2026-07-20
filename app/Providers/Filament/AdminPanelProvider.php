@@ -268,14 +268,10 @@ class AdminPanelProvider extends PanelProvider
                             z-index: 30 !important;
                         }
 
-                        /* Prevent table actions dropdown clipping by adding padding-bottom to the table content container globally */
+                        /* Allow table container to display overflowing dropdowns without clipping */
+                        .fi-ta-ctn,
                         .fi-ta-content {
-                            padding-bottom: 120px !important;
-                        }
-                        
-                        /* Force table wrapper to grow and accommodate the dropdown */
-                        .fi-ta-table {
-                            margin-bottom: 120px !important;
+                            overflow: visible !important;
                         }
 
                     </style>
