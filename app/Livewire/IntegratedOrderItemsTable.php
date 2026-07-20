@@ -1061,7 +1061,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 'production_category' => 'jasa',
                                 'price' => (int) ($data['bulk_price_jasa'] ?? 0),
                                 'quantity' => $jasaQty,
-                                'design_status' => in_array($this->order->status, ['produksi', 'diproses', 'siap_diambil', 'selesai']) ? 'approved' : 'pending',
+                                'design_status' => $this->getNewItemDesignStatus($productName),
                                 'size_and_request_details' => [
                                     'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
                                     'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
@@ -1099,7 +1099,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     'size' => $key,
                                     'price' => (int) ($data["non_price_{$key}"] ?? 0),
                                     'quantity' => $qty,
-                                    'design_status' => in_array($this->order->status, ['produksi', 'diproses', 'siap_diambil', 'selesai']) ? 'approved' : 'pending',
+                                    'design_status' => $this->getNewItemDesignStatus($productName),
                                     'size_and_request_details' => [
                                         'gender' => null,
                                         'sleeve_model' => null,
@@ -1153,7 +1153,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             'size' => $key,
                                             'price' => (int) ($group["price_{$key}"] ?? $data['bulk_price'] ?? 0),
                                             'quantity' => $qty,
-                                            'design_status' => in_array($this->order->status, ['produksi', 'diproses', 'siap_diambil', 'selesai']) ? 'approved' : 'pending',
+                                            'design_status' => $this->getNewItemDesignStatus($productName),
                                             'size_and_request_details' => [
                                                 'gender' => $group['bulk_gender'] ?? 'L',
                                                 'sleeve_model' => $group['bulk_sleeve'] ?? 'pendek',
@@ -1193,7 +1193,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             'size' => 'Custom',
                                             'quantity' => 1,
                                             'price' => (int) ($category === 'produksi' ? ($group['price_custom'] ?? $data['bulk_price_custom'] ?? $data['bulk_price'] ?? 0) : 0),
-                                            'design_status' => in_array($this->order->status, ['produksi', 'diproses', 'siap_diambil', 'selesai']) ? 'approved' : 'pending',
+                                            'design_status' => $this->getNewItemDesignStatus($productName),
                                             'size_and_request_details' => [
                                                 'gender' => $group['bulk_gender'] ?? 'L',
                                                 'sleeve_model' => $group['bulk_sleeve'] ?? 'pendek',
@@ -1511,7 +1511,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             'size' => $key,
                                             'price' => $price ?: $record->price,
                                             'quantity' => $qty,
-                                            'design_status' => in_array($record->order->status, ['produksi', 'diproses', 'siap_diambil', 'selesai']) ? 'approved' : 'pending',
+                                            'design_status' => $record->order->orderItems()->where('product_name', $record->product_name)->where('design_status', 'approved')->exists() && !in_array($record->order->status, ['draft', 'antrian']) ? 'approved' : 'pending',
                                             'size_and_request_details' => $newDetails,
                                         ]);
                                     }
@@ -1722,6 +1722,20 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
             ->paginated(false)
             ->defaultSort('product_name', 'asc')
             ->defaultKeySort(false);
+    }
+
+    protected function getNewItemDesignStatus(string $productName): string
+    {
+        if (in_array($this->order->status, ['draft', 'antrian'])) {
+            return 'pending';
+        }
+
+        $existsApproved = $this->order->orderItems()
+            ->where('product_name', $productName)
+            ->where('design_status', 'approved')
+            ->exists();
+
+        return $existsApproved ? 'approved' : 'pending';
     }
 
     protected function getItemsInGroup(OrderItem $record): \Illuminate\Support\Collection
