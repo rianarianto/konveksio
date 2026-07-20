@@ -1132,7 +1132,10 @@ class OrderResource extends Resource
                 ]),
             ])
             ->defaultSort('is_express', 'desc')
-            ->modifyQueryUsing(fn($query) => $query->orderBy('is_express', 'desc')->orderBy('order_date', 'desc'));
+            ->modifyQueryUsing(fn($query) => $query->orderBy('is_express', 'desc')->orderBy('order_date', 'desc'))
+            ->extraAttributes([
+                'class' => 'orders-main-table-container',
+            ]);
     }
 
 

@@ -231,6 +231,14 @@ class AdminPanelProvider extends PanelProvider
                             background-color: #1f2937 !important;
                         }
 
+                        /* Hide Filament\'s default empty actions column on the Orders main table */
+                        .orders-main-table-container th.fi-ta-actions-header-cell {
+                            display: none !important;
+                        }
+                        .orders-main-table-container td:has(> .fi-ta-actions) {
+                            display: none !important;
+                        }
+
                     </style>
                 '),
             )
