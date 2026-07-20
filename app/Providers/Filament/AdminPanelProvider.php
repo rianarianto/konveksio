@@ -268,9 +268,12 @@ class AdminPanelProvider extends PanelProvider
                             z-index: 30 !important;
                         }
 
-                        /* Allow table container to display overflowing dropdowns without clipping */
+                        /* Allow table card container and its wrappers to overflow vertically */
+                        .fi-ta,
                         .fi-ta-ctn,
-                        .fi-ta-content {
+                        .fi-ta-content,
+                        .orders-main-table-container,
+                        .orders-main-table-container > div {
                             overflow: visible !important;
                         }
 
