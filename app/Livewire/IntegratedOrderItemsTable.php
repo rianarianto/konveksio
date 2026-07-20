@@ -251,35 +251,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
             ->columns([
                 TextColumn::make('product_name')
                     ->label('Penerima / Tipe')
-                    ->html()
                     ->searchable()
                     ->sortable()
-                    ->state(function(OrderItem $record) {
-                        if ($record->size === 'Custom') {
-                            $escapedName = e($record->recipient_name);
-                            return new \Illuminate\Support\HtmlString("
-                                <div class='flex flex-col gap-1' onclick='event.stopPropagation();' wire:key='rec-name-container-{$record->id}' wire:ignore.self>
-                                    <!-- <span class='text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider'>Penerima (Ukur Badan):</span> -->
-                                    <input 
-                                        wire:key='rec-name-input-{$record->id}'
-                                        type='text' 
-                                        value='{$escapedName}' 
-                                        placeholder='Ketik nama penerima...'
-                                        wire:change='updateRecipientName({$record->id}, \$event.target.value)'
-                                        class='px-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none w-52 shadow-sm transition-colors'
-                                        style='height: 36px;'
-                                    />
-                                </div>
-                            ");
-                        }
-                        
-                        $badgeText = $record->production_category === 'non_produksi' ? '📦 Standar (Bawaan Produk)' : '📦 Standar (Size Toko)';
-                        return new \Illuminate\Support\HtmlString("
-                            <span class='inline-flex items-center text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700'>
-                                {$badgeText}
-                            </span>
-                        ");
-                    }),
+                    ->view('filament.tables.columns.recipient-name-input'),
 
                 TextColumn::make('production_category')
                     ->label('Kategori')
