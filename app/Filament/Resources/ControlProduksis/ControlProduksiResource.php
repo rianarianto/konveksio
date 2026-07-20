@@ -132,6 +132,9 @@ class ControlProduksiResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
+                    ->getStateUsing(fn(OrderItem $record): string => 
+                        $record->product_name . ($record->production_category === 'non_produksi' || $record->production_category === 'jasa' ? '' : ' (' . ($record->size === 'Custom' ? 'Ukur Badan' : 'Size Toko') . ')')
+                    )
                     ->description(fn(OrderItem $record): string => match ($record->production_category) {
                         'custom' => '🧵 Produksi (Ukur Badan)',
                         'non_produksi' => '📦 Non-Produksi',
