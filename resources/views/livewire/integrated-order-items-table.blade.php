@@ -3,60 +3,14 @@
         $nextTick(() => {
             if (!collapsed) {
                 // Find all grouping toggle buttons that are currently expanded
-                // Filament usually uses an svg with chevron-up or similar for expanded state
                 document.querySelectorAll('.fi-ta-group-header button').forEach(button => {
                     button.click();
                 });
                 collapsed = true;
             }
         });
-
-        const styleUnassignedGroups = () => {
-            document.querySelectorAll('.fi-ta-group-header').forEach(row => {
-                if (row.textContent.includes('⚠️ [Belum Ditugaskan]')) {
-                    // Soft orange/yellow warning background
-                    row.style.setProperty('background-color', '#fffbeb', 'important');
-                    row.querySelectorAll('td, th').forEach(cell => {
-                        cell.style.setProperty('background-color', '#fffbeb', 'important');
-                        cell.style.setProperty('border-color', '#fef3c7', 'important');
-                    });
-                    const firstCell = row.querySelector('td:first-child, th:first-child');
-                    if (firstCell) {
-                        firstCell.style.setProperty('border-left', '4px solid #ea580c', 'important');
-                    }
-                    
-                    // Replace the plain text marker with a beautiful HTML badge
-                    row.querySelectorAll('span, button, div, td').forEach(el => {
-                        el.childNodes.forEach(node => {
-                            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('⚠️ [Belum Ditugaskan]')) {
-                                const container = document.createElement('span');
-                                container.style.display = 'inline-flex';
-                                container.style.alignItems = 'center';
-                                container.style.verticalAlign = 'middle';
-                                
-                                const cleanText = node.textContent.replace('⚠️ [Belum Ditugaskan]', '').trim();
-                                container.innerHTML = cleanText + ' <span style="background-color: #f97316; color: #ffffff; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 6px; margin-left: 8px; border: 1px solid #ea580c; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">Belum Ditugaskan</span>';
-                                
-                                node.parentNode.replaceChild(container, node);
-                            }
-                        });
-                    });
-                }
-            });
-        };
-
-        // Run initially
-        setTimeout(styleUnassignedGroups, 100);
-        setTimeout(styleUnassignedGroups, 300);
-
-        // Run on Livewire updates
-        if (typeof Livewire !== 'undefined') {
-            Livewire.hook('commit', ({ succeed }) => {
-                succeed(() => {
-                    setTimeout(styleUnassignedGroups, 50);
-                    setTimeout(styleUnassignedGroups, 150);
-                });
-            });
+        if (typeof styleUnassignedGroups === 'function') {
+            styleUnassignedGroups();
         }
      ">
     <style>
@@ -191,4 +145,55 @@
     </div>
 
     <x-filament-actions::modals />
+
+    <script>
+        function styleUnassignedGroups() {
+            document.querySelectorAll('.fi-ta-group-header').forEach(row => {
+                if (row.textContent.includes('⚠️ [Belum Ditugaskan]')) {
+                    // Soft orange/yellow warning background
+                    row.style.setProperty('background-color', '#fffbeb', 'important');
+                    row.querySelectorAll('td, th').forEach(cell => {
+                        cell.style.setProperty('background-color', '#fffbeb', 'important');
+                        cell.style.setProperty('border-color', '#fef3c7', 'important');
+                    });
+                    const firstCell = row.querySelector('td:first-child, th:first-child');
+                    if (firstCell) {
+                        firstCell.style.setProperty('border-left', '4px solid #ea580c', 'important');
+                    }
+                    
+                    // Replace the plain text marker with a beautiful HTML badge
+                    row.querySelectorAll('span, button, div, td').forEach(el => {
+                        el.childNodes.forEach(node => {
+                            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('⚠️ [Belum Ditugaskan]')) {
+                                const container = document.createElement('span');
+                                container.style.display = 'inline-flex';
+                                container.style.alignItems = 'center';
+                                container.style.verticalAlign = 'middle';
+                                
+                                const cleanText = node.textContent.replace('⚠️ [Belum Ditugaskan]', '').trim();
+                                container.innerHTML = cleanText + ' <span style="background-color: #f97316; color: #ffffff; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 6px; margin-left: 8px; border: 1px solid #ea580c; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">Belum Ditugaskan</span>';
+                                
+                                node.parentNode.replaceChild(container, node);
+                            }
+                        });
+                    });
+                }
+            });
+        }
+
+        // Run initially
+        setTimeout(styleUnassignedGroups, 100);
+        setTimeout(styleUnassignedGroups, 300);
+
+        // Run on Livewire updates
+        if (typeof Livewire !== 'undefined' && !window.livewireHookRegisteredForSpecTable) {
+            window.livewireHookRegisteredForSpecTable = true;
+            Livewire.hook('commit', ({ succeed }) => {
+                succeed(() => {
+                    setTimeout(styleUnassignedGroups, 50);
+                    setTimeout(styleUnassignedGroups, 150);
+                });
+            });
+        }
+    </script>
 </div>
