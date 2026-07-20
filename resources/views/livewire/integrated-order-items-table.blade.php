@@ -13,7 +13,7 @@
 
         const styleUnassignedGroups = () => {
             document.querySelectorAll('.fi-ta-group-header').forEach(row => {
-                if (row.textContent.includes('[Belum Ditugaskan]')) {
+                if (row.textContent.includes('⚠️ [Belum Ditugaskan]')) {
                     // Soft orange/yellow warning background
                     row.style.setProperty('background-color', '#fffbeb', 'important');
                     row.querySelectorAll('td, th').forEach(cell => {
@@ -24,9 +24,22 @@
                     if (firstCell) {
                         firstCell.style.setProperty('border-left', '4px solid #ea580c', 'important');
                     }
-                    row.querySelectorAll('button, span, div').forEach(el => {
-                        el.style.setProperty('color', '#c2410c', 'important');
-                        el.style.setProperty('font-weight', '700', 'important');
+                    
+                    // Replace the plain text marker with a beautiful HTML badge
+                    row.querySelectorAll('span, button, div, td').forEach(el => {
+                        el.childNodes.forEach(node => {
+                            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('⚠️ [Belum Ditugaskan]')) {
+                                const container = document.createElement('span');
+                                container.style.display = 'inline-flex';
+                                container.style.alignItems = 'center';
+                                container.style.verticalAlign = 'middle';
+                                
+                                const cleanText = node.textContent.replace('⚠️ [Belum Ditugaskan]', '').trim();
+                                container.innerHTML = cleanText + ' <span style="background-color: #f97316; color: #ffffff; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 6px; margin-left: 8px; border: 1px solid #ea580c; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">Belum Ditugaskan</span>';
+                                
+                                node.parentNode.replaceChild(container, node);
+                            }
+                        });
                     });
                 }
             });
