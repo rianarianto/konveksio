@@ -161,22 +161,17 @@
                         firstCell.style.setProperty('border-left', '4px solid #ea580c', 'important');
                     }
                     
-                    // Replace the plain text marker with a beautiful HTML badge
-                    row.querySelectorAll('span, button, div, td').forEach(el => {
-                        el.childNodes.forEach(node => {
-                            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('[UNASSIGNED]')) {
-                                const container = document.createElement('span');
-                                container.style.display = 'inline-flex';
-                                container.style.alignItems = 'center';
-                                container.style.verticalAlign = 'middle';
-                                
-                                const cleanText = node.textContent.replace('[UNASSIGNED]', '').trim();
-                                container.innerHTML = cleanText + ' <span style="background-color: #fdf2f2; color: #b91c1c; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 9999px; margin-left: 10px; border: 1px solid #fecaca; display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; box-shadow: 0 1px 2px rgba(0,0,0,0.02); line-height: 1.2;">⚠️ Belum Ditugaskan</span>';
-                                
-                                node.parentNode.replaceChild(container, node);
-                            }
-                        });
+                    // Find the deepest element containing the [UNASSIGNED] tag
+                    const candidates = Array.from(row.querySelectorAll('span, button, div, td'));
+                    const titleEl = candidates.find(el => {
+                        return el.textContent.includes('[UNASSIGNED]') && 
+                               !Array.from(el.querySelectorAll('span, button, div')).some(child => child.textContent.includes('[UNASSIGNED]'));
                     });
+                    
+                    if (titleEl) {
+                        const cleanText = titleEl.textContent.replace('[UNASSIGNED]', '').trim();
+                        titleEl.innerHTML = cleanText + ' <span style="background-color: #fdf2f2; color: #b91c1c; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 9999px; margin-left: 10px; border: 1px solid #fecaca; display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; box-shadow: 0 1px 2px rgba(0,0,0,0.02); line-height: 1.2;">⚠️ Belum Ditugaskan</span>';
+                    }
                 }
             });
         }
