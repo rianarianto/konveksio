@@ -161,6 +161,42 @@ class AdminPanelProvider extends PanelProvider
                             z-index: 40 !important; 
                         }
 
+                        /* Global Sticky Actions Column on the Right for Tables */
+                        .fi-ta-table th.fi-ta-actions-header-cell,
+                        .fi-ta-table th:last-child {
+                            position: sticky !important;
+                            right: 0 !important;
+                            z-index: 20 !important;
+                            background-color: #ffffff !important;
+                            box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.1) !important;
+                        }
+                        .dark .fi-ta-table th.fi-ta-actions-header-cell,
+                        .dark .fi-ta-table th:last-child {
+                            background-color: #111827 !important;
+                            box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.4) !important;
+                        }
+                        .fi-ta-table tr:not(.fi-ta-group-header) td:has(> .fi-ta-actions),
+                        .fi-ta-table tr:not(.fi-ta-group-header) td:last-child {
+                            position: sticky !important;
+                            right: 0 !important;
+                            z-index: 15 !important;
+                            background-color: #ffffff !important;
+                            box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.1) !important;
+                        }
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header) td:has(> .fi-ta-actions),
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header) td:last-child {
+                            background-color: #111827 !important;
+                            box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.4) !important;
+                        }
+                        .fi-ta-table tr:not(.fi-ta-group-header):hover td:has(> .fi-ta-actions),
+                        .fi-ta-table tr:not(.fi-ta-group-header):hover td:last-child {
+                            background-color: #f9fafb !important;
+                        }
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td:has(> .fi-ta-actions),
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td:last-child {
+                            background-color: #1f2937 !important;
+                        }
+
                     </style>
                 '),
             )
