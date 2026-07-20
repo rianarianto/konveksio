@@ -598,15 +598,15 @@ class ControlProduksiResource extends Resource
                     }),
 
                 Action::make('hapus_tugas')
-                    ->label('Batalkan Produksi')
+                    ->label('Batalkan Tugas')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->visible(fn(OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin', 'designer']) && $record->productionTasks()->exists())
                     ->disabled(fn(OrderItem $record) => auth()->user()->role !== 'owner' && $record->productionTasks()->where('status', 'done')->exists())
                     ->requiresConfirmation()
-                    ->modalHeading('Batalkan Produksi?')
+                    ->modalHeading('Batalkan Tugas?')
                     ->modalDescription('Tindakan ini akan menghapus seluruh penugasan kerja untuk item ini secara permanen. Status pengerjaan item akan kembali ke Belum Diatur.')
-                    ->modalSubmitActionLabel('Ya, Batalkan Produksi')
+                    ->modalSubmitActionLabel('Ya, Batalkan Tugas')
                     ->action(function (OrderItem $record) {
                         // Hapus task produksi
                         $record->productionTasks()->delete();
