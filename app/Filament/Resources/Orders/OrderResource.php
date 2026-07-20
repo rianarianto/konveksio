@@ -428,7 +428,7 @@ class OrderResource extends Resource
                                             ->live()
                                             ->dehydrated(false)
                                             ->helperText('Kosongkan jika belum ada pembayaran')
-                                            ->disabled(fn (string $operation) => $operation !== 'create'),
+                                            ->disabled(fn ($record) => $record !== null),
  
                                         Select::make('initial_payment_method')
                                             ->label('Metode Pembayaran')
@@ -439,7 +439,7 @@ class OrderResource extends Resource
                                             ])
                                             ->default('cash')
                                             ->dehydrated(false)
-                                            ->disabled(fn (string $operation) => $operation !== 'create'),
+                                            ->disabled(fn ($record) => $record !== null),
                                     ])->columns(2),
  
                                     FileUpload::make('initial_payment_proof')
@@ -451,7 +451,7 @@ class OrderResource extends Resource
                                         ->openable()
                                         ->downloadable()
                                         ->previewable()
-                                        ->disabled(fn (string $operation) => $operation !== 'create')
+                                        ->disabled(fn ($record) => $record !== null)
                                         ->getUploadedFileUsing(function (string $file): ?array {
                                             $disk = Storage::disk('public');
                                             if (!$disk->exists($file)) {
