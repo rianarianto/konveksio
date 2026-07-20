@@ -1704,8 +1704,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             : "{$record->product_name} (" . (($record->size === 'Custom') ? 'Ukur Badan' : 'Size Toko') . ") - {$categoryLabel}";
 
                         if (!$hasTasks) {
-                            $badge = '<span class="unassigned-badge" style="background-color: #fdf2f2; color: #b91c1c; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 9999px; margin-left: 10px; border: 1px solid #fecaca; display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; box-shadow: 0 1px 2px rgba(0,0,0,0.02); line-height: 1.2;">⚠️ Belum Ditugaskan</span>';
-                            return new \Illuminate\Support\HtmlString("<span>" . e($title) . "</span>" . $badge);
+                            $badge = '<span class=unassigned-badge>⚠️ Belum Ditugaskan</span>';
+                            return new \Illuminate\Support\HtmlString("<span>" . e($title) . "</span> " . $badge);
                         }
 
                         return $title;

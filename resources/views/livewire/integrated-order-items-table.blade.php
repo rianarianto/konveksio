@@ -154,6 +154,29 @@
             color: #ffedd5 !important;
         }
 
+        /* Badge styling inside the group header */
+        .unassigned-badge {
+            background-color: #fdf2f2 !important;
+            color: #b91c1c !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            padding: 2px 10px !important;
+            border-radius: 9999px !important;
+            margin-left: 10px !important;
+            border: 1px solid #fecaca !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            vertical-align: middle !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
+            line-height: 1.2 !important;
+        }
+        .dark .unassigned-badge {
+            background-color: #7f1d1d !important;
+            color: #fca5a5 !important;
+            border-color: #991b1b !important;
+        }
+
         /* Batasi tinggi HANYA pada isi tabel (th sampai td) dan buat scrollable */
         .fi-ta-content {
             max-height: 500px;
