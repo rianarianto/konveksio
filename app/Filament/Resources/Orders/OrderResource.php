@@ -428,8 +428,8 @@ class OrderResource extends Resource
                                             ->live()
                                             ->dehydrated(false)
                                             ->helperText('Kosongkan jika belum ada pembayaran')
-                                            ->disabled(fn (string $context) => $context !== 'create'),
-
+                                            ->disabled(fn (string $operation) => $operation !== 'create'),
+ 
                                         Select::make('initial_payment_method')
                                             ->label('Metode Pembayaran')
                                             ->options([
@@ -439,9 +439,9 @@ class OrderResource extends Resource
                                             ])
                                             ->default('cash')
                                             ->dehydrated(false)
-                                            ->disabled(fn (string $context) => $context !== 'create'),
+                                            ->disabled(fn (string $operation) => $operation !== 'create'),
                                     ])->columns(2),
-
+ 
                                     FileUpload::make('initial_payment_proof')
                                         ->label('Bukti Bayar')
                                         ->image()
@@ -451,7 +451,7 @@ class OrderResource extends Resource
                                         ->openable()
                                         ->downloadable()
                                         ->previewable()
-                                        ->disabled(fn (string $context) => $context !== 'create')
+                                        ->disabled(fn (string $operation) => $operation !== 'create')
                                         ->getUploadedFileUsing(function (string $file): ?array {
                                             $disk = Storage::disk('public');
                                             if (!$disk->exists($file)) {
