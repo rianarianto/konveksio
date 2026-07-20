@@ -74,7 +74,7 @@ class ViewOrder extends ViewRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $data['shop_id'] = Filament::getTenant()?->id;
-
+ 
         // Prefill virtual customer fields
         if (!empty($data['customer_id'])) {
             $customer = \App\Models\Customer::find($data['customer_id']);
@@ -83,19 +83,7 @@ class ViewOrder extends ViewRecord
                 $data['customer_address'] = $customer->address;
             }
         }
-
-        // Prefill virtual initial payment fields from the first payment record
-        $firstPayment = Payment::where('order_id', $this->record->id)
-            ->orderBy('payment_date', 'asc')
-            ->orderBy('id', 'asc')
-            ->first();
-
-        if ($firstPayment) {
-            $data['initial_payment_amount'] = $firstPayment->amount;
-            $data['initial_payment_method'] = $firstPayment->payment_method;
-            $data['initial_payment_proof'] = $firstPayment->proof_image;
-        }
-
+ 
         return $data;
     }
 }

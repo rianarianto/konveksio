@@ -416,95 +416,17 @@ class OrderResource extends Resource
                                 ->placeholder('0')
                                 ->columnSpanFull(),
 
-                            Section::make('Pembayaran Awal / DP')
-                                ->description('Input pembayaran awal saat pembuatan pesanan. Pembayaran tambahan bisa dikelola di tabel paling bawah setelah pesanan disimpan.')
-                                ->schema([
-                                    Group::make([
-                                        TextInput::make('initial_payment_amount')
-                                            ->label('Nominal Bayar (DP)')
-                                            ->numeric()
-                                            ->prefix('Rp')
-                                            ->placeholder('0')
-                                            ->live()
-                                            ->dehydrated(false)
-                                            ->helperText('Kosongkan jika belum ada pembayaran')
-                                            ->disabled(fn ($record) => $record !== null),
- 
-                                        Select::make('initial_payment_method')
-                                            ->label('Metode Pembayaran')
-                                            ->options([
-                                                'cash' => 'Cash',
-                                                'transfer' => 'Transfer',
-                                                'qris' => 'QRIS',
-                                            ])
-                                            ->default('cash')
-                                            ->dehydrated(false)
-                                            ->disabled(fn ($record) => $record !== null),
-                                    ])->columns(2),
- 
-                                    FileUpload::make('initial_payment_proof')
-                                        ->label('Bukti Bayar')
-                                        ->image()
-                                        ->disk('public')
-                                        ->directory('payments/proofs')
-                                        ->dehydrated(false)
-                                        ->openable()
-                                        ->downloadable()
-                                        ->previewable()
-                                        ->disabled(fn ($record) => $record !== null)
-                                        ->getUploadedFileUsing(function (string $file): ?array {
-                                            $disk = Storage::disk('public');
-                                            if (!$disk->exists($file)) {
-                                                return null;
-                                            }
-                                            return [
-                                                'name' => basename($file),
-                                                'size' => $disk->size($file),
-                                                'type' => (function () use ($disk, $file) {
-                                                    $path = $disk->path($file);
-                                                    if (!file_exists($path))
-                                                        return 'image/jpeg';
-                                                    return mime_content_type($path) ?: 'image/jpeg';
-                                                })(),
-                                                'url' => asset('storage/' . $file),
-                                            ];
-                                        })
-                                        ->saveUploadedFileUsing(function (TemporaryUploadedFile $file): string {
-                                            $mimeType = $file->getMimeType();
-                                            if ($mimeType === 'application/pdf') {
-                                                $filename = Str::uuid() . '.pdf';
-                                                $path = 'payments/proofs/' . $filename;
-                                                Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
-                                                return $path;
-                                            }
-                                            $img = Image::read($file->getRealPath());
-                                            if ($img->width() > 1920) {
-                                                $img->scaleDown(width: 1920);
-                                            }
-                                            $encoded = $img->toJpeg(quality: 75);
-                                            $filename = Str::uuid() . '.jpg';
-                                            $path = 'payments/proofs/' . $filename;
-                                            Storage::disk('public')->put($path, (string) $encoded);
-                                            return $path;
-                                        }),
-
-                                    Placeholder::make('remaining_payment_display')
-                                        ->label('Sisa Yang Harus Dibayar')
-                                        ->content(function (Get $get, ?Order $record): HtmlString {
-                                            if ($record) {
-                                                $record->refresh();
-                                            }
-                                            $total = (int) ($get('total_price') ?? 0);
-                                            $initial = (int) ($get('initial_payment_amount') ?? 0);
-                                            $remaining = $total - $initial;
-                                            $color = $remaining > 0 ? '#ef4444' : '#22c55e';
-                                            $text = $remaining > 0 ? 'Rp ' . number_format($remaining, 0, ',', '.') : 'Lunas';
-                                            return new HtmlString('<span style="font-size:18px; font-weight:800; color:' . $color . '">' . $text . '</span>');
-                                        })
-                                ])
-                                ->compact()
-                                ->collapsible(),
-
+                            Placeholder::make('remaining_payment_display')
+                                ->label('Sisa Yang Harus Dibayar')
+                                ->content(function (Get $get, ?Order $record): HtmlString {
+                                    $total = (int) ($get('total_price') ?? 0);
+                                    $paid = $record ? (int) $record->payments()->sum('amount') : 0;
+                                    $remaining = max(0, $total - $paid);
+                                    $color = $remaining > 0 ? '#ef4444' : '#22c55e';
+                                    $text = $remaining > 0 ? 'Rp ' . number_format($remaining, 0, ',', '.') : 'Lunas';
+                                    return new HtmlString('<span style="font-size:18px; font-weight:800; color:' . $color . '">' . $text . '</span>');
+                                })
+                                ->columnSpanFull(),
                         ]),
 
                     // Section 5: Bukti Penyerahan
