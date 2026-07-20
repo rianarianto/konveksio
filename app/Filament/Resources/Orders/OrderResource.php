@@ -1068,14 +1068,14 @@ class OrderResource extends Resource
             ->actions([
                 \Filament\Actions\ActionGroup::make([
                     // Lihat Detail
-                    \Filament\Tables\Actions\Action::make('view_detail')
+                    \Filament\Actions\Action::make('view_detail')
                         ->label('Lihat Detail')
                         ->icon('heroicon-o-eye')
                         ->color('primary')
                         ->url(fn (Order $record): string => \App\Filament\Resources\Orders\OrderResource::getUrl($record->status === 'produksi' || $record->status === 'draft' ? 'edit' : 'view', ['record' => $record])),
 
                     // Kuitansi
-                    \Filament\Tables\Actions\Action::make('print_receipt')
+                    \Filament\Actions\Action::make('print_receipt')
                         ->label('Kuitansi')
                         ->icon('heroicon-o-document-text')
                         ->color('success')
@@ -1083,7 +1083,7 @@ class OrderResource extends Resource
                         ->openUrlInNewTab(),
 
                     // Edit
-                    \Filament\Tables\Actions\Action::make('edit_record')
+                    \Filament\Actions\Action::make('edit_record')
                         ->label('Edit')
                         ->icon('heroicon-o-pencil-square')
                         ->color('warning')
@@ -1091,7 +1091,7 @@ class OrderResource extends Resource
                         ->visible(fn (Order $record): bool => \App\Filament\Resources\Orders\OrderResource::canEdit($record)),
 
                     // Serahkan Pesanan (deliver_order)
-                    \Filament\Tables\Actions\Action::make('deliver_order')
+                    \Filament\Actions\Action::make('deliver_order')
                         ->label('Serahkan Pesanan')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
@@ -1124,7 +1124,7 @@ class OrderResource extends Resource
                         ->visible(fn (Order $record): bool => $record->status === 'siap_diambil' && in_array(auth()->user()->role, ['owner', 'admin'])),
 
                     // Retur Pesanan
-                    \Filament\Tables\Actions\Action::make('create_return')
+                    \Filament\Actions\Action::make('create_return')
                         ->label('Retur Pesanan')
                         ->icon('heroicon-o-arrow-path')
                         ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
@@ -1140,7 +1140,7 @@ class OrderResource extends Resource
                         ->visible(fn (Order $record): bool => in_array(auth()->user()->role, ['owner', 'admin']) && ($record->status === 'selesai' || $record->status === 'siap_diambil')),
 
                     // Delete
-                    \Filament\Tables\Actions\DeleteAction::make()
+                    \Filament\Actions\DeleteAction::make()
                         ->visible(fn() => auth()->user()->role === 'owner'),
                 ])
                 ->icon('heroicon-m-ellipsis-vertical')
