@@ -66,6 +66,15 @@
             border: 1px solid #6366f1 !important; /* Indigo 500 */
             ring: 1px #6366f1 !important;
         }
+
+        /* Prevent dropdown clipping in small tables by adding padding at the bottom of the content container */
+        .fi-ta-content {
+            padding-bottom: 120px !important;
+        }
+        /* Ensure dropdown sits on top */
+        .fi-dropdown-panel {
+            z-index: 9999 !important;
+        }
         
         /* Ultra premium table grouping styles */
         tr.fi-ta-group-header, 
