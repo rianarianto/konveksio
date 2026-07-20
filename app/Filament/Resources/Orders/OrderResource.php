@@ -1066,7 +1066,7 @@ class OrderResource extends Resource
             ])
 
             ->actions([
-                \Filament\Tables\Actions\ActionGroup::make([
+                \Filament\Actions\ActionGroup::make([
                     // Lihat Detail
                     \Filament\Tables\Actions\Action::make('view_detail')
                         ->label('Lihat Detail')
