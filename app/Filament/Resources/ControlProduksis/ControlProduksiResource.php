@@ -101,18 +101,21 @@ class ControlProduksiResource extends Resource
                 $query->selectRaw('MIN(id)')
                     ->from('order_items')
                     ->where('design_status', 'approved')
-                    ->groupBy(
+                    ->groupBy([
                         'order_id',
                         'product_name',
                         'production_category',
                         'bahan_id',
-                        'gender',
-                        'model',
-                        'sleeve_model',
-                        'collar_model',
-                        'pocket_model',
-                        'button_model'
-                    );
+                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.gender')), 'L')"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.model')), 'biasa')"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sleeve_model')), 'pendek')"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.collar_model')), 'biasa')"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.pocket_model')), 'tanpa_saku')"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.button_model')), 'biasa')"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_jenis')), '')"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_lokasi')), '')"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_keterangan')), '')"),
+                    ]);
             });
     }
 
