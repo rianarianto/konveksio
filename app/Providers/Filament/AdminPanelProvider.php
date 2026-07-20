@@ -163,6 +163,10 @@ class AdminPanelProvider extends PanelProvider
 
                         /* Global Sticky Actions Column on the Right for Tables */
                         .fi-ta-table th.fi-ta-actions-header-cell,
+                        .fi-ta-table th.fi-table-header-cell-actions,
+                        .fi-ta-table th.fi-ta-header-cell-actions,
+                        .fi-ta-table th.fi-ta-col-actions,
+                        .fi-ta-table th[data-column-name="actions"],
                         .fi-ta-table th:last-child {
                             position: sticky !important;
                             right: 0 !important;
@@ -171,11 +175,22 @@ class AdminPanelProvider extends PanelProvider
                             box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.1) !important;
                         }
                         .dark .fi-ta-table th.fi-ta-actions-header-cell,
+                        .dark .fi-ta-table th.fi-table-header-cell-actions,
+                        .dark .fi-ta-table th.fi-ta-header-cell-actions,
+                        .dark .fi-ta-table th.fi-ta-col-actions,
+                        .dark .fi-ta-table th[data-column-name="actions"],
                         .dark .fi-ta-table th:last-child {
                             background-color: #111827 !important;
                             box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.4) !important;
                         }
+                        
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-actions-cell,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-table-cell-actions,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-cell-actions,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-col-actions,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td[data-column-name="actions"],
                         .fi-ta-table tr:not(.fi-ta-group-header) td:has(> .fi-ta-actions),
+                        .fi-ta-table tr:not(.fi-ta-group-header) td:has(a[href*="/edit"]),
                         .fi-ta-table tr:not(.fi-ta-group-header) td:last-child {
                             position: sticky !important;
                             right: 0 !important;
@@ -183,16 +198,35 @@ class AdminPanelProvider extends PanelProvider
                             background-color: #ffffff !important;
                             box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.1) !important;
                         }
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-actions-cell,
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header) td.fi-table-cell-actions,
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-cell-actions,
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-col-actions,
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header) td[data-column-name="actions"],
                         .dark .fi-ta-table tr:not(.fi-ta-group-header) td:has(> .fi-ta-actions),
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header) td:has(a[href*="/edit"]),
                         .dark .fi-ta-table tr:not(.fi-ta-group-header) td:last-child {
                             background-color: #111827 !important;
                             box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.4) !important;
                         }
+                        
+                        .fi-ta-table tr:not(.fi-ta-group-header):hover td.fi-ta-actions-cell,
+                        .fi-ta-table tr:not(.fi-ta-group-header):hover td.fi-table-cell-actions,
+                        .fi-ta-table tr:not(.fi-ta-group-header):hover td.fi-ta-cell-actions,
+                        .fi-ta-table tr:not(.fi-ta-group-header):hover td.fi-ta-col-actions,
+                        .fi-ta-table tr:not(.fi-ta-group-header):hover td[data-column-name="actions"],
                         .fi-ta-table tr:not(.fi-ta-group-header):hover td:has(> .fi-ta-actions),
+                        .fi-ta-table tr:not(.fi-ta-group-header):hover td:has(a[href*="/edit"]),
                         .fi-ta-table tr:not(.fi-ta-group-header):hover td:last-child {
                             background-color: #f9fafb !important;
                         }
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td.fi-ta-actions-cell,
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td.fi-table-cell-actions,
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td.fi-ta-cell-actions,
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td.fi-ta-col-actions,
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td[data-column-name="actions"],
                         .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td:has(> .fi-ta-actions),
+                        .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td:has(a[href*="/edit"]),
                         .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td:last-child {
                             background-color: #1f2937 !important;
                         }
