@@ -272,6 +272,11 @@ class AdminPanelProvider extends PanelProvider
                         .fi-ta-content {
                             padding-bottom: 120px !important;
                         }
+                        
+                        /* Force table wrapper to grow and accommodate the dropdown */
+                        .fi-ta-table {
+                            margin-bottom: 120px !important;
+                        }
 
                     </style>
                 '),
