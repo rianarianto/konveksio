@@ -106,12 +106,7 @@ class ControlProduksiResource extends Resource
                         'product_name',
                         'production_category',
                         'bahan_id',
-                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.gender')), 'L')"),
-                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.model')), 'biasa')"),
-                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sleeve_model')), 'pendek')"),
-                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.collar_model')), 'biasa')"),
-                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.pocket_model')), 'tanpa_saku')"),
-                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.button_model')), 'biasa')"),
+                        \Illuminate\Support\Facades\DB::raw("IF(size = 'Custom', 1, 0)"),
                         \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_jenis')), '')"),
                         \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_lokasi')), '')"),
                         \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_keterangan')), '')"),
@@ -148,10 +143,16 @@ class ControlProduksiResource extends Resource
                     ->label('Total Qty')
                     ->getStateUsing(
                         fn(OrderItem $record): int => (function() use ($record) {
-                            $details = $record->size_and_request_details ?? [];
                             $query = OrderItem::where('order_id', $record->order_id)
                                 ->where('product_name', $record->product_name)
                                 ->where('bahan_id', $record->bahan_id)
+                                ->where(function($q) use ($record) {
+                                    if ($record->size === 'Custom') {
+                                        $q->where('size', 'Custom');
+                                    } else {
+                                        $q->where('size', '!=', 'Custom')->orWhereNull('size');
+                                    }
+                                })
                                 ->where('design_status', 'approved');
                             
                             return $query->sum('quantity');
