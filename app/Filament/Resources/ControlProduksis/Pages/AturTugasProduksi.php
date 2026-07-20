@@ -48,6 +48,13 @@ class AturTugasProduksi extends Page
         $allGroupItems = OrderItem::where('order_id', $item->order_id)
             ->where('product_name', $item->product_name)
             ->where('bahan_id', $item->bahan_id)
+            ->where('production_category', $item->production_category)
+            ->where('gender', $item->gender)
+            ->where('model', $item->model)
+            ->where('sleeve_model', $item->sleeve_model)
+            ->where('collar_model', $item->collar_model)
+            ->where('pocket_model', $item->pocket_model)
+            ->where('button_model', $item->button_model)
             ->where('design_status', 'approved')
             ->get();
             
@@ -952,6 +959,13 @@ class AturTugasProduksi extends Page
         $allGroupItems = OrderItem::where('order_id', $item->order_id)
             ->where('product_name', $item->product_name)
             ->where('bahan_id', $item->bahan_id)
+            ->where('production_category', $item->production_category)
+            ->where('gender', $item->gender)
+            ->where('model', $item->model)
+            ->where('sleeve_model', $item->sleeve_model)
+            ->where('collar_model', $item->collar_model)
+            ->where('pocket_model', $item->pocket_model)
+            ->where('button_model', $item->button_model)
             ->where('design_status', 'approved')
             ->get();
 
@@ -1073,6 +1087,13 @@ class AturTugasProduksi extends Page
         $allItems = OrderItem::where('order_id', $item->order_id)
             ->where('product_name', $item->product_name)
             ->where('bahan_id', $item->bahan_id)
+            ->where('production_category', $item->production_category)
+            ->where('gender', $item->gender)
+            ->where('model', $item->model)
+            ->where('sleeve_model', $item->sleeve_model)
+            ->where('collar_model', $item->collar_model)
+            ->where('pocket_model', $item->pocket_model)
+            ->where('button_model', $item->button_model)
             ->where('design_status', 'approved')
             ->get();
 

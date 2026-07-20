@@ -101,7 +101,18 @@ class ControlProduksiResource extends Resource
                 $query->selectRaw('MIN(id)')
                     ->from('order_items')
                     ->where('design_status', 'approved')
-                    ->groupBy('order_id', 'product_name');
+                    ->groupBy(
+                        'order_id',
+                        'product_name',
+                        'production_category',
+                        'bahan_id',
+                        'gender',
+                        'model',
+                        'sleeve_model',
+                        'collar_model',
+                        'pocket_model',
+                        'button_model'
+                    );
             });
     }
 
