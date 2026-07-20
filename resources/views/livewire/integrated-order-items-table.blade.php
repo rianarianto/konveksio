@@ -41,6 +41,12 @@
         .dark .fi-ta-table tr:not(.fi-ta-group-header):hover td:last-child {
             background-color: #1f2937 !important;
         }
+        
+        /* Elevate z-index when actions cell is hovered or focused to prevent overlapping */
+        .fi-ta-table tr:not(.fi-ta-group-header) td:last-child:hover,
+        .fi-ta-table tr:not(.fi-ta-group-header) td:last-child:focus-within {
+            z-index: 30 !important;
+        }
 
         .fi-ta-table th {
             vertical-align: baseline !important;
