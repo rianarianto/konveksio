@@ -128,5 +128,7 @@
                 </button>
             @endif
         </div>
+        {{-- Spacer dinamis untuk mencegah dropdown terpotong di baris paling bawah --}}
+        <div x-show="open" style="height: 120px; pointer-events: none;" x-transition></div>
     </div>
 </div>
