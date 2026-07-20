@@ -5,16 +5,18 @@ namespace App\Filament\Resources\Orders\Pages;
 use App\Filament\Resources\Orders\OrderResource;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use App\Models\Payment;
-
+ 
 class ViewOrder extends ViewRecord
 {
     protected static string $resource = OrderResource::class;
-
+ 
     protected function getHeaderActions(): array
     {
         return [
+            EditAction::make(),
             Action::make('deliver_order')
                 ->label('Serahkan Pesanan')
                 ->icon('heroicon-o-check-circle')
