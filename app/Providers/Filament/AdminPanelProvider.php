@@ -271,6 +271,33 @@ class AdminPanelProvider extends PanelProvider
                             overflow: visible !important;
                         }
 
+                        /* Style Filament native icon buttons globally to look like rounded squares */
+                        .fi-ta-actions .fi-icon-btn,
+                        .fi-icon-btn.fi-ac-action-group {
+                            background-color: #f3f4f6 !important;
+                            color: #4b5563 !important;
+                            border: 1px solid #e5e7eb !important;
+                            border-radius: 10px !important;
+                            padding: 6px !important;
+                            width: 32px !important;
+                            height: 32px !important;
+                            transition: all 0.2s !important;
+                        }
+                        .fi-ta-actions .fi-icon-btn:hover,
+                        .fi-icon-btn.fi-ac-action-group:hover {
+                            background-color: #e5e7eb !important;
+                        }
+                        .dark .fi-ta-actions .fi-icon-btn,
+                        .dark .fi-icon-btn.fi-ac-action-group {
+                            background-color: #374151 !important;
+                            color: #d1d5db !important;
+                            border: 1px solid #4b5563 !important;
+                        }
+                        .dark .fi-ta-actions .fi-icon-btn:hover,
+                        .dark .fi-icon-btn.fi-ac-action-group:hover {
+                            background-color: #4b5563 !important;
+                        }
+
                     </style>
                 '),
             )
