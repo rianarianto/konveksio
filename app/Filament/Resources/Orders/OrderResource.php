@@ -1035,9 +1035,9 @@ class OrderResource extends Resource
                 // KOLOM 5: Aksi (Action)
                 TextColumn::make('actions')
                     ->label('Aksi')
-                    ->alignEnd()
+                    ->alignCenter()
                     ->view('filament.resources.orders.actions')
-                    ->extraCellAttributes(['style' => 'vertical-align:top; padding-top:16px;']),
+                    ->extraCellAttributes(['style' => 'vertical-align:top; padding-top:16px; width: 100px; text-align: center;']),
             ])
 
             ->filters([
