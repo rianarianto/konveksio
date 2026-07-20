@@ -248,6 +248,26 @@ class AdminPanelProvider extends PanelProvider
                             padding-right: 24px !important;
                         }
 
+                        /* Elevate global actions cell z-index on hover or focus-within to prevent overlapping */
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-actions-cell:hover,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-table-cell-actions:hover,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-cell-actions:hover,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-col-actions:hover,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td[data-column-name="actions"]:hover,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td:has(> .fi-ta-actions):hover,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td:has(a[href*="/edit"]):hover,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td:last-child:hover,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-actions-cell:focus-within,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-table-cell-actions:focus-within,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-cell-actions:focus-within,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td.fi-ta-col-actions:focus-within,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td[data-column-name="actions"]:focus-within,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td:has(> .fi-ta-actions):focus-within,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td:has(a[href*="/edit"]):focus-within,
+                        .fi-ta-table tr:not(.fi-ta-group-header) td:last-child:focus-within {
+                            z-index: 30 !important;
+                        }
+
                     </style>
                 '),
             )
