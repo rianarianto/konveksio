@@ -106,9 +106,6 @@ class ControlProduksiResource extends Resource
                         'product_name',
                         'production_category',
                         'bahan_id',
-                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_jenis')), '')"),
-                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_lokasi')), '')"),
-                        \Illuminate\Support\Facades\DB::raw("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_keterangan')), '')"),
                     ]);
             });
     }
@@ -133,8 +130,8 @@ class ControlProduksiResource extends Resource
                     ->weight('bold')
                     ->getStateUsing(function(OrderItem $record): string {
                         $items = $record->getItemsInGroup();
-                        $hasCustom = $items->contains('size', 'Custom');
-                        $hasStandard = $items->contains(fn($item) => $item->size !== 'Custom');
+                        $hasCustom = $items->contains(fn($item) => $item->size === 'Custom');
+                        $hasStandard = $items->contains(fn($item) => $item->size !== 'Custom' && $item->size !== null);
                         
                         $suffix = '';
                         if ($record->production_category !== 'non_produksi' && $record->production_category !== 'jasa') {
@@ -163,13 +160,6 @@ class ControlProduksiResource extends Resource
                             $query = OrderItem::where('order_id', $record->order_id)
                                 ->where('product_name', $record->product_name)
                                 ->where('bahan_id', $record->bahan_id)
-                                ->where(function($q) use ($record) {
-                                    if ($record->size === 'Custom') {
-                                        $q->where('size', 'Custom');
-                                    } else {
-                                        $q->where('size', '!=', 'Custom')->orWhereNull('size');
-                                    }
-                                })
                                 ->where('design_status', 'approved');
                             
                             return $query->sum('quantity');
