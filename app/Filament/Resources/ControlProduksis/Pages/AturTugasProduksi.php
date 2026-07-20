@@ -1370,6 +1370,22 @@ class AturTugasProduksi extends Page
                     ]);
                 }
             }
+
+            // Tambahan Koreksi: Jika baru saja ditambahkan QC Persiapan (has_qc_prep & qcWorkerId)
+            // sedangkan status WorkOrder saat ini bukan QC_PREP dan task QC_PERSIAPAN masih pending,
+            // kembalikan status WorkOrder ke QC_PREP agar kunci tugas terbuka untuk QC worker.
+            if ($hasQcPrep && $qcWorkerId) {
+                $qcTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->where('order_item_id', $item->id)
+                    ->where('stage_name', 'QC_PERSIAPAN')
+                    ->first();
+                if ($qcTask && $qcTask->status === 'pending' && $workOrder->status !== \App\Models\WorkOrder::STATUS_QC_PREP) {
+                    $workOrder->update([
+                        'status' => \App\Models\WorkOrder::STATUS_QC_PREP,
+                        'stage_entered_at' => now(),
+                    ]);
+                }
+            }
         }
 
         // Sync status order
