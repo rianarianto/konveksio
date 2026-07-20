@@ -120,37 +120,37 @@
         }
 
         /* Style unassigned group headers dynamically via pure CSS has() */
-        tr.fi-ta-group-header:has(.unassigned-badge),
-        tr.fi-ta-group-header:has(.unassigned-badge) td,
-        tr.fi-ta-group-header:has(.unassigned-badge) th {
+        tr[class*="group-header"]:has(.unassigned-badge),
+        tr[class*="group-header"]:has(.unassigned-badge) td,
+        tr[class*="group-header"]:has(.unassigned-badge) th {
             background-color: #fffbeb !important; /* Soft yellow warning */
             border-bottom: 1px solid #fef3c7 !important;
             border-top: 1px solid #fef3c7 !important;
         }
-        tr.fi-ta-group-header:has(.unassigned-badge) td:first-child,
-        tr.fi-ta-group-header:has(.unassigned-badge) th:first-child {
+        tr[class*="group-header"]:has(.unassigned-badge) td:first-child,
+        tr[class*="group-header"]:has(.unassigned-badge) th:first-child {
             border-left: 4px solid #ea580c !important; /* Orange left border */
         }
-        tr.fi-ta-group-header:has(.unassigned-badge) span,
-        tr.fi-ta-group-header:has(.unassigned-badge) button,
-        tr.fi-ta-group-header:has(.unassigned-badge) div {
+        tr[class*="group-header"]:has(.unassigned-badge) span,
+        tr[class*="group-header"]:has(.unassigned-badge) button,
+        tr[class*="group-header"]:has(.unassigned-badge) div {
             color: #9a3412 !important; /* Brownish-orange text for warning */
         }
         
-        .dark tr.fi-ta-group-header:has(.unassigned-badge),
-        .dark tr.fi-ta-group-header:has(.unassigned-badge) td,
-        .dark tr.fi-ta-group-header:has(.unassigned-badge) th {
+        .dark tr[class*="group-header"]:has(.unassigned-badge),
+        .dark tr[class*="group-header"]:has(.unassigned-badge) td,
+        .dark tr[class*="group-header"]:has(.unassigned-badge) th {
             background-color: #451a03 !important; /* Dark amber/brown warning */
             border-bottom: 1px solid #78350f !important;
             border-top: 1px solid #78350f !important;
         }
-        .dark tr.fi-ta-group-header:has(.unassigned-badge) td:first-child,
-        .dark tr.fi-ta-group-header:has(.unassigned-badge) th:first-child {
+        .dark tr[class*="group-header"]:has(.unassigned-badge) td:first-child,
+        .dark tr[class*="group-header"]:has(.unassigned-badge) th:first-child {
             border-left: 4px solid #ea580c !important;
         }
-        .dark tr.fi-ta-group-header:has(.unassigned-badge) span,
-        .dark tr.fi-ta-group-header:has(.unassigned-badge) button,
-        .dark tr.fi-ta-group-header:has(.unassigned-badge) div {
+        .dark tr[class*="group-header"]:has(.unassigned-badge) span,
+        .dark tr[class*="group-header"]:has(.unassigned-badge) button,
+        .dark tr[class*="group-header"]:has(.unassigned-badge) div {
             color: #ffedd5 !important;
         }
 
