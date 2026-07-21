@@ -439,11 +439,8 @@ class ControlProduksiResource extends Resource
                                 . '<span style="font-size:13px;color:#166534;font-weight:500;">Produksi Selesai</span>'
                                 . '</div>';
                         } else {
-                            // WO di tahap produksi (nama tahap)
-                            $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;display:flex;align-items:center;gap:10px;">'
-                                . '<span style="font-size:18px;">🔨</span>'
-                                . '<span style="font-size:13px;color:#1e40af;font-weight:500;">Sedang di tahap: <strong>' . htmlspecialchars($woStatus) . '</strong></span>'
-                                . '</div>';
+                            // Info tahap produksi tidak memerlukan banner khusus karena sudah jelas di tabel tugas
+                            $woBannerHtml = '';
                         }
 
                         // ─── Banner desain ───────────────────────────────────────
