@@ -378,12 +378,30 @@ class ControlProduksiResource extends Resource
                                 default => '',
                             };
 
+                            // Check if this task is eligible for QC Review action by Admin:
+                            $showQcActions = false;
+                            if ($task->status === 'done' && !$task->qc_approved) {
+                                if ($woStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW && $workOrder->current_review_stage === $task->stage_name) {
+                                    $showQcActions = true;
+                                } elseif ($woStatus === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
+                                    $showQcActions = true;
+                                }
+                            }
+
                             if (!$isUnlocked) {
                                 $actionBtn = '<span style="color:#9ca3af;font-size:12px">🔒 Menunggu tahap sebelumnya</span>';
                             } elseif ($task->status === 'pending') {
                                 $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'start', 'item' => $record->id]) . '" style="background:#2563eb;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">▶ Mulai</a>';
                             } elseif ($task->status === 'in_progress') {
                                 $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'done', 'item' => $record->id]) . '" style="background:#059669;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✓ Tandai Selesai</a>';
+                            } elseif ($showQcActions) {
+                                $approveUrl = route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'approve', 'item' => $record->id]);
+                                $rejectUrl = route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'reject', 'item' => $record->id]);
+                                
+                                $actionBtn = '<div style="display:flex;gap:6px;justify-content:flex-end;">'
+                                    . '<a href="' . $approveUrl . '" style="background:#059669;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Setujui</a>'
+                                    . '<a href="javascript:void(0)" onclick="const reason = prompt(\'Masukkan alasan revisi:\'); if(reason) { window.location.href = \'' . $rejectUrl . '?reason=\' + encodeURIComponent(reason); }" style="background:#dc2626;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">❌ Revisi</a>'
+                                    . '</div>';
                             } else {
                                 $actionBtn = '<span style="color:#6b7280;font-size:12px">Selesai</span>';
                             }
@@ -494,71 +512,7 @@ class ControlProduksiResource extends Resource
                         // Update status dilakukan via dedicated route (link tombol per baris)
                     }),
 
-                // QC Review Reject Action - only visible when WO is in QC_REVIEW
-                Action::make('qc_revisi')
-                    ->label('🔧 QC Revisi')
-                    ->icon('heroicon-o-arrow-uturn-left')
-                    ->color('danger')
-                    ->visible(function (OrderItem $record) {
-                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->first();
-                        return $wo && $wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW;
-                    })
-                    ->form([
-                        \Filament\Forms\Components\Textarea::make('reject_reason')
-                            ->label('Alasan Revisi')
-                            ->placeholder('Tuliskan alasan revisi...')
-                            ->required()
-                            ->rows(3),
-                    ])
-                    ->action(function (array $data, OrderItem $record) {
-                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->first();
 
-                        if (!$wo) {
-                            Notification::make()->title('Work Order tidak ditemukan')->danger()->send();
-                            return;
-                        }
-
-                        app(\App\Services\WorkOrderService::class)->rejectQC($wo->id, $data['reject_reason']);
-
-                        // Mark task back to pending for revision
-                        $prevStage = $wo->current_review_stage;
-                        if ($prevStage) {
-                            $task = \App\Models\ProductionTask::withoutGlobalScopes()
-                                ->where('order_item_id', $wo->order_item_id)
-                                ->where('stage_name', $prevStage)
-                                ->first();
-                            if ($task) {
-                                $task->update([
-                                    'status' => 'pending',
-                                    'completed_at' => null,
-                                    'is_revision' => true,
-                                ]);
-                            }
-                        }
-
-                        // Sync order status
-                        $order = $record->order;
-                        if ($order) {
-                            $allGroupIds = $order->orderItems()->pluck('id');
-                            $wos = \App\Models\WorkOrder::withoutGlobalScopes()
-                                ->whereIn('order_item_id', $allGroupIds)
-                                ->get();
-                            $anyInProgress = $wos->some(fn($w) => !$w->isCompleted() && $w->status !== \App\Models\WorkOrder::STATUS_CREATED);
-                            $order->update(['status' => $anyInProgress ? 'diproses' : 'antrian']);
-                        }
-
-                        Notification::make()
-                            ->title('Revisi Dikirim')
-                            ->body('Pekerja akan memperbaiki pekerjaan di tahap ' . str_replace('_', ' ', $prevStage ?? '-'))
-                            ->success()
-                            ->send();
-                    }),
 
                 Action::make('cetak_spk')
                     ->label('Cetak SPK')

@@ -58,6 +58,11 @@ class TaskActionController extends Controller
                 $woId = $this->getWorkOrderId($orderItem);
                 $service->advance($woId);
             }
+        } elseif ($action === 'approve') {
+            $service->approveTask($task->id);
+        } elseif ($action === 'reject') {
+            $reason = $request->query('reason', 'Revisi dari Admin');
+            $service->rejectTask($task->id, $reason);
         } else {
             abort(400, 'Aksi tidak dikenal.');
         }

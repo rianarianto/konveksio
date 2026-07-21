@@ -241,7 +241,17 @@ class WorkOrderService
                 ->first();
 
             if ($wo) {
-                $wo->update(['reject_reason' => $reason]);
+                $wo->update([
+                    'reject_reason' => $reason,
+                ]);
+
+                if ($wo->status === WorkOrder::STATUS_QC_REVIEW || $wo->status === WorkOrder::STATUS_QC_AKHIR) {
+                    $wo->update([
+                        'status' => $task->stage_name,
+                        'current_review_stage' => null,
+                        'stage_entered_at' => now(),
+                    ]);
+                }
                 $worker = \App\Models\Worker::find($task->assigned_to);
                 if ($worker && $worker->phone) {
                     $link = url("/tugas?wo_id={$wo->id}&token={$wo->token}&wt={$worker->portal_token}");
