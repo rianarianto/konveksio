@@ -1379,7 +1379,7 @@ class AturTugasProduksi extends Page
                     ->where('order_item_id', $item->id)
                     ->where('stage_name', 'QC_PERSIAPAN')
                     ->first();
-                if ($qcTask && $qcTask->status === 'pending' && $workOrder->status !== \App\Models\WorkOrder::STATUS_QC_PREP) {
+                if ($qcTask && in_array($qcTask->status, ['pending', 'in_progress']) && $workOrder->status !== \App\Models\WorkOrder::STATUS_QC_PREP) {
                     $workOrder->update([
                         'status' => \App\Models\WorkOrder::STATUS_QC_PREP,
                         'stage_entered_at' => now(),

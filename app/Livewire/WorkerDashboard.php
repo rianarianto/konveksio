@@ -214,10 +214,16 @@ class WorkerDashboard extends Component
             $wo->update(['started_at' => now()]);
         }
 
-        // Directly update THIS specific task to in_progress
-        // (avoids bug where startTask() picks wrong worker's task in multi-worker stage)
         if ($task->status === 'pending') {
             $task->update(['status' => 'in_progress']);
+        }
+
+        // Jika ini QC_PERSIAPAN, pastikan status WO diset ke QC_PREP
+        if ($task->stage_name === 'QC_PERSIAPAN' && $wo->status !== WorkOrder::STATUS_QC_PREP) {
+            $wo->update([
+                'status' => WorkOrder::STATUS_QC_PREP,
+                'stage_entered_at' => now(),
+            ]);
         }
 
         $this->syncOrderStatus($wo);
@@ -307,6 +313,9 @@ class WorkerDashboard extends Component
 
         $stages = $wo->stage_sequence ?? [];
         $currentIdx = array_search($wo->status, $stages);
+        if ($wo->status === WorkOrder::STATUS_COMPLETED) {
+            $currentIdx = count($stages);
+        }
         $taskIdx = array_search($task->stage_name, $stages);
 
         $progress = [];

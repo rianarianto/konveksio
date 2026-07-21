@@ -36,8 +36,8 @@ class TaskActionController extends Controller
                 if (!$wo->started_at) {
                     $wo->update(['started_at' => now()]);
                 }
-                // Jika status WO masih CREATED dan ini QC_PERSIAPAN, majukan ke QC_PREP
-                if ($task->stage_name === 'QC_PERSIAPAN' && $wo->status === \App\Models\WorkOrder::STATUS_CREATED) {
+                // Jika ini QC_PERSIAPAN, pastikan status WO diset ke QC_PREP
+                if ($task->stage_name === 'QC_PERSIAPAN' && $wo->status !== \App\Models\WorkOrder::STATUS_QC_PREP) {
                     $wo->update([
                         'status' => \App\Models\WorkOrder::STATUS_QC_PREP,
                         'stage_entered_at' => now(),
