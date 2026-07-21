@@ -1359,10 +1359,10 @@ class AturTugasProduksi extends Page
                         'started_at' => now(),
                     ]);
                 }
-            } else {
+            } elseif (empty($workOrder->status)) {
                 // Jika status kosong atau null karena instansiasi baru, fallback ke default dari getNextStatus()
                 $nextStatus = $workOrder->getNextStatus();
-                if ($nextStatus && $workOrder->status !== $nextStatus) {
+                if ($nextStatus) {
                     $workOrder->update([
                         'status' => $nextStatus,
                         'stage_entered_at' => now(),
