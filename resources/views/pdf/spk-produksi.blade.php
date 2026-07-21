@@ -377,7 +377,7 @@
                         <td>
                             @if($task->description)
                                 @php
-                                    $lines = explode("\n", $task->description);
+                                     $lines = explode("\n", str_replace('TANPA_UKURAN', 'Tanpa Ukuran', $task->description));
                                 @endphp
                                 @foreach($lines as $line)
                                     @if(str_starts_with(trim($line), 'Pembagian Ukuran:') || str_starts_with(trim($line), 'Baju Custom:'))

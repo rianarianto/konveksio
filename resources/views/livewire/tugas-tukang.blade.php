@@ -393,7 +393,7 @@
         @endif
 
         @php
-            $rawText = $myTask->description ?: $defaultInstructions;
+            $rawText = str_replace('TANPA_UKURAN', 'Tanpa Ukuran', $myTask->description ?: $defaultInstructions);
             $hasCustom = !empty($taskCustomRecipients);
 
             $isQcTask = in_array(strtoupper($myTask->stage_name ?? ''), ['QC_PREP', 'QC_PERSIAPAN', 'QC_AKHIR']) || str_starts_with(strtoupper($myTask->stage_name ?? ''), 'QC_');
