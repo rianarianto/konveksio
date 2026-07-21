@@ -284,7 +284,7 @@
                     </td>
                     <td>
                         @foreach($group['sizes'] as $sz => $q)
-                            <div class="size-badge">{{ $sz }}:<strong>{{ $q }}</strong></div>
+                            <div class="size-badge">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}:<strong>{{ $q }}</strong></div>
                         @endforeach
                     </td>
                     <td style="text-align: center; font-weight: bold; font-size: 10pt;">{{ $group['total_qty'] }}</td>
@@ -317,7 +317,7 @@
                     @if(!empty($rec['standard']))
                         @foreach($rec['standard'] as $sz => $names)
                             <div style="font-size: 7.5pt; margin-bottom: 2px;">
-                                <strong style="background: #f3e8ff; padding: 0 4px; border-radius: 2px; color: #7c3aed;">{{ $sz }}</strong>: {{ implode(', ', $names) }}
+                                <strong style="background: #f3e8ff; padding: 0 4px; border-radius: 2px; color: #7c3aed;">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}</strong>: {{ implode(', ', $names) }}
                             </div>
                         @endforeach
                     @endif
@@ -369,7 +369,7 @@
                             <div style="font-size: 7.5pt; color: #444; margin-top: 2px;">
                                 @if(!empty($task->size_quantities))
                                     @foreach($task->size_quantities as $sz => $q)
-                                        @if(!str_starts_with($sz, '_') && $q > 0) {{ $sz }}:{{ $q }}{{ !$loop->last ? ',' : '' }} @endif
+                                        @if(!str_starts_with($sz, '_') && $q > 0) {{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}:{{ $q }}{{ !$loop->last ? ',' : '' }} @endif
                                     @endforeach
                                 @else - @endif
                             </div>

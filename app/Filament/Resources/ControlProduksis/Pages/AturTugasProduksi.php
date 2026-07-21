@@ -1181,15 +1181,16 @@ class AturTugasProduksi extends Page
                 $autoDesc = [];
                 $cleanSizes = array_filter($sizeQuantities, fn($k) => !str_starts_with($k, '_'), ARRAY_FILTER_USE_KEY);
                 foreach ($cleanSizes as $sz => $sqty) {
+                    $szDisplay = $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz;
                     $szGenders = $workerGenders[$sz] ?? [];
                     if (!empty($szGenders)) {
                         $gStrings = [];
                         foreach ($szGenders as $gLabel => $gQty) {
                             $gStrings[] = ($gLabel === 'P' ? 'Perempuan' : 'Laki-laki') . ': ' . $gQty;
                         }
-                        $autoDesc[] = $sz . ' (' . implode(', ', $gStrings) . ')';
+                        $autoDesc[] = $szDisplay . ' (' . implode(', ', $gStrings) . ')';
                     } else {
-                        $autoDesc[] = $sz . ': ' . $sqty;
+                        $autoDesc[] = $szDisplay . ': ' . $sqty;
                     }
                 }
 
@@ -1313,7 +1314,8 @@ class AturTugasProduksi extends Page
 
                 $sizeBreakdown = [];
                 foreach ($groupSizeQuantities as $sz => $q) {
-                    $sizeBreakdown[] = "{$sz} ({$q})";
+                    $displaySz = $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz;
+                    $sizeBreakdown[] = "{$displaySz} ({$q})";
                 }
                 $qcDesc = 'Pembagian Ukuran: ' . implode(' | ', $sizeBreakdown);
                 if (!empty($customNames)) {

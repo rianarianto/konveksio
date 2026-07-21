@@ -625,7 +625,7 @@
                     <thead>
                         <tr style="background: #F9FAFB; font-weight: bold; border-bottom: 1px solid #E5E7EB; color: #374151;">
                             @foreach($group['sizes'] as $sz => $q)
-                                <th style="padding: 6px; border-right: 1px solid #E5E7EB; font-weight: bold;">{{ $sz }}</th>
+                                <th style="padding: 6px; border-right: 1px solid #E5E7EB; font-weight: bold;">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}</th>
                             @endforeach
                             <th style="padding: 6px; background: #F3EEFF; color: #7F00FF; font-weight: bold;">TOTAL</th>
                         </tr>

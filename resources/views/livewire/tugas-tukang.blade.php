@@ -346,7 +346,7 @@
                     @foreach($myTask->size_quantities as $sz => $qty)
                         @if(!str_starts_with($sz, '_') && $qty > 0)
                         <div class="size-chip size-chip-sm">
-                            <span class="size-label">{{ $sz }}</span>
+                            <span class="size-label">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}</span>
                             <span class="size-qty">{{ $qty }}</span>
                         </div>
                         @endif
@@ -586,7 +586,7 @@
         <div class="size-grid">
             @foreach($group['sizes'] as $sz => $qty)
             <div class="size-chip">
-                <span class="size-label">{{ $sz }}</span>
+                <span class="size-label">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}</span>
                 <span class="size-qty">{{ $qty }}</span>
             </div>
             @endforeach
@@ -599,7 +599,7 @@
             <div class="recipients-title">👤 Nama Penerima</div>
             @foreach($group['recipients']['standard'] as $sz => $names)
             <div class="recipient-row">
-                <span class="recipient-size">{{ $sz }}</span>
+                <span class="recipient-size">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}</span>
                 <span class="recipient-names">{{ implode(', ', $names) }}</span>
             </div>
             @endforeach
