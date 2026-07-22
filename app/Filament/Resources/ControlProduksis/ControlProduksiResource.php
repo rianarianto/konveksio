@@ -138,16 +138,16 @@ class ControlProduksiResource extends Resource
                             if ($hasCustom && $hasStandard) {
                                 $suffix = ' (Standar & Custom)';
                             } elseif ($hasCustom) {
-                                $suffix = ' (Ukur Badan)';
+                                $suffix = ' (Custom)';
                             } else {
-                                $suffix = ' (Size Toko)';
+                                $suffix = ' (Standar)';
                             }
                         }
                         
                         return $record->product_name . $suffix;
                     })
                     ->description(fn(OrderItem $record): string => match ($record->production_category) {
-                        'custom' => '🧵 Produksi (Ukur Badan)',
+                        'custom' => '🧵 Produksi (Custom)',
                         'non_produksi' => '📦 Non-Produksi',
                         'jasa' => '🔧 Jasa',
                         default => '🏭 Produksi',
@@ -259,7 +259,7 @@ class ControlProduksiResource extends Resource
                 TableGroup::make('production_category')
                     ->label('Kategori Pesanan')
                     ->getTitleFromRecordUsing(fn(OrderItem $record): string => match ($record->production_category) {
-                        'custom' => '🧵 Produksi (Ukur Badan)',
+                        'custom' => '🧵 Produksi (Custom)',
                         'non_produksi' => '📦 Non-Produksi',
                         'jasa' => '🔧 Jasa',
                         default => '🏭 Produksi',
