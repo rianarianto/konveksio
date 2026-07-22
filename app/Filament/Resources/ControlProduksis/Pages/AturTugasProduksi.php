@@ -437,38 +437,35 @@ class AturTugasProduksi extends Page
                                                             $workers[$wKey]['_custom_recipients'] = [];
                                                         }
 
-                                                        // 3. Algoritma Greedy Bin-Packing — ukuran TIDAK BOLEH dipecah
-                                                        //    Urutkan ukuran dari yang terbesar (agar distribusi lebih merata)
-                                                        $stdSizes = $standardSizes;
-                                                        arsort($stdSizes); // dari terbesar ke terkecil
+                                                        // 3. Distribusikan qty setiap ukuran standar secara merata ke semua worker
+                                                        foreach ($standardSizes as $sz => $qty) {
+                                                            $baseQty = floor($qty / $numWorkers);
+                                                            $remainder = $qty % $numWorkers;
 
-                                                        // Lacak beban setiap worker dalam array sederhana
-                                                        $workerLoad = array_fill_keys($workerKeys, 0);
-
-                                                        foreach ($stdSizes as $sz => $qty) {
-                                                            // Temukan worker dengan beban paling ringan
-                                                            $lightestKey = null;
-                                                            $lightestLoad = PHP_INT_MAX;
-                                                            foreach ($workerKeys as $wKey) {
-                                                                if ($workerLoad[$wKey] < $lightestLoad) {
-                                                                    $lightestLoad = $workerLoad[$wKey];
-                                                                    $lightestKey  = $wKey;
-                                                                }
+                                                            foreach ($workerKeys as $idx => $wKey) {
+                                                                $allocated = $baseQty + ($idx < $remainder ? 1 : 0);
+                                                                $workers[$wKey][$sz] = $allocated;
+                                                                $workers[$wKey]['quantity'] += $allocated;
                                                             }
-
-                                                            // Masukkan ukuran ini secara utuh ke worker terpilih
-                                                            $workers[$lightestKey][$sz]        = $qty;
-                                                            $workers[$lightestKey]['quantity'] += $qty;
-                                                            $workerLoad[$lightestKey]          += $qty;
                                                         }
 
-                                                        // 4. Alokasikan CUSTOM ke worker dengan beban PALING RINGAN setelah distribusi standar
+                                                        // 4. Distribusikan CUSTOM secara merata ke semua worker
                                                         if ($customQtyTotal > 0) {
-                                                            $lightestKey  = array_keys($workerLoad, min($workerLoad))[0];
-                                                            $workers[$lightestKey]['CUSTOM']              = $customQtyTotal;
-                                                            $workers[$lightestKey]['quantity']            += $customQtyTotal;
-                                                            $workers[$lightestKey]['_custom_recipients']  = $customNames;
-                                                            $workerLoad[$lightestKey]                     += $customQtyTotal;
+                                                            $baseQty = floor($customQtyTotal / $numWorkers);
+                                                            $remainder = $customQtyTotal % $numWorkers;
+
+                                                            // Bagi customNames ke masing-masing worker
+                                                            $customOffset = 0;
+                                                            foreach ($workerKeys as $idx => $wKey) {
+                                                                $allocated = $baseQty + ($idx < $remainder ? 1 : 0);
+                                                                $workers[$wKey]['CUSTOM'] = $allocated;
+                                                                $workers[$wKey]['quantity'] += $allocated;
+                                                                
+                                                                if ($allocated > 0) {
+                                                                    $workers[$wKey]['_custom_recipients'] = array_slice($customNames, $customOffset, $allocated);
+                                                                    $customOffset += $allocated;
+                                                                }
+                                                            }
                                                         }
 
                                                         // 5. Bersihkan nilai 0 → null agar UI tetap rapi
@@ -483,7 +480,7 @@ class AturTugasProduksi extends Page
                                                         $set('workers', $workers);
                                                         \Filament\Notifications\Notification::make()
                                                             ->title('Tugas Terbagi')
-                                                            ->body('Setiap ukuran dialokasikan utuh ke satu pekerja.')
+                                                            ->body('Kuantitas setiap ukuran telah dibagi rata ke seluruh pekerja.')
                                                             ->success()
                                                             ->send();
                                                     })
