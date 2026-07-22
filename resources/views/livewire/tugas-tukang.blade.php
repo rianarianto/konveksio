@@ -329,6 +329,11 @@
 
     <div class="section-title-bar">🔧 TUGAS KAMU</div>
     <div class="card card-task-highlight">
+        @if(!empty($myTask->note))
+        <div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 10px; margin-bottom: 12px; font-size: 13px; color: #991b1b; font-weight: 600;">
+            {{ $myTask->note }}
+        </div>
+        @endif
         <div class="task-detail-row">
             <div class="task-detail-label">Tahap</div>
             <div class="task-detail-value">{{ strtoupper(str_replace('_', ' ', $myTask->stage_name)) }}</div>

@@ -1051,6 +1051,7 @@ class OrderResource extends Resource
                         ->icon('heroicon-o-arrow-path')
                         ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
                         ->action(function (Order $record, array $data): void {
+                            $data['shop_id'] = $record->shop_id;
                             $record->returns()->create($data);
                             Notification::make()
                                 ->title('Retur Berhasil Dicatat')

@@ -18,11 +18,17 @@ class OrderReturn extends Model
         'status', // pending, diproses, selesai
         'action_type',
         'target_stage',
+        'responsibility_type', // store_guarantee, customer_paid
+        'additional_fee',
+        'size_breakdown',
+        'photo_path',
     ];
 
     protected $casts = [
         'return_date' => 'date',
         'quantity' => 'integer',
+        'additional_fee' => 'decimal:2',
+        'size_breakdown' => 'array',
     ];
 
     public function order(): BelongsTo
@@ -47,6 +53,10 @@ class OrderReturn extends Model
             if (!$item) return;
 
             $wo = $item->workOrder;
+            $isCustomerPaid = $return->responsibility_type === 'customer_paid';
+
+            // Size Breakdown untuk Task (Array [size => qty] atau custom recipients)
+            $taskSizeQty = !empty($return->size_breakdown) ? $return->size_breakdown : null;
 
             if ($return->action_type === 'repair') {
                 $stageName = match($return->target_stage) {
@@ -63,39 +73,51 @@ class OrderReturn extends Model
                     ->latest('id')
                     ->first();
 
+                $originalWagePerPcs = 0;
+                if ($task && $task->quantity > 0) {
+                    $originalWagePerPcs = $task->wage_amount / $task->quantity;
+                }
+
+                $repairWage = $isCustomerPaid ? ($originalWagePerPcs * $return->quantity) : 0;
+
                 if ($task) {
-                    if ($task->is_paid) {
-                        // If already paid, create a new revision task with 0 wage
+                    if ($task->is_paid || $isCustomerPaid) {
+                        // If already paid OR paid by customer, create a new revision task
                         \App\Models\ProductionTask::create([
                             'shop_id' => $return->shop_id,
                             'order_item_id' => $item->id,
                             'stage_name' => $stageName,
                             'quantity' => $return->quantity,
-                            'wage_amount' => 0,
+                            'wage_amount' => $repairWage,
                             'status' => 'pending',
                             'is_revision' => true,
                             'assigned_to' => $task->assigned_to,
-                            'note' => 'REVISI RETUR (Paid): ' . $return->reason,
+                            'size_quantities' => $taskSizeQty,
+                            'note' => '⚠️ REVISI RETUR (' . ($isCustomerPaid ? 'Berbayar' : 'Garansi') . '): ' . $return->reason,
                         ]);
                     } else {
                         // Reset status to pending for redo
                         $task->update([
                             'status' => 'pending',
                             'is_revision' => true,
-                            'note' => ($task->note ? $task->note . ' | ' : '') . 'REVISI RETUR: ' . $return->reason,
+                            'quantity' => $return->quantity,
+                            'wage_amount' => 0,
+                            'size_quantities' => $taskSizeQty,
+                            'note' => ($task->note ? $task->note . ' | ' : '') . '⚠️ REVISI RETUR: ' . $return->reason,
                         ]);
                     }
                 } else {
-                    // Create new task with 0 wage
+                    // Create new task
                     \App\Models\ProductionTask::create([
                         'shop_id' => $return->shop_id,
                         'order_item_id' => $item->id,
                         'stage_name' => $stageName,
                         'quantity' => $return->quantity,
-                        'wage_amount' => 0,
+                        'wage_amount' => $repairWage,
                         'status' => 'pending',
                         'is_revision' => true,
-                        'note' => 'REVISI RETUR (New): ' . $return->reason,
+                        'size_quantities' => $taskSizeQty,
+                        'note' => '⚠️ REVISI RETUR (New): ' . $return->reason,
                     ]);
                 }
 
@@ -128,7 +150,8 @@ class OrderReturn extends Model
                         'quantity' => $return->quantity,
                         'wage_amount' => $wagePerPcs * $return->quantity,
                         'status' => 'pending',
-                        'note' => 'REMAKE RETUR: ' . $return->reason,
+                        'size_quantities' => $taskSizeQty,
+                        'note' => '⚠️ REMAKE RETUR: ' . $return->reason,
                     ]);
                 }
 
@@ -143,10 +166,17 @@ class OrderReturn extends Model
                 }
             }
 
-            // Revert Order status to 'diproses' if it was 'selesai' or 'siap_diambil'
+            // Handles additional fee if customer paid
             $order = $item->order;
-            if ($order && in_array($order->status, ['selesai', 'siap_diambil'])) {
-                $order->update(['status' => 'diproses']);
+            if ($order) {
+                if ($isCustomerPaid && $return->additional_fee > 0) {
+                    $order->increment('total_amount', $return->additional_fee);
+                }
+                
+                // Revert Order status to 'diproses' if it was 'selesai' or 'siap_diambil'
+                if (in_array($order->status, ['selesai', 'siap_diambil'])) {
+                    $order->update(['status' => 'diproses']);
+                }
             }
         });
     }

@@ -90,6 +90,9 @@ class WorkOrderService
             // Catat waktu selesai saat mencapai COMPLETED
             if ($nextStatus === WorkOrder::STATUS_COMPLETED) {
                 $updateData['completed_at'] = $now;
+                \App\Models\OrderReturn::where('order_item_id', $wo->order_item_id)
+                    ->whereIn('status', ['pending', 'diproses'])
+                    ->update(['status' => 'selesai']);
             }
 
             // Update current_stage_index
