@@ -282,7 +282,7 @@ class WorkOrderService
      */
     public function approveQC(int $woId): WorkOrder
     {
-        return $this->advance($woId);
+        return $this->advance($woId, true);
     }
 
     /**

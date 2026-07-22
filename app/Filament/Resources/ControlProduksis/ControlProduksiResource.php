@@ -388,13 +388,7 @@ class ControlProduksiResource extends Resource
                                 }
                             }
 
-                            if (!$isUnlocked) {
-                                $actionBtn = '<span style="color:#9ca3af;font-size:12px">🔒 Menunggu tahap sebelumnya</span>';
-                            } elseif ($task->status === 'pending') {
-                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'start', 'item' => $record->id]) . '" style="background:#2563eb;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">▶ Mulai</a>';
-                            } elseif ($task->status === 'in_progress') {
-                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'done', 'item' => $record->id]) . '" style="background:#059669;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✓ Tandai Selesai</a>';
-                            } elseif ($showQcActions) {
+                            if ($showQcActions) {
                                 $approveUrl = route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'approve', 'item' => $record->id]);
                                 $rejectUrl = route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'reject', 'item' => $record->id]);
                                 
@@ -402,6 +396,12 @@ class ControlProduksiResource extends Resource
                                     . '<a href="' . $approveUrl . '" style="background:#059669;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Setujui</a>'
                                     . '<a href="javascript:void(0)" onclick="const reason = prompt(\'Masukkan alasan revisi:\'); if(reason) { window.location.href = \'' . $rejectUrl . '?reason=\' + encodeURIComponent(reason); }" style="background:#dc2626;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">❌ Revisi</a>'
                                     . '</div>';
+                            } elseif (!$isUnlocked) {
+                                $actionBtn = '<span style="color:#9ca3af;font-size:12px">🔒 Menunggu tahap sebelumnya</span>';
+                            } elseif ($task->status === 'pending') {
+                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'start', 'item' => $record->id]) . '" style="background:#2563eb;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">▶ Mulai</a>';
+                            } elseif ($task->status === 'in_progress') {
+                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'done', 'item' => $record->id]) . '" style="background:#059669;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✓ Tandai Selesai</a>';
                             } else {
                                 $actionBtn = '<span style="color:#6b7280;font-size:12px">Selesai</span>';
                             }
