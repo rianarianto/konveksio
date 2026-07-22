@@ -268,7 +268,7 @@
             </div>
             <div class="info-item">
                 <span class="info-label">Produk</span>
-                <span class="info-value">{{ $orderItem?->product_name ?? '-' }}</span>
+                <span class="info-value">{{ $orderItem?->product_name ?? '-' }} @if($orderItem?->is_addition)<span style="background:#f59e0b;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-left:4px;display:inline-block;">➕ ITEM TAMBAHAN</span>@endif</span>
             </div>
             <div class="info-item">
                 <span class="info-label">Pelanggan</span>

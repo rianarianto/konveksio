@@ -149,4 +149,32 @@ class Order extends Model
     {
         return $this->hasMany(OrderReturn::class);
     }
+
+    /**
+     * Check if this order has started production in any of its WorkOrders.
+     */
+    public function hasStartedProduction(): bool
+    {
+        $itemIds = $this->orderItems()->pluck('id');
+        $wos = WorkOrder::withoutGlobalScopes()
+            ->whereIn('order_item_id', $itemIds)
+            ->get();
+        
+        foreach ($wos as $wo) {
+            if (!in_array($wo->status, [WorkOrder::STATUS_CREATED, WorkOrder::STATUS_QC_PREP])) {
+                return true;
+            }
+            if ($wo->status === WorkOrder::STATUS_QC_PREP) {
+                $qcTask = ProductionTask::withoutGlobalScopes()
+                    ->where('order_item_id', $wo->order_item_id)
+                    ->where('stage_name', 'QC_PERSIAPAN')
+                    ->first();
+                if ($qcTask && $qcTask->status !== 'pending') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }

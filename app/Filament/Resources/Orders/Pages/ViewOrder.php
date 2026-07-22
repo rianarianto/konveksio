@@ -16,7 +16,6 @@ class ViewOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make(),
             Action::make('deliver_order')
                 ->label('Serahkan Pesanan')
                 ->icon('heroicon-o-check-circle')

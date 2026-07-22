@@ -28,6 +28,7 @@ class ProductionControlRelationManager extends RelationManager
                 TextColumn::make('product_name')
                     ->label('Produk')
                     ->weight('bold')
+                    ->formatStateUsing(fn ($state, OrderItem $record) => $state . ($record->is_addition ? ' ➕ [Item Tambahan]' : ''))
                     ->description(fn(OrderItem $record): string => match ($record->production_category) {
                         'custom' => '🧵 Produksi (Custom)',
                         'non_produksi' => '📦 Non-Produksi',

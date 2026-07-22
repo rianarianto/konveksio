@@ -144,7 +144,8 @@ class ControlProduksiResource extends Resource
                             }
                         }
                         
-                        return $record->product_name . $suffix;
+                        $additionTag = $record->is_addition ? ' ➕ [Item Tambahan]' : '';
+                        return $record->product_name . $suffix . $additionTag;
                     })
                     ->description(fn(OrderItem $record): string => match ($record->production_category) {
                         'custom' => '🧵 Produksi (Custom)',

@@ -24,6 +24,7 @@ class OrderItem extends Model
         'size_and_request_details',
         'design_status',
         'design_image',
+        'is_addition',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class OrderItem extends Model
         'quantity' => 'integer',
         'price' => 'integer',
         'design_status' => 'string',
+        'is_addition' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -334,6 +336,38 @@ class OrderItem extends Model
     {
         return self::where('order_id', $this->order_id)
             ->where('product_name', $this->product_name)
+            ->where('is_addition', $this->is_addition ?? false)
             ->get();
+    }
+
+    /**
+     * Check if this item can still be edited or deleted by Admin/Owner.
+     * Locked once production has started (WorkOrder status is not CREATED or QC_PERSIAPAN has started).
+     */
+    public function canBeEdited(): bool
+    {
+        $wo = $this->workOrder;
+        if (!$wo) {
+            return true;
+        }
+
+        // If WO is in CREATED status, it can be edited
+        if ($wo->status === WorkOrder::STATUS_CREATED) {
+            return true;
+        }
+
+        // If WO is in QC_PREP status, check if QC_PERSIAPAN task has started
+        if ($wo->status === WorkOrder::STATUS_QC_PREP) {
+            $qcTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->where('order_item_id', $this->id)
+                ->where('stage_name', 'QC_PERSIAPAN')
+                ->first();
+            
+            // If QC_PERSIAPAN task is pending or doesn't exist yet, it can be edited
+            return !$qcTask || $qcTask->status === 'pending';
+        }
+
+        // Otherwise, production has started (Potong, Jahit, Sablon, QC_REVIEW, etc.) -> locked!
+        return false;
     }
 }

@@ -14,12 +14,17 @@ class OrderItemObserver
      */
     public function creating(OrderItem $item): void
     {
+        // Auto-mark as additional item if the order has already started production
+        if ($item->order && $item->order->hasStartedProduction()) {
+            $item->is_addition = true;
+        }
+
         $existingApproved = OrderItem::where('order_id', $item->order_id)
             ->where('product_name', $item->product_name)
             ->where('design_status', 'approved')
             ->first();
 
-        if ($existingApproved) {
+        if ($existingApproved && !$item->is_addition) {
             $item->design_status = 'approved';
             $item->design_image = $existingApproved->design_image;
         }
