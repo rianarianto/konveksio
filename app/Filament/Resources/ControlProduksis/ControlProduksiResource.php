@@ -328,7 +328,12 @@ class ControlProduksiResource extends Resource
                         // Tentukan stage mana yang "current" berdasarkan WO
                         $currentWoStage = null;
                         // QC_PERSIAPAN is also a QC stage (WO status might be 'QC_PERSIAPAN' from stage_sequence)
-                        $isWoInQcStage = in_array($woStatus, [\App\Models\WorkOrder::STATUS_QC_PREP, \App\Models\WorkOrder::STATUS_QC_REVIEW, 'QC_PERSIAPAN']);
+                        $isWoInQcStage = in_array($woStatus, [
+                            \App\Models\WorkOrder::STATUS_QC_PREP,
+                            \App\Models\WorkOrder::STATUS_QC_REVIEW,
+                            \App\Models\WorkOrder::STATUS_QC_AKHIR,
+                            'QC_PERSIAPAN'
+                        ]);
                         $isWoCompleted = $woStatus === \App\Models\WorkOrder::STATUS_COMPLETED;
                         $isWoCreated = $woStatus === \App\Models\WorkOrder::STATUS_CREATED;
 
@@ -451,6 +456,13 @@ class ControlProduksiResource extends Resource
                                 . '<span style="font-size:18px;">⚙️</span>'
                                 . '<span style="font-size:13px;color:#9a3412;font-weight:500;flex:1;">QC ' . htmlspecialchars($reviewStage) . ' - menunggu verifikasi</span>'
                                 . '<a href="' . $approveUrl . '" style="background:#ea580c;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Approve</a>'
+                                . '</div>';
+                        } elseif ($woStatus === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
+                            $approveUrl = route('filament.admin.resources.control-produksis.wo-action', ['action' => 'approve_qc', 'item' => $itemId]);
+                            $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;display:flex;align-items:center;gap:10px;">'
+                                . '<span style="font-size:18px;">🏁</span>'
+                                . '<span style="font-size:13px;color:#166534;font-weight:500;flex:1;">QC Akhir - Menunggu Verifikasi Final</span>'
+                                . '<a href="' . $approveUrl . '" style="background:#16a34a;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Approve QC Akhir</a>'
                                 . '</div>';
                         } elseif ($isWoCompleted) {
                             $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;display:flex;align-items:center;gap:10px;">'
