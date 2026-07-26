@@ -75,7 +75,8 @@ class EditOrder extends EditRecord
                         ->send();
                 })
                 ->modalHeading('Catat Retur Pesanan')
-                ->modalSubmitActionLabel('Simpan'),
+                ->modalSubmitActionLabel('Simpan')
+                ->visible(fn(): bool => $this->record->status === 'selesai'),
             DeleteAction::make()
                 ->visible(fn() => auth()->user()->role === 'owner'),
         ];

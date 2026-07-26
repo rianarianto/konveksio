@@ -45,7 +45,8 @@ class ViewOrder extends ViewRecord
                         ->send();
                 })
                 ->modalHeading('Catat Retur Pesanan')
-                ->modalSubmitActionLabel('Simpan'),
+                ->modalSubmitActionLabel('Simpan')
+                ->visible(fn(): bool => $this->record->status === 'selesai'),
         ];
     }
 

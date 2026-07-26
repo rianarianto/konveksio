@@ -1038,7 +1038,7 @@ class OrderResource extends Resource
                         })
                         ->modalHeading('Catat Retur Pesanan')
                         ->modalSubmitActionLabel('Simpan Retur')
-                        ->visible(fn (Order $record): bool => in_array(auth()->user()->role, ['owner', 'admin']) && ($record->status === 'selesai' || $record->status === 'siap_diambil')),
+                        ->visible(fn (Order $record): bool => in_array(auth()->user()->role, ['owner', 'admin']) && $record->status === 'selesai'),
 
                     // Delete
                     \Filament\Actions\DeleteAction::make()
