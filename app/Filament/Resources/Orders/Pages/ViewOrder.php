@@ -20,34 +20,12 @@ class ViewOrder extends ViewRecord
                 ->label('Serahkan Pesanan')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
-                ->form([
-                    \Filament\Forms\Components\FileUpload::make('pickup_proof')
-                        ->label('Foto Bukti Pengambilan / Penyerahan')
-                        ->image()
-                        ->extraInputAttributes(['capture' => 'camera'])
-                        ->disk('public')
-                        ->directory('pickup-proofs')
-                        ->required(),
-                    \Filament\Forms\Components\Textarea::make('pickup_note')
-                        ->label('Catatan Penyerahan')
-                        ->rows(3)
-                        ->placeholder('Masukkan nama pengambil, kurir, atau info lainnya jika ada...'),
-                ])
+                ->form(\App\Filament\Resources\Orders\Schemas\OrderDeliveryForm::getComponents())
                 ->action(function (array $data): void {
-                    $this->record->update([
-                        'status' => 'selesai',
-                        'pickup_proof' => $data['pickup_proof'],
-                        'pickup_note' => $data['pickup_note'] ?? null,
-                        'pickup_at' => now(),
-                    ]);
-                    \Filament\Notifications\Notification::make()
-                        ->title('Pesanan Telah Diserahkan!')
-                        ->body("Pesanan #{$this->record->order_number} telah selesai dan diserahkan.")
-                        ->success()
-                        ->send();
+                    \App\Filament\Resources\Orders\Schemas\OrderDeliveryForm::processDelivery($this->record, $data);
                     $this->redirect(OrderResource::getUrl('view', ['record' => $this->record]));
                 })
-                ->visible(fn(): bool => $this->record->status === 'siap_diambil'),
+                ->visible(fn(): bool => \App\Filament\Resources\Orders\Schemas\OrderDeliveryForm::isVisible($this->record)),
             Action::make('print_receipt')
                 ->label('Cetak Kuitansi')
                 ->icon('heroicon-o-printer')

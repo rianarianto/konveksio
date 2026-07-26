@@ -34,11 +34,13 @@ class WorkOrder extends Model
         'has_qc_selesai',
         'qc_worker_id',
         'revision_return_stage',
+        'delivered_at',
     ];
 
     protected $casts = [
         'started_at'          => 'datetime',
         'completed_at'        => 'datetime',
+        'delivered_at'        => 'datetime',
         'stage_entered_at'    => 'datetime',
         'stage_sequence'      => 'array',
         'is_express'          => 'boolean',
@@ -138,6 +140,11 @@ class WorkOrder extends Model
     public function isCompleted(): bool
     {
         return $this->status === self::STATUS_COMPLETED;
+    }
+
+    public function isDelivered(): bool
+    {
+        return !is_null($this->delivered_at);
     }
 
     public function isInQcStage(): bool

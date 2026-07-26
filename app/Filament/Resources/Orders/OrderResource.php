@@ -1017,33 +1017,11 @@ class OrderResource extends Resource
                         ->label('Serahkan Pesanan')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
-                        ->form([
-                            \Filament\Forms\Components\FileUpload::make('pickup_proof')
-                                ->label('Foto Bukti Pengambilan / Penyerahan')
-                                ->image()
-                                ->extraInputAttributes(['capture' => 'camera'])
-                                ->disk('public')
-                                ->directory('pickup-proofs')
-                                ->required(),
-                            \Filament\Forms\Components\Textarea::make('pickup_note')
-                                ->label('Catatan Penyerahan')
-                                ->rows(3)
-                                ->placeholder('Masukkan nama pengambil, kurir, atau info lainnya jika ada...'),
-                        ])
+                        ->form(\App\Filament\Resources\Orders\Schemas\OrderDeliveryForm::getComponents())
                         ->action(function (Order $record, array $data): void {
-                            $record->update([
-                                'status' => 'selesai',
-                                'pickup_proof' => $data['pickup_proof'],
-                                'pickup_note' => $data['pickup_note'] ?? null,
-                                'pickup_at' => now(),
-                            ]);
-                            Notification::make()
-                                ->title('Pesanan Telah Diserahkan!')
-                                ->body("Pesanan #{$record->order_number} telah selesai dan diserahkan.")
-                                ->success()
-                                ->send();
+                            \App\Filament\Resources\Orders\Schemas\OrderDeliveryForm::processDelivery($record, $data);
                         })
-                        ->visible(fn (Order $record): bool => $record->status === 'siap_diambil' && in_array(auth()->user()->role, ['owner', 'admin'])),
+                        ->visible(fn (Order $record): bool => \App\Filament\Resources\Orders\Schemas\OrderDeliveryForm::isVisible($record)),
 
                     // Retur Pesanan
                     \Filament\Actions\Action::make('create_return')
