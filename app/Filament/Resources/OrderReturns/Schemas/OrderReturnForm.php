@@ -45,12 +45,18 @@ class OrderReturnForm
                 ->options(function ($get, $record) {
                     $orderId = $get('order_id');
                     if (!$orderId && $record) {
-                        $orderId = $record->order_id;
+                        if ($record instanceof \App\Models\Order) {
+                            $orderId = $record->id;
+                        } elseif (isset($record->order_id)) {
+                            $orderId = $record->order_id;
+                        }
                     }
                     if (!$orderId) {
-                        $livewire = request()->route()?->parameter('record');
-                        if ($livewire instanceof \App\Models\Order) {
-                            $orderId = $livewire->id;
+                        $routeRecord = request()->route()?->parameter('record');
+                        if ($routeRecord instanceof \App\Models\Order) {
+                            $orderId = $routeRecord->id;
+                        } elseif (is_numeric($routeRecord)) {
+                            $orderId = (int) $routeRecord;
                         }
                     }
                     if (!$orderId) {
@@ -58,7 +64,11 @@ class OrderReturnForm
                     }
                     return OrderItem::where('order_id', $orderId)
                         ->get()
-                        ->mapWithKeys(fn($item) => [$item->id => $item->product_name . ' (' . ($item->size ?? 'All Size') . ')'])
+                        ->mapWithKeys(function ($item) {
+                            $qty = $item->quantity ? " ({$item->quantity} pcs)" : "";
+                            $size = $item->size ? " [Size {$item->size}]" : "";
+                            return [$item->id => $item->product_name . $qty . $size];
+                        })
                         ->toArray();
                 })
                 ->searchable()
