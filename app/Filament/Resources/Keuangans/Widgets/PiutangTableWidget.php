@@ -305,16 +305,34 @@ class PiutangTableWidget extends BaseWidget
                             $phone = $record->customer->phone ?? '';
                             $phone = preg_replace('/^0/', '62', $phone);
                             $phone = preg_replace('/[^\d]/', '', $phone);
-                            $sisa = number_format($record->remaining_balance, 0, ',', '.');
-                            $businessName = 'Dunia Bordir Komputer';
-                            $productNames = $record->orderItems->pluck('product_name')->unique()->filter()->implode(', ');
-                            $orderTitle = $productNames ?: $record->order_number;
+                            
+                            $businessName = $record->shop->name ?? 'Dunia Bordir Komputer';
+                            $customerName = $record->customer->name ?? 'Pelanggan';
+                            
+                            $totalTagihan = number_format($record->total_price, 0, ',', '.');
+                            $paidAmount = number_format($record->payments()->sum('amount'), 0, ',', '.');
+                            $sisaTagihan = number_format($record->remaining_balance, 0, ',', '.');
+                            
+                            $itemCount = $record->orderItems->count();
+                            $statusLabel = match($record->status) {
+                                'siap_diambil' => 'Siap Diambil',
+                                'selesai'     => 'Selesai',
+                                'diproses'    => 'Sedang Diproses / Produksi',
+                                default       => ucfirst($record->status ?? 'Diproses'),
+                            };
 
-                            $msg = "Halo Kak " . ($record->customer->name ?? '') . ",\n\n"
-                                . "Ini konfirmasi dari " . $businessName . " untuk pesanan *" . $orderTitle . "*.\n"
-                                . "Saat ini masih ada sisa pembayaran sebesar *Rp " . $sisa . "*.\n"
-                                . "Mohon konfirmasinya ya Kak jika sudah bisa dilunasi. Terima kasih banyak! \n"
-                                . "https://konveksio.id";
+                            $msg = "Halo Kak *" . $customerName . "*, 👋\n\n"
+                                . "Berikut adalah informasi rincian tagihan untuk pesanan Anda di *" . $businessName . "*:\n\n"
+                                . "📌 *No. Pesanan:* " . $record->order_number . "\n"
+                                . "📦 *Jumlah Item:* " . $itemCount . " Item\n"
+                                . "📍 *Status Pesanan:* *" . $statusLabel . "*\n\n"
+                                . "💰 *Rincian Pembayaran:*\n"
+                                . "• Total Tagihan: Rp " . $totalTagihan . "\n"
+                                . "• Sudah Dibayar: Rp " . $paidAmount . "\n"
+                                . "-----------------------------------\n"
+                                . "🔴 *Sisa Tagihan:* *Rp " . $sisaTagihan . "*\n\n"
+                                . "Mohon konfirmasi atau dapat melampirkan foto bukti pembayaran jika sudah melakukan pelunasan ya Kak. Terima kasih banyak atas kepercayaan Anda! 🙏";
+
                             return "https://wa.me/" . $phone . "?text=" . urlencode($msg);
                         })
                         ->openUrlInNewTab(),
