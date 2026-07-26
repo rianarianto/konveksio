@@ -221,7 +221,9 @@ class OrderReturnForm
                     $item = OrderItem::find($itemId);
                     if (!$item) return [];
 
-                    $wo = $item->workOrder;
+                    // Cari WO dari item ini atau item induk dalam grupnya
+                    $groupItemIds = $item->getItemsInGroup()->pluck('id');
+                    $wo = \App\Models\WorkOrder::whereIn('order_item_id', $groupItemIds)->first();
                     $options = [];
 
                     // 1. QC Persiapan (jika diaktifkan pada WO)
@@ -235,10 +237,20 @@ class OrderReturnForm
                         $stages = $wo->stage_sequence;
                     } else {
                         $stages = \App\Models\ProductionTask::withoutGlobalScopes()
-                            ->where('order_item_id', $item->id)
+                            ->whereIn('order_item_id', $groupItemIds)
                             ->pluck('stage_name')
                             ->unique()
                             ->toArray();
+                    }
+
+                    // Fallback jika item produksi belum memiliki SPK tersimpan
+                    if (empty($stages)) {
+                        $cat = $item->production_category ?? 'produksi';
+                        if ($cat === 'non_produksi' || $cat === 'jasa') {
+                            $stages = ['Bordir/Sablon', 'Finishing'];
+                        } else {
+                            $stages = ['Potong', 'Bordir/Sablon', 'Jahit', 'Finishing'];
+                        }
                     }
 
                     foreach ($stages as $stg) {
