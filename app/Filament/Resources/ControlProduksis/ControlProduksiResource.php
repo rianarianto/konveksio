@@ -239,19 +239,19 @@ class ControlProduksiResource extends Resource
                         if ($wo) {
                             $woStatus = $wo->status;
                             if ($woStatus === \App\Models\WorkOrder::STATUS_CREATED) {
-                                return '📝 Belum dimulai';
+                                return 'Belum dimulai';
                             }
                             if ($woStatus === \App\Models\WorkOrder::STATUS_QC_PREP || $woStatus === 'QC_PERSIAPAN') {
-                                return '📋 QC Persiapan - menunggu approve';
+                                return 'QC Persiapan - menunggu approve';
                             }
                             if ($woStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
-                                return '⚙️ QC ' . ($wo->current_review_stage ?? '') . ' - menunggu verifikasi';
+                                return 'QC ' . ($wo->current_review_stage ?? '') . ' - menunggu verifikasi';
                             }
                             if ($woStatus === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
-                                return '🏁 QC Akhir - menunggu approve';
+                                return 'QC Akhir - menunggu approve';
                             }
                             if ($woStatus === \App\Models\WorkOrder::STATUS_COMPLETED) {
-                                return '✅ Selesai';
+                                return 'Selesai';
                             }
                         }
 
@@ -260,11 +260,11 @@ class ControlProduksiResource extends Resource
                             return null;
                         $activeTask = $tasks->firstWhere('status', 'in_progress');
                         if ($activeTask) {
-                            return '🔨 ' . $activeTask->stage_name . ' — ' . ($activeTask->assignedTo?->name ?? '-');
+                            return $activeTask->stage_name . ' — ' . ($activeTask->assignedTo?->name ?? '-');
                         }
                         $pendingTask = $tasks->where('status', 'pending')->sortBy('id')->first();
                         if ($pendingTask) {
-                            return '⏳ Menunggu: ' . $pendingTask->stage_name;
+                            return 'Menunggu: ' . $pendingTask->stage_name;
                         }
                         return null;
                     }),
@@ -404,9 +404,9 @@ class ControlProduksiResource extends Resource
                             $prevStageName = $task->stage_name;
 
                             $statusBadge = match ($task->status) {
-                                'pending' => '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">⏳ Antrian</span>',
-                                'in_progress' => '<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">🔨 Dikerjakan</span>',
-                                'done' => '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">✅ Selesai</span>',
+                                'pending' => '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">Antrian</span>',
+                                'in_progress' => '<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">Dikerjakan</span>',
+                                'done' => '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600">Selesai</span>',
                                 default => '',
                             };
 
@@ -425,15 +425,15 @@ class ControlProduksiResource extends Resource
                                 $rejectUrl = route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'reject', 'item' => $record->id]);
                                 
                                 $actionBtn = '<div style="display:flex;gap:6px;justify-content:flex-end;">'
-                                    . '<a href="' . $approveUrl . '" style="background:#059669;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Setujui</a>'
-                                    . '<a href="javascript:void(0)" onclick="const reason = prompt(\'Masukkan alasan revisi:\'); if(reason) { window.location.href = \'' . $rejectUrl . '?reason=\' + encodeURIComponent(reason); }" style="background:#dc2626;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">❌ Revisi</a>'
+                                    . '<a href="' . $approveUrl . '" style="background:#059669;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Setujui</a>'
+                                    . '<a href="javascript:void(0)" onclick="const reason = prompt(\'Masukkan alasan revisi:\'); if(reason) { window.location.href = \'' . $rejectUrl . '?reason=\' + encodeURIComponent(reason); }" style="background:#dc2626;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Revisi</a>'
                                     . '</div>';
                             } elseif (!$isUnlocked) {
-                                $actionBtn = '<span style="color:#9ca3af;font-size:12px">🔒 Menunggu tahap sebelumnya</span>';
+                                $actionBtn = '<span style="color:#9ca3af;font-size:12px">Menunggu tahap sebelumnya</span>';
                             } elseif ($task->status === 'pending') {
-                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'start', 'item' => $record->id]) . '" style="background:#2563eb;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">▶ Mulai</a>';
+                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'start', 'item' => $record->id]) . '" style="background:#2563eb;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Mulai</a>';
                             } elseif ($task->status === 'in_progress') {
-                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'done', 'item' => $record->id]) . '" style="background:#059669;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✓ Tandai Selesai</a>';
+                                $actionBtn = '<a href="' . route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'done', 'item' => $record->id]) . '" style="background:#059669;color:#fff;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Tandai Selesai</a>';
                             } else {
                                 $actionBtn = '<span style="color:#6b7280;font-size:12px">Selesai</span>';
                             }
@@ -458,41 +458,35 @@ class ControlProduksiResource extends Resource
 
                         if ($woStatus === 'NO_WO') {
                             $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;display:flex;align-items:center;gap:10px;">'
-                                . '<span style="font-size:18px;">⚠️</span>'
                                 . '<span style="font-size:13px;color:#991b1b;font-weight:500;">Work Order belum dibuat</span>'
                                 . '</div>';
                         } elseif ($isWoCreated) {
                             $advanceUrl = route('filament.admin.resources.control-produksis.wo-action', ['action' => 'advance', 'item' => $itemId]);
                             $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;display:flex;align-items:center;gap:10px;">'
-                                . '<span style="font-size:18px;">📝</span>'
                                 . '<span style="font-size:13px;color:#0c4a6e;font-weight:500;flex:1;">Status: Belum dimulai</span>'
-                                . '<a href="' . $advanceUrl . '" style="background:#0284c7;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">▶ Mulai Produksi</a>'
+                                . '<a href="' . $advanceUrl . '" style="background:#0284c7;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Mulai Produksi</a>'
                                 . '</div>';
                         } elseif ($woStatus === \App\Models\WorkOrder::STATUS_QC_PREP || $woStatus === 'QC_PERSIAPAN') {
                             $approveUrl = route('filament.admin.resources.control-produksis.wo-action', ['action' => 'approve_qc', 'item' => $itemId]);
                             $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#faf5ff;border:1px solid #c4b5fd;border-radius:8px;display:flex;align-items:center;gap:10px;">'
-                                . '<span style="font-size:18px;">📋</span>'
                                 . '<span style="font-size:13px;color:#5b21b6;font-weight:500;flex:1;">QC Persiapan Bahan & Peralatan</span>'
-                                . '<a href="' . $approveUrl . '" style="background:#7c3aed;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Approve</a>'
+                                . '<a href="' . $approveUrl . '" style="background:#7c3aed;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Approve</a>'
                                 . '</div>';
                         } elseif ($woStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
                             $reviewStage = $workOrder->current_review_stage ?? '-';
                             $approveUrl = route('filament.admin.resources.control-produksis.wo-action', ['action' => 'approve_qc', 'item' => $itemId]);
                             $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;display:flex;align-items:center;gap:10px;">'
-                                . '<span style="font-size:18px;">⚙️</span>'
                                 . '<span style="font-size:13px;color:#9a3412;font-weight:500;flex:1;">QC ' . htmlspecialchars($reviewStage) . ' - menunggu verifikasi</span>'
-                                . '<a href="' . $approveUrl . '" style="background:#ea580c;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Approve</a>'
+                                . '<a href="' . $approveUrl . '" style="background:#ea580c;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Approve</a>'
                                 . '</div>';
                         } elseif ($woStatus === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
                             $approveUrl = route('filament.admin.resources.control-produksis.wo-action', ['action' => 'approve_qc', 'item' => $itemId]);
                             $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;display:flex;align-items:center;gap:10px;">'
-                                . '<span style="font-size:18px;">🏁</span>'
                                 . '<span style="font-size:13px;color:#166534;font-weight:500;flex:1;">QC Akhir - Menunggu Verifikasi Final</span>'
-                                . '<a href="' . $approveUrl . '" style="background:#16a34a;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">✅ Approve QC Akhir</a>'
+                                . '<a href="' . $approveUrl . '" style="background:#16a34a;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Approve QC Akhir</a>'
                                 . '</div>';
                         } elseif ($isWoCompleted) {
                             $woBannerHtml = '<div style="margin-bottom:16px;padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;display:flex;align-items:center;gap:10px;">'
-                                . '<span style="font-size:18px;">✅</span>'
                                 . '<span style="font-size:13px;color:#166534;font-weight:500;">Produksi Selesai</span>'
                                 . '</div>';
                         } else {
