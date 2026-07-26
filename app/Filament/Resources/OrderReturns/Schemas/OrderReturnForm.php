@@ -208,11 +208,11 @@ class OrderReturnForm
                 ->options(function ($get) {
                     $itemId = $get('order_item_id');
                     $options = [
+                        'QC_PERSIAPAN'  => '🔍 QC Persiapan Bahan',
                         'Potong'        => '✂️ Divisi Potong',
                         'Bordir/Sablon' => '🧵 Divisi Bordir / Sablon',
                         'Jahit'         => '🪡 Divisi Jahit',
                         'Finishing'     => '✨ Divisi Finishing / Packing',
-                        'QC_PERSIAPAN'  => '🔍 QC Persiapan Bahan',
                         'QC_AKHIR'      => '🏁 QC Akhir / Pemeriksaan Final',
                     ];
 
