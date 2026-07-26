@@ -240,10 +240,12 @@ class PaymentsRelationManager extends RelationManager
             ])
             ->actions([
                 EditAction::make()
+                    ->visible(fn() => auth()->user()->role === 'owner')
                     ->after(function () {
                         $this->dispatch('refreshOrderSummary');
                     }),
                 DeleteAction::make()
+                    ->visible(fn() => auth()->user()->role === 'owner')
                     ->after(function () {
                         $this->dispatch('refreshOrderSummary');
                     }),
