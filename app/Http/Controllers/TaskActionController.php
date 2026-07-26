@@ -62,7 +62,13 @@ class TaskActionController extends Controller
             $service->approveTask($task->id);
         } elseif ($action === 'reject') {
             $reason = $request->query('reason', 'Revisi dari Admin');
-            $service->rejectTask($task->id, $reason);
+            $woId = $this->getWorkOrderId($orderItem);
+            $wo = \App\Models\WorkOrder::withoutGlobalScopes()->find($woId);
+            if ($wo && $wo->status === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
+                $service->rejectTaskQcAkhir($task->id, $reason);
+            } else {
+                $service->rejectTask($task->id, $reason);
+            }
         } else {
             abort(400, 'Aksi tidak dikenal.');
         }

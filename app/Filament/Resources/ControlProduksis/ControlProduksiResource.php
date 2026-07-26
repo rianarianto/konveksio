@@ -424,12 +424,14 @@ class ControlProduksiResource extends Resource
 
                             // Check if this task is eligible for QC Review action by Admin:
                             $showQcActions = false;
+                            $isQcAkhirReview = false;
                             if ($task->status === 'done' && !$task->qc_approved) {
                                 if ($woStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW && $workOrder->current_review_stage === $task->stage_name) {
                                     $showQcActions = true;
-                                } elseif ($woStatus === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
-                                    $showQcActions = true;
                                 }
+                            }
+                            if ($task->status === 'done' && $woStatus === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
+                                $isQcAkhirReview = true;
                             }
 
                             if ($showQcActions) {
@@ -439,6 +441,11 @@ class ControlProduksiResource extends Resource
                                 $actionBtn = '<div style="display:flex;gap:6px;justify-content:flex-end;">'
                                     . '<a href="' . $approveUrl . '" style="background:#059669;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Setujui</a>'
                                     . '<a href="javascript:void(0)" onclick="const reason = prompt(\'Masukkan alasan revisi:\'); if(reason) { window.location.href = \'' . $rejectUrl . '?reason=\' + encodeURIComponent(reason); }" style="background:#dc2626;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Revisi</a>'
+                                    . '</div>';
+                            } elseif ($isQcAkhirReview) {
+                                $rejectUrl = route('filament.admin.resources.control-produksis.task-action', ['task' => $task->id, 'action' => 'reject', 'item' => $record->id]);
+                                $actionBtn = '<div style="display:flex;gap:6px;justify-content:flex-end;">'
+                                    . '<a href="javascript:void(0)" onclick="const reason = prompt(\'Masukkan alasan revisi QC Akhir:\'); if(reason) { window.location.href = \'' . $rejectUrl . '?reason=\' + encodeURIComponent(reason); }" style="background:#dc2626;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Revisi</a>'
                                     . '</div>';
                             } elseif ($task->status === 'done') {
                                 $actionBtn = '<span style="color:#6b7280;font-size:12px">Selesai</span>';

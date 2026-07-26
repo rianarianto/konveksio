@@ -109,6 +109,21 @@ class WorkOrderService
                 $updateData['current_review_stage'] = null;
             }
 
+            if ($fromQcApproval) {
+                $groupItemIds = $wo->orderItem
+                    ? $wo->orderItem->getItemsInGroup()->pluck('id')
+                    : [$wo->order_item_id];
+                
+                $stageToApprove = $wo->current_review_stage ?? $wo->status;
+                \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItemIds)
+                    ->where(function($q) use ($stageToApprove) {
+                        $q->where('stage_name', $stageToApprove)
+                          ->orWhere('stage_name', 'QC_PERSIAPAN');
+                    })
+                    ->update(['qc_approved' => true, 'qc_reviewed_at' => $now]);
+            }
+
             $wo->update($updateData);
             $wo->refresh();
 
