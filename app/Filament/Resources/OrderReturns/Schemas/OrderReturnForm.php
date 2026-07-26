@@ -32,7 +32,7 @@ class OrderReturnForm
 
             $components[] = Select::make('order_id')
                 ->label('Pesanan')
-                ->relationship('order', 'order_number')
+                ->relationship('order', 'order_number', modifyQueryUsing: fn ($query) => $query->where('status', 'selesai'))
                 ->searchable()
                 ->preload()
                 ->required()
