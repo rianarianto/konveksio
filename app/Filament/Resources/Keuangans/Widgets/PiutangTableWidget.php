@@ -306,7 +306,10 @@ class PiutangTableWidget extends BaseWidget
                             $phone = preg_replace('/^0/', '62', $phone);
                             $phone = preg_replace('/[^\d]/', '', $phone);
                             
-                            $businessName = $record->shop->name ?? 'Toko Kami';
+                            $rawShopName = $record->shop->name ?? '';
+                            $businessName = ($rawShopName && !str_contains(strtolower($rawShopName), 'toko 1'))
+                                ? $rawShopName
+                                : 'Dunia Bordir Komputer';
 
                             $customerName = $record->customer->name ?? 'Pelanggan';
                             
@@ -320,14 +323,27 @@ class PiutangTableWidget extends BaseWidget
                                 default       => 'sedang dalam proses pengerjaan',
                             };
 
+                            // Group order items for WhatsApp breakdown
+                            $itemLines = [];
+                            if ($record->orderItems && $record->orderItems->count() > 0) {
+                                $groupedItems = $record->orderItems->groupBy(fn($i) => $i->product_name ?: 'Item');
+                                foreach ($groupedItems as $productName => $items) {
+                                    $qty = $items->sum('quantity');
+                                    $itemLines[] = "• " . $qty . "x " . $productName;
+                                }
+                            }
+                            $itemBreakdown = count($itemLines) > 0 ? implode("\n", $itemLines) : "• 1x " . $record->order_number;
+
                             $msg = "Selamat pagi/siang Kak *" . $customerName . "*,\n\n"
                                 . "Kami dari *" . $businessName . "* ingin menginformasikan bahwa pesanan Kakak dengan nomor *" . $record->order_number . "* " . $statusText . ".\n\n"
+                                . "Detail Item Pesanan:\n"
+                                . $itemBreakdown . "\n\n"
                                 . "Rincian Pembayaran:\n"
                                 . "• Total Tagihan: Rp " . $totalTagihan . "\n"
                                 . "• Sudah Dibayar: Rp " . $paidAmount . "\n"
                                 . "• Sisa Tagihan: Rp " . $sisaTagihan . "\n\n"
                                 . "Mohon melampirkan bukti pelunasan bilamana pembayaran telah dilakukan. Jika ada pertanyaan terkait pesanan, jangan ragu untuk menghubungi kami kembali.\n\n"
-                                . "Terima kasih atas kepercayaan Kakak kepada *" . $businessName . "*. 🙏";
+                                . "Terima kasih atas kepercayaan Kakak kepada *" . $businessName . "*.";
 
                             return "https://wa.me/" . $phone . "?text=" . urlencode($msg);
                         })
