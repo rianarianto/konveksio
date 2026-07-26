@@ -101,34 +101,60 @@ class OrderReturnForm
             Select::make('action_type')
                 ->label('Tindakan Retur')
                 ->options([
-                    'repair' => '🛠️ Perbaikan (Tukang Kerjakan Ulang Divisi Tertentu)',
-                    'remake' => '🏭 Buat Baru (Produksi Ulang dari Awal)',
+                    'repair' => '🛠️ Perbaikan (Tukang Kerjakan Ulang Divisi/Tahap Tertentu)',
+                    'remake' => '🏭 Buat Baru (Produksi Ulang Seluruhnya dari Awal)',
                 ])
                 ->required()
                 ->reactive()
                 ->default('repair'),
 
             Select::make('target_stage')
-                ->label('Kirim Kembali Ke Tahap (Untuk Perbaikan)')
-                ->options([
-                    'potong' => 'Potong',
-                    'sablon' => 'Sablon/Bordir',
-                    'jahit' => 'Jahit',
-                    'qc' => 'QC',
-                ])
+                ->label('Kirim Kembali Ke Tahap Mana? (Untuk Perbaikan)')
+                ->options(function ($get) {
+                    $itemId = $get('order_item_id');
+                    $options = [
+                        'Potong'        => '✂️ Divisi Potong',
+                        'Bordir/Sablon' => '🧵 Divisi Bordir / Sablon',
+                        'Jahit'         => '🪡 Divisi Jahit',
+                        'Finishing'     => '✨ Divisi Finishing / Packing',
+                        'QC_PERSIAPAN'  => '🔍 QC Persiapan Bahan',
+                        'QC_AKHIR'      => '🏁 QC Akhir / Pemeriksaan Final',
+                    ];
+
+                    if ($itemId) {
+                        $item = OrderItem::find($itemId);
+                        if ($item) {
+                            $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $item->id)
+                                ->pluck('stage_name')
+                                ->unique();
+                            foreach ($tasks as $stg) {
+                                if (!isset($options[$stg])) {
+                                    $options[$stg] = '🛠️ Divisi ' . $stg;
+                                }
+                            }
+                        }
+                    }
+
+                    return $options;
+                })
                 ->visible(fn ($get) => $get('action_type') === 'repair')
-                ->required(fn ($get) => $get('action_type') === 'repair'),
+                ->required(fn ($get) => $get('action_type') === 'repair')
+                ->helperText('Pilih tahap/divisi kerja yang bertanggung jawab untuk melakukan perbaikan.'),
 
             KeyValue::make('size_breakdown')
-                ->label('Rincian Ukuran / Penerima yang Diretur')
-                ->keyLabel('Ukuran / Nama Penerima')
-                ->valueLabel('Jumlah (Pcs)')
+                ->label('Rincian Ukuran / Nama Khusus Penerima yang Diretur')
+                ->keyLabel('Ukuran / Nama Penerima / Identitas Khusus')
+                ->keyPlaceholder('Contoh: Size S (Nama: Andre)')
+                ->valuePlaceholder('1')
                 ->helperText(function ($get) {
                     $itemId = $get('order_item_id');
-                    if (!$itemId) return 'Pilih barang yang diretur untuk melihat rincian ukuran tersedia.';
+                    $baseHelper = '💡 Anda bebas mengetik ukuran atau nama pendaftar khusus. Contoh: "Size S (Nama: Andre)" -> 1 pcs.';
+
+                    if (!$itemId) return $baseHelper;
 
                     $item = OrderItem::find($itemId);
-                    if (!$item) return '';
+                    if (!$item) return $baseHelper;
 
                     $groupItems = $item->getItemsInGroup();
                     $sizes = [];
@@ -136,7 +162,7 @@ class OrderReturnForm
                         $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
                         $sizes[] = ($sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz) . " ({$gi->quantity} pcs)";
                     }
-                    return 'Ukuran tersedia dalam pesanan ini: ' . implode(', ', $sizes);
+                    return $baseHelper . ' | Ukuran umum dalam item ini: ' . implode(', ', $sizes);
                 })
                 ->reactive()
                 ->afterStateUpdated(function ($state, callable $set) {
@@ -152,32 +178,35 @@ class OrderReturnForm
                 }),
 
             TextInput::make('quantity')
-                ->label('Total Jumlah Retur (Pcs)')
+                ->label('Total Jumlah Pcs yang Diretur')
                 ->required()
                 ->numeric()
-                ->default(1),
+                ->default(1)
+                ->minValue(1),
 
             Select::make('status')
-                ->label('Status Retur')
+                ->label('Status Antrian Retur')
                 ->options([
-                    'pending' => '⏳ Pending (Antrian)',
-                    'diproses' => '🔨 Diproses (Sedang Dikerjakan)',
-                    'selesai' => '✅ Selesai (Selesai Diretur)',
+                    'pending'  => '⏳ Pending (Masuk Antrian Tukang)',
+                    'diproses' => '🔨 Diproses (Sedang Dikerjakan Tukang)',
+                    'selesai'  => '✅ Selesai (Retur Selesai)',
                 ])
                 ->required()
                 ->default('pending'),
 
             FileUpload::make('photo_path')
-                ->label('Foto Bukti Kerusakan / Retur')
+                ->label('Foto Bukti Kerusakan / Cacat Baju')
                 ->image()
                 ->directory('order-returns')
                 ->maxSize(5120)
                 ->columnSpanFull(),
 
             Textarea::make('items_description')
-                ->label('Catatan Keterangan Barang')
-                ->placeholder('Misal: Kaos M warna merah jahitan lepas, sablon miring')
+                ->label('Catatan Detail Kerusakan & Petunjuk Instruksi Tukang')
+                ->placeholder('Jelaskan kecacatan secara spesifik. Contoh: Baju Size S dengan nama "Andre", bordir nama di dada kiri miring 2 cm. Tolong dibongkar dan dibordir ulang nama Andre dengan rapi.')
+                ->rows(3)
                 ->required()
+                ->helperText('Petunjuk ini akan langsung terkirim ke WhatsApp tukang dan muncul mencolok di portal tugas tukang.')
                 ->columnSpanFull(),
 
             Textarea::make('reason')
