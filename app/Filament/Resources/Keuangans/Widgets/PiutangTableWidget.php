@@ -306,7 +306,11 @@ class PiutangTableWidget extends BaseWidget
                             $phone = preg_replace('/^0/', '62', $phone);
                             $phone = preg_replace('/[^\d]/', '', $phone);
                             
-                            $businessName = $record->shop->name ?? 'Dunia Bordir Komputer';
+                            $rawShopName = $record->shop->name ?? '';
+                            $businessName = ($rawShopName && !str_contains(strtolower($rawShopName), 'toko 1'))
+                                ? $rawShopName
+                                : 'Dunia Bordir Komputer';
+
                             $customerName = $record->customer->name ?? 'Pelanggan';
                             
                             $totalTagihan = number_format($record->total_price, 0, ',', '.');
@@ -321,8 +325,8 @@ class PiutangTableWidget extends BaseWidget
                                 default       => ucfirst($record->status ?? 'Diproses'),
                             };
 
-                            $msg = "Halo Kak *" . $customerName . "*, 👋\n\n"
-                                . "Berikut adalah informasi rincian tagihan untuk pesanan Anda di *" . $businessName . "*:\n\n"
+                            $msg = "Halo Kak *" . $customerName . "*,\n\n"
+                                . "Pesan pengingat dari *" . $businessName . "* untuk rincian tagihan pesanan Anda:\n\n"
                                 . "📌 *No. Pesanan:* " . $record->order_number . "\n"
                                 . "📦 *Jumlah Item:* " . $itemCount . " Item\n"
                                 . "📍 *Status Pesanan:* *" . $statusLabel . "*\n\n"
@@ -331,7 +335,7 @@ class PiutangTableWidget extends BaseWidget
                                 . "• Sudah Dibayar: Rp " . $paidAmount . "\n"
                                 . "-----------------------------------\n"
                                 . "🔴 *Sisa Tagihan:* *Rp " . $sisaTagihan . "*\n\n"
-                                . "Mohon konfirmasi atau dapat melampirkan foto bukti pembayaran jika sudah melakukan pelunasan ya Kak. Terima kasih banyak atas kepercayaan Anda! 🙏";
+                                . "Terima kasih banyak atas kepercayaan Anda di *" . $businessName . "*! 🙏";
 
                             return "https://wa.me/" . $phone . "?text=" . urlencode($msg);
                         })
