@@ -207,35 +207,64 @@ class OrderReturnForm
                 ->label('Kirim Kembali Ke Tahap Mana? (Untuk Perbaikan)')
                 ->options(function ($get) {
                     $itemId = $get('order_item_id');
-                    $options = [
-                        'QC_PERSIAPAN'  => '🔍 QC Persiapan Bahan',
-                        'Potong'        => '✂️ Divisi Potong',
-                        'Bordir/Sablon' => '🧵 Divisi Bordir / Sablon',
-                        'Jahit'         => '🪡 Divisi Jahit',
-                        'Finishing'     => '✨ Divisi Finishing / Packing',
-                        'QC_AKHIR'      => '🏁 QC Akhir / Pemeriksaan Final',
-                    ];
+                    if (!$itemId) {
+                        return [
+                            'QC_PERSIAPAN'  => '🔍 QC Persiapan Bahan',
+                            'Potong'        => '✂️ Divisi Potong',
+                            'Bordir/Sablon' => '🧵 Divisi Bordir / Sablon',
+                            'Jahit'         => '🪡 Divisi Jahit',
+                            'Finishing'     => '✨ Divisi Finishing / Packing',
+                            'QC_AKHIR'      => '🏁 QC Akhir / Pemeriksaan Final',
+                        ];
+                    }
 
-                    if ($itemId) {
-                        $item = OrderItem::find($itemId);
-                        if ($item) {
-                            $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
-                                ->where('order_item_id', $item->id)
-                                ->pluck('stage_name')
-                                ->unique();
-                            foreach ($tasks as $stg) {
-                                if (!isset($options[$stg])) {
-                                    $options[$stg] = '🛠️ Divisi ' . $stg;
-                                }
-                            }
-                        }
+                    $item = OrderItem::find($itemId);
+                    if (!$item) return [];
+
+                    $wo = $item->workOrder;
+                    $options = [];
+
+                    // 1. QC Persiapan (jika diaktifkan pada WO)
+                    if (!$wo || ($wo && $wo->has_qc_prep)) {
+                        $options['QC_PERSIAPAN'] = '🔍 QC Persiapan Bahan';
+                    }
+
+                    // 2. Tahap-tahap Pekerja Aktual Sesuai Urutan Template Produksi
+                    $stages = [];
+                    if ($wo && !empty($wo->stage_sequence)) {
+                        $stages = $wo->stage_sequence;
+                    } else {
+                        $stages = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->where('order_item_id', $item->id)
+                            ->pluck('stage_name')
+                            ->unique()
+                            ->toArray();
+                    }
+
+                    foreach ($stages as $stg) {
+                        if (in_array($stg, ['QC_PERSIAPAN', 'QC_AKHIR'])) continue;
+                        $label = match($stg) {
+                            'Potong'        => '✂️ Divisi Potong',
+                            'Bordir/Sablon' => '🧵 Divisi Bordir / Sablon',
+                            'Sablon/Bordir' => '🧵 Divisi Bordir / Sablon',
+                            'Jahit'         => '🪡 Divisi Jahit',
+                            'Finishing'     => '✨ Divisi Finishing / Packing',
+                            'Kancing'       => '🔘 Divisi Kancing',
+                            default         => '🛠️ Divisi ' . $stg,
+                        };
+                        $options[$stg] = $label;
+                    }
+
+                    // 3. QC Akhir (jika diaktifkan)
+                    if (!$wo || ($wo && ($wo->has_qc_selesai ?? true))) {
+                        $options['QC_AKHIR'] = '🏁 QC Akhir / Pemeriksaan Final';
                     }
 
                     return $options;
                 })
                 ->visible(fn ($get) => $get('action_type') === 'repair')
                 ->required(fn ($get) => $get('action_type') === 'repair')
-                ->helperText('Pilih tahap/divisi kerja yang bertanggung jawab untuk melakukan perbaikan.'),
+                ->helperText('Tahapan disusun otomatis mengikuti template & alur produksi aktual barang ini.'),
 
             KeyValue::make('size_breakdown')
                 ->label('Rincian Ukuran / Nama Khusus Penerima yang Diretur')
