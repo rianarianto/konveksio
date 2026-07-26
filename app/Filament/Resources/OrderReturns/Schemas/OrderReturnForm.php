@@ -40,8 +40,9 @@ class OrderReturnForm
         }
 
         return array_merge($components, [
-            Select::make('order_item_id')
-                ->label('Barang yang Diretur')
+            // Step 1: Pilih Produk Utama
+            Select::make('selected_product_name')
+                ->label('1. Pilih Produk / Item Pesanan Utama')
                 ->options(function ($get, $record) {
                     $orderId = $get('order_id');
                     if (!$orderId && $record) {
@@ -59,21 +60,93 @@ class OrderReturnForm
                             $orderId = (int) $routeRecord;
                         }
                     }
-                    if (!$orderId) {
-                        return [];
+                    if (!$orderId) return [];
+
+                    $items = OrderItem::where('order_id', $orderId)->get();
+                    $grouped = $items->groupBy(fn($i) => $i->product_name ?: 'Item');
+
+                    $options = [];
+                    foreach ($grouped as $pName => $group) {
+                        $totQty = $group->sum('quantity');
+                        $cat = match($group->first()->production_category) {
+                            'custom' => '🧵 Produksi (Custom)',
+                            'non_produksi' => '📦 Non-Produksi',
+                            'jasa' => '🔧 Jasa',
+                            default => '🏭 Produksi',
+                        };
+                        $isAddition = $group->first()->is_addition ? ' ➕ [Item Tambahan]' : '';
+                        $options[$pName] = "{$cat} - {$pName}{$isAddition} (Total: {$totQty} pcs)";
                     }
-                    return OrderItem::where('order_id', $orderId)
-                        ->get()
-                        ->mapWithKeys(function ($item) {
-                            $qty = $item->quantity ? " ({$item->quantity} pcs)" : "";
-                            $size = $item->size ? " [Size {$item->size}]" : "";
-                            return [$item->id => $item->product_name . $qty . $size];
-                        })
-                        ->toArray();
+                    return $options;
                 })
                 ->searchable()
                 ->required()
-                ->reactive(),
+                ->reactive()
+                ->afterStateUpdated(fn (callable $set) => $set('order_item_id', null)),
+
+            // Step 2: Pilih Ukuran / Varian Spesifik (Laki-laki / Perempuan / Custom)
+            Select::make('order_item_id')
+                ->label('2. Pilih Ukuran & Varian Spesifik yang Diretur')
+                ->options(function ($get, $record) {
+                    $pName = $get('selected_product_name');
+                    $orderId = $get('order_id');
+                    if (!$orderId && $record) {
+                        if ($record instanceof \App\Models\Order) {
+                            $orderId = $record->id;
+                        } elseif (isset($record->order_id)) {
+                            $orderId = $record->order_id;
+                        }
+                    }
+                    if (!$orderId) {
+                        $routeRecord = request()->route()?->parameter('record');
+                        if ($routeRecord instanceof \App\Models\Order) {
+                            $orderId = $routeRecord->id;
+                        } elseif (is_numeric($routeRecord)) {
+                            $orderId = (int) $routeRecord;
+                        }
+                    }
+                    if (!$orderId || !$pName) return [];
+
+                    $items = OrderItem::where('order_id', $orderId)
+                        ->where('product_name', $pName)
+                        ->get();
+
+                    $options = [];
+                    foreach ($items as $item) {
+                        $size = $item->size ? "Ukuran: {$item->size}" : "Tanpa Ukuran";
+                        $qty = " ({$item->quantity} pcs)";
+                        $details = [];
+                        if ($item->recipient_name) {
+                            $details[] = "Penerima: {$item->recipient_name}";
+                        }
+                        if (!empty($item->size_and_request_details['gender'])) {
+                            $genderLabel = $item->size_and_request_details['gender'] === 'L' ? 'Laki-laki' : 'Perempuan';
+                            $details[] = "Kategori: {$genderLabel}";
+                        }
+                        $extra = count($details) > 0 ? " — " . implode(', ', $details) : "";
+                        $options[$item->id] = "{$size}{$qty}{$extra}";
+                    }
+                    return $options;
+                })
+                ->visible(fn ($get) => !empty($get('selected_product_name')))
+                ->searchable()
+                ->required()
+                ->reactive()
+                ->afterStateUpdated(function ($state, callable $set) {
+                    if ($state) {
+                        $item = OrderItem::find($state);
+                        if ($item) {
+                            $sizeKey = "Size " . ($item->size ?? 'All Size');
+                            if (!empty($item->recipient_name)) {
+                                $sizeKey .= " (Nama: {$item->recipient_name})";
+                            }
+                            $set('size_breakdown', [
+                                $sizeKey => 1,
+                            ]);
+                            $set('quantity', 1);
+                        }
+                    }
+                }),
 
             DatePicker::make('return_date')
                 ->label('Tanggal Retur')
