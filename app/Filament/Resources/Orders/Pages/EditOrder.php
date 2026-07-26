@@ -73,6 +73,7 @@ class EditOrder extends EditRecord
                         ->title('Retur Berhasil Dicatat')
                         ->success()
                         ->send();
+                    $this->redirect(OrderResource::getUrl('edit', ['record' => $this->record]));
                 })
                 ->modalHeading('Catat Retur Pesanan')
                 ->modalSubmitActionLabel('Simpan')

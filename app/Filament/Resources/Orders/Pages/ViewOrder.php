@@ -43,11 +43,18 @@ class ViewOrder extends ViewRecord
                         ->title('Retur Berhasil Dicatat')
                         ->success()
                         ->send();
+                    $this->redirect(OrderResource::getUrl('view', ['record' => $this->record]));
                 })
                 ->modalHeading('Catat Retur Pesanan')
                 ->modalSubmitActionLabel('Simpan')
                 ->visible(fn(): bool => $this->record->status === 'selesai'),
         ];
+    }
+
+    #[\Livewire\Attributes\On('refreshOrderSummary')]
+    public function handleRefreshOrderSummary(): void
+    {
+        $this->record->refresh();
     }
 
     protected function mutateFormDataBeforeFill(array $data): array
