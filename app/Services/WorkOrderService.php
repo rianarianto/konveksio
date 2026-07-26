@@ -555,13 +555,6 @@ class WorkOrderService
                 $woStages = $wo->stage_sequence ?? [];
                 $isLastStage = (end($woStages) === $task->stage_name);
                 $hasQcAkhir = $wo->has_qc_selesai ?? true;
-            }
-
-            // Pastikan tahap ini tidak punya wajib_qc (kecuali tahap terakhir yang QC Review-nya di-skip oleh QC Akhir)
-            if ($task->wajib_qc && !($isLastStage && $hasQcAkhir)) {
-                throw new \RuntimeException('Tahap ini sudah memiliki QC Review sendiri, tidak bisa direvisi dari QC Akhir.');
-            }
-
             // Reset task ke pending, tandai sebagai revisi dari qc_akhir
             $task->update([
                 'status'          => 'pending',
@@ -573,7 +566,12 @@ class WorkOrderService
             ]);
 
             if ($wo) {
-                $wo->update(['reject_reason' => $reason]);
+                $wo->update([
+                    'status'               => $task->stage_name,
+                    'reject_reason'        => $reason,
+                    'current_review_stage' => null,
+                    'stage_entered_at'     => now(),
+                ]);
                 // Kirim notifikasi WA ke worker
                 $worker = \App\Models\Worker::find($task->assigned_to);
                 if ($worker && $worker->phone) {
