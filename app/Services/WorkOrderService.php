@@ -555,6 +555,8 @@ class WorkOrderService
                 $woStages = $wo->stage_sequence ?? [];
                 $isLastStage = (end($woStages) === $task->stage_name);
                 $hasQcAkhir = $wo->has_qc_selesai ?? true;
+            }
+
             // Reset task ke pending, tandai sebagai revisi dari qc_akhir
             $task->update([
                 'status'          => 'pending',
