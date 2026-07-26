@@ -64,7 +64,17 @@ class OrderDeliveryForm
                             if (!$order) return 0;
                             return max(0, (int) $order->total_price - (int) $order->payments()->sum('amount'));
                         })
-                        ->required(),
+                        ->required()
+                        ->minValue(1)
+                        ->maxValue(function ($record) {
+                            if (!$record) return null;
+                            $order = $record instanceof Order ? $record : $record->order ?? null;
+                            if (!$order) return null;
+                            return max(0, (int) $order->total_price - (int) $order->payments()->sum('amount'));
+                        })
+                        ->validationMessages([
+                            'max' => 'Nominal pelunasan tidak boleh melebihi sisa tagihan.',
+                        ]),
 
                     Select::make('payment_method')
                         ->label('Metode Pembayaran')

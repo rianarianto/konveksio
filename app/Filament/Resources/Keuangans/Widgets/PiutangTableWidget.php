@@ -248,7 +248,12 @@ class PiutangTableWidget extends BaseWidget
                                 ->numeric()
                                 ->prefix('Rp')
                                 ->default($record->remaining_balance)
-                                ->required(),
+                                ->required()
+                                ->minValue(1)
+                                ->maxValue(fn ($record) => max(0, (int) $record->remaining_balance))
+                                ->validationMessages([
+                                    'max' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan.',
+                                ]),
                             DatePicker::make('payment_date')
                                 ->label('Tanggal')
                                 ->default(now())

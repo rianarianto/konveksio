@@ -99,7 +99,15 @@ class PaymentsRelationManager extends RelationManager
                 ->numeric()
                 ->prefix('Rp')
                 ->required()
-                ->minValue(1),
+                ->minValue(1)
+                ->maxValue(function () {
+                    $order = $this->getOwnerRecord();
+                    if (!$order) return null;
+                    return max(0, (int) $order->total_price - (int) $order->payments()->sum('amount'));
+                })
+                ->validationMessages([
+                    'max' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan.',
+                ]),
 
             DatePicker::make('payment_date')
                 ->label('Tanggal Pembayaran')
