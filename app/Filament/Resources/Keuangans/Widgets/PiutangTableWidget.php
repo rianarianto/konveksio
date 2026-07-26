@@ -306,10 +306,7 @@ class PiutangTableWidget extends BaseWidget
                             $phone = preg_replace('/^0/', '62', $phone);
                             $phone = preg_replace('/[^\d]/', '', $phone);
                             
-                            $rawShopName = $record->shop->name ?? '';
-                            $businessName = ($rawShopName && !str_contains(strtolower($rawShopName), 'toko 1'))
-                                ? $rawShopName
-                                : 'Dunia Bordir Komputer';
+                            $businessName = $record->shop->name ?? 'Toko Kami';
 
                             $customerName = $record->customer->name ?? 'Pelanggan';
                             
