@@ -179,6 +179,25 @@ class ControlProduksiResource extends Resource
                     ->label('Status Produksi')
                     ->badge()
                     ->state(function (OrderItem $record) {
+                        $groupItemIds = OrderItem::where('order_id', $record->order_id)
+                            ->where('product_name', $record->product_name)
+                            ->where('bahan_id', $record->bahan_id)
+                            ->where('production_category', $record->production_category)
+                            ->where('is_addition', $record->is_addition ?? false)
+                            ->pluck('id');
+                        
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->first();
+
+                        if ($wo) {
+                            if ($wo->status === \App\Models\WorkOrder::STATUS_CREATED) return 'Belum Diatur';
+                            if ($wo->status === \App\Models\WorkOrder::STATUS_QC_PREP || $wo->status === 'QC_PERSIAPAN') return 'QC Persiapan';
+                            if ($wo->status === \App\Models\WorkOrder::STATUS_QC_REVIEW) return 'QC Review';
+                            if ($wo->status === \App\Models\WorkOrder::STATUS_QC_AKHIR) return 'QC Akhir';
+                            if ($wo->status === \App\Models\WorkOrder::STATUS_COMPLETED) return 'Selesai';
+                        }
+
                         $tasks = $record->productionTasks;
                         if ($tasks->count() === 0)
                             return 'Belum Diatur';
@@ -192,6 +211,9 @@ class ControlProduksiResource extends Resource
                         'Belum Diatur' => 'gray',
                         'Antrian' => 'warning',
                         'Diproses' => 'info',
+                        'QC Persiapan' => 'purple',
+                        'QC Review' => 'warning',
+                        'QC Akhir' => 'warning',
                         'Selesai' => 'success',
                         default => 'gray',
                     })
@@ -200,6 +222,7 @@ class ControlProduksiResource extends Resource
                             ->where('product_name', $record->product_name)
                             ->where('bahan_id', $record->bahan_id)
                             ->where('production_category', $record->production_category)
+                            ->where('is_addition', $record->is_addition ?? false)
                             ->where(function($q) use ($record) {
                                 if ($record->size === 'Custom') {
                                     $q->where('size', 'Custom');
@@ -223,6 +246,9 @@ class ControlProduksiResource extends Resource
                             }
                             if ($woStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
                                 return '⚙️ QC ' . ($wo->current_review_stage ?? '') . ' - menunggu verifikasi';
+                            }
+                            if ($woStatus === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
+                                return '🏁 QC Akhir - menunggu approve';
                             }
                             if ($woStatus === \App\Models\WorkOrder::STATUS_COMPLETED) {
                                 return '✅ Selesai';
