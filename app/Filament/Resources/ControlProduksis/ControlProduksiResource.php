@@ -308,7 +308,19 @@ class ControlProduksiResource extends Resource
             ->actions([
                 ActionGroup::make([
                     Action::make('update_progress')
-                    ->hidden(fn(OrderItem $record) => $record->productionTasks()->where('status', '!=', 'done')->count() === 0)
+                    ->hidden(function (OrderItem $record): bool {
+                        $wo = $record->workOrder;
+                        if (!$wo) {
+                            $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->first();
+                        }
+                        if ($wo) {
+                            return $wo->isCompleted();
+                        }
+                        return false;
+                    })
                     ->label('Update Progress')
                     ->icon('heroicon-o-arrow-path')
                     ->color('info')
