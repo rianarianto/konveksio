@@ -440,6 +440,8 @@ class ControlProduksiResource extends Resource
                                     . '<a href="' . $approveUrl . '" style="background:#059669;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Setujui</a>'
                                     . '<a href="javascript:void(0)" onclick="const reason = prompt(\'Masukkan alasan revisi:\'); if(reason) { window.location.href = \'' . $rejectUrl . '?reason=\' + encodeURIComponent(reason); }" style="background:#dc2626;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Revisi</a>'
                                     . '</div>';
+                            } elseif ($task->status === 'done') {
+                                $actionBtn = '<span style="color:#6b7280;font-size:12px">Selesai</span>';
                             } elseif (!$isUnlocked) {
                                 $actionBtn = '<span style="color:#9ca3af;font-size:12px">Menunggu tahap sebelumnya</span>';
                             } elseif ($task->status === 'pending') {
