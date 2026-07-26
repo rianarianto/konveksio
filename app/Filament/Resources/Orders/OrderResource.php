@@ -438,35 +438,30 @@ class OrderResource extends Resource
                                     ->content(fn (?Order $record) => $record?->pickup_at ? $record->pickup_at->format('d M Y, H:i') . ' WIB' : '-'),
                                 
                                 Placeholder::make('pickup_note_display')
-                                    ->label('Catatan Penyerahan')
+                                    ->label('Catatan Penyerahan / Penerima')
                                     ->content(fn (?Order $record) => $record?->pickup_note ?: '-'),
                             ])->columns(2),
 
-                            FileUpload::make('pickup_proof')
-                                ->label('Foto Bukti Pengambilan')
-                                ->image()
-                                ->disk('public')
-                                ->directory('pickup-proofs')
-                                ->disabled()
-                                ->dehydrated(false)
-                                ->openable()
-                                ->downloadable()
-                                ->previewable()
-                                ->getUploadedFileUsing(function (string $file): ?array {
-                                    $disk = Storage::disk('public');
-                                    if (!$disk->exists($file)) {
-                                        return null;
+                            Placeholder::make('pickup_proof_display')
+                                ->label('Foto Bukti Penyerahan Barang')
+                                ->content(function (?Order $record) {
+                                    if (!$record || empty($record->pickup_proof)) {
+                                        return new HtmlString('<div style="padding:12px;background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px;color:#9ca3af;font-size:13px;">Belum ada foto bukti penyerahan</div>');
                                     }
-                                    return [
-                                        'name' => basename($file),
-                                        'size' => $disk->size($file),
-                                        'type' => 'image/jpeg',
-                                        'url' => asset('storage/' . $file),
-                                    ];
+
+                                    $url = asset('storage/' . $record->pickup_proof);
+                                    return new HtmlString("
+                                        <div style='margin-top:6px;'>
+                                            <a href='{$url}' target='_blank' style='display:inline-block;'>
+                                                <img src='{$url}' style='max-height:280px;width:auto;border-radius:10px;border:1px solid #e5e7eb;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);object-fit:cover;' alt='Bukti Penyerahan' />
+                                                <div style='margin-top:6px;font-size:12px;color:#2563eb;font-weight:600;'>🔍 Klik foto untuk membuka ukuran penuh di tab baru</div>
+                                            </a>
+                                        </div>
+                                    ");
                                 })
                                 ->columnSpanFull(),
                         ])
-                        ->visible(fn (?Order $record) => $record?->status === 'selesai')
+                        ->visible(fn (?Order $record) => $record?->status === 'selesai' || !empty($record?->pickup_proof))
                         ->collapsible(),
 
                 ])
@@ -1039,6 +1034,37 @@ class OrderResource extends Resource
                         ->modalHeading('Catat Retur Pesanan')
                         ->modalSubmitActionLabel('Simpan Retur')
                         ->visible(fn (Order $record): bool => in_array(auth()->user()->role, ['owner', 'admin']) && $record->status === 'selesai'),
+
+                    // Lihat Bukti Penyerahan
+                    \Filament\Actions\Action::make('view_pickup_proof')
+                        ->label('Lihat Bukti Penyerahan')
+                        ->icon('heroicon-o-camera')
+                        ->color('info')
+                        ->modalHeading('Bukti Penyerahan Pesanan')
+                        ->modalSubmitAction(false)
+                        ->modalCancelActionLabel('Tutup')
+                        ->form([
+                            Placeholder::make('pickup_info')
+                                ->label(false)
+                                ->content(function (Order $record) {
+                                    $pickupAt = $record->pickup_at ? $record->pickup_at->format('d M Y, H:i') . ' WIB' : '-';
+                                    $note = $record->pickup_note ?: '-';
+                                    $proofUrl = $record->pickup_proof ? asset('storage/' . $record->pickup_proof) : null;
+
+                                    $imgHtml = $proofUrl
+                                        ? "<div style='margin-top:12px;'><a href='{$proofUrl}' target='_blank'><img src='{$proofUrl}' style='max-height:350px;width:100%;object-fit:contain;border-radius:10px;border:1px solid #e5e7eb;' /><div style='margin-top:8px;font-size:12px;color:#2563eb;font-weight:600;text-align:center;'>🔍 Klik gambar untuk membuka ukuran penuh di tab baru</div></a></div>"
+                                        : "<div style='margin-top:12px;padding:12px;background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px;color:#6b7280;'>Tidak ada foto bukti penyerahan.</div>";
+
+                                    return new HtmlString("
+                                        <div style='font-size:13px;color:#374151;'>
+                                            <div style='margin-bottom:6px;'><strong>Waktu Penyerahan:</strong> {$pickupAt}</div>
+                                            <div style='margin-bottom:6px;'><strong>Catatan / Penerima:</strong> {$note}</div>
+                                            {$imgHtml}
+                                        </div>
+                                    ");
+                                })
+                        ])
+                        ->visible(fn (Order $record): bool => $record->status === 'selesai' || !empty($record->pickup_proof)),
 
                     // Delete
                     \Filament\Actions\DeleteAction::make()
