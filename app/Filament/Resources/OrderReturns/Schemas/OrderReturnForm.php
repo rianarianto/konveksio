@@ -115,15 +115,37 @@ class OrderReturnForm
                     foreach ($items as $item) {
                         $size = $item->size ? "Ukuran: {$item->size}" : "Tanpa Ukuran";
                         $qty = " ({$item->quantity} pcs)";
+                        
                         $details = [];
                         if ($item->recipient_name) {
                             $details[] = "Penerima: {$item->recipient_name}";
                         }
-                        if (!empty($item->size_and_request_details['gender'])) {
-                            $genderLabel = $item->size_and_request_details['gender'] === 'L' ? 'Laki-laki' : 'Perempuan';
+
+                        $reqDetails = $item->size_and_request_details ?? [];
+                        if (!empty($reqDetails['gender'])) {
+                            $genderLabel = $reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan';
                             $details[] = "Kategori: {$genderLabel}";
                         }
-                        $extra = count($details) > 0 ? " — " . implode(', ', $details) : "";
+
+                        // Specific clothing model specs (lengan, kerah, etc.)
+                        $specs = [];
+                        if (!empty($reqDetails['sleeve_model'])) {
+                            $sleeve = str_replace('_', ' ', (string)$reqDetails['sleeve_model']);
+                            $specs[] = "Lengan " . ucfirst($sleeve);
+                        }
+                        if (!empty($reqDetails['collar_model'])) {
+                            $collar = str_replace('_', ' ', (string)$reqDetails['collar_model']);
+                            $specs[] = "Kerah " . ucfirst($collar);
+                        }
+                        if (count($specs) > 0) {
+                            $details[] = implode(', ', $specs);
+                        }
+
+                        if (!empty($reqDetails['note'])) {
+                            $details[] = "Catatan: " . $reqDetails['note'];
+                        }
+
+                        $extra = count($details) > 0 ? " — " . implode(' | ', $details) : "";
                         $options[$item->id] = "{$size}{$qty}{$extra}";
                     }
                     return $options;
