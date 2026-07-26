@@ -317,25 +317,20 @@ class PiutangTableWidget extends BaseWidget
                             $paidAmount = number_format($record->payments()->sum('amount'), 0, ',', '.');
                             $sisaTagihan = number_format($record->remaining_balance, 0, ',', '.');
                             
-                            $itemCount = $record->orderItems->count();
-                            $statusLabel = match($record->status) {
-                                'siap_diambil' => 'Siap Diambil',
-                                'selesai'     => 'Selesai',
-                                'diproses'    => 'Sedang Diproses / Produksi',
-                                default       => ucfirst($record->status ?? 'Diproses'),
+                            $statusText = match($record->status) {
+                                'siap_diambil' => 'telah siap untuk diambil',
+                                'selesai'     => 'telah selesai diproses',
+                                default       => 'sedang dalam proses pengerjaan',
                             };
 
-                            $msg = "Halo Kak *" . $customerName . "*,\n\n"
-                                . "Pesan pengingat dari *" . $businessName . "* untuk rincian tagihan pesanan Anda:\n\n"
-                                . "📌 *No. Pesanan:* " . $record->order_number . "\n"
-                                . "📦 *Jumlah Item:* " . $itemCount . " Item\n"
-                                . "📍 *Status Pesanan:* *" . $statusLabel . "*\n\n"
-                                . "💰 *Rincian Pembayaran:*\n"
+                            $msg = "Selamat pagi/siang Kak *" . $customerName . "*,\n\n"
+                                . "Kami dari *" . $businessName . "* ingin menginformasikan bahwa pesanan Kakak dengan nomor *" . $record->order_number . "* " . $statusText . ".\n\n"
+                                . "Rincian Pembayaran:\n"
                                 . "• Total Tagihan: Rp " . $totalTagihan . "\n"
                                 . "• Sudah Dibayar: Rp " . $paidAmount . "\n"
-                                . "-----------------------------------\n"
-                                . "🔴 *Sisa Tagihan:* *Rp " . $sisaTagihan . "*\n\n"
-                                . "Terima kasih banyak atas kepercayaan Anda di *" . $businessName . "*! 🙏";
+                                . "• Sisa Tagihan: Rp " . $sisaTagihan . "\n\n"
+                                . "Mohon melampirkan bukti pelunasan bilamana pembayaran telah dilakukan. Jika ada pertanyaan terkait pesanan, jangan ragu untuk menghubungi kami kembali.\n\n"
+                                . "Terima kasih atas kepercayaan Kakak kepada *" . $businessName . "*. 🙏";
 
                             return "https://wa.me/" . $phone . "?text=" . urlencode($msg);
                         })
