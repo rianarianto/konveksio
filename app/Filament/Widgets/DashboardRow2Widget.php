@@ -34,23 +34,31 @@ class DashboardRow2Widget extends Widget
             ->sum('amount');
 
         // ── Daftar Aktivitas Terbaru ──
-        // Latest updated production tasks with their order/customer info
+        // Ambil aktivitas produksi terbaru per item pesanan (unique order_item_id)
         $tasks = ProductionTask::with([
             'orderItem.order.customer',
         ])
             ->whereHas('orderItem.order', fn($q) => $q->where('shop_id', $tenantId))
             ->latest('updated_at')
-            ->take(4)
-            ->get();
+            ->get()
+            ->unique('order_item_id')
+            ->take(5);
 
         $activities = $tasks->map(function ($task) {
-            $order = $task->orderItem?->order;
+            $orderItem = $task->orderItem;
+            $order = $orderItem?->order;
             $customer = $order?->customer;
+            $productName = $orderItem?->product_name ?? '';
+
+            $displayName = $customer?->name ?? '-';
+            if ($productName) {
+                $displayName .= " • {$productName}";
+            }
 
             return [
                 'invoice' => $order?->order_number ?? '-',
-                'customer_name' => $customer?->name ?? '-',
-                'stage' => $task->stage_name ?? '-',
+                'customer_name' => $displayName,
+                'stage' => strtoupper(str_replace('_', ' ', $task->stage_name ?? '-')),
                 'status' => $task->status ?? 'antrian',
             ];
         });

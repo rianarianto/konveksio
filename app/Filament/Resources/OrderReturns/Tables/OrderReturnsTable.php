@@ -2,10 +2,11 @@
 
 namespace App\Filament\Resources\OrderReturns\Tables;
 
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -30,8 +31,14 @@ class OrderReturnsTable
                     ->searchable(),
 
                 TextColumn::make('return_date')
-                    ->label('Tanggal')
+                    ->label('Tanggal Retur')
                     ->date('d M Y')
+                    ->description(function (OrderReturn $record) {
+                        if ($record->expected_pickup_date) {
+                            return '🎯 Target: ' . $record->expected_pickup_date->format('d M Y');
+                        }
+                        return null;
+                    })
                     ->sortable(),
 
                 TextColumn::make('responsibility_type')
@@ -97,11 +104,40 @@ class OrderReturnsTable
             ->filters([
                 //
             ])
-            ->recordActions([
+            ->actions([
                 ViewAction::make(),
                 EditAction::make(),
+                DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->before(function (OrderReturn $record) {
+                        $itemId = $record->order_item_id;
+
+                        // 1. Hapus task revisi retur
+                        if ($itemId) {
+                            \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $itemId)
+                                ->where('is_revision', true)
+                                ->delete();
+
+                            // 2. Jika tidak ada retur aktif lainnya, kembalikan status WorkOrder ke COMPLETED
+                            $hasOtherReturns = OrderReturn::where('order_item_id', $itemId)
+                                ->where('id', '!=', $record->id)
+                                ->whereIn('status', ['pending', 'diproses'])
+                                ->exists();
+
+                            if (!$hasOtherReturns) {
+                                $wo = \App\Models\WorkOrder::where('order_item_id', $itemId)->first();
+                                if ($wo) {
+                                    $wo->update([
+                                        'status' => \App\Models\WorkOrder::STATUS_COMPLETED,
+                                        'current_review_stage' => null,
+                                    ]);
+                                }
+                            }
+                        }
+                    }),
             ])
-            ->toolbarActions([
+            ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),

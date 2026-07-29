@@ -110,39 +110,96 @@ class OrderItemRelationManager extends RelationManager
                 \Filament\Actions\CreateAction::make()
                     ->label('Tambah Item')
                     ->icon('heroicon-o-plus')
-                    ->form([
-                        \Filament\Forms\Components\Grid::make(2)
-                            ->schema([
-                                TextInput::make('product_name')
-                                    ->label('Nama Item')
-                                    ->required()
-                                    ->columnSpanFull(),
-                                Select::make('size')
-                                    ->label('Ukuran')
-                                    ->options(array_merge($sizeOptions, ['Custom' => 'Custom']))
-                                    ->searchable(),
-                                Select::make('production_category')
-                                    ->label('Kategori')
-                                    ->options($categoryOptions)
-                                    ->required()
-                                    ->default('produksi'),
-                                Select::make('bahan_id')
-                                    ->label('Bahan')
-                                    ->options($bahanOptions)
-                                    ->searchable(),
-                                TextInput::make('price')
-                                    ->label('Harga Satuan')
-                                    ->numeric()
-                                    ->prefix('Rp')
-                                    ->required()
-                                    ->default(0),
-                                TextInput::make('quantity')
-                                    ->label('Quantity')
-                                    ->numeric()
-                                    ->required()
-                                    ->default(1),
-                            ])
-                    ])
+                    ->form(function () use ($sizeOptions, $bahanOptions, $categoryOptions) {
+                        $order = $this->getOwnerRecord();
+                        $existingProductNames = $order->orderItems()
+                            ->pluck('product_name', 'product_name')
+                            ->filter()
+                            ->unique()
+                            ->toArray();
+
+                        return [
+                            \Filament\Forms\Components\Grid::make(2)
+                                ->schema([
+                                    Select::make('product_name')
+                                        ->label('Nama Item / Produk')
+                                        ->options($existingProductNames)
+                                        ->searchable()
+                                        ->createOptionForm([
+                                            TextInput::make('new_product_name')
+                                                ->label('Nama Produk Baru')
+                                                ->required(),
+                                        ])
+                                        ->createOptionUsing(fn (array $data) => $data['new_product_name'])
+                                        ->required()
+                                        ->reactive()
+                                        ->columnSpanFull()
+                                        ->afterStateUpdated(function ($state, callable $set) use ($order) {
+                                            if (!$state) return;
+                                            $existingItem = $order->orderItems()->where('product_name', $state)->first();
+                                            if ($existingItem) {
+                                                $set('production_category', $existingItem->production_category);
+                                                $set('bahan_id', $existingItem->bahan_id);
+                                                $set('price', $existingItem->price);
+                                            }
+                                        }),
+
+                                    Select::make('size')
+                                        ->label('Ukuran')
+                                        ->options(array_merge($sizeOptions, ['Custom' => 'Custom']))
+                                        ->searchable()
+                                        ->required(),
+
+                                    TextInput::make('recipient_name')
+                                        ->label('Nama Penerima (Opsional)')
+                                        ->placeholder('Contoh: Andre / Budi'),
+
+                                    Select::make('production_category')
+                                        ->label('Kategori')
+                                        ->options($categoryOptions)
+                                        ->required()
+                                        ->default('produksi')
+                                        ->disabled(fn ($get) => !empty($get('product_name')) && $order->orderItems()->where('product_name', $get('product_name'))->exists())
+                                        ->dehydrated(),
+
+                                    Select::make('bahan_id')
+                                        ->label('Bahan')
+                                        ->options($bahanOptions)
+                                        ->searchable()
+                                        ->disabled(fn ($get) => !empty($get('product_name')) && $order->orderItems()->where('product_name', $get('product_name'))->exists())
+                                        ->dehydrated(),
+
+                                    TextInput::make('price')
+                                        ->label('Harga Satuan')
+                                        ->numeric()
+                                        ->prefix('Rp')
+                                        ->required()
+                                        ->default(0),
+
+                                    TextInput::make('quantity')
+                                        ->label('Quantity (Pcs)')
+                                        ->numeric()
+                                        ->required()
+                                        ->default(1)
+                                        ->minValue(1),
+                                ])
+                        ];
+                    })
+                    ->mutateFormDataUsing(function (array $data): array {
+                        $order = $this->getOwnerRecord();
+                        $existingItem = $order->orderItems()->where('product_name', $data['product_name'] ?? '')->first();
+
+                        if ($existingItem) {
+                            $data['production_category'] = $existingItem->production_category;
+                            $data['bahan_id'] = $existingItem->bahan_id;
+                            $data['size_and_request_details'] = $existingItem->size_and_request_details;
+                            $data['design_status'] = $existingItem->design_status;
+                            $data['design_image'] = $existingItem->design_image;
+                            $data['is_addition'] = true;
+                        }
+
+                        return $data;
+                    })
                     ->after(function () {
                         $this->updateOrderSubtotal();
                     }),
@@ -153,18 +210,54 @@ class OrderItemRelationManager extends RelationManager
                     ->icon('heroicon-o-squares-plus')
                     ->color('primary')
                     ->form(function () use ($sizeOptions, $bahanOptions, $categoryOptions) {
+                        $order = $this->getOwnerRecord();
+                        $existingProductNames = $order->orderItems()
+                            ->pluck('product_name', 'product_name')
+                            ->filter()
+                            ->unique()
+                            ->toArray();
+
                         return [
+                            Select::make('bulk_product_name')
+                                ->label('Nama Item / Produk')
+                                ->options($existingProductNames)
+                                ->searchable()
+                                ->createOptionForm([
+                                    TextInput::make('new_product_name')
+                                        ->label('Nama Produk Baru')
+                                        ->required(),
+                                ])
+                                ->createOptionUsing(fn (array $data) => $data['new_product_name'])
+                                ->required()
+                                ->reactive()
+                                ->columnSpanFull()
+                                ->afterStateUpdated(function ($state, callable $set) use ($order) {
+                                    if (!$state) return;
+                                    $existingItem = $order->orderItems()->where('product_name', $state)->first();
+                                    if ($existingItem) {
+                                        $set('bulk_category', $existingItem->production_category);
+                                        $set('bulk_bahan', $existingItem->bahan_id);
+                                        $set('bulk_price', $existingItem->price);
+                                    }
+                                }),
+
                             \Filament\Forms\Components\Grid::make(3)
                                 ->schema([
                                     Select::make('bulk_category')
                                         ->label('Kategori')
                                         ->options($categoryOptions)
                                         ->default('produksi')
-                                        ->required(),
+                                        ->required()
+                                        ->disabled(fn ($get) => !empty($get('bulk_product_name')) && $order->orderItems()->where('product_name', $get('bulk_product_name'))->exists())
+                                        ->dehydrated(),
+
                                     Select::make('bulk_bahan')
                                         ->label('Bahan')
                                         ->options($bahanOptions)
-                                        ->searchable(),
+                                        ->searchable()
+                                        ->disabled(fn ($get) => !empty($get('bulk_product_name')) && $order->orderItems()->where('product_name', $get('bulk_product_name'))->exists())
+                                        ->dehydrated(),
+
                                     TextInput::make('bulk_price')
                                         ->label('Harga Default')
                                         ->numeric()
@@ -208,40 +301,36 @@ class OrderItemRelationManager extends RelationManager
                     ->modalHeading('Bulk Generate Items')
                     ->modalDescription('Masukkan jumlah per ukuran. Item akan langsung ditambahkan ke tabel.')
                     ->action(function (array $data) use ($sizeOptions) {
-                        $category = $data['bulk_category'] ?? 'produksi';
-                        $bahanId = $data['bulk_bahan'] ?? null;
-                        $price = (int) ($data['bulk_price'] ?? 0);
-                        $items = [];
+                        $order = $this->getOwnerRecord();
+                        $productName = $data['bulk_product_name'] ?? 'Item Baru';
+                        $existingItem = $order->orderItems()->where('product_name', $productName)->first();
+
+                        $category = $data['bulk_category'] ?? ($existingItem?->production_category ?? 'produksi');
+                        $bahanId = $data['bulk_bahan'] ?? ($existingItem?->bahan_id ?? null);
+                        $price = (int) ($data['bulk_price'] ?? ($existingItem?->price ?? 0));
+                        $rawItems = [];
 
                         foreach ($sizeOptions as $key => $label) {
                             $qty = (int) ($data["qty_{$key}"] ?? 0);
                             for ($i = 0; $i < $qty; $i++) {
-                                $items[] = [
-                                    'product_name' => '',
+                                $rawItems[] = [
                                     'size' => $key,
-                                    'production_category' => $category,
-                                    'bahan_id' => $bahanId,
                                     'price' => $price,
-                                    'quantity' => 1,
                                 ];
                             }
                         }
 
                         $customQty = (int) ($data['qty_custom'] ?? 0);
-                        $customPrice = (int) ($data['bulk_price_custom'] ?? $price); // Use custom price if set, otherwise fallback to default price
+                        $customPrice = (int) ($data['bulk_price_custom'] ?? $price);
 
                         for ($i = 0; $i < $customQty; $i++) {
-                            $items[] = [
-                                'product_name' => '',
+                            $rawItems[] = [
                                 'size' => 'Custom',
-                                'production_category' => $category,
-                                'bahan_id' => $bahanId,
                                 'price' => $customPrice,
-                                'quantity' => 1,
                             ];
                         }
 
-                        if (empty($items)) {
+                        if (empty($rawItems)) {
                             Notification::make()
                                 ->warning()
                                 ->title('Tidak ada item yang digenerate')
@@ -250,16 +339,89 @@ class OrderItemRelationManager extends RelationManager
                             return;
                         }
 
-                        $order = $this->getOwnerRecord();
-                        foreach ($items as $item) {
-                            $order->orderItems()->create($item);
+                        foreach ($rawItems as $itemData) {
+                            $newItemData = [
+                                'product_name' => $productName,
+                                'size' => $itemData['size'],
+                                'production_category' => $category,
+                                'bahan_id' => $bahanId,
+                                'price' => $itemData['price'],
+                                'quantity' => 1,
+                            ];
+
+                            if ($existingItem) {
+                                $newItemData['size_and_request_details'] = $existingItem->size_and_request_details;
+                                $newItemData['design_status'] = $existingItem->design_status;
+                                $newItemData['design_image'] = $existingItem->design_image;
+                                $newItemData['is_addition'] = true;
+                            }
+
+                            $order->orderItems()->create($newItemData);
                         }
 
                         $this->updateOrderSubtotal();
 
                         Notification::make()
                             ->success()
-                            ->title(count($items) . ' item berhasil ditambahkan!')
+                            ->title(count($rawItems) . ' item berhasil ditambahkan!')
+                            ->send();
+                    }),
+
+                // ─── SINKRONKAN SPESIFIKASI ──────────────────────────────────
+                \Filament\Actions\Action::make('sync_specs')
+                    ->label('Sinkronkan Spesifikasi')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Sinkronkan Spesifikasi Item Pesanan')
+                    ->modalDescription('Tindakan ini akan menyeragamkan spesifikasi (bahan, lengan, kerah, saku, kancing) seluruh item yang memiliki nama produk yang sama.')
+                    ->action(function () {
+                        $order = $this->getOwnerRecord();
+                        $grouped = $order->orderItems()->get()->groupBy('product_name');
+                        $updatedCount = 0;
+
+                        foreach ($grouped as $pName => $items) {
+                            if ($items->count() <= 1) continue;
+
+                            $primaryL = $items->first(fn($i) => strtoupper($i->size_and_request_details['gender'] ?? 'L') === 'L');
+                            $primaryP = $items->first(fn($i) => strtoupper($i->size_and_request_details['gender'] ?? 'L') === 'P');
+                            $baseItem = $items->first();
+
+                            foreach ($items as $item) {
+                                $gender = strtoupper($item->size_and_request_details['gender'] ?? 'L');
+                                $refItem = ($gender === 'P' && $primaryP) ? $primaryP : (($gender === 'L' && $primaryL) ? $primaryL : $baseItem);
+
+                                $updateData = [
+                                    'bahan_id' => $refItem->bahan_id,
+                                    'production_category' => $refItem->production_category,
+                                    'design_status' => $refItem->design_status,
+                                    'design_image' => $refItem->design_image,
+                                ];
+
+                                if ($refItem->id !== $item->id) {
+                                    $details = $item->size_and_request_details ?? [];
+                                    $refDetails = $refItem->size_and_request_details ?? [];
+
+                                    $details['material_variant_id'] = $refDetails['material_variant_id'] ?? ($details['material_variant_id'] ?? null);
+                                    $details['sleeve_model'] = $refDetails['sleeve_model'] ?? ($details['sleeve_model'] ?? null);
+                                    $details['pocket_model'] = $refDetails['pocket_model'] ?? ($details['pocket_model'] ?? null);
+                                    $details['button_model'] = $refDetails['button_model'] ?? ($details['button_model'] ?? null);
+                                    $details['collar_model'] = $refDetails['collar_model'] ?? ($details['collar_model'] ?? null);
+                                    if ($gender === 'P' && isset($refDetails['model'])) {
+                                        $details['model'] = $refDetails['model'];
+                                    }
+
+                                    $updateData['size_and_request_details'] = $details;
+                                    $item->update($updateData);
+                                    $updatedCount++;
+                                }
+                            }
+                        }
+
+                        Notification::make()
+                            ->success()
+                            ->title("Spesifikasi berhasil disinkronkan!")
+                            ->body("{$updatedCount} item telah diseragamkan spesifikasinya.")
                             ->send();
                     }),
             ])

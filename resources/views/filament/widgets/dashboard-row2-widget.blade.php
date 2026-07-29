@@ -30,6 +30,13 @@
             'bordir' => ['label' => 'BORDIR', 'bg' => '#f0fdf4', 'color' => '#15803d', 'border' => '#bbf7d0'],
             'finishing' => ['label' => 'FINISHING', 'bg' => '#fef9c3', 'color' => '#a16207', 'border' => '#fef08a'],
             'packing' => ['label' => 'PACKING', 'bg' => '#f0f9ff', 'color' => '#0369a1', 'border' => '#bae6fd'],
+            'qc_persiapan' => ['label' => 'QC PERSIAPAN', 'bg' => '#fef3c7', 'color' => '#d97706', 'border' => '#fde68a'],
+            'qc_prep' => ['label' => 'QC PERSIAPAN', 'bg' => '#fef3c7', 'color' => '#d97706', 'border' => '#fde68a'],
+            'qc_review' => ['label' => 'QC REVIEW', 'bg' => '#e0e7ff', 'color' => '#4338ca', 'border' => '#c7d2fe'],
+            'qc_akhir' => ['label' => 'QC AKHIR', 'bg' => '#ecfdf5', 'color' => '#047857', 'border' => '#a7f3d0'],
+            'qc_finishing' => ['label' => 'QC FINISHING', 'bg' => '#fef9c3', 'color' => '#a16207', 'border' => '#fef08a'],
+            'selesai' => ['label' => 'SELESAI', 'bg' => '#dcfce7', 'color' => '#16a34a', 'border' => '#bbf7d0'],
+            'completed' => ['label' => 'SELESAI', 'bg' => '#dcfce7', 'color' => '#16a34a', 'border' => '#bbf7d0'],
             'antrian' => ['label' => 'ANTRIAN', 'bg' => '#f1f5f9', 'color' => '#475569', 'border' => '#e2e8f0'],
         ];
     @endphp
@@ -366,7 +373,7 @@
                     @php
                         $stageKey = strtolower(trim($act['stage']));
                         $badge = $stageConfig[$stageKey]
-                            ?? ['label' => strtoupper($act['stage']), 'bg' => '#f1f5f9', 'color' => '#475569', 'border' => '#e2e8f0'];
+                            ?? ['label' => strtoupper(str_replace('_', ' ', $act['stage'])), 'bg' => '#f1f5f9', 'color' => '#475569', 'border' => '#e2e8f0'];
                     @endphp
                     <div class="r2-act-item">
                         <div class="r2-act-info">

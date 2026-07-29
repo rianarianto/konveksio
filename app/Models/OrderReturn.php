@@ -12,6 +12,7 @@ class OrderReturn extends Model
         'order_id',
         'order_item_id',
         'return_date',
+        'expected_pickup_date',
         'items_description',
         'quantity',
         'reason',
@@ -26,6 +27,7 @@ class OrderReturn extends Model
 
     protected $casts = [
         'return_date' => 'date',
+        'expected_pickup_date' => 'date',
         'quantity' => 'integer',
         'additional_fee' => 'decimal:2',
         'size_breakdown' => 'array',
@@ -48,6 +50,34 @@ class OrderReturn extends Model
 
     protected static function booted(): void
     {
+        static::creating(function ($return) {
+            if (empty($return->status)) {
+                $return->status = 'pending';
+            }
+            if (empty($return->return_date)) {
+                $return->return_date = now();
+            }
+            if (empty($return->expected_pickup_date)) {
+                $return->expected_pickup_date = now()->addDays(3);
+            }
+            if (empty($return->reason) && !empty($return->items_description)) {
+                $return->reason = $return->items_description;
+            }
+            if (empty($return->items_description) && !empty($return->reason)) {
+                $return->items_description = $return->reason;
+            }
+            if (empty($return->size_breakdown) && $return->order_item_id) {
+                $item = \App\Models\OrderItem::find($return->order_item_id);
+                if ($item) {
+                    $szKey = $item->size ? "Size {$item->size}" : "Tanpa Ukuran";
+                    if (!empty($item->recipient_name)) {
+                        $szKey .= " (Nama: {$item->recipient_name})";
+                    }
+                    $return->size_breakdown = [$szKey => $return->quantity ?: 1];
+                }
+            }
+        });
+
         static::created(function ($return) {
             $item = $return->orderItem;
             if (!$item) return;
@@ -55,16 +85,17 @@ class OrderReturn extends Model
             $wo = $item->workOrder;
             $isCustomerPaid = $return->responsibility_type === 'customer_paid';
 
-            // Size Breakdown untuk Task (Array [size => qty] atau custom recipients)
             $taskSizeQty = !empty($return->size_breakdown) ? $return->size_breakdown : null;
 
             if ($return->action_type === 'repair') {
-                $stageName = match($return->target_stage) {
+                $stageName = match(strtolower((string)$return->target_stage)) {
                     'potong' => 'Potong',
-                    'sablon' => 'Sablon/Bordir',
-                    'jahit' => 'Jahit',
-                    'qc' => 'QC',
-                    default => 'Jahit',
+                    'bordir/sablon', 'sablon/bordir', 'sablon', 'bordir' => 'Bordir/Sablon',
+                    'finishing' => 'Finishing',
+                    'kancing' => 'Kancing',
+                    'qc_persiapan', 'qc_prep' => 'QC_PERSIAPAN',
+                    'qc_akhir', 'qc_selesai', 'qc' => 'QC_AKHIR',
+                    default => $return->target_stage ?: 'Jahit',
                 };
 
                 // Find the latest task for this stage
@@ -91,6 +122,8 @@ class OrderReturn extends Model
                             'wage_amount' => $repairWage,
                             'status' => 'pending',
                             'is_revision' => true,
+                            'revision_source' => 'qc_akhir',
+                            'assigned_by' => $task->assigned_by ?? auth()->id() ?? 1,
                             'assigned_to' => $task->assigned_to,
                             'size_quantities' => $taskSizeQty,
                             'note' => '⚠️ REVISI RETUR (' . ($isCustomerPaid ? 'Berbayar' : 'Garansi') . '): ' . $return->reason,
@@ -100,6 +133,7 @@ class OrderReturn extends Model
                         $task->update([
                             'status' => 'pending',
                             'is_revision' => true,
+                            'revision_source' => 'qc_akhir',
                             'quantity' => $return->quantity,
                             'wage_amount' => 0,
                             'size_quantities' => $taskSizeQty,
@@ -116,12 +150,14 @@ class OrderReturn extends Model
                         'wage_amount' => $repairWage,
                         'status' => 'pending',
                         'is_revision' => true,
+                        'revision_source' => 'qc_akhir',
+                        'assigned_by' => auth()->id() ?? 1,
                         'size_quantities' => $taskSizeQty,
                         'note' => '⚠️ REVISI RETUR (New): ' . $return->reason,
                     ]);
                 }
 
-                // Revert WorkOrder status to target stage
+                // Revert WorkOrder status to target stage & trigger WA to worker
                 if ($wo) {
                     $idx = array_search($stageName, $wo->stage_sequence);
                     $wo->update([
@@ -129,6 +165,12 @@ class OrderReturn extends Model
                         'current_stage_index' => $idx !== false ? $idx : 0,
                         'stage_entered_at' => now(),
                     ]);
+                    
+                    try {
+                        \App\Helpers\NotificationHelper::notify($wo, $stageName);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error("[WA Retur] Gagal kirim WA retur: " . $e->getMessage());
+                    }
                 }
             } elseif ($return->action_type === 'remake') {
                 $stages = ['Potong', 'Sablon/Bordir', 'Jahit', 'QC'];

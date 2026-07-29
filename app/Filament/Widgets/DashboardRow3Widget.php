@@ -42,7 +42,7 @@ class DashboardRow3Widget extends Widget
 
         $query = Order::query()
             ->where('shop_id', $tenantId)
-            ->with(['customer', 'orderItems.productionTasks']);
+            ->with(['customer', 'creator', 'orderItems.productionTasks']);
 
         if (!empty($this->search)) {
             $query->where(function ($q) {

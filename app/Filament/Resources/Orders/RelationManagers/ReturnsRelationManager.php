@@ -2,23 +2,16 @@
 
 namespace App\Filament\Resources\Orders\RelationManagers;
 
-use Filament\Actions\AssociateAction;
-use Filament\Actions\BulkActionGroup;
+use App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm;
+use App\Models\OrderReturn;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\DissociateAction;
-use Filament\Actions\DissociateBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Hidden;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -26,87 +19,91 @@ class ReturnsRelationManager extends RelationManager
 {
     protected static string $relationship = 'returns';
     
-    protected static ?string $title = 'Retur Pesanan';
+    protected static ?string $title = 'Retur & Garansi Pesanan';
 
     public function form(Schema $schema): Schema
     {
-        return $schema
-            ->components([
-                Hidden::make('shop_id')
-                    ->default(fn () => \Filament\Facades\Filament::getTenant()?->id),
-                DatePicker::make('return_date')
-                    ->label('Tanggal Retur')
-                    ->default(now())
-                    ->required(),
-                TextInput::make('quantity')
-                    ->label('Jumlah (Pcs)')
-                    ->required()
-                    ->numeric()
-                    ->default(1),
-                Select::make('status')
-                    ->label('Status')
-                    ->options([
-                        'pending' => 'Pending',
-                        'diproses' => 'Diproses',
-                        'selesai' => 'Selesai',
-                    ])
-                    ->required()
-                    ->default('pending'),
-                Textarea::make('items_description')
-                    ->label('Barang yang Diretur')
-                    ->placeholder('Misal: Kaos XL warna merah luntur')
-                    ->required()
-                    ->columnSpanFull(),
-                Textarea::make('reason')
-                    ->label('Alasan Retur')
-                    ->placeholder('Misal: Jahitan di ketiak lepas, sablon miring, dll.')
-                    ->columnSpanFull(),
-            ]);
-    }
-
-    public function infolist(Schema $schema): Schema
-    {
-        return $schema
-            ->components([
-                TextEntry::make('shop.name')
-                    ->label('Shop'),
-                TextEntry::make('return_date')
-                    ->date(),
-                TextEntry::make('items_description')
-                    ->columnSpanFull(),
-                TextEntry::make('quantity')
-                    ->numeric(),
-                TextEntry::make('reason')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('status'),
-                TextEntry::make('created_at')
-                    ->dateTime()
-                    ->placeholder('-'),
-                TextEntry::make('updated_at')
-                    ->dateTime()
-                    ->placeholder('-'),
-            ]);
+        return $schema->components(OrderReturnForm::getComponents(true));
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('items_description')
             ->columns([
                 TextColumn::make('return_date')
-                    ->label('Tanggal')
+                    ->label('Tanggal Retur')
                     ->date('d M Y')
+                    ->description(function (OrderReturn $record) {
+                        if ($record->expected_pickup_date) {
+                            return '🎯 Target Selesai: ' . $record->expected_pickup_date->format('d M Y');
+                        }
+                        return null;
+                    })
                     ->sortable(),
-                TextColumn::make('items_description')
-                    ->label('Barang')
-                    ->limit(50),
-                TextColumn::make('quantity')
-                    ->label('Jml')
-                    ->numeric(),
-                TextColumn::make('status')
-                    ->label('Status')
+
+                TextColumn::make('orderItem.product_name')
+                    ->label('Varian / Ukuran Item')
+                    ->formatStateUsing(function (OrderReturn $record) {
+                        $item = $record->orderItem;
+                        if (!$item) return '-';
+                        
+                        $size = $item->size ?: 'All Size';
+                        $gender = $item->size_and_request_details['gender'] ?? null;
+                        $genderLabel = $gender ? ($gender === 'L' ? 'Laki-laki' : 'Perempuan') : null;
+                        $additionTag = $item->is_addition ? ' ➕ [Tambahan]' : '';
+                        
+                        return "{$item->product_name} [Size {$size}" . ($genderLabel ? " - {$genderLabel}" : '') . "]{$additionTag}";
+                    })
+                    ->description(fn (OrderReturn $record) => $record->orderItem?->recipient_name ? '👤 Penerima: ' . $record->orderItem->recipient_name : null),
+
+                TextColumn::make('responsibility_type')
+                    ->label('Tipe Garansi')
                     ->badge()
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'customer_paid' => '💳 Berbayar (Kesalahan Customer)',
+                        default => '🛡️ Garansi Toko (Gratis)',
+                    })
+                    ->color(fn ($state) => match ($state) {
+                        'customer_paid' => 'danger',
+                        default => 'success',
+                    }),
+
+                TextColumn::make('items_description')
+                    ->label('Catatan Perbaikan / Defect')
+                    ->limit(40)
+                    ->wrap(),
+
+                TextColumn::make('target_stage')
+                    ->label('Tujuan Perbaikan')
+                    ->formatStateUsing(fn ($state) => '🔧 ' . ucfirst($state ?: 'Jahit')),
+
+                TextColumn::make('quantity')
+                    ->label('Qty Retur')
+                    ->formatStateUsing(function ($state, OrderReturn $record) {
+                        if (!empty($record->size_breakdown) && is_array($record->size_breakdown)) {
+                            $parts = [];
+                            foreach ($record->size_breakdown as $sz => $q) {
+                                $parts[] = "{$sz}: {$q} pcs";
+                            }
+                            return implode(', ', $parts);
+                        }
+                        return $state . ' pcs';
+                    })
+                    ->weight('bold'),
+
+                ImageColumn::make('photo_path')
+                    ->label('Foto Bukti')
+                    ->circular(),
+
+                TextColumn::make('status')
+                    ->label('Status Antrian')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'pending' => '⏳ Pending (Di Antrian)',
+                        'diproses' => '🔨 Diproses Tukang',
+                        'selesai' => '✅ Selesai Retur',
+                        default => $state,
+                    })
                     ->color(fn (string $state): string => match ($state) {
                         'pending' => 'warning',
                         'diproses' => 'primary',
@@ -114,22 +111,73 @@ class ReturnsRelationManager extends RelationManager
                         default => 'gray',
                     }),
             ])
-            ->filters([
-                //
-            ])
             ->headerActions([
-                CreateAction::make()
-                    ->label('Tambah Retur')
-                    ->icon('heroicon-o-plus'),
+                \Filament\Actions\Action::make('create_return')
+                    ->label('Tambah Retur Pesanan')
+                    ->icon('heroicon-o-plus')
+                    ->button()
+                    ->color('primary')
+                    ->fillForm(fn (): array => [
+                        'order_id' => $this->getOwnerRecord()?->id,
+                        'shop_id' => $this->getOwnerRecord()?->shop_id ?? \Filament\Facades\Filament::getTenant()?->id,
+                    ])
+                    ->form(OrderReturnForm::getComponents(true))
+                    ->action(function (array $data): void {
+                        $data['shop_id'] = $this->getOwnerRecord()?->shop_id ?? \Filament\Facades\Filament::getTenant()?->id;
+                        $order = $this->getOwnerRecord();
+                        if ($order) {
+                            $data['order_id'] = $order->id;
+                        }
+                        OrderReturn::create($data);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Retur Pesanan Berhasil Dicatat')
+                            ->success()
+                            ->send();
+                    }),
             ])
-            ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+            ->actions([
+                \Filament\Actions\Action::make('delete_return')
+                    ->label('Hapus')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Hapus Retur Pesanan?')
+                    ->modalDescription('Apakah Anda yakin ingin menghapus transaksi retur ini? Task perbaikan tukang akan dibersihkan.')
+                    ->action(function (OrderReturn $record): void {
+                        $itemId = $record->order_item_id;
+
+                        // 1. Hapus task revisi retur
+                        if ($itemId) {
+                            \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $itemId)
+                                ->where('is_revision', true)
+                                ->delete();
+
+                            // 2. Jika tidak ada retur aktif lainnya, kembalikan status WorkOrder ke COMPLETED
+                            $hasOtherReturns = OrderReturn::where('order_item_id', $itemId)
+                                ->where('id', '!=', $record->id)
+                                ->whereIn('status', ['pending', 'diproses'])
+                                ->exists();
+
+                            if (!$hasOtherReturns) {
+                                $wo = \App\Models\WorkOrder::where('order_item_id', $itemId)->first();
+                                if ($wo) {
+                                    $wo->update([
+                                        'status' => \App\Models\WorkOrder::STATUS_COMPLETED,
+                                        'current_review_stage' => null,
+                                    ]);
+                                }
+                            }
+                        }
+
+                        $record->delete();
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Retur Berhasil Dihapus')
+                            ->success()
+                            ->send();
+                    }),
             ]);
     }
 }

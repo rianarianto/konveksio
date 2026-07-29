@@ -12,6 +12,7 @@ class Order extends Model
     protected $fillable = [
         'shop_id',
         'customer_id',
+        'created_by',
         'order_number',
         'order_date',
         'deadline',
@@ -53,6 +54,9 @@ class Order extends Model
             }
             if (empty($order->status)) {
                 $order->status = 'draft';
+            }
+            if (empty($order->created_by) && auth()->check()) {
+                $order->created_by = auth()->id();
             }
         });
 
@@ -121,6 +125,11 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function orderItems(): HasMany

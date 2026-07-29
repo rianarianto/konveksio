@@ -229,14 +229,16 @@ class NotificationHelper
 
         // Notifikasi khusus ke QC Worker saat WO masuk QC_AKHIR
         if ($newStatus === WorkOrder::STATUS_QC_AKHIR && !$isReject) {
-            $qcWorker = $wo->qc_worker_id ? Worker::find($wo->qc_worker_id) : null;
+            $qcWorker = $wo->qc_worker_id 
+                ? Worker::find($wo->qc_worker_id) 
+                : Worker::where('shop_id', $wo->shop_id)->where('is_active', true)->first();
 
             if ($qcWorker && $qcWorker->phone) {
                 $qcLink = url("/worker/{$qcWorker->portal_token}");
 
                 $qcPesan = "🏁 *QC AKHIR PERLU DILAKUKAN — {$wo->wo_number}*\n\n"
                     . "Halo {$qcWorker->name},\n"
-                    . "Semua tahap produksi telah selesai. Silakan lakukan *Verifikasi QC Akhir* sebelum pesanan diserahkan ke admin.\n\n"
+                    . "Perbaikan barang retur pada tahap produksi telah selesai dikerjakan tukang. Silakan lakukan *Verifikasi QC Akhir*.\n\n"
                     . "📋 *Detail:*\n"
                     . "• Produk: {$produk}\n"
                     . "• Pelanggan: {$customer}\n"
@@ -250,9 +252,12 @@ class NotificationHelper
                         'nohp'  => $qcWorker->phone,
                         'pesan' => $qcPesan,
                     ]);
+                    Log::info("[WA-Bot] Notifikasi QC Akhir berhasil dikirim ke {$qcWorker->name} ({$qcWorker->phone})");
                 } catch (\Exception $e) {
                     Log::error('[WA-Bot] Gagal kirim notif QC Akhir: ' . $e->getMessage());
                 }
+            } else {
+                Log::info("[WA-Bot] QC Akhir: tidak ada QC worker atau nomor HP untuk WO {$wo->wo_number}");
             }
         }
 
@@ -349,11 +354,25 @@ class NotificationHelper
         $groupItemIds = $item->getItemsInGroup()->pluck('id');
         $totalGroupQty = \App\Models\OrderItem::whereIn('id', $groupItemIds)->sum('quantity');
 
-        // Ambil semua production tasks dari seluruh group (QC_PERSIAPAN bisa di item lain dalam group)
-        $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
+        // Cek jika item ini sedang dalam status RETUR PERBAIKAN
+        $activeRevisionTask = \App\Models\ProductionTask::withoutGlobalScopes()
             ->whereIn('order_item_id', $groupItemIds)
-            ->with('assignedTo')
-            ->get();
+            ->where('is_revision', true)
+            ->where('status', '!=', 'done')
+            ->latest('id')
+            ->first();
+
+        if ($activeRevisionTask) {
+            // MODE RETUR: Hanya ambil task revisi retur tersebut (HANYA kirim ke 1 tukang retur!)
+            $tasks = collect([$activeRevisionTask]);
+        } else {
+            // MODE NORMAL: Hanya ambil task yang statusnya pending atau in_progress
+            $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->with('assignedTo')
+                ->get();
+        }
 
         // Grup per pekerja (satu pekerja bisa punya lebih dari 1 tahap)
         $workerTasks = $tasks->groupBy('assigned_to');
@@ -377,7 +396,12 @@ class NotificationHelper
                 $displayQty = ($task->stage_name === 'QC_PERSIAPAN')
                     ? $totalGroupQty
                     : $task->quantity;
-                $rincian .= "• {$task->stage_name}: {$displayQty} pcs — Rp " . number_format($task->wage_amount, 0, ',', '.') . "\n";
+                $stgLabel = strtoupper(str_replace('_', ' ', $task->stage_name));
+                $revTag = $task->is_revision ? ' ⚠️ [REVISI RETUR]' : '';
+                $rincian .= "• {$stgLabel}{$revTag}: {$displayQty} pcs — Rp " . number_format($task->wage_amount, 0, ',', '.') . "\n";
+                if (!empty($task->note)) {
+                    $rincian .= "  📝 Catatan: {$task->note}\n";
+                }
             }
 
             $pesan = "📋 *PENUGASAN PRODUKSI — {$produk}*\n\n"
@@ -445,9 +469,10 @@ class NotificationHelper
             ? url("/worker/{$worker->portal_token}")
             : url("/tugas?wo_id={$wo->id}&token={$wo->token}");
 
+        $stgLabel = strtoupper(str_replace('_', ' ', $task->stage_name));
         $pesan = "⚠️ *REVISI QC — {$wo->wo_number}*\n\n"
             . "Halo {$worker->name},\n"
-            . "Hasil kerja Anda pada tahap *{$task->stage_name}* perlu diperbaiki.\n\n"
+            . "Hasil kerja Anda pada tahap *{$stgLabel}* perlu diperbaiki.\n\n"
             . "📋 *Detail:*\n"
             . "• Produk: {$produk} ({$qty} pcs)\n"
             . "• Pelanggan: {$customer}\n"
@@ -484,7 +509,8 @@ class NotificationHelper
         $produk    = $wo->orderItem?->product_name ?? '-';
         $qty       = $task->quantity ?? '-';
         $customer  = $wo->orderItem?->order?->customer?->name ?? '-';
-        $stageName = $task->stage_name ?? ($wo->current_review_stage ?? '-');
+        $rawStage = $task->stage_name ?? ($wo->current_review_stage ?? '-');
+        $stageName = strtoupper(str_replace('_', ' ', $rawStage));
         $worker    = Worker::find($task->assigned_to);
         $workerName = $worker?->name ?? 'Pekerja';
 

@@ -145,19 +145,46 @@ class ControlProduksiResource extends Resource
                         }
                         
                         $additionTag = $record->is_addition ? ' ➕ [Item Tambahan]' : '';
+
                         return $record->product_name . $suffix . $additionTag;
                     })
-                    ->description(fn(OrderItem $record): string => match ($record->production_category) {
-                        'custom' => '🧵 Produksi (Custom)',
-                        'non_produksi' => '📦 Non-Produksi',
-                        'jasa' => '🔧 Jasa',
-                        default => '🏭 Produksi',
+                    ->description(function(OrderItem $record): string {
+                        $baseCategory = match ($record->production_category) {
+                            'custom' => '🧵 Produksi (Custom)',
+                            'non_produksi' => '📦 Non-Produksi',
+                            'jasa' => '🔧 Jasa',
+                            default => '🏭 Produksi',
+                        };
+
+                        $items = $record->getItemsInGroup();
+                        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $items->pluck('id'))
+                            ->whereIn('status', ['pending', 'diproses'])
+                            ->latest('id')
+                            ->first();
+
+                        if ($activeReturn) {
+                            $garansi = $activeReturn->responsibility_type === 'customer_paid' ? '💳 Retur Berbayar' : '🛡️ Retur Garansi Toko';
+                            return "{$baseCategory} — {$garansi}";
+                        }
+
+                        return $baseCategory;
                     }),
 
                 TextColumn::make('total_quantity')
                     ->label('Total Qty')
                     ->getStateUsing(
                         fn(OrderItem $record): int => (function() use ($record) {
+                            $items = $record->getItemsInGroup();
+
+                            $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $items->pluck('id'))
+                                ->whereIn('status', ['pending', 'diproses'])
+                                ->latest('id')
+                                ->first();
+
+                            if ($activeReturn) {
+                                return $activeReturn->quantity;
+                            }
+
                             $query = OrderItem::where('order_id', $record->order_id)
                                 ->where('product_name', $record->product_name)
                                 ->where('bahan_id', $record->bahan_id)
@@ -166,7 +193,23 @@ class ControlProduksiResource extends Resource
                             return $query->sum('quantity');
                         })()
                     )
-                    ->numeric()
+                    ->description(function (OrderItem $record) {
+                        $items = $record->getItemsInGroup();
+                        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $items->pluck('id'))
+                            ->whereIn('status', ['pending', 'diproses'])
+                            ->latest('id')
+                            ->first();
+
+                        if ($activeReturn) {
+                            $totalOrderQty = OrderItem::where('order_id', $record->order_id)
+                                ->where('product_name', $record->product_name)
+                                ->where('bahan_id', $record->bahan_id)
+                                ->sum('quantity');
+                            return "dari total {$totalOrderQty} pcs";
+                        }
+                        return null;
+                    })
+                    ->formatStateUsing(fn ($state) => $state . ' pcs')
                     ->sortable(['quantity']),
 
                 TextColumn::make('order.deadline')
@@ -185,6 +228,16 @@ class ControlProduksiResource extends Resource
                             ->where('production_category', $record->production_category)
                             ->where('is_addition', $record->is_addition ?? false)
                             ->pluck('id');
+
+                        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+                            ->whereIn('status', ['pending', 'diproses'])
+                            ->latest('id')
+                            ->first();
+
+                        if ($activeReturn) {
+                            $target = $activeReturn->target_stage ?: 'Jahit';
+                            return '🔄 Retur (' . ucfirst($target) . ')';
+                        }
                         
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
@@ -207,14 +260,15 @@ class ControlProduksiResource extends Resource
                             return 'Diproses';
                         return 'Antrian';
                     })
-                    ->color(fn(string $state): string => match ($state) {
-                        'Belum Diatur' => 'gray',
-                        'Antrian' => 'warning',
-                        'Diproses' => 'info',
-                        'QC Persiapan' => 'purple',
-                        'QC Review' => 'warning',
-                        'QC Akhir' => 'warning',
-                        'Selesai' => 'success',
+                    ->color(fn(string $state): string => match (true) {
+                        str_contains($state, 'Retur') => 'danger',
+                        $state === 'Belum Diatur' => 'gray',
+                        $state === 'Antrian' => 'warning',
+                        $state === 'Diproses' => 'info',
+                        $state === 'QC Persiapan' => 'purple',
+                        $state === 'QC Review' => 'warning',
+                        $state === 'QC Akhir' => 'warning',
+                        $state === 'Selesai' => 'success',
                         default => 'gray',
                     })
                     ->description(function (OrderItem $record) {
@@ -231,6 +285,23 @@ class ControlProduksiResource extends Resource
                                 }
                             })
                             ->pluck('id');
+
+                        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+                            ->whereIn('status', ['pending', 'diproses'])
+                            ->latest('id')
+                            ->first();
+
+                        if ($activeReturn) {
+                            $revTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->where('is_revision', true)
+                                ->latest('id')
+                                ->first();
+
+                            $workerName = $revTask?->assignedTo?->name ?: 'Belum ditunjuk';
+                            $note = $activeReturn->items_description ? \Illuminate\Support\Str::limit($activeReturn->items_description, 25) : '-';
+                            return "👷 Tukang: {$workerName} | 📝 {$note}";
+                        }
                         
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
@@ -251,7 +322,7 @@ class ControlProduksiResource extends Resource
                                 return 'QC Akhir - menunggu approve';
                             }
                             if ($woStatus === \App\Models\WorkOrder::STATUS_COMPLETED) {
-                                return 'Selesai';
+                                return null;
                             }
                         }
 
@@ -268,7 +339,6 @@ class ControlProduksiResource extends Resource
                         }
                         return null;
                     }),
-
             ])
 
             ->groups([
@@ -589,15 +659,15 @@ class ControlProduksiResource extends Resource
                     ->color('success')
                     ->visible(fn(OrderItem $record) => $record->productionTasks()->where('status', 'pending')->exists())
                     ->requiresConfirmation()
-                    ->modalHeading('Kirim Notifikasi ke Semua Pekerja?')
-                    ->modalDescription('Sistem akan mengirim pesan WhatsApp ke seluruh pekerja yang ditugaskan pada item ini beserta link portal tugas mereka.')
+                    ->modalHeading(fn(OrderItem $record) => $record->productionTasks()->where('is_revision', true)->where('status', '!=', 'done')->exists() ? 'Kirim WhatsApp Retur?' : 'Kirim Notifikasi ke Pekerja?')
+                    ->modalDescription(fn(OrderItem $record) => $record->productionTasks()->where('is_revision', true)->where('status', '!=', 'done')->exists() ? 'Sistem akan mengirim pesan WhatsApp perbaikan retur khusus ke 1 tukang yang ditugaskan.' : 'Sistem akan mengirim pesan WhatsApp ke pekerja yang ditugaskan pada item ini.')
                     ->modalSubmitActionLabel('Ya, Kirim Sekarang')
                     ->action(function (OrderItem $record) {
                         \App\Helpers\NotificationHelper::notifyAllWorkers($record);
 
                         \Filament\Notifications\Notification::make()
                             ->title('Notifikasi terkirim!')
-                            ->body('Pesan WhatsApp sedang dikirim ke seluruh pekerja.')
+                            ->body('Pesan WhatsApp perbaikan telah dikirim ke tukang yang bersangkutan.')
                             ->success()
                             ->send();
                     }),

@@ -29,6 +29,11 @@ Route::get('/orders/{order}/receipt', [PDFController::class, 'downloadReceipt'])
     ->middleware(['web', 'auth'])
     ->name('orders.receipt');
 
+// Download SPK PDF per Order
+Route::get('/orders/{order}/spk', [PDFController::class, 'downloadSpkByOrder'])
+    ->middleware(['web', 'auth'])
+    ->name('orders.spk');
+
 // Temporary route to seed database on Railway
 Route::get('/setup-database', function() {
     \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);

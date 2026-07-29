@@ -221,21 +221,15 @@
                 <table style="width:100%; border-collapse:collapse; text-align:left;">
                     <thead>
                         <tr class="r3-th">
-                            <th style="padding:12px 16px; width:40px;"><input type="checkbox" disabled
-                                    style="accent-color:#7c3aed;"></th>
-                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:32px;">#
+                            <th style="padding:12px 16px; width:40px;">
+                                <input type="checkbox" disabled style="accent-color:#7c3aed;">
                             </th>
-                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:22%;">
-                                Pesanan & Pelanggan</th>
-                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:15%;">
-                                Deadline</th>
-                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:18%;">
-                                Sisa Tagihan (Sisa/Total)</th>
-                            <th style="padding:12px 8px; font-size:13px; font-weight:600; min-width:280px;">
-                                Tipe Produk & Status Pesanan</th>
-                            <th
-                                style="padding:12px 16px; font-size:13px; font-weight:600; width:120px; text-align:right;">
-                                Aksi (Action)</th>
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:32px;">#</th>
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:22%;">Pesanan & Pelanggan</th>
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:18%;">Timeline</th>
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; width:18%;">Finance</th>
+                            <th style="padding:12px 8px; font-size:13px; font-weight:600; min-width:280px;">Produk & Status</th>
+                            <th style="padding:12px 16px; font-size:13px; font-weight:600; width:120px; text-align:right;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -247,219 +241,282 @@
                                 </td>
 
                                 {{-- Index --}}
-                                <td class="r3-td-text"
-                                    style="padding:16px 8px; vertical-align:top; font-size:15px; font-weight:500;">
+                                <td class="r3-td-text" style="padding:16px 8px; vertical-align:top; font-size:14px; font-weight:500;">
                                     {{ $orders->firstItem() + $index }}
                                 </td>
 
+                                {{-- KOLOM 1: Pesanan & Pelanggan --}}
                                 <td style="padding:16px 8px; vertical-align:top;">
-                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
-                                        @if($order->is_express)
-                                            <span
-                                                style="background:#dc2626; color:#fff; font-size:10px; font-weight:800; padding:2px 8px; border-radius:999px; letter-spacing:0.02em; display:inline-flex; align-items:center; gap:3px;">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"
-                                                    viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                                                </svg>
-                                                EXPRESS
-                                            </span>
-                                        @endif
-                                        <div class="r3-td-text"
-                                            style="font-weight:500; font-size:13px; letter-spacing:0.04em; text-transform:uppercase;">
-                                            {{ $order->order_number }}
-                                        </div>
-                                    </div>
+                                    @php
+                                        $expressHtml = '';
+                                        if ($order->is_express) {
+                                            $expressHtml = '<span style="background:#dc2626; color:#fff; font-size:10px; font-weight:800; padding:2px 8px; border-radius:9999px; letter-spacing:0.02em; display:inline-flex; align-items:center; gap:3px; margin-right:4px;">'
+                                                . '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
+                                                . 'EXPRESS</span>';
+                                        }
+
+                                        $orderNum = '<div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">'
+                                            . $expressHtml
+                                            . '<div style="font-weight:600; color:#666666; font-size:13px; letter-spacing:0.04em; text-transform:uppercase;">' . e($order->order_number) . '</div>'
+                                            . '</div>';
+
+                                        $customer = $order->customer;
+                                        $name = $customer?->name ?? '-';
+                                        $phone = $customer?->phone ?? null;
+
+                                        $pillClass = 'display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border:1px solid #f3e8ff; border-radius:9999px; background:white; color:#a855f7; font-size:12px; font-weight:500;';
+
+                                        $nameBadge = '<div style="' . $pillClass . '">'
+                                            . '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+                                            . e($name)
+                                            . '</div>';
+
+                                        $phoneLine = $phone
+                                            ? '<div style="' . $pillClass . '">'
+                                            . '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+                                            . e($phone)
+                                            . '</div>'
+                                            : '';
+
+                                        $creatorName = $order->creator?->name ?? 'Sistem';
+                                        $creatorPill = '<div style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; background:#f8fafc; border:1px solid #e2e8f0; color:#64748b; font-size:11px; font-weight:500;">'
+                                            . '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+                                            . 'Oleh: ' . e($creatorName)
+                                            . '</div>';
+                                    @endphp
                                     <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
-                                        <div
-                                            style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border:1px solid #f3e8ff; border-radius:9999px; background:white; color:#a855f7; font-size:12px; font-weight:500;">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                                                <circle cx="12" cy="7" r="4" />
-                                            </svg>
-                                            {{ $order->customer->name ?? '-' }}
-                                        </div>
-                                        <div
-                                            style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border:1px solid #f3e8ff; border-radius:9999px; background:white; color:#a855f7; font-size:12px; font-weight:500;">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path
-                                                    d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                                            </svg>
-                                            {{ $order->customer->phone ?? '-' }}
-                                        </div>
+                                        {!! $orderNum !!}
+                                        {!! $nameBadge !!}
+                                        {!! $phoneLine !!}
+                                        {!! $creatorPill !!}
                                     </div>
                                 </td>
 
-                                {{-- Deadline --}}
+                                {{-- KOLOM 2: Timeline --}}
                                 <td style="padding:16px 8px; vertical-align:top;">
                                     @php
-                                        $deadline = \Carbon\Carbon::parse($order->deadline);
-                                        $today = \Carbon\Carbon::today();
-                                        $diff = $today->diffInDays($deadline, false);
+                                        $masukStr = $order->order_date instanceof \Illuminate\Support\Carbon ? $order->order_date->format('d M Y') : ($order->order_date ? date('d M Y', strtotime($order->order_date)) : '-');
+                                        $deadlineStr = $order->deadline instanceof \Illuminate\Support\Carbon ? $order->deadline->format('d M Y') : ($order->deadline ? date('d M Y', strtotime($order->deadline)) : '-');
 
-                                        if ($diff < 0) {
-                                            $sisaText = 'Terlambat ' . abs($diff) . ' hari';
+                                        $days = $order->deadline
+                                            ? now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse($order->deadline)->startOfDay(), false)
+                                            : null;
+
+                                        $sisaBadgeStyle = '';
+                                        $sisaText = '';
+                                        $sisaIconColor = '';
+
+                                        if ($days === null) {
+                                            $sisaText = 'Tidak ada';
+                                            $sisaBadgeStyle = 'color:#9ca3af; border:1px solid #e5e7eb; background:#f9fafb;';
+                                            $sisaIconColor = '#9ca3af';
+                                        } elseif ($days < 0) {
+                                            $sisaText = 'Terlambat ' . abs($days) . ' hari';
                                             $sisaBadgeStyle = 'color:#e11d48; border:1px solid #fda4af; background:white;';
                                             $sisaIconColor = '#e11d48';
-                                        } elseif ($diff == 0) {
+                                        } elseif ($days === 0) {
                                             $sisaText = 'Hari ini';
                                             $sisaBadgeStyle = 'color:#e11d48; border:1px solid #fda4af; background:white;';
                                             $sisaIconColor = '#e11d48';
-                                        } elseif ($diff <= 3) {
-                                            $sisaText = 'Sisa ' . $diff . ' hari';
+                                        } elseif ($days <= 3) {
+                                            $sisaText = 'Sisa ' . $days . ' hari';
                                             $sisaBadgeStyle = 'color:#e11d48; border:1px solid #fda4af; background:white;';
                                             $sisaIconColor = '#e11d48';
-                                        } elseif ($diff <= 7) {
-                                            $sisaText = 'Sisa ' . $diff . ' hari';
+                                        } elseif ($days <= 7) {
+                                            $sisaText = 'Sisa ' . $days . ' hari';
                                             $sisaBadgeStyle = 'color:#ca8a04; border:1px solid #fbbf24; background:white;';
                                             $sisaIconColor = '#ca8a04';
                                         } else {
-                                            $sisaText = 'Sisa ' . $diff . ' hari';
+                                            $sisaText = 'Sisa ' . $days . ' hari';
                                             $sisaBadgeStyle = 'color:#16a34a; border:1px solid #86efac; background:white;';
                                             $sisaIconColor = '#16a34a';
                                         }
+
+                                        $displayStatus = $order->status;
+                                        if ($displayStatus === 'diproses') {
+                                            $allTasks = $order->orderItems->flatMap->productionTasks;
+                                            if ($allTasks->isNotEmpty() && $allTasks->every(fn($t) => $t->status === 'done')) {
+                                                $displayStatus = 'selesai';
+                                            }
+                                        }
+
+                                        $badgeStyles = match ($displayStatus) {
+                                            'draft' => ['bg' => '#fef3c7', 'text' => '#d97706', 'border' => '#fde68a', 'indicator' => '#d97706', 'label' => 'DRAFT'],
+                                            'diterima' => ['bg' => '#f3e8ff', 'text' => '#7e22ce', 'border' => '#ddd6fe', 'indicator' => '#7e22ce', 'label' => 'DITERIMA'],
+                                            'diproses' => ['bg' => '#dbeafe', 'text' => '#2563eb', 'border' => '#bfdbfe', 'indicator' => '#2563eb', 'label' => 'PROSES'],
+                                            'selesai' => ['bg' => '#dcfce7', 'text' => '#16a34a', 'border' => '#bbf7d0', 'indicator' => '#16a34a', 'label' => 'SELESAI'],
+                                            'siap_diambil' => ['bg' => '#dcfce7', 'text' => '#16a34a', 'border' => '#bbf7d0', 'indicator' => '#16a34a', 'label' => 'SIAP DIAMBIL'],
+                                            default => ['bg' => '#f3f4f6', 'text' => '#4b5563', 'border' => '#e5e7eb', 'indicator' => '#6b7280', 'label' => strtoupper($displayStatus)],
+                                        };
+
+                                        $statusBadge = '<div style="display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:6px; font-size:10px; font-weight:800; border:1px solid ' . $badgeStyles['border'] . '; background:' . $badgeStyles['bg'] . '; color:' . $badgeStyles['text'] . '; line-height:1; vertical-align:middle;">'
+                                            . '<div style="width:3.5px; height:12px; background-color:' . $badgeStyles['indicator'] . '; border-radius:2px; flex-shrink:0;"></div>'
+                                            . '<span>' . $badgeStyles['label'] . '</span>'
+                                            . '</div>';
                                     @endphp
-                                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                                        <span class="r3-td-text"
-                                            style="font-size:14px; font-weight:500;">{{ $deadline->format('d M Y') }}</span>
-                                    </div>
-                                    <div
-                                        style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:9999px; font-size:11px; font-weight:500; {{ $sisaBadgeStyle }}">
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                                            stroke="{{ $sisaIconColor }}" stroke-width="2">
-                                            <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-                                            <line x1="16" x2="16" y1="2" y2="6" />
-                                            <line x1="8" x2="8" y1="2" y2="6" />
-                                            <line x1="3" x2="21" y1="10" y2="10" />
-                                        </svg>
-                                        {{ $sisaText }}
+                                    <div style="display:flex; flex-direction:column;">
+                                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                                            <span style="font-size:13px; font-weight:500; color:#9ca3af;">{{ $masukStr }}</span>
+                                            {!! $statusBadge !!}
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                                            <span style="font-size:14px; font-weight:500; color:#4b5563;">{{ $deadlineStr }}</span>
+                                        </div>
+                                        <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:9999px; font-size:11px; font-weight:500; {!! $sisaBadgeStyle !!}">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{{ $sisaIconColor }}" stroke-width="2.5"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                                            {{ $sisaText }}
+                                        </div>
                                     </div>
                                 </td>
 
-                                {{-- Sisa Tagihan --}}
+                                {{-- KOLOM 3: Finance --}}
                                 <td style="padding:16px 8px; vertical-align:top;">
-                                    <div class="r3-td-text-bold"
-                                        style="font-size:15px; font-weight:700; margin-bottom:6px;">Rp
-                                        {{ number_format($order->remaining_balance ?? 0, 0, ',', '.') }}
-                                    </div>
-                                    <div class="r3-td-text" style="font-size:11px; font-weight:500; margin-bottom:6px;">
-                                        Total
-                                        Tagihan</div>
-                                    <div
-                                        style="display:inline-flex; padding:4px 12px; border-radius:9999px; background:#faf5ff; border:1px solid #f3e8ff; color:#a855f7; font-size:12px; font-weight:700;">
-                                        Rp {{ number_format($order->total_price ?? 0, 0, ',', '.') }}
+                                    @php
+                                        $total = (int) $order->total_price;
+                                        $paid = (int) $order->payments->sum('amount');
+                                        $sisa = max(0, $total - $paid);
+                                        $lunas = ($total > 0 && $sisa === 0);
+                                        $isZero = ($total === 0);
+
+                                        $label = 'Rp ' . number_format($sisa, 0, ',', '.');
+                                        if ($isZero) {
+                                            $label = 'MENUNGGU PRODUK';
+                                            $sisaColor = '#9ca3af';
+                                            $sisaBg = '#f3f4f6';
+                                        } elseif ($lunas) {
+                                            $label = 'LUNAS';
+                                            $sisaColor = '#16a34a';
+                                            $sisaBg = '#f0fdf4';
+                                        } else {
+                                            $sisaColor = '#7c3aed';
+                                            $sisaBg = '#f3e8ff';
+                                        }
+
+                                        $cicilan = $order->payments->count();
+                                    @endphp
+                                    <div style="display:flex; flex-direction:column; min-width:180px;">
+                                        <div style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:12px; background:{{ $sisaBg }}; color:{{ $sisaColor }}; font-size:15px; font-weight:700; margin-bottom:8px;">
+                                            {{ $label }}
+                                        </div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#6b7280; font-weight:500; margin-bottom:4px;">
+                                            <span>Total Tagihan</span>
+                                            <span style="color:#374151; font-weight:600;">Rp {{ number_format($total, 0, ',', '.') }}</span>
+                                        </div>
+                                        @if($paid > 0)
+                                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#6b7280; font-weight:500;">
+                                                <span>Sudah Dibayar</span>
+                                                <span style="color:#374151; font-weight:600;">Rp {{ number_format($paid, 0, ',', '.') }} ({{ $cicilan }}x)</span>
+                                            </div>
+                                        @else
+                                            <div style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#f59e0b; font-weight:600;">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                                                Belum ada deposit
+                                            </div>
+                                        @endif
                                     </div>
                                 </td>
 
-                                {{-- Tipe Produk & Status --}}
+                                {{-- KOLOM 4: Produk & Status --}}
                                 <td style="padding:16px 8px; vertical-align:top;">
-                                    <div style="display:flex; flex-direction:column; gap:16px;">
+                                    @php
+                                        $items = $order->orderItems;
+                                    @endphp
+                                    @if($items->isEmpty())
+                                        <span style="color:#9ca3af;font-size:13px;">-</span>
+                                    @else
                                         @php
-                                            $groupedItems = $order->orderItems->groupBy('product_name');
+                                            $groupedItems = $items->groupBy('product_name');
                                         @endphp
-                                        @foreach($groupedItems as $productName => $items)
-                                            @php
-                                                $totalQty = $items->sum('quantity');
-                                                
-                                                // Calculate combined progress and collect status labels
-                                                $totalTasks = 0;
-                                                $doneTasks = 0;
-                                                $statusLabels = [];
-                                                $categories = [];
+                                        <div style="display:flex; flex-direction:column; gap:12px;">
+                                            @foreach($groupedItems as $productName => $itemsGroup)
+                                                @php
+                                                    $totalQty = $itemsGroup->sum('quantity');
 
-                                                foreach($items as $item) {
-                                                    $itemTasks = $item->productionTasks;
-                                                    $totalTasks += $itemTasks->count();
-                                                    $doneTasks += $itemTasks->where('status', 'done')->count();
-                                                    
-                                                    $catName = match ($item->production_category) {
-                                                        'produksi' => 'Konveksi',
-                                                        'non_produksi' => 'Non-Produksi',
-                                                        'custom' => 'Konveksi',
-                                                        default => 'Jasa',
-                                                    };
-                                                    $categories[] = $catName;
+                                                    $categories = [];
+                                                    foreach ($itemsGroup as $item) {
+                                                        $cat = match ($item->production_category) {
+                                                            'custom' => ['Produksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
+                                                            'non_produksi' => ['Non-Produksi', 'rgba(245,158,11,0.12)', '#d97706'],
+                                                            'jasa' => ['Jasa', 'rgba(16,185,129,0.12)', '#059669'],
+                                                            default => ['Produksi', 'rgba(124,58,237,0.10)', '#7c3aed'],
+                                                        };
+                                                        $categories[$cat[0]] = $cat;
+                                                    }
+                                                    $firstCat = reset($categories);
 
-                                                    if ($itemTasks->count() > 0) {
-                                                        $activeItemTask = $itemTasks->whereIn('status', ['in_progress', 'pending', 'antrian'])->first();
-                                                        if ($activeItemTask) {
-                                                             $statusLabels[] = str_replace('_', ' ', $activeItemTask->stage_name);
-                                                        } elseif ($itemTasks->where('status', 'done')->count() == $itemTasks->count()) {
-                                                            $statusLabels[] = 'Selesai';
+                                                    $groupTasks = $itemsGroup->flatMap->productionTasks;
+                                                    $totalTasks = $groupTasks->count();
+                                                    $doneTasks = $groupTasks->where('status', 'done')->count();
+
+                                                    $groupWo = $itemsGroup->map(fn($it) => $it->workOrder)->filter()->first();
+
+                                                    $groupItemIds = $itemsGroup->pluck('id');
+                                                    $hasActiveReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+                                                        ->whereIn('status', ['pending', 'diproses'])
+                                                        ->exists();
+
+                                                    $isHandedOver = ($order->status === 'selesai' || $order->status === 'diambil' || !empty($order->pickup_proof) || !empty($order->pickup_at));
+
+                                                    if ($hasActiveReturn) {
+                                                        $displayStatusText = 'Retur';
+                                                    } elseif ($isHandedOver) {
+                                                        $displayStatusText = 'Diserahkan';
+                                                    } elseif ($groupWo) {
+                                                        if ($groupWo->status === \App\Models\WorkOrder::STATUS_COMPLETED || $groupWo->delivered_at !== null) {
+                                                            $displayStatusText = 'Siap Diambil';
                                                         } else {
-                                                            $statusLabels[] = 'Antrian';
+                                                            $displayStatusText = match($groupWo->status) {
+                                                                \App\Models\WorkOrder::STATUS_CREATED => 'Antrian',
+                                                                \App\Models\WorkOrder::STATUS_QC_PREP, 'QC_PERSIAPAN' => 'QC Persiapan',
+                                                                \App\Models\WorkOrder::STATUS_QC_REVIEW => 'QC ' . str_replace('_', ' ', $groupWo->current_review_stage ?? ''),
+                                                                \App\Models\WorkOrder::STATUS_QC_AKHIR => 'QC Akhir',
+                                                                default => str_replace('_', ' ', $groupWo->status),
+                                                            };
+                                                        }
+                                                    } elseif ($totalTasks > 0) {
+                                                        $activeTask = $groupTasks->whereIn('status', ['in_progress', 'pending', 'antrian'])->first();
+                                                        if ($activeTask) {
+                                                            $displayStatusText = $activeTask->stage_name ?: ($activeTask->nama_tugas ?: 'Proses');
+                                                        } elseif ($doneTasks == $totalTasks) {
+                                                            $displayStatusText = 'Siap Diambil';
+                                                        } else {
+                                                            $displayStatusText = 'Antrian';
                                                         }
                                                     } else {
                                                         if ($order->status === 'batal') {
-                                                            $statusLabels[] = 'Batal';
+                                                            $displayStatusText = 'Batal';
                                                         } else {
-                                                            $statusLabels[] = 'Belum Diatur';
+                                                            $displayStatusText = 'Siap Diambil';
                                                         }
                                                     }
-                                                }
 
-                                                $combinedProgress = $totalTasks > 0 ? round(($doneTasks / $totalTasks) * 100) : 0;
-                                                $uniqueStatusLabels = array_unique($statusLabels);
-                                                $displayStatus = count($uniqueStatusLabels) === 1 ? $uniqueStatusLabels[0] : (count($uniqueStatusLabels) > 1 ? 'Mix Status' : 'Belum Diatur');
-                                                $uniqueCategories = array_unique($categories);
-                                                $displayCategory = implode(', ', $uniqueCategories);
+                                                    $statusBadge = match ($displayStatusText) {
+                                                        'Diserahkan' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">DISERAHKAN</span>',
+                                                        'Retur' => '<span style="padding:2px 6px; border-radius:4px; background:#fef2f2; color:#dc2626; font-size:10px; font-weight:600;">REVISI RETUR</span>',
+                                                        'Siap Diambil' => '<span style="padding:2px 6px; border-radius:4px; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600;">SIAP DIAMBIL</span>',
+                                                        'Selesai' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">DISERAHKAN</span>',
+                                                        'Proses' => '<span style="padding:2px 6px; border-radius:4px; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600;">PROSES</span>',
+                                                        'Belum Diatur' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">BELUM DIATUR</span>',
+                                                        default => '<span style="padding:2px 6px; border-radius:4px; background:#fef3c7; color:#d97706; font-size:10px; font-weight:600;">'.strtoupper($displayStatusText).'</span>',
+                                                    };
+                                                @endphp
 
-                                                if ($totalTasks > 0 && $combinedProgress < 100 && $displayStatus === 'Selesai') {
-                                                     $displayStatus = 'Sebagian Selesai';
-                                                }
-                                                if ($totalTasks > 0 && $combinedProgress > 0 && $displayStatus === 'Belum Diatur') {
-                                                     $displayStatus = 'Proses';
-                                                }
-
-                                                // Determine color
-                                                $statusKey = strtolower($displayStatus);
-                                                $colorMap = [
-                                                    'antrian' => '#818cf8',
-                                                    'potong' => '#f87171',
-                                                    'jahit' => '#22d3ee',
-                                                    'bordir' => '#fb923c',
-                                                    'kancing' => '#6366f1',
-                                                    'finishing' => '#4ade80',
-                                                    'qc' => '#a855f7',
-                                                    'selesai' => '#2dd4bf',
-                                                    'siap diambil' => '#22c55e',
-                                                    'batal' => '#ef4444',
-                                                    'diterima' => '#d946ef',
-                                                    'dikerjakan' => '#3b82f6',
-                                                    'mix status' => '#6366f1',
-                                                ];
-
-                                                $baseColor = $colorMap[$statusKey] ?? ($combinedProgress === 100 ? '#16a34a' : '#a855f7');
-                                                $barColor = $baseColor;
-                                                $bgColor = $baseColor . '15';
-                                                $borderColor = $baseColor . '30';
-                                            @endphp
-
-                                            <div style="display:flex; flex-direction:column; background:white; border:1.5px solid #f1f5f9; border-radius:12px; padding:12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); gap:2px;">
-                                                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; gap:8px;">
-                                                    <div style="font-size:14px; font-weight:700; color:#111827; line-height:1.4;">
-                                                        <span style="color:#6b7280; margin-right:4px;">{{ $totalQty }}x</span>
-                                                        {{ $productName }}
-                                                    </div>
-                                                    <span
-                                                        style="padding:2px 8px; border-radius:4px; border:1px solid {{ $borderColor }}; background:{{ $bgColor }}; color:{{ $barColor }}; font-size:11px; font-weight:500;">{{ $displayCategory }}</span>
-                                                </div>
-
-                                                {{-- Grouped Progress Bar --}}
-                                                <div style="display:flex; align-items:center; gap:10px; margin-top:2px;">
-                                                    <div
-                                                        style="width:70px; height:6px; background:#f1f5f9; border-radius:9999px; overflow:hidden; border:1px solid #e2e8f0;">
-                                                        <div
-                                                            style="height:100%; background:{{ $barColor }}; border-radius:9999px; width:{{ $combinedProgress }}%;">
+                                                <div style="display:flex; flex-direction:column; background:white; border:1.5px solid #f1f5f9; border-radius:12px; padding:12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);">
+                                                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; gap:8px;">
+                                                        <div style="font-size:14px; font-weight:700; color:#111827; line-height:1.4;">
+                                                            <span style="color:#6b7280; margin-right:4px;">{{ $totalQty }}x</span>{{ $productName }}
+                                                        </div>
+                                                        <div style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; background:{{ $firstCat[1] }}; color:{{ $firstCat[2] }};">
+                                                            {{ $firstCat[0] }}
                                                         </div>
                                                     </div>
-                                                    <span
-                                                        style="font-size:10px; font-weight:600; color:{{ $barColor }};">{{ $displayStatus }}</span>
+                                                    <div style="margin-top:4px;">
+                                                        {!! $statusBadge !!}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </td>
 
                                 {{-- Actions --}}
@@ -467,8 +524,8 @@
                                     <div x-data="{ open: false }"
                                         style="position:relative; display:inline-block; text-align:left;">
                                         <button @click.stop="open = !open" class="r3-action-btn"
-                                            style="padding:6px; border-radius:10px; border:1px solid; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center;"
-                                            onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                                            style="padding:6px; border-radius:10px; border:1px solid #e5e7eb; background:white; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; color:#6b7280;"
+                                            onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'">
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
                                                 stroke-linejoin="round">
@@ -485,18 +542,28 @@
                                             x-transition:leave="transition ease-in duration-75"
                                             x-transition:leave-start="transform opacity-100 scale-100"
                                             x-transition:leave-end="transform opacity-0 scale-95" class="r3-dropdown"
-                                            style="position:absolute; right:0; top:calc(100% + 5px); z-index:1000; width:165px; border-radius:12px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding:6px;">
+                                            style="position:absolute; right:0; top:calc(100% + 5px); z-index:1000; width:185px; border-radius:12px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); padding:6px; background:white; border:1px solid #e5e7eb;">
 
-                                            {{-- Detail --}}
-                                            <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order]) }}"
-                                                style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#9333ea; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
+                                            @php
+                                                $canEditOrder = \App\Filament\Resources\Orders\OrderResource::canEdit($order);
+                                                $canDeliverOrder = \App\Filament\Resources\Orders\Schemas\OrderDeliveryForm::isVisible($order);
+                                                $canReturnOrder = in_array(auth()->user()->role, ['owner', 'admin']) && $order->status === 'selesai';
+                                                $canViewProof = $order->status === 'selesai' || !empty($order->pickup_proof);
+                                                $canDeleteOrder = auth()->user()->role === 'owner';
+
+                                                $detailUrl = \App\Filament\Resources\Orders\OrderResource::getUrl(
+                                                    in_array($order->status, ['produksi', 'draft']) ? 'edit' : 'view',
+                                                    ['record' => $order]
+                                                );
+                                            @endphp
+
+                                            {{-- 1. Lihat Detail --}}
+                                            <a href="{{ $detailUrl }}"
+                                                style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#7c3aed; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
                                                 onmouseover="this.style.background='#f5f3ff'"
                                                 onmouseout="this.style.background='transparent'">
-                                                <div
-                                                    style="width:22px; height:22px; background:#f5f3ff; border-radius:6px; display:flex; align-items:center; justify-content:center;">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                                        stroke-linejoin="round">
+                                                <div style="width:22px; height:22px; background:#f5f3ff; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                                         <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                                                         <circle cx="12" cy="12" r="3" />
                                                     </svg>
@@ -504,18 +571,29 @@
                                                 Lihat Detail
                                             </a>
 
-                                            {{-- Kuitansi --}}
+                                            {{-- 2. Cetak SPK --}}
+                                            <a href="{{ route('orders.spk', ['order' => $order->id]) }}" target="_blank" @click="open = false"
+                                                style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#0284c7; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
+                                                onmouseover="this.style.background='#f0f9ff'"
+                                                onmouseout="this.style.background='transparent'">
+                                                <div style="width:22px; height:22px; background:#f0f9ff; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                                                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                                                        <rect x="6" y="14" width="12" height="8"></rect>
+                                                    </svg>
+                                                </div>
+                                                Cetak SPK
+                                            </a>
+
+                                            {{-- 3. Kuitansi --}}
                                             <button wire:click="downloadReceipt({{ $order->id }})" @click="open = false"
                                                 style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#16a34a; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
                                                 onmouseover="this.style.background='#f0fdf4'"
                                                 onmouseout="this.style.background='transparent'">
-                                                <div
-                                                    style="width:22px; height:22px; background:#f0fdf4; border-radius:6px; display:flex; align-items:center; justify-content:center;">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                                        stroke-linejoin="round">
-                                                        <path
-                                                            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                <div style="width:22px; height:22px; background:#f0fdf4; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                                                         <polyline points="14 2 14 8 20 8" />
                                                         <line x1="12" y1="18" x2="12" y2="12" />
                                                         <polyline points="9 15 12 18 15 15" />
@@ -524,42 +602,86 @@
                                                 Kuitansi
                                             </button>
 
-                                            {{-- Edit --}}
-                                            <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order]) }}"
-                                                style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#7c3aed; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
-                                                onmouseover="this.style.background='#f5f3ff'"
-                                                onmouseout="this.style.background='transparent'">
-                                                <div
-                                                    style="width:22px; height:22px; background:#f5f3ff; border-radius:6px; display:flex; align-items:center; justify-content:center;">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                                        stroke-linejoin="round">
-                                                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                                                    </svg>
-                                                </div>
-                                                Edit
-                                            </a>
+                                            {{-- 4. Edit --}}
+                                            @if($canEditOrder)
+                                                <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('edit', ['record' => $order]) }}"
+                                                    style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#d97706; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
+                                                    onmouseover="this.style.background='#fffbeb'"
+                                                    onmouseout="this.style.background='transparent'">
+                                                    <div style="width:22px; height:22px; background:#fffbeb; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                                                        </svg>
+                                                    </div>
+                                                    Edit
+                                                </a>
+                                            @endif
 
-                                            {{-- Delete --}}
-                                            <button
-                                                @click="if(confirm('Apakah Anda yakin ingin menghapus pesanan ini?')) { $wire.deleteOrder({{ $order->id }}); open = false; }"
-                                                style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ef4444; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
-                                                onmouseover="this.style.background='#fef2f2'"
-                                                onmouseout="this.style.background='transparent'">
-                                                <div
-                                                    style="width:22px; height:22px; background:#fef2f2; border-radius:6px; display:flex; align-items:center; justify-content:center;">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                                        stroke-linejoin="round">
-                                                        <polyline points="3 6 5 6 21 6" />
-                                                        <path
-                                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                                        <line x1="10" y1="11" x2="10" y2="17" />
-                                                        <line x1="14" y1="11" x2="14" y2="17" />
-                                                    </svg>
-                                                </div>
-                                                Delete
-                                            </button>
+                                            {{-- 5. Serahkan Pesanan --}}
+                                            @if($canDeliverOrder)
+                                                <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $order]) }}"
+                                                    style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#16a34a; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
+                                                    onmouseover="this.style.background='#f0fdf4'"
+                                                    onmouseout="this.style.background='transparent'">
+                                                    <div style="width:22px; height:22px; background:#f0fdf4; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                        </svg>
+                                                    </div>
+                                                    Serahkan Pesanan
+                                                </a>
+                                            @endif
+
+                                            {{-- 6. Retur Pesanan --}}
+                                            @if($canReturnOrder)
+                                                <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $order]) }}"
+                                                    style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ea580c; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
+                                                    onmouseover="this.style.background='#fff7ed'"
+                                                    onmouseout="this.style.background='transparent'">
+                                                    <div style="width:22px; height:22px; background:#fff7ed; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                                        </svg>
+                                                    </div>
+                                                    Retur Pesanan
+                                                </a>
+                                            @endif
+
+                                            {{-- 7. Lihat Bukti Penyerahan --}}
+                                            @if($canViewProof)
+                                                <a href="{{ \App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $order]) }}"
+                                                    style="display:flex; align-items:center; gap:8px; padding:6px 8px; color:#0284c7; font-size:12px; font-weight:600; text-decoration:none; border-radius:8px; transition:all 0.2s;"
+                                                    onmouseover="this.style.background='#f0f9ff'"
+                                                    onmouseout="this.style.background='transparent'">
+                                                    <div style="width:22px; height:22px; background:#f0f9ff; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+                                                            <circle cx="12" cy="13" r="3"/>
+                                                        </svg>
+                                                    </div>
+                                                    Lihat Bukti Penyerahan
+                                                </a>
+                                            @endif
+
+                                            {{-- 8. Delete --}}
+                                            @if($canDeleteOrder)
+                                                <button
+                                                    @click="if(confirm('Apakah Anda yakin ingin menghapus pesanan ini?')) { $wire.deleteOrder({{ $order->id }}); open = false; }"
+                                                    style="width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; color:#ef4444; font-size:12px; font-weight:600; background:none; border:none; cursor:pointer; border-radius:8px; transition:all 0.2s; text-align:left;"
+                                                    onmouseover="this.style.background='#fef2f2'"
+                                                    onmouseout="this.style.background='transparent'">
+                                                    <div style="width:22px; height:22px; background:#fef2f2; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                            <polyline points="3 6 5 6 21 6" />
+                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                            <line x1="10" y1="11" x2="10" y2="17" />
+                                                            <line x1="14" y1="11" x2="14" y2="17" />
+                                                        </svg>
+                                                    </div>
+                                                    Delete
+                                                </button>
+                                            @endif
                                         </div>
                                     </div>
                                 </td>

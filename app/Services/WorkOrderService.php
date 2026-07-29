@@ -40,17 +40,19 @@ class WorkOrderService
                     return $wo;
                 }
 
-                // Jika ada task di stage ini yang berasal dari revisi QC_AKHIR,
-                // setelah selesai harus kembali ke QC_AKHIR bukan alur normal
-                $hasQcAkhirRevision = $allTasksForStage
-                    ->contains(fn($t) => $t->revision_source === 'qc_akhir');
+                // Jika ini adalah task perbaikan retur / revisi,
+                // setelah selesai harus LANGSUNG kembali ke QC_AKHIR
+                $hasQcAkhirRevision = $allTasksForStage->contains(fn($t) => $t->is_revision || $t->revision_source === 'qc_akhir')
+                    || \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+                        ->whereIn('status', ['pending', 'diproses'])
+                        ->exists();
 
                 if ($hasQcAkhirRevision) {
                     // Reset revision_source tasks
                     \App\Models\ProductionTask::withoutGlobalScopes()
                         ->whereIn('order_item_id', $groupItemIds)
                         ->where('stage_name', $currentStage)
-                        ->update(['revision_source' => null]);
+                        ->update(['revision_source' => null, 'is_revision' => false]);
 
                     $wo->update([
                         'status'               => WorkOrder::STATUS_QC_AKHIR,
@@ -59,11 +61,11 @@ class WorkOrderService
                     ]);
                     $wo->refresh();
 
-                    $woId2 = $wo->id;
-                    dispatch(function () use ($woId2) {
-                        $wo = WorkOrder::withoutGlobalScopes()->find($woId2);
-                        if ($wo) NotificationHelper::notify($wo, WorkOrder::STATUS_QC_AKHIR);
-                    })->afterResponse();
+                    try {
+                        NotificationHelper::notify($wo, WorkOrder::STATUS_QC_AKHIR);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error("[WA QC Akhir] Gagal kirim WA ke QC Worker: " . $e->getMessage());
+                    }
 
                     return $wo;
                 }
@@ -114,14 +116,16 @@ class WorkOrderService
                     ? $wo->orderItem->getItemsInGroup()->pluck('id')
                     : [$wo->order_item_id];
                 
-                $stageToApprove = $wo->current_review_stage ?? $wo->status;
-                \App\Models\ProductionTask::withoutGlobalScopes()
-                    ->whereIn('order_item_id', $groupItemIds)
-                    ->where(function($q) use ($stageToApprove) {
-                        $q->where('stage_name', $stageToApprove)
-                          ->orWhere('stage_name', 'QC_PERSIAPAN');
-                    })
-                    ->update(['qc_approved' => true, 'qc_reviewed_at' => $now]);
+                $stageToApprove = ($wo->status === WorkOrder::STATUS_QC_PREP)
+                    ? 'QC_PERSIAPAN'
+                    : ($wo->current_review_stage ?? $wo->status);
+
+                if ($stageToApprove) {
+                    \App\Models\ProductionTask::withoutGlobalScopes()
+                        ->whereIn('order_item_id', $groupItemIds)
+                        ->where('stage_name', $stageToApprove)
+                        ->update(['qc_approved' => true, 'qc_reviewed_at' => $now]);
+                }
             }
 
             $wo->update($updateData);

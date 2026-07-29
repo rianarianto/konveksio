@@ -216,7 +216,7 @@
                     <td style="padding-left: 20px;">
                         {{ $item['product'] }} {{ $item['is_custom'] ? '[Custom]' : '' }}
                     </td>
-                    <td>{{ $item['stage'] }}</td>
+                    <td>{{ strtoupper(str_replace('_', ' ', $item['stage'])) }}</td>
                     <td style="text-align: center;">{{ $item['qty'] }}</td>
                     <td style="text-align: right;">Rp {{ number_format($item['wage'], 0, ',', '.') }}</td>
                     <td style="text-align: right;">Rp {{ number_format($item['qty'] * $item['wage'], 0, ',', '.') }}</td>

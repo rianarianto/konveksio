@@ -242,6 +242,63 @@
 
 
 
+    {{-- ── HERO RETUR PERBAIKAN CARD (Tampil Utama Jika Tugas Adalah Retur) ── --}}
+    @if($myTask && ($myTask->is_revision || $myTask->revision_source))
+    @php
+        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $orderItem?->id)
+            ->whereIn('status', ['pending', 'diproses'])
+            ->latest('id')
+            ->first();
+    @endphp
+    <div class="card" style="border: 2px solid #ef4444; background: #fff5f5; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);">
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px dashed #fca5a5; padding-bottom: 10px; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <span style="background: #dc2626; color: white; font-weight: 800; font-size: 13px; padding: 4px 12px; border-radius: 20px;">
+                🔄 PERBAIKAN RETUR — {{ strtoupper(str_replace('_', ' ', $myTask->stage_name)) }}
+            </span>
+            <span style="font-size: 12px; font-weight: 700; color: #b91c1c; background: #fee2e2; padding: 3px 10px; border-radius: 12px;">
+                {{ $activeReturn?->responsibility_type === 'customer_paid' ? '💳 Retur Berbayar' : '🛡️ Garansi Toko' }}
+            </span>
+        </div>
+
+        <div style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 6px;">
+            📌 Item & Ukuran yang Perlu Diperbaiki:
+        </div>
+
+        <div style="background: white; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 15px; font-weight: 800; color: #991b1b; margin-bottom: 4px;">
+                {{ $orderItem?->product_name }} [Size {{ $orderItem?->size ?: 'All Size' }}]
+            </div>
+            <div style="font-size: 13px; color: #475569;">
+                Jumlah: <b style="color: #b91c1c; font-size: 14px;">{{ $myTask->quantity }} pcs</b>
+                @if($orderItem?->recipient_name)
+                | Penerima: <b>{{ $orderItem->recipient_name }}</b>
+                @endif
+            </div>
+            @if(!empty($activeReturn?->size_breakdown))
+            <div style="margin-top: 8px; font-size: 12px; color: #b91c1c; font-weight: 600;">
+                Rincian Ukuran Retur: 
+                @foreach($activeReturn->size_breakdown as $sz => $q)
+                    <span style="background: #fee2e2; padding: 3px 8px; border-radius: 6px; margin-right: 4px; display: inline-block; margin-top: 4px;">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}: {{ $q }} pcs</span>
+                @endforeach
+            </div>
+            @endif
+        </div>
+
+        <div style="font-size: 13px; font-weight: 700; color: #991b1b; margin-bottom: 4px;">
+            📝 Catatan & Instruksi Perbaikan Admin:
+        </div>
+        <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 10px 12px; border-radius: 0 8px 8px 0; font-size: 13px; color: #7f1d1d; font-weight: 700; line-height: 1.4;">
+            {{ $activeReturn?->items_description ?: ($myTask->note ?: 'Perbaiki item sesuai catatan retur admin.') }}
+        </div>
+
+        @if($activeReturn?->expected_pickup_date)
+        <div style="margin-top: 12px; font-size: 12px; color: #dc2626; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+            🎯 <span>Target Selesai / Ambil Customer: <b>{{ $activeReturn->expected_pickup_date->format('d M Y') }}</b></span>
+        </div>
+        @endif
+    </div>
+    @endif
+
     {{-- ── DETAIL PEKERJAAN ── --}}
 
     {{-- Kartu Progress WO --}}
@@ -300,7 +357,7 @@
 
 
     {{-- ── SECTION: TUGAS SAYA ── --}}
-    @if($myTask)
+    @if($myTask && !($myTask->is_revision || $myTask->revision_source))
     @php
         $isQcTask = in_array(strtoupper($myTask->stage_name ?? ''), ['QC_PREP', 'QC_PERSIAPAN', 'QC_REVIEW', 'QC_FINISHING', 'QC_AKHIR']);
         $displayTaskQty = $isQcTask ? $totalQty : $myTask->quantity;
@@ -484,23 +541,6 @@
                 @endif
             </div>
         </div>
-
-
-        
-        @if($myTask->is_revision)
-        <div class="revision-notice" style="background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 12px; padding: 12px; margin-top: 12px;">
-            <div style="font-weight: 700; color: #991B1B; display: flex; align-items: center; gap: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
-                <span>🔧</span> Tugas Revisi
-            </div>
-            @if($wo->reject_reason)
-            <div style="margin-top: 6px; font-size: 13px; color: #7F1D1D; font-weight: 500; line-height: 1.4; background: #FFF; padding: 8px 10px; border-radius: 8px; border: 1px solid #FEE2E2;">
-                <strong>Catatan QC:</strong> {{ $wo->reject_reason }}
-            </div>
-            @else
-            <div style="margin-top: 4px; font-size: 12px; color: #7F1D1D;">Perbaiki pengerjaan sesuai arahan QC.</div>
-            @endif
-        </div>
-        @endif
     </div>
     @endif
 
@@ -772,11 +812,15 @@
     @if($isMyActiveStage)
         @if($myActiveTask && $myActiveTask->status === 'done')
         <div class="action-banner banner-green">
+            @if($wo->status === \App\Models\WorkOrder::STATUS_QC_AKHIR)
+            <span>✅ Tugas perbaikan {{ str_replace('_', ' ', $myActiveTask->stage_name) }} telah selesai & diteruskan ke QC Akhir!</span>
+            @else
             <span>✅ Tugas {{ str_replace('_', ' ', $myActiveTask->stage_name) }} selesai & {{ $nextStageLabel }}</span>
+            @endif
         </div>
         @else
         <div class="action-card">
-            <div class="action-title">🔧 Tugas Anda: {{ $statusLabel }}</div>
+            <div class="action-title">🔧 Tugas Anda: {{ ($myActiveTask?->is_revision || $myActiveTask?->revision_source) ? 'Perbaikan Retur' : $statusLabel }}</div>
 
             @if($myActiveTask && $myActiveTask->status === 'pending')
             @php $isRevision = $myActiveTask->is_revision ?? false; @endphp
@@ -809,7 +853,11 @@
                     @php
                         $nextStatus = $wo->getNextStatus();
                         $isActiveTaskQcPrep = in_array(strtoupper($myActiveTask->stage_name ?? ''), ['QC_PREP', 'QC_PERSIAPAN']);
-                        if ($isActiveTaskQcPrep) {
+                        $isRevisionTask = $myActiveTask?->is_revision || $myActiveTask?->revision_source === 'qc_akhir';
+
+                        if ($isRevisionTask) {
+                            $btnLabel = '✅ Selesai Perbaikan & Lanjut ke QC Akhir';
+                        } elseif ($isActiveTaskQcPrep) {
                             $btnLabel = '✅ Selesai & Lanjutkan';
                         } elseif ($nextStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
                             $btnLabel = '✅ Selesai & Kirim ke QC';
@@ -818,7 +866,7 @@
                         } elseif ($nextStatus) {
                             $btnLabel = '✅ Selesai & Lanjut ke ' . str_replace('_', ' ', $nextStatus);
                         } else {
-                            $btnLabel = '✅ Selesai';
+                            $btnLabel = '✅ Selesai Pekerjaan';
                         }
                     @endphp
                     {{ $btnLabel }}

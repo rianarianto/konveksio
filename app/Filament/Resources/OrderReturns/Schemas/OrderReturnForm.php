@@ -4,7 +4,6 @@ namespace App\Filament\Resources\OrderReturns\Schemas;
 
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -40,9 +39,9 @@ class OrderReturnForm
         }
 
         return array_merge($components, [
-            // Step 1: Pilih Produk Utama
+            // 1. Pilih Produk Utama Pesanan
             Select::make('selected_product_name')
-                ->label('1. Pilih Produk / Item Pesanan Utama')
+                ->label('1. Pilih Produk Pesanan')
                 ->options(function ($get, $record) {
                     $orderId = $get('order_id');
                     if (!$orderId && $record) {
@@ -69,24 +68,24 @@ class OrderReturnForm
                     foreach ($grouped as $pName => $group) {
                         $totQty = $group->sum('quantity');
                         $cat = match($group->first()->production_category) {
-                            'custom' => '🧵 Produksi (Custom)',
-                            'non_produksi' => '📦 Non-Produksi',
-                            'jasa' => '🔧 Jasa',
-                            default => '🏭 Produksi',
+                            'custom' => 'Produksi',
+                            'non_produksi' => 'Non-Produksi',
+                            'jasa' => 'Jasa',
+                            default => 'Produksi',
                         };
-                        $isAddition = $group->first()->is_addition ? ' ➕ [Item Tambahan]' : '';
-                        $options[$pName] = "{$cat} - {$pName}{$isAddition} (Total: {$totQty} pcs)";
+                        $options[$pName] = "{$pName} ({$cat} — Total: {$totQty} pcs)";
                     }
                     return $options;
                 })
                 ->searchable()
                 ->required()
                 ->reactive()
-                ->afterStateUpdated(fn (callable $set) => $set('order_item_id', null)),
+                ->afterStateUpdated(fn (callable $set) => $set('order_item_id', null))
+                ->helperText('Pilih nama produk dari pesanan ini yang mengalami komplain/cacat.'),
 
-            // Step 2: Pilih Ukuran / Varian Spesifik (Laki-laki / Perempuan / Custom)
+            // 2. Pilih Ukuran / Varian Spesifik yang Diretur
             Select::make('order_item_id')
-                ->label('2. Pilih Ukuran & Varian Spesifik yang Diretur')
+                ->label('2. Pilih Ukuran / Varian yang Diretur')
                 ->options(function ($get, $record) {
                     $pName = $get('selected_product_name');
                     $orderId = $get('order_id');
@@ -112,22 +111,24 @@ class OrderReturnForm
                         ->get();
 
                     $options = [];
+                    $labelCounts = [];
+                    $itemLabels = [];
+
                     foreach ($items as $item) {
-                        $size = $item->size ? "Ukuran: {$item->size}" : "Tanpa Ukuran";
+                        $sz = $item->size ? "Ukuran {$item->size}" : "Tanpa Ukuran";
                         $qty = " ({$item->quantity} pcs)";
                         
                         $details = [];
-                        if ($item->recipient_name) {
+                        $reqDetails = $item->size_and_request_details ?? [];
+                        
+                        if (!empty($reqDetails['gender'])) {
+                            $details[] = $reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan';
+                        }
+
+                        if (!empty($item->recipient_name)) {
                             $details[] = "Penerima: {$item->recipient_name}";
                         }
 
-                        $reqDetails = $item->size_and_request_details ?? [];
-                        if (!empty($reqDetails['gender'])) {
-                            $genderLabel = $reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan';
-                            $details[] = "Kategori: {$genderLabel}";
-                        }
-
-                        // Specific clothing model specs (lengan, kerah, etc.)
                         $specs = [];
                         if (!empty($reqDetails['sleeve_model'])) {
                             $sleeve = str_replace('_', ' ', (string)$reqDetails['sleeve_model']);
@@ -141,70 +142,65 @@ class OrderReturnForm
                             $details[] = implode(', ', $specs);
                         }
 
-                        if (!empty($reqDetails['note'])) {
-                            $details[] = "Catatan: " . $reqDetails['note'];
+                        if ($item->is_addition) {
+                            $details[] = "➕ Item Tambahan";
                         }
 
                         $extra = count($details) > 0 ? " — " . implode(' | ', $details) : "";
-                        $options[$item->id] = "{$size}{$qty}{$extra}";
+                        $baseLabel = "{$sz}{$qty}{$extra}";
+
+                        $itemLabels[$item->id] = [
+                            'baseLabel' => $baseLabel,
+                            'is_addition' => $item->is_addition,
+                        ];
+
+                        $labelCounts[$baseLabel] = ($labelCounts[$baseLabel] ?? 0) + 1;
                     }
+
+                    $seenCounts = [];
+                    foreach ($itemLabels as $itemId => $data) {
+                        $baseLabel = $data['baseLabel'];
+                        if (($labelCounts[$baseLabel] ?? 0) > 1) {
+                            $seenCounts[$baseLabel] = ($seenCounts[$baseLabel] ?? 0) + 1;
+                            $idx = $seenCounts[$baseLabel];
+                            $tag = $idx === 1 ? " [Item Awal]" : " ➕ [Penambahan #{$idx}]";
+                            $options[$itemId] = "{$baseLabel}{$tag}";
+                        } else {
+                            $options[$itemId] = $baseLabel;
+                        }
+                    }
+
                     return $options;
                 })
                 ->visible(fn ($get) => !empty($get('selected_product_name')))
                 ->searchable()
                 ->required()
                 ->reactive()
-                ->afterStateUpdated(function ($state, callable $set) {
-                    if ($state) {
-                        $item = OrderItem::find($state);
-                        if ($item) {
-                            $sizeKey = "Size " . ($item->size ?? 'All Size');
-                            if (!empty($item->recipient_name)) {
-                                $sizeKey .= " (Nama: {$item->recipient_name})";
-                            }
-                            $set('size_breakdown', [
-                                $sizeKey => 1,
-                            ]);
-                            $set('quantity', 1);
-                        }
-                    }
-                }),
+                ->helperText('Pilih ukuran spesifik baju yang mengalami kerusakan.'),
 
-            DatePicker::make('return_date')
-                ->label('Tanggal Retur')
-                ->default(now())
-                ->required(),
-
-            Select::make('responsibility_type')
-                ->label('Penanggung Jawab / Tipe Garansi')
-                ->options([
-                    'store_guarantee' => '🛡️ Garansi Toko / Internal (Gratis Customer - Upah Revisi Rp 0 jika sudah gajian)',
-                    'customer_paid' => '💳 Kesalahan Customer (Berbayar - Charge Tambahan & Upah Pekerja Normal)',
-                ])
-                ->default('store_guarantee')
+            // 3. Jumlah Pcs yang Diretur
+            TextInput::make('quantity')
+                ->label('3. Jumlah Pcs yang Diretur')
                 ->required()
-                ->reactive(),
-
-            TextInput::make('additional_fee')
-                ->label('Biaya Tambahan Customer (Rp)')
                 ->numeric()
-                ->prefix('Rp')
-                ->default(0)
-                ->visible(fn ($get) => $get('responsibility_type') === 'customer_paid')
-                ->required(fn ($get) => $get('responsibility_type') === 'customer_paid'),
+                ->default(1)
+                ->minValue(1)
+                ->helperText('Jumlah pcs/potong yang cacat dari ukuran tersebut.'),
 
+            // 4. Tindakan Retur (Perbaikan / Buat Baru)
             Select::make('action_type')
-                ->label('Tindakan Retur')
+                ->label('4. Tindakan Retur')
                 ->options([
-                    'repair' => '🛠️ Perbaikan (Tukang Kerjakan Ulang Divisi/Tahap Tertentu)',
-                    'remake' => '🏭 Buat Baru (Produksi Ulang Seluruhnya dari Awal)',
+                    'repair' => '🛠️ Perbaikan / Revisi (Dikerjakan ulang bagian tertentu)',
+                    'remake' => '🏭 Buat Baru (Produksi ulang dari awal)',
                 ])
                 ->required()
                 ->reactive()
                 ->default('repair'),
 
+            // 5. Divisi Tujuan Perbaikan
             Select::make('target_stage')
-                ->label('Kirim Kembali Ke Tahap Mana? (Untuk Perbaikan)')
+                ->label('5. Kirim Ke Divisi Mana? (Untuk Perbaikan)')
                 ->options(function ($get) {
                     $itemId = $get('order_item_id');
                     if (!$itemId) {
@@ -221,17 +217,14 @@ class OrderReturnForm
                     $item = OrderItem::find($itemId);
                     if (!$item) return [];
 
-                    // Cari WO dari item ini atau item induk dalam grupnya
                     $groupItemIds = $item->getItemsInGroup()->pluck('id');
                     $wo = \App\Models\WorkOrder::whereIn('order_item_id', $groupItemIds)->first();
                     $options = [];
 
-                    // 1. QC Persiapan (jika diaktifkan pada WO)
                     if (!$wo || ($wo && $wo->has_qc_prep)) {
                         $options['QC_PERSIAPAN'] = '🔍 QC Persiapan Bahan';
                     }
 
-                    // 2. Tahap-tahap Pekerja Aktual Sesuai Urutan Template Produksi
                     $stages = [];
                     if ($wo && !empty($wo->stage_sequence)) {
                         $stages = $wo->stage_sequence;
@@ -243,7 +236,6 @@ class OrderReturnForm
                             ->toArray();
                     }
 
-                    // Fallback jika item produksi belum memiliki SPK tersimpan
                     if (empty($stages)) {
                         $cat = $item->production_category ?? 'produksi';
                         if ($cat === 'non_produksi' || $cat === 'jasa') {
@@ -267,7 +259,6 @@ class OrderReturnForm
                         $options[$stg] = $label;
                     }
 
-                    // 3. QC Akhir (jika diaktifkan)
                     if (!$wo || ($wo && ($wo->has_qc_selesai ?? true))) {
                         $options['QC_AKHIR'] = '🏁 QC Akhir / Pemeriksaan Final';
                     }
@@ -276,78 +267,53 @@ class OrderReturnForm
                 })
                 ->visible(fn ($get) => $get('action_type') === 'repair')
                 ->required(fn ($get) => $get('action_type') === 'repair')
-                ->helperText('Tahapan disusun otomatis mengikuti template & alur produksi aktual barang ini.'),
+                ->helperText('Pilih divisi tukang yang akan memperbaiki barang ini.'),
 
-            KeyValue::make('size_breakdown')
-                ->label('Rincian Ukuran / Nama Khusus Penerima yang Diretur')
-                ->keyLabel('Ukuran / Nama Penerima / Identitas Khusus')
-                ->keyPlaceholder('Contoh: Size S (Nama: Andre)')
-                ->valuePlaceholder('1')
-                ->helperText(function ($get) {
-                    $itemId = $get('order_item_id');
-                    $baseHelper = '💡 Anda bebas mengetik ukuran atau nama pendaftar khusus. Contoh: "Size S (Nama: Andre)" -> 1 pcs.';
-
-                    if (!$itemId) return $baseHelper;
-
-                    $item = OrderItem::find($itemId);
-                    if (!$item) return $baseHelper;
-
-                    $groupItems = $item->getItemsInGroup();
-                    $sizes = [];
-                    foreach ($groupItems as $gi) {
-                        $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-                        $sizes[] = ($sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz) . " ({$gi->quantity} pcs)";
-                    }
-                    return $baseHelper . ' | Ukuran umum dalam item ini: ' . implode(', ', $sizes);
-                })
-                ->reactive()
-                ->afterStateUpdated(function ($state, callable $set) {
-                    if (is_array($state)) {
-                        $total = 0;
-                        foreach ($state as $val) {
-                            $total += is_numeric($val) ? (int)$val : 1;
-                        }
-                        if ($total > 0) {
-                            $set('quantity', $total);
-                        }
-                    }
-                }),
-
-            TextInput::make('quantity')
-                ->label('Total Jumlah Pcs yang Diretur')
-                ->required()
-                ->numeric()
-                ->default(1)
-                ->minValue(1),
-
-            Select::make('status')
-                ->label('Status Antrian Retur')
+            // 6. Penanggung Jawab / Garansi
+            Select::make('responsibility_type')
+                ->label('6. Garansi / Tanggung Jawab')
                 ->options([
-                    'pending'  => '⏳ Pending (Masuk Antrian Tukang)',
-                    'diproses' => '🔨 Diproses (Sedang Dikerjakan Tukang)',
-                    'selesai'  => '✅ Selesai (Retur Selesai)',
+                    'store_guarantee' => '🛡️ Garansi Toko / Cacat Produksi (Gratis Customer)',
+                    'customer_paid'   => '💳 Kesalahan Customer / Request Tambahan (Berbayar)',
                 ])
+                ->default('store_guarantee')
                 ->required()
-                ->default('pending'),
+                ->reactive(),
 
+            TextInput::make('additional_fee')
+                ->label('Biaya Tambahan Customer (Rp)')
+                ->numeric()
+                ->prefix('Rp')
+                ->default(0)
+                ->visible(fn ($get) => $get('responsibility_type') === 'customer_paid')
+                ->required(fn ($get) => $get('responsibility_type') === 'customer_paid'),
+
+            DatePicker::make('return_date')
+                ->label('Tanggal Masuk Retur')
+                ->default(now())
+                ->required(),
+
+            DatePicker::make('expected_pickup_date')
+                ->label('Target Tanggal Selesai / Ambil')
+                ->default(now()->addDays(3))
+                ->required()
+                ->helperText('Janji tanggal barang returan siap diambil customer.'),
+
+            // 7. Detail Kerusakan & Catatan Perbaikan
+            Textarea::make('items_description')
+                ->label('7. Detail Cacat & Instruksi Perbaikan')
+                ->placeholder('Jelaskan bagian mana yang cacat. Contoh: Baju Size S nama Andre, jahitan ketiak kanan lepas 3 cm. Tolong dijahit ulang dengan rapi.')
+                ->rows(3)
+                ->required()
+                ->helperText('Instruksi ini akan langsung terkirim ke tukang yang bertugas.')
+                ->columnSpanFull(),
+
+            // 8. Foto Bukti Kerusakan
             FileUpload::make('photo_path')
-                ->label('Foto Bukti Kerusakan / Cacat Baju')
+                ->label('Foto Bukti Cacat / Kerusakan (Opsional)')
                 ->image()
                 ->directory('order-returns')
                 ->maxSize(5120)
-                ->columnSpanFull(),
-
-            Textarea::make('items_description')
-                ->label('Catatan Detail Kerusakan & Petunjuk Instruksi Tukang')
-                ->placeholder('Jelaskan kecacatan secara spesifik. Contoh: Baju Size S dengan nama "Andre", bordir nama di dada kiri miring 2 cm. Tolong dibongkar dan dibordir ulang nama Andre dengan rapi.')
-                ->rows(3)
-                ->required()
-                ->helperText('Petunjuk ini akan langsung terkirim ke WhatsApp tukang dan muncul mencolok di portal tugas tukang.')
-                ->columnSpanFull(),
-
-            Textarea::make('reason')
-                ->label('Alasan & Rincian Retur')
-                ->placeholder('Tuliskan alasan retur atau instruksi perbaikan untuk tukang...')
                 ->columnSpanFull(),
         ]);
     }

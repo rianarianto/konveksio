@@ -208,18 +208,26 @@
     <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
     @endif
     <div class="card task-card {{ $canStart ? ($isRevision ? 'task-revision' : 'task-ready') : '' }}" style="cursor:pointer;">
-        <div class="task-header" style="display:flex; justify-content: space-between; align-items: center; gap:12px;">
+        <div class="task-header" style="display:flex; justify- space-between; align-items: center; gap:12px;">
             <div class="task-info" style="flex:1;">
-                <div class="task-stage {{ $isRevision ? 'task-stage-revision' : '' }}">
-                    {{ str_replace('_', ' ', $task->stage_name) }}
-                    @if($isRevision)
-                    <span class="revision-badge">REVISI</span>
-                    @endif
+                @if($isRevision)
+                <div style="background:#fee2e2;color:#b91c1c;font-weight:700;font-size:12px;padding:2px 10px;border-radius:20px;display:inline-block;margin-bottom:6px;">
+                    🔄 RETUR PERBAIKAN — {{ str_replace('_', ' ', $task->stage_name) }}
                 </div>
+                @else
+                <div class="task-stage">
+                    {{ str_replace('_', ' ', $task->stage_name) }}
+                </div>
+                @endif
                 <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
                 <div class="task-customer">
                     <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
-                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
+                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
+                    @if($isRevision)
+                    <b style="color:#b91c1c;">{{ $task->quantity }} pcs retur</b>
+                    @else
+                    {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
+                    @endif
                     @if($task->orderItem?->order?->is_express)
                     <span class="express-badge">⚡ Express</span>
                     @endif
@@ -227,11 +235,8 @@
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
                 @if($canStart)
-                    <span style="font-size:11px;font-weight:700;color:{{ $isRevision ? '#b91c1c' : '#1d4ed8' }};background:{{ $isRevision ? '#fee2e2' : '#dbeafe' }};border-radius:20px;padding:4px 10px;white-space:nowrap;">
-                        {{ $isRevision ? '🔧 Perlu Perbaikan' : '👉 Siap Kerja' }}
-                    </span>
-                    <span class="btn btn-primary btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer;">
-                        Buka Detail
+                    <span class="btn btn-primary btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer; {{ $isRevision ? 'background:#dc2626;border-color:#dc2626;' : '' }}">
+                        {{ $isRevision ? '🔧 Perbaiki Sekarang' : 'Buka Detail' }}
                     </span>
                 @else
                     <span style="font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:20px;padding:4px 10px;white-space:nowrap;">

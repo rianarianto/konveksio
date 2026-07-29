@@ -663,7 +663,7 @@ class OrderResource extends Resource
             ->recordTitleAttribute('order_number')
             ->query(
                 Order::query()
-                    ->with(['customer', 'orderItems.productionTasks', 'payments'])
+                    ->with(['customer', 'creator', 'orderItems.productionTasks', 'payments'])
             )
             ->columns([
 
@@ -705,7 +705,13 @@ class OrderResource extends Resource
                             . '</div>'
                             : '';
 
-                        return '<div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">' . $orderNum . $nameBadge . $phoneLine . '</div>';
+                        $creatorName = $record->creator?->name ?? 'Sistem';
+                        $creatorPill = '<div style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; background:#f8fafc; border:1px solid #e2e8f0; color:#64748b; font-size:11px; font-weight:500;">'
+                            . '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+                            . 'Oleh: ' . htmlspecialchars($creatorName)
+                            . '</div>';
+
+                        return '<div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">' . $orderNum . $nameBadge . $phoneLine . $creatorPill . '</div>';
                     }),
 
                 // KOLOM 2: Timeline
@@ -877,16 +883,41 @@ class OrderResource extends Resource
                             $catBadge = '<div style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; background:' . $firstCat[1] . '; color:' . $firstCat[2] . ';">' . $firstCat[0] . '</div>';
 
                             // Combined Progress & Status
+                            $groupItemIds = $itemsGroup->pluck('id');
+                            $hasActiveReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+                                ->whereIn('status', ['pending', 'diproses'])
+                                ->exists();
+
+                            $isHandedOver = ($record->status === 'selesai' || $record->status === 'diambil' || !empty($record->pickup_proof) || !empty($record->pickup_at));
+
                             $groupTasks = $itemsGroup->flatMap->productionTasks;
                             $totalTasks = $groupTasks->count();
                             $doneTasks = $groupTasks->where('status', 'done')->count();
 
-                            if ($totalTasks > 0) {
+                            $groupWo = $itemsGroup->map(fn($it) => $it->workOrder)->filter()->first();
+
+                            if ($hasActiveReturn) {
+                                $displayStatusText = 'Retur';
+                            } elseif ($isHandedOver) {
+                                $displayStatusText = 'Diserahkan';
+                            } elseif ($groupWo) {
+                                if ($groupWo->status === \App\Models\WorkOrder::STATUS_COMPLETED || $groupWo->delivered_at !== null) {
+                                    $displayStatusText = 'Siap Diambil';
+                                } else {
+                                    $displayStatusText = match($groupWo->status) {
+                                        \App\Models\WorkOrder::STATUS_CREATED => 'Antrian',
+                                        \App\Models\WorkOrder::STATUS_QC_PREP, 'QC_PERSIAPAN' => 'QC Persiapan',
+                                        \App\Models\WorkOrder::STATUS_QC_REVIEW => 'QC ' . str_replace('_', ' ', $groupWo->current_review_stage ?? ''),
+                                        \App\Models\WorkOrder::STATUS_QC_AKHIR => 'QC Akhir',
+                                        default => str_replace('_', ' ', $groupWo->status),
+                                    };
+                                }
+                            } elseif ($totalTasks > 0) {
                                 $activeTask = $groupTasks->whereIn('status', ['in_progress', 'pending', 'antrian'])->first();
                                 if ($activeTask) {
                                     $displayStatusText = $activeTask->stage_name ?: ($activeTask->nama_tugas ?: 'Proses');
                                 } elseif ($doneTasks == $totalTasks) {
-                                    $displayStatusText = ($record->status === 'selesai') ? 'Selesai' : 'Siap Diambil';
+                                    $displayStatusText = 'Siap Diambil';
                                 } else {
                                     $displayStatusText = 'Antrian';
                                 }
@@ -894,7 +925,7 @@ class OrderResource extends Resource
                                 if ($record->status === 'batal') {
                                     $displayStatusText = 'Batal';
                                 } else {
-                                    $displayStatusText = 'Belum Diatur';
+                                    $displayStatusText = 'Siap Diambil';
                                 }
                             }
 
@@ -904,8 +935,10 @@ class OrderResource extends Resource
                             }
 
                             $statusBadge = match ($displayStatusText) {
+                                'Diserahkan' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">DISERAHKAN</span>',
+                                'Retur' => '<span style="padding:2px 6px; border-radius:4px; background:#fef2f2; color:#dc2626; font-size:10px; font-weight:600;">REVISI RETUR</span>',
                                 'Siap Diambil' => '<span style="padding:2px 6px; border-radius:4px; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600;">SIAP DIAMBIL</span>',
-                                'Selesai' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">SELESAI</span>',
+                                'Selesai' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">DISERAHKAN</span>',
                                 'Proses' => '<span style="padding:2px 6px; border-radius:4px; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600;">PROSES</span>',
                                 'Belum Diatur' => '<span style="padding:2px 6px; border-radius:4px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:600;">BELUM DIATUR</span>',
                                 default => '<span style="padding:2px 6px; border-radius:4px; background:#fef3c7; color:#d97706; font-size:10px; font-weight:600;">'.strtoupper($displayStatusText).'</span>',

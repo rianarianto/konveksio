@@ -304,6 +304,21 @@ class OrderForm
                                     ->hiddenLabel()
                                     ->placeholder('Nama/Item...')
                                     ->required()
+                                    ->live(debounce: 500)
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                        if (!$state) return;
+                                        $allItems = $get('../../orderItems') ?? [];
+                                        foreach ($allItems as $otherItem) {
+                                            if (($otherItem['product_name'] ?? '') === $state && !empty($otherItem['bahan_baju'])) {
+                                                $set('production_category', $otherItem['production_category'] ?? 'produksi');
+                                                $set('bahan_baju', $otherItem['bahan_baju']);
+                                                if (empty($get('price')) || (int)$get('price') === 0) {
+                                                    $set('price', $otherItem['price'] ?? 0);
+                                                }
+                                                break;
+                                            }
+                                        }
+                                    })
                                     ->columnSpan(3),
                                 Select::make('size')
                                     ->hiddenLabel()
@@ -320,12 +335,34 @@ class OrderForm
                                         'jasa' => 'Jasa',
                                     ])
                                     ->required()
+                                    ->disabled(function (Get $get) {
+                                        $pName = $get('product_name');
+                                        if (!$pName) return false;
+                                        $items = $get('../../orderItems') ?? [];
+                                        $count = 0;
+                                        foreach ($items as $it) {
+                                            if (($it['product_name'] ?? '') === $pName) $count++;
+                                        }
+                                        return $count > 1;
+                                    })
+                                    ->dehydrated()
                                     ->columnSpan(1),
                                 Select::make('bahan_baju')
                                     ->hiddenLabel()
                                     ->options(OrderResource::getBahanOptions())
                                     ->placeholder('Bahan...')
                                     ->allowHtml()
+                                    ->disabled(function (Get $get) {
+                                        $pName = $get('product_name');
+                                        if (!$pName) return false;
+                                        $items = $get('../../orderItems') ?? [];
+                                        $count = 0;
+                                        foreach ($items as $it) {
+                                            if (($it['product_name'] ?? '') === $pName) $count++;
+                                        }
+                                        return $count > 1;
+                                    })
+                                    ->dehydrated()
                                     ->columnSpan(3),
                                 TextInput::make('price')
                                     ->hiddenLabel()

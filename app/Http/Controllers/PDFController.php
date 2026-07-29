@@ -33,6 +33,52 @@ class PDFController extends Controller
         ]);
     }
 
+    public function downloadSpkByOrder(Order $order, Request $request)
+    {
+        $wo = \App\Models\WorkOrder::whereHas('orderItem', fn($q) => $q->where('order_id', $order->id))->first();
+        if (!$wo) {
+            $item = $order->orderItems()->first();
+            if ($item) {
+                $totalQuantity = \App\Models\OrderItem::where('order_id', $item->order_id)
+                    ->where('product_name', $item->product_name)
+                    ->sum('quantity');
+
+                $allGroupItems = \App\Models\OrderItem::where('order_id', $item->order_id)
+                    ->where('product_name', $item->product_name)
+                    ->get();
+
+                $sizes = [];
+                $specGroups = [];
+
+                foreach ($allGroupItems as $gi) {
+                    $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                    $sizes[$sz] = ($sizes[$sz] ?? 0) + $gi->quantity;
+                }
+
+                $data = [
+                    'record' => $item->load(['order.customer', 'productionTasks.assignedTo', 'bahan.material']),
+                    'totalQuantity' => $totalQuantity,
+                    'sizes' => $sizes,
+                    'specGroups' => $specGroups,
+                    'allGroupItems' => $allGroupItems,
+                ];
+
+                $pdf = app('dompdf.wrapper')->loadView('pdf.spk-produksi', $data);
+                $filename = 'SPK-' . str_replace('#', '', $order->order_number) . '.pdf';
+
+                $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+                $pdf->save($tempPath);
+                return response()->file($tempPath, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="' . $filename . '"',
+                ]);
+            }
+            abort(404, 'Data pesanan tidak ditemukan.');
+        }
+
+        return $this->downloadSpk($wo, $request);
+    }
+
     public function downloadSpk(\App\Models\WorkOrder $wo, Request $request)
     {
         $record = $wo->orderItem;
