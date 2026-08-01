@@ -202,9 +202,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             ->selectRaw("IF(production_category IN ('produksi', 'custom'), JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_keterangan')), null) as sablon_keterangan")
                             ->selectRaw("
                                 CONCAT(
-                                    product_name, IF(production_category IN ('non_produksi', 'jasa'), '', CONCAT(' (', IF(order_items.size = 'Custom', 'Ukur Badan', 'Size Toko'), ')')), ' | ',
+                                    product_name, ' - ',
                                     CASE 
-                                        WHEN production_category = 'custom' THEN 'Produksi (Ukur)' 
+                                        WHEN production_category IN ('produksi', 'custom') THEN 'Produksi'
                                         WHEN production_category = 'non_produksi' THEN 'Non-Produksi'
                                         WHEN production_category = 'jasa' THEN 'Jasa'
                                         ELSE 'Produksi' 
@@ -2022,10 +2022,17 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             default => 'Produksi',
                         };
                         
-                        $sizeType = ($record->size === 'Custom') ? 'Ukur Badan' : 'Size Toko';
-                        return in_array($record->production_category, ['non_produksi', 'jasa'])
-                            ? "{$record->product_name} - {$categoryLabel}"
-                            : "{$record->product_name} ({$sizeType}) - {$categoryLabel}";
+                        if (in_array($record->production_category, ['non_produksi', 'jasa'])) {
+                            return "📦 {$record->product_name} - {$categoryLabel}";
+                        }
+
+                        $bahan = $record->bahan_name ?: 'Tanpa Bahan';
+                        $color = $record->varian_warna ?: 'Tanpa Warna';
+                        if (!empty($record->varian_kode_warna)) {
+                            $color .= " ({$record->varian_kode_warna})";
+                        }
+
+                        return "📦 {$record->product_name} - {$categoryLabel} ({$bahan} - {$color})";
                     })
                     ->getDescriptionUsing(function ($record) {
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
