@@ -518,7 +518,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->icon('heroicon-o-cog-6-tooth')
                     ->color('gray')
                     ->closeModalByClickingAway(false)
-                    ->visible(fn() => in_array(auth()->user()->role, ['owner', 'admin']) && $this->order->orderItems()->exists())
+                    ->visible(false)
                     ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Simpan Perubahan Produk'))
                     ->modalHeading('Edit Informasi Produk Utama')
                     ->modalWidth('2xl')
@@ -2036,7 +2036,29 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->getDescriptionUsing(function ($record) {
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
                         $hasTasks = \App\Models\ProductionTask::whereIn('order_item_id', $groupItemIds)->exists();
-                        return $hasTasks ? null : '⚠️ Belum Ditugaskan';
+
+                        $unassignedBadge = !$hasTasks ? '<span class="unassigned-badge">⚠️ Belum Ditugaskan</span>' : '';
+                        $escapedJsProduct = addslashes($record->product_name);
+
+                        $html = '
+                        <div class="flex items-center justify-between w-full mt-1" onclick="event.stopPropagation();">
+                            <div>' . $unassignedBadge . '</div>
+                            <div x-data="{ open: false }" class="relative inline-block text-left" onclick="event.stopPropagation();">
+                                <button @click="open = !open" type="button" class="inline-flex items-center justify-center w-7 h-7 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold transition-colors">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/></svg>
+                                </button>
+                                <div x-show="open" @click.away="open = false" style="display: none;" class="absolute right-0 mt-1 w-52 rounded-xl shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 py-1 z-50 text-left">
+                                    <button wire:click="openEditProductModal(\'' . $escapedJsProduct . '\')" @click="open = false" type="button" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 flex items-center gap-2">
+                                        <span>⚙️</span> Edit Info Produk Ini
+                                    </button>
+                                    <button wire:click="deleteProductGroup(\'' . $escapedJsProduct . '\')" wire:confirm="Hapus seluruh item produk \'' . $escapedJsProduct . '\'?" @click="open = false" type="button" class="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700">
+                                        <span>🗑️</span> Hapus Seluruh Produk Ini
+                                    </button>
+                                </div>
+                            </div>
+                        </div>';
+
+                        return new \Illuminate\Support\HtmlString($html);
                     })
                     ->collapsible(),
             ])
@@ -2143,6 +2165,51 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
             $this->refreshOrderData();
             Notification::make()->success()->title('Nama penerima diperbarui!')->send();
         }
+    }
+
+    public function openEditProductModal(string $productName): void
+    {
+        $sample = OrderItem::where('order_id', $this->order->id)->where('product_name', $productName)->first();
+        if (!$sample) return;
+
+        $details = $sample->size_and_request_details ?? [];
+
+        $sablonItem = OrderItem::where('order_id', $this->order->id)
+            ->where('product_name', $productName)
+            ->get()
+            ->first(fn($i) => filled($i->size_and_request_details['sablon_jenis'] ?? null) || filled($i->size_and_request_details['sablon_lokasi'] ?? null));
+        $sDetails = $sablonItem?->size_and_request_details ?? $details;
+
+        $this->mountTableAction('edit_parent_product', data: [
+            'select_product_name' => $productName,
+            'new_product_name' => $sample->product_name,
+            'new_category' => $sample->production_category === 'custom' ? 'produksi' : ($sample->production_category ?? 'produksi'),
+            'new_bahan_id' => $sample->bahan_id,
+            'new_material_variant_id' => $details['material_variant_id'] ?? null,
+            'new_sablon_teknik' => $sDetails['sablon_jenis'] ?? null,
+            'new_sablon_lokasi' => $sDetails['sablon_lokasi'] ?? null,
+            'new_sablon_keterangan' => $sDetails['sablon_keterangan'] ?? null,
+        ]);
+    }
+
+    public function deleteProductGroup(string $productName): void
+    {
+        if (!in_array(auth()->user()->role, ['owner', 'admin'])) return;
+
+        $items = OrderItem::where('order_id', $this->order->id)
+            ->where('product_name', $productName)
+            ->get();
+
+        foreach ($items as $item) {
+            $item->delete();
+        }
+
+        Notification::make()
+            ->success()
+            ->title("Seluruh item produk '{$productName}' berhasil dihapus")
+            ->send();
+
+        $this->refreshOrderData();
     }
 
     public function render()
