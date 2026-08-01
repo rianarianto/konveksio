@@ -294,8 +294,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     })
                     ->sortable(),
 
-                 TextColumn::make('bahan_warna')
+                TextColumn::make('bahan_warna')
                     ->label('Bahan & Warna')
+                    ->badge()
+                    ->color('gray')
                     ->state(function(OrderItem $record) {
                         if ($record->production_category === 'jasa') return '-';
                         $color = $record->varian_warna ?: 'Tanpa Warna';
@@ -321,120 +323,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         }
                         return null;
                     }),
-
-                TextColumn::make('specifications')
-                    ->label('Spesifikasi')
-                    ->state(function(OrderItem $record) use ($genderOptions, $sleeveOptions, $collarOptions) {
-                        $details = $record->size_and_request_details ?? [];
-                        $groupLabel = $details['group_label'] ?? null;
-                        
-                        $isProduksi = in_array($record->production_category, ['produksi', 'custom']);
-                        
-                        $summary = "";
-                        if ($isProduksi) {
-                            $gender = $genderOptions[$record->gender] ?? $record->gender ?? 'Laki-laki';
-                            $sleeve = $sleeveOptions[$record->sleeve_model] ?? $record->sleeve_model ?? 'pendek';
-                            $collar = $collarOptions[$record->collar_model] ?? $record->collar_model ?? 'biasa';
-                            $prefix = filled($groupLabel) ? "🏷️ {$groupLabel} ({$gender})" : $gender;
-                            $summary = "{$prefix} | Lengan {$sleeve}, Kerah {$collar}";
-                        }
-                        
-                        return $summary ?: '-';
-                    })
-                    ->badge(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']))
-                    ->color('gray')
-                    ->icon(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'heroicon-m-magnifying-glass-circle' : null)
-                    ->iconPosition('after')
-                    ->tooltip(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Klik untuk detail lengkap' : null)
-                    ->action(
-                        Action::make('view_spec_details')
-                            ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
-                            ->modalHeading('Detail Spesifikasi Produk')
-                            ->modalWidth('md')
-                            ->modalSubmitAction(false)
-                            ->modalCancelAction(fn($action) => $action->label('Tutup')->color('primary'))
-                            ->form(function(OrderItem $record) use ($genderOptions, $sleeveOptions, $pocketOptions, $buttonOptions, $collarOptions, $modelOptions) {
-                                $gender = $genderOptions[$record->gender] ?? $record->gender ?? 'L';
-                                $sleeve = $sleeveOptions[$record->sleeve_model] ?? $record->sleeve_model ?? 'pendek';
-                                $pocket = $pocketOptions[$record->pocket_model] ?? $record->pocket_model ?? 'tanpa_saku';
-                                $button = $buttonOptions[$record->button_model] ?? $record->button_model ?? 'biasa';
-                                $collar = $collarOptions[$record->collar_model] ?? $record->collar_model ?? 'biasa';
-                                $model = $modelOptions[$record->model] ?? $record->model ?? 'biasa';
-
-                                $details = $record->size_and_request_details ?? [];
-                                $sablon = $details['sablon_jenis'] ?? null;
-                                $lokasi = $details['sablon_lokasi'] ?? null;
-                                $ket = $details['sablon_keterangan'] ?? null;
-
-                                if (!$sablon && !$lokasi && !$ket) {
-                                    $groupItem = OrderItem::where('order_id', $record->order_id)
-                                        ->where('product_name', $record->product_name)
-                                        ->get()
-                                        ->first(fn($i) => filled($i->size_and_request_details['sablon_jenis'] ?? null) || filled($i->size_and_request_details['sablon_lokasi'] ?? null) || filled($i->size_and_request_details['sablon_keterangan'] ?? null));
-                                    if ($groupItem) {
-                                        $gDetails = $groupItem->size_and_request_details ?? [];
-                                        $sablon = $gDetails['sablon_jenis'] ?? null;
-                                        $lokasi = $gDetails['sablon_lokasi'] ?? null;
-                                        $ket = $gDetails['sablon_keterangan'] ?? null;
-                                    }
-                                }
-
-                                $sablon = $sablon ?: '-';
-                                $lokasi = $lokasi ?: '-';
-                                $ket = $ket ?: '-';
-
-                                $isProduksi = in_array($record->production_category, ['produksi', 'custom']);
-                                $isCustom = $record->size === 'Custom';
-                                $ld = $details['LD'] ?? '-';
-                                $pb = $details['PB'] ?? '-';
-                                $pl = $details['PL'] ?? '-';
-                                $lb = $details['LB'] ?? '-';
-                                $lp = $details['LP'] ?? '-';
-                                $lph = $details['LPh'] ?? '-';
-                                $note = $details['note'] ?? '-';
-                                $groupLabel = $details['group_label'] ?? null;
-                                $specNotes = $details['spec_notes'] ?? null;
-
-                                return [
-                                    Grid::make(['default' => 2, 'sm' => 2, 'md' => 3])->schema([
-                                        Placeholder::make('group_label')->label('Nama Pengelompokan / Label')->content($groupLabel ?: '-')->columnSpanFull()->visible($isProduksi && filled($groupLabel)),
-                                        Placeholder::make('recipient_name')->label('Nama Penerima')->content($record->recipient_name ?: '-')->visible($isCustom && filled($record->recipient_name)),
-                                        Placeholder::make('gender')->label('Gender / JK')->content($gender)->visible($isProduksi),
-                                        Placeholder::make('sleeve')->label('Lengan')->content("Lengan " . $sleeve)->visible($isProduksi),
-                                        Placeholder::make('pocket')->label('Saku')->content($pocket)->visible($isProduksi),
-                                        Placeholder::make('button')->label('Kancing')->content("Kancing " . $button)->visible($isProduksi),
-                                        Placeholder::make('collar')->label('Kerah')->content("Kerah " . $collar)->visible($isProduksi),
-                                        Placeholder::make('model')->label('Model')->content($model)->visible($isProduksi),
-                                        Placeholder::make('spec_notes')->label('Catatan Khusus Spesifikasi')->content($specNotes)->columnSpanFull()->visible($isProduksi && filled($specNotes)),
-                                        
-                                        Section::make('Detail Ukuran Badan (Custom)')
-                                            ->visible($isCustom)
-                                            ->columnSpanFull()
-                                            ->columns(['default' => 3, 'sm' => 3, 'md' => 6])
-                                            ->compact()
-                                            ->schema([
-                                                Placeholder::make('ld_view')->label('LD')->content($ld ? $ld . " cm" : '-'),
-                                                Placeholder::make('pb_view')->label('PB')->content($pb ? $pb . " cm" : '-'),
-                                                Placeholder::make('pl_view')->label('PL')->content($pl ? $pl . " cm" : '-'),
-                                                Placeholder::make('lb_view')->label('LB')->content($lb ? $lb . " cm" : '-'),
-                                                Placeholder::make('lp_view')->label('LP')->content($lp ? $lp . " cm" : '-'),
-                                                Placeholder::make('lph_view')->label('LPh')->content($lph ? $lph . " cm" : '-'),
-                                                Placeholder::make('note_view')->label('Catatan Khusus Ukuran')->content($note ?: '-')->columnSpanFull(),
-                                            ]),
-
-                                        Section::make('Desain Sablon / Bordir')
-                                            ->columnSpanFull()
-                                            ->columns(['default' => 2, 'sm' => 2, 'md' => 3])
-                                            ->compact()
-                                            ->schema([
-                                                Placeholder::make('sablon_jenis')->label('Teknik')->content($sablon),
-                                                Placeholder::make('sablon_lokasi')->label('Titik Lokasi')->content($lokasi),
-                                                Placeholder::make('sablon_ket')->label('Keterangan Desain')->content($ket)->columnSpanFull(),
-                                            ]),
-                                    ]),
-                                 ];
-                            })
-                    ),
 
                  TextColumn::make('sablon_bordir')
                     ->label('Desain Sablon / Bordir')
@@ -479,6 +367,89 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         }
                         return $ket ? "Keterangan: {$ket}" : null;
                     }),
+
+                 TextColumn::make('specifications')
+                    ->label('Spesifikasi')
+                    ->state(function(OrderItem $record) use ($genderOptions, $sleeveOptions, $collarOptions) {
+                        $details = $record->size_and_request_details ?? [];
+                        $groupLabel = $details['group_label'] ?? null;
+                        
+                        $isProduksi = in_array($record->production_category, ['produksi', 'custom']);
+                        
+                        $summary = "";
+                        if ($isProduksi) {
+                            $gender = $genderOptions[$record->gender] ?? $record->gender ?? 'Laki-laki';
+                            $sleeve = $sleeveOptions[$record->sleeve_model] ?? $record->sleeve_model ?? 'pendek';
+                            $collar = $collarOptions[$record->collar_model] ?? $record->collar_model ?? 'biasa';
+                            $prefix = filled($groupLabel) ? "🏷️ {$groupLabel} ({$gender})" : $gender;
+                            $summary = "{$prefix} | Lengan {$sleeve}, Kerah {$collar}";
+                        }
+                        
+                        return $summary ?: '-';
+                    })
+                    ->badge(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']))
+                    ->color('gray')
+                    ->icon(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'heroicon-m-magnifying-glass-circle' : null)
+                    ->iconPosition('after')
+                    ->tooltip(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Klik untuk detail lengkap' : null)
+                    ->action(
+                        Action::make('view_spec_details')
+                            ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
+                            ->modalHeading('Detail Spesifikasi Produk')
+                            ->modalWidth('md')
+                            ->modalSubmitAction(false)
+                            ->modalCancelAction(fn($action) => $action->label('Tutup')->color('primary'))
+                            ->form(function(OrderItem $record) use ($genderOptions, $sleeveOptions, $pocketOptions, $buttonOptions, $collarOptions, $modelOptions) {
+                                $gender = $genderOptions[$record->gender] ?? $record->gender ?? 'L';
+                                $sleeve = $sleeveOptions[$record->sleeve_model] ?? $record->sleeve_model ?? 'pendek';
+                                $pocket = $pocketOptions[$record->pocket_model] ?? $record->pocket_model ?? 'tanpa_saku';
+                                $button = $buttonOptions[$record->button_model] ?? $record->button_model ?? 'biasa';
+                                $collar = $collarOptions[$record->collar_model] ?? $record->collar_model ?? 'biasa';
+                                $model = $modelOptions[$record->model] ?? $record->model ?? 'biasa';
+
+                                $details = $record->size_and_request_details ?? [];
+                                $isProduksi = in_array($record->production_category, ['produksi', 'custom']);
+                                $isCustom = $record->size === 'Custom';
+                                $ld = $details['LD'] ?? '-';
+                                $pb = $details['PB'] ?? '-';
+                                $pl = $details['PL'] ?? '-';
+                                $lb = $details['LB'] ?? '-';
+                                $lp = $details['LP'] ?? '-';
+                                $lph = $details['LPh'] ?? '-';
+                                $note = $details['note'] ?? '-';
+                                $groupLabel = $details['group_label'] ?? null;
+                                $specNotes = $details['spec_notes'] ?? null;
+
+                                return [
+                                    Grid::make(['default' => 2, 'sm' => 2, 'md' => 3])->schema([
+                                        Placeholder::make('group_label')->label('Nama Pengelompokan / Label')->content($groupLabel ?: '-')->columnSpanFull()->visible($isProduksi && filled($groupLabel)),
+                                        Placeholder::make('recipient_name')->label('Nama Penerima')->content($record->recipient_name ?: '-')->visible($isCustom && filled($record->recipient_name)),
+                                        Placeholder::make('gender')->label('Gender / JK')->content($gender)->visible($isProduksi),
+                                        Placeholder::make('sleeve')->label('Lengan')->content("Lengan " . $sleeve)->visible($isProduksi),
+                                        Placeholder::make('pocket')->label('Saku')->content($pocket)->visible($isProduksi),
+                                        Placeholder::make('button')->label('Kancing')->content("Kancing " . $button)->visible($isProduksi),
+                                        Placeholder::make('collar')->label('Kerah')->content("Kerah " . $collar)->visible($isProduksi),
+                                        Placeholder::make('model')->label('Model')->content($model)->visible($isProduksi),
+                                        Placeholder::make('spec_notes')->label('Catatan Khusus Spesifikasi')->content($specNotes)->columnSpanFull()->visible($isProduksi && filled($specNotes)),
+                                        
+                                        Section::make('Detail Ukuran Badan (Custom)')
+                                            ->visible($isCustom)
+                                            ->columnSpanFull()
+                                            ->columns(['default' => 3, 'sm' => 3, 'md' => 6])
+                                            ->compact()
+                                            ->schema([
+                                                Placeholder::make('ld_view')->label('LD')->content($ld ? $ld . " cm" : '-'),
+                                                Placeholder::make('pb_view')->label('PB')->content($pb ? $pb . " cm" : '-'),
+                                                Placeholder::make('pl_view')->label('PL')->content($pl ? $pl . " cm" : '-'),
+                                                Placeholder::make('lb_view')->label('LB')->content($lb ? $lb . " cm" : '-'),
+                                                Placeholder::make('lp_view')->label('LP')->content($lp ? $lp . " cm" : '-'),
+                                                Placeholder::make('lph_view')->label('LPh')->content($lph ? $lph . " cm" : '-'),
+                                                Placeholder::make('note_view')->label('Catatan Khusus Ukuran')->content($note ?: '-')->columnSpanFull(),
+                                            ]),
+                                    ]),
+                                ];
+                            })
+                    ),
 
                 TextColumn::make('sizes_summary')
                     ->label('Ukuran & Qty')
