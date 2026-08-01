@@ -521,7 +521,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->visible(false)
                     ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Simpan Perubahan Produk'))
                     ->modalHeading('Edit Informasi Produk Utama')
-                    ->modalWidth('2xl')
                     ->form(function () use ($bahanOptions, $categoryOptions) {
                         return [
                             Select::make('select_product_name')
@@ -641,6 +640,31 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                         $this->refreshOrderData();
                         Notification::make()->success()->title("Informasi Produk Utama '{$oldName}' berhasil diperbarui ke seluruh kelompok!")->send();
+                    }),
+
+                Action::make('delete_parent_product')
+                    ->label('Hapus Produk Utama')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->visible(false)
+                    ->requiresConfirmation()
+                    ->modalHeading(fn(array $arguments) => "Hapus Seluruh Item Produk '" . ($arguments['product_name'] ?? '') . "'?")
+                    ->modalDescription('Apakah Anda yakin ingin menghapus seluruh item di bawah produk ini? Tindakan ini tidak dapat dibatalkan.')
+                    ->modalSubmitActionLabel('Ya, Hapus Seluruh Item')
+                    ->action(function (array $arguments) {
+                        $productName = $arguments['product_name'] ?? null;
+                        if (!$productName) return;
+
+                        OrderItem::where('order_id', $this->order->id)
+                            ->where('product_name', $productName)
+                            ->delete();
+
+                        Notification::make()
+                            ->success()
+                            ->title("Seluruh item produk '{$productName}' berhasil dihapus")
+                            ->send();
+
+                        $this->refreshOrderData();
                     }),
 
                 Action::make('bulk_generate')
@@ -2051,7 +2075,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     <button @click="$wire.openEditProductModal(\'' . $escapedJsProduct . '\'); open = false;" type="button" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 flex items-center gap-2">
                                         <span>⚙️</span> Edit Info Produk Ini
                                     </button>
-                                    <button @click="if (confirm(\'Hapus seluruh item produk \\\'' . $escapedJsProduct . '\\\'?\')) { $wire.deleteProductGroup(\'' . $escapedJsProduct . '\'); } open = false;" type="button" class="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700">
+                                    <button @click="$wire.deleteProductGroup(\'' . $escapedJsProduct . '\'); open = false;" type="button" class="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700">
                                         <span>🗑️</span> Hapus Seluruh Produk Ini
                                     </button>
                                 </div>
@@ -2195,21 +2219,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
     public function deleteProductGroup(string $productName): void
     {
         if (!in_array(auth()->user()->role, ['owner', 'admin'])) return;
-
-        $items = OrderItem::where('order_id', $this->order->id)
-            ->where('product_name', $productName)
-            ->get();
-
-        foreach ($items as $item) {
-            $item->delete();
-        }
-
-        Notification::make()
-            ->success()
-            ->title("Seluruh item produk '{$productName}' berhasil dihapus")
-            ->send();
-
-        $this->refreshOrderData();
+        $this->mountTableAction('delete_parent_product', data: ['product_name' => $productName]);
     }
 
     public function render()
