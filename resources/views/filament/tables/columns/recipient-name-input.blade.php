@@ -7,7 +7,7 @@
     @endphp
     <div class="flex items-center gap-2" onclick="event.stopPropagation();" wire:key="rec-name-container-{{ $record->id }}" wire:ignore.self>
         <span class="inline-flex items-center text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 whitespace-nowrap">
-            🧵 Custom:
+            🧵 Ukur Badan:
         </span>
         <input 
             wire:key="rec-name-input-{{ $record->id }}"
