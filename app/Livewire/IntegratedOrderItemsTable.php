@@ -2048,10 +2048,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/></svg>
                                 </button>
                                 <div x-show="open" @click.away="open = false" style="display: none;" class="absolute right-0 mt-1 w-52 rounded-xl shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 py-1 z-50 text-left">
-                                    <button wire:click="openEditProductModal(\'' . $escapedJsProduct . '\')" @click="open = false" type="button" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 flex items-center gap-2">
+                                    <button @click="$wire.openEditProductModal(\'' . $escapedJsProduct . '\'); open = false;" type="button" class="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 flex items-center gap-2">
                                         <span>⚙️</span> Edit Info Produk Ini
                                     </button>
-                                    <button wire:click="deleteProductGroup(\'' . $escapedJsProduct . '\')" wire:confirm="Hapus seluruh item produk \'' . $escapedJsProduct . '\'?" @click="open = false" type="button" class="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700">
+                                    <button @click="if (confirm(\'Hapus seluruh item produk \\\'' . $escapedJsProduct . '\\\'?\')) { $wire.deleteProductGroup(\'' . $escapedJsProduct . '\'); } open = false;" type="button" class="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700">
                                         <span>🗑️</span> Hapus Seluruh Produk Ini
                                     </button>
                                 </div>
