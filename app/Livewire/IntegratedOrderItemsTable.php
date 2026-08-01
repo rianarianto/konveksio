@@ -2072,9 +2072,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         $escapedJsProduct = addslashes($record->product_name);
 
                         $html = '
-                        <span class="inline-flex items-center justify-between w-full -mt-6" x-on:click.stop="">
-                            <span class="inline-flex items-center gap-2" x-on:click.stop="">' . $unassignedBadge . '</span>
-                            <span x-data="{ open: false }" class="relative inline-block text-left" x-on:click.stop="">
+                        <div class="flex items-center justify-between w-full mt-1.5" x-on:click.stop="">
+                            <div class="flex items-center gap-2" x-on:click.stop="">' . $unassignedBadge . '</div>
+                            <div x-data="{ open: false }" class="relative inline-block text-left" x-on:click.stop="">
                                 <button x-on:click.stop.prevent="open = !open" type="button" class="fi-icon-btn inline-flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-gray-500 focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-500 dark:hover:text-gray-400 transition-colors">
                                     <svg class="fi-icon-btn-icon w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
@@ -2090,8 +2090,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         Hapus Seluruh Produk Ini
                                     </button>
                                 </div>
-                            </span>
-                        </span>';
+                            </div>
+                        </div>';
 
                         return new \Illuminate\Support\HtmlString($html);
                     })
