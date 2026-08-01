@@ -521,6 +521,31 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->visible(false)
                     ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Simpan Perubahan Produk'))
                     ->modalHeading('Edit Informasi Produk Utama')
+                    ->fillForm(function (array $arguments) {
+                        $productName = $arguments['product_name'] ?? null;
+                        if (!$productName) return [];
+
+                        $sample = OrderItem::where('order_id', $this->order->id)->where('product_name', $productName)->first();
+                        if (!$sample) return [];
+
+                        $details = $sample->size_and_request_details ?? [];
+                        $sablonItem = OrderItem::where('order_id', $this->order->id)
+                            ->where('product_name', $productName)
+                            ->get()
+                            ->first(fn($i) => filled($i->size_and_request_details['sablon_jenis'] ?? null) || filled($i->size_and_request_details['sablon_lokasi'] ?? null));
+                        $sDetails = $sablonItem?->size_and_request_details ?? $details;
+
+                        return [
+                            'select_product_name' => $productName,
+                            'new_product_name' => $sample->product_name,
+                            'new_category' => $sample->production_category === 'custom' ? 'produksi' : ($sample->production_category ?? 'produksi'),
+                            'new_bahan_id' => $sample->bahan_id,
+                            'new_material_variant_id' => $details['material_variant_id'] ?? null,
+                            'new_sablon_teknik' => $sDetails['sablon_jenis'] ?? null,
+                            'new_sablon_lokasi' => $sDetails['sablon_lokasi'] ?? null,
+                            'new_sablon_keterangan' => $sDetails['sablon_keterangan'] ?? null,
+                        ];
+                    })
                     ->form(function () use ($bahanOptions, $categoryOptions) {
                         return [
                             Select::make('select_product_name')
@@ -2193,33 +2218,13 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
     public function openEditProductModal(string $productName): void
     {
-        $sample = OrderItem::where('order_id', $this->order->id)->where('product_name', $productName)->first();
-        if (!$sample) return;
-
-        $details = $sample->size_and_request_details ?? [];
-
-        $sablonItem = OrderItem::where('order_id', $this->order->id)
-            ->where('product_name', $productName)
-            ->get()
-            ->first(fn($i) => filled($i->size_and_request_details['sablon_jenis'] ?? null) || filled($i->size_and_request_details['sablon_lokasi'] ?? null));
-        $sDetails = $sablonItem?->size_and_request_details ?? $details;
-
-        $this->mountTableAction('edit_parent_product', data: [
-            'select_product_name' => $productName,
-            'new_product_name' => $sample->product_name,
-            'new_category' => $sample->production_category === 'custom' ? 'produksi' : ($sample->production_category ?? 'produksi'),
-            'new_bahan_id' => $sample->bahan_id,
-            'new_material_variant_id' => $details['material_variant_id'] ?? null,
-            'new_sablon_teknik' => $sDetails['sablon_jenis'] ?? null,
-            'new_sablon_lokasi' => $sDetails['sablon_lokasi'] ?? null,
-            'new_sablon_keterangan' => $sDetails['sablon_keterangan'] ?? null,
-        ]);
+        $this->mountTableAction('edit_parent_product', arguments: ['product_name' => $productName]);
     }
 
     public function deleteProductGroup(string $productName): void
     {
         if (!in_array(auth()->user()->role, ['owner', 'admin'])) return;
-        $this->mountTableAction('delete_parent_product', data: ['product_name' => $productName]);
+        $this->mountTableAction('delete_parent_product', arguments: ['product_name' => $productName]);
     }
 
     public function render()
