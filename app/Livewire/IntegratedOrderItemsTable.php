@@ -725,18 +725,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                         
                                                         $set('bulk_bahan', $existing->bahan_id);
                                                         $set('bulk_material_variant_id', $details['material_variant_id'] ?? null);
-
-                                                        $set('specification_groups', [
-                                                            [
-                                                                'bulk_gender' => $details['gender'] ?? 'L',
-                                                                'bulk_model' => $details['model'] ?? 'biasa',
-                                                                'bulk_sleeve' => $details['sleeve_model'] ?? 'pendek',
-                                                                'bulk_pocket' => $details['pocket_model'] ?? 'tanpa_saku',
-                                                                'bulk_button' => $details['button_model'] ?? 'biasa',
-                                                                'bulk_collar' => $details['collar_model'] ?? 'kemeja',
-                                                                'enable_custom' => false,
-                                                            ]
-                                                        ]);
+                                                        $set('specification_groups', []);
+                                                        
                                                         $sablonItem = OrderItem::where('order_id', $this->order->id)
                                                              ->where('product_name', $state)
                                                              ->get()
@@ -1045,6 +1035,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             \Filament\Forms\Components\Repeater::make('specification_groups')
                                 ->label('Daftar Spesifikasi & Ukuran')
                                 ->addActionLabel('+ Tambah Spesifikasi & Ukuran')
+                                ->default([])
                                 ->defaultItems(0)
                                 ->itemLabel(fn(array $state): string => !empty($state['group_label']) ? $state['group_label'] : (($state['bulk_gender'] ?? 'L') === 'L' ? 'Laki-laki' : 'Perempuan'))
                                 ->schema([
