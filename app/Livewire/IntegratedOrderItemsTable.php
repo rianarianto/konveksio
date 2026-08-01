@@ -1044,19 +1044,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                             \Filament\Forms\Components\Repeater::make('specification_groups')
                                 ->label('Daftar Spesifikasi & Ukuran')
+                                ->addActionLabel('+ Tambah Spesifikasi & Ukuran')
+                                ->defaultItems(0)
                                 ->itemLabel(fn(array $state): string => !empty($state['group_label']) ? $state['group_label'] : (($state['bulk_gender'] ?? 'L') === 'L' ? 'Laki-laki' : 'Perempuan'))
-                                ->default([
-                                    [
-                                        'group_label' => 'Laki-laki',
-                                        'bulk_gender' => 'L',
-                                        'bulk_model' => 'biasa',
-                                        'bulk_sleeve' => 'pendek',
-                                        'bulk_pocket' => 'tanpa_saku',
-                                        'bulk_button' => 'biasa',
-                                        'bulk_collar' => 'kemeja',
-                                        'enable_custom' => false,
-                                    ]
-                                ])
                                 ->schema([
                                     TextInput::make('group_label')
                                         ->label('Nama Pengelompokan / Label Spesifikasi')
