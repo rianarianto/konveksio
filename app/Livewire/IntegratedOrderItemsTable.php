@@ -2072,15 +2072,15 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         $escapedJsProduct = addslashes($record->product_name);
 
                         $html = '
-                        <div class="flex items-center justify-between w-full mt-1" x-on:click.stop="">
-                            <div x-on:click.stop="">' . $unassignedBadge . '</div>
-                            <div x-data="{ open: false }" class="relative inline-block text-left" x-on:click.stop="">
+                        <span class="inline-flex items-center justify-between w-full -mt-6" x-on:click.stop="">
+                            <span class="inline-flex items-center gap-2" x-on:click.stop="">' . $unassignedBadge . '</span>
+                            <span x-data="{ open: false }" class="relative inline-block text-left" x-on:click.stop="">
                                 <button x-on:click.stop.prevent="open = !open" type="button" class="fi-icon-btn inline-flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-gray-500 focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-500 dark:hover:text-gray-400 transition-colors">
                                     <svg class="fi-icon-btn-icon w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
                                     </svg>
                                 </button>
-                                <div x-show="open" x-on:click.away="open = false" style="display: none;" class="fi-dropdown-panel absolute right-0 z-50 mt-2 w-52 rounded-lg bg-white p-1 shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 text-left">
+                                <div x-show="open" x-on:click.away="open = false" style="display: none;" class="fi-dropdown-panel absolute right-0 z-50 mt-1 w-52 rounded-lg bg-white p-1 shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 text-left">
                                     <button x-on:click.stop.prevent="$wire.openEditProductModal(\'' . $escapedJsProduct . '\'); open = false;" type="button" class="fi-dropdown-list-item flex w-full items-center gap-x-3 rounded-md px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5 transition-colors">
                                         <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                                         Edit Info Produk Ini
@@ -2090,8 +2090,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         Hapus Seluruh Produk Ini
                                     </button>
                                 </div>
-                            </div>
-                        </div>';
+                            </span>
+                        </span>';
 
                         return new \Illuminate\Support\HtmlString($html);
                     })
