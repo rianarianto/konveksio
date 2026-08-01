@@ -2076,8 +2076,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         <div class="flex items-center justify-between w-full mt-1" x-on:click.stop="">
                             <div x-on:click.stop="">' . $unassignedBadge . '</div>
                             <div x-data="{ open: false }" class="relative inline-block text-left" x-on:click.stop="">
-                                <button x-on:click.stop.prevent="open = !open" type="button" class="inline-flex items-center justify-center w-7 h-7 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold transition-colors">
-                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/></svg>
+                                <button x-on:click.stop.prevent="open = !open" type="button" class="fi-icon-btn inline-flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-gray-500 focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-500 dark:hover:text-gray-400 transition-colors">
+                                    <svg class="fi-icon-btn-icon w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
+                                    </svg>
                                 </button>
                                 <div x-show="open" x-on:click.away="open = false" style="display: none;" class="absolute right-0 mt-1 w-52 rounded-xl shadow-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 py-1 z-50 text-left divide-y divide-gray-100 dark:divide-gray-700">
                                     <button x-on:click.stop.prevent="$wire.openEditProductModal(\'' . $escapedJsProduct . '\'); open = false;" type="button" class="w-full text-left px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 flex items-center gap-2 transition-colors">
