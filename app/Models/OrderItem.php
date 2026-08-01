@@ -342,7 +342,9 @@ class OrderItem extends Model
 
     /**
      * Check if this item can still be edited or deleted by Admin/Owner.
-     * Locked once production has started (WorkOrder status is not CREATED or QC_PERSIAPAN has started).
+     * 1. Belum Ditugaskan (Belum ada WorkOrder/SPK) -> BISA DIEDIT (Semua data).
+     * 2. Sudah Ditugaskan, tapi BELUM DIMULAI (Seluruh ProductionTask masih pending) -> BISA DIEDIT (Spesifikasi & Qty).
+     * 3. Sudah Dimulai (Ada ProductionTask dengan status in_progress / completed) -> LOCKED (TIDAK BISA DIUBAH SAMA SEKALI).
      */
     public function canBeEdited(): bool
     {
@@ -351,23 +353,16 @@ class OrderItem extends Model
             return true;
         }
 
-        // If WO is in CREATED status, it can be edited
-        if ($wo->status === WorkOrder::STATUS_CREATED) {
-            return true;
+        // Lock item if any production task has started (in_progress) or completed
+        $hasStartedTask = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->where('order_item_id', $this->id)
+            ->whereIn('status', ['in_progress', 'completed'])
+            ->exists();
+
+        if ($hasStartedTask) {
+            return false;
         }
 
-        // If WO is in QC_PREP status, check if QC_PERSIAPAN task has started
-        if ($wo->status === WorkOrder::STATUS_QC_PREP) {
-            $qcTask = \App\Models\ProductionTask::withoutGlobalScopes()
-                ->where('order_item_id', $this->id)
-                ->where('stage_name', 'QC_PERSIAPAN')
-                ->first();
-            
-            // If QC_PERSIAPAN task is pending or doesn't exist yet, it can be edited
-            return !$qcTask || $qcTask->status === 'pending';
-        }
-
-        // Otherwise, production has started (Potong, Jahit, Sablon, QC_REVIEW, etc.) -> locked!
-        return false;
+        return true;
     }
 }

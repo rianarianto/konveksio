@@ -18,8 +18,10 @@
     }
 
     if (in_array('gender', $selectedGroups)) {
+        $groupLabel = $record->size_and_request_details['group_label'] ?? null;
         $gender = $record->size_and_request_details['gender'] ?? 'L';
-        $labels[] = $gender === 'P' ? '👩 Perempuan' : '👨 Laki-laki';
+        $genderLabel = $gender === 'P' ? '👩 Perempuan' : '👨 Laki-laki';
+        $labels[] = filled($groupLabel) ? "🏷️ <b>{$groupLabel}</b> ({$genderLabel})" : $genderLabel;
     }
 
     if (in_array('bahan', $selectedGroups)) {
