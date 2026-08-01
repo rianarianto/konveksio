@@ -322,11 +322,10 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         return null;
                     }),
 
-                 TextColumn::make('specifications')
+                TextColumn::make('specifications')
                     ->label('Spesifikasi')
                     ->state(function(OrderItem $record) use ($genderOptions, $sleeveOptions, $collarOptions) {
                         $details = $record->size_and_request_details ?? [];
-                        $sablon = $details['sablon_jenis'] ?? null;
                         $groupLabel = $details['group_label'] ?? null;
                         
                         $isProduksi = in_array($record->production_category, ['produksi', 'custom']);
@@ -340,25 +339,16 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             $summary = "{$prefix} | Lengan {$sleeve}, Kerah {$collar}";
                         }
                         
-                        if ($sablon && $sablon !== 'Tanpa Sablon/Bordir') {
-                            if ($isProduksi) {
-                                $summary .= " (🎨 +{$sablon})";
-                            } else {
-                                $lokasi = $details['sablon_lokasi'] ?? '';
-                                $summary = $lokasi ? "🎨 {$sablon} - {$lokasi}" : "🎨 {$sablon}";
-                            }
-                        }
-                        
                         return $summary ?: '-';
                     })
-                    ->badge(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) || !empty($record->size_and_request_details['sablon_jenis']))
+                    ->badge(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']))
                     ->color('gray')
-                    ->icon(fn(OrderItem $record) => (in_array($record->production_category, ['produksi', 'custom']) || !empty($record->size_and_request_details['sablon_jenis'])) ? 'heroicon-m-magnifying-glass-circle' : null)
+                    ->icon(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'heroicon-m-magnifying-glass-circle' : null)
                     ->iconPosition('after')
-                    ->tooltip(fn(OrderItem $record) => (in_array($record->production_category, ['produksi', 'custom']) || !empty($record->size_and_request_details['sablon_jenis'])) ? 'Klik untuk detail lengkap' : null)
+                    ->tooltip(fn(OrderItem $record) => in_array($record->production_category, ['produksi', 'custom']) ? 'Klik untuk detail lengkap' : null)
                     ->action(
                         Action::make('view_spec_details')
-                            ->disabled(fn(OrderItem $record) => !(in_array($record->production_category, ['produksi', 'custom']) || !empty($record->size_and_request_details['sablon_jenis'])))
+                            ->disabled(fn(OrderItem $record) => !in_array($record->production_category, ['produksi', 'custom']))
                             ->modalHeading('Detail Spesifikasi Produk')
                             ->modalWidth('md')
                             ->modalSubmitAction(false)
@@ -442,9 +432,53 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 Placeholder::make('sablon_ket')->label('Keterangan Desain')->content($ket)->columnSpanFull(),
                                             ]),
                                     ]),
-                                ];
+                                 ];
                             })
                     ),
+
+                 TextColumn::make('sablon_bordir')
+                    ->label('Desain Sablon / Bordir')
+                    ->state(function(OrderItem $record) {
+                        $details = $record->size_and_request_details ?? [];
+                        $sablon = $details['sablon_jenis'] ?? null;
+                        $lokasi = $details['sablon_lokasi'] ?? null;
+
+                        if (!$sablon && !$lokasi) {
+                            $groupItem = OrderItem::where('order_id', $record->order_id)
+                                ->where('product_name', $record->product_name)
+                                ->get()
+                                ->first(fn($i) => filled($i->size_and_request_details['sablon_jenis'] ?? null) || filled($i->size_and_request_details['sablon_lokasi'] ?? null));
+                            if ($groupItem) {
+                                $gDetails = $groupItem->size_and_request_details ?? [];
+                                $sablon = $gDetails['sablon_jenis'] ?? null;
+                                $lokasi = $gDetails['sablon_lokasi'] ?? null;
+                            }
+                        }
+
+                        if (!$sablon || $sablon === 'Tanpa Sablon/Bordir') {
+                            return 'Tanpa Sablon/Bordir';
+                        }
+
+                        $res = "🎨 {$sablon}";
+                        if ($lokasi) {
+                            $res .= " ({$lokasi})";
+                        }
+                        return $res;
+                    })
+                    ->badge()
+                    ->color(fn($state) => $state === 'Tanpa Sablon/Bordir' ? 'gray' : 'warning')
+                    ->tooltip(function(OrderItem $record) {
+                        $details = $record->size_and_request_details ?? [];
+                        $ket = $details['sablon_keterangan'] ?? null;
+                        if (!$ket) {
+                            $groupItem = OrderItem::where('order_id', $record->order_id)
+                                ->where('product_name', $record->product_name)
+                                ->get()
+                                ->first(fn($i) => filled($i->size_and_request_details['sablon_keterangan'] ?? null));
+                            $ket = $groupItem->size_and_request_details['sablon_keterangan'] ?? null;
+                        }
+                        return $ket ? "Keterangan: {$ket}" : null;
+                    }),
 
                 TextColumn::make('sizes_summary')
                     ->label('Ukuran & Qty')
