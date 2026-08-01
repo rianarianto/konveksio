@@ -200,6 +200,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             ->selectRaw("IF(production_category IN ('produksi', 'custom'), JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_jenis')), null) as sablon_jenis")
                             ->selectRaw("IF(production_category IN ('produksi', 'custom'), JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_lokasi')), null) as sablon_lokasi")
                             ->selectRaw("IF(production_category IN ('produksi', 'custom'), JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.sablon_keterangan')), null) as sablon_keterangan")
+                            ->selectRaw("IF(order_items.size = 'Custom', 1, 0) as is_custom_sort")
                             ->selectRaw("
                                 CONCAT(
                                     product_name, ' - ',
@@ -247,6 +248,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->selectRaw('SUM(quantity) as quantity')
                     ->selectRaw("GROUP_CONCAT(CONCAT(size, ': ', quantity) ORDER BY size SEPARATOR ', ') as sizes_summary")
                     ->selectRaw('MAX(item_group_identity) as item_group_identity')
+                    ->selectRaw('MAX(is_custom_sort) as is_custom_sort')
                     ->groupBy([
                         'product_name',
                         'production_category',
@@ -265,6 +267,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ]),
                     'order_items'
                 )
+                ->orderBy('is_custom_sort', 'asc')
+                ->orderBy('id', 'asc')
              )
             ->columns([
                 TextColumn::make('product_name')
