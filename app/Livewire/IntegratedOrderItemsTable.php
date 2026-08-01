@@ -675,7 +675,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             })
                                             ->required()
                                             ->placeholder('Pilih atau ketik nama baru...')
-                                            ->helperText(fn(Get $get) => $isExistingProduct($get) ? '🔒 Spesifikasi dikunci.' : null)
+                                            ->helperText(fn(Get $get) => $isExistingProduct($get) ? '🔒 Detail Produksi & Sablon/Bordir dikunci.' : null)
                                             ->live(onBlur: true)
                                             ->afterStateUpdated(function ($state, Set $set) {
                                                 if (!$state) return;
