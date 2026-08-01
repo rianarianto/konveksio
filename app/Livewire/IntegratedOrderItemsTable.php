@@ -737,9 +737,15 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                                 'enable_custom' => false,
                                                             ]
                                                         ]);
-                                                        $set('bulk_sablon_teknik', $details['sablon_jenis'] ?? null);
-                                                        $set('bulk_sablon_lokasi', $details['sablon_lokasi'] ?? null);
-                                                        $set('bulk_sablon_keterangan', $details['sablon_keterangan'] ?? null);
+                                                        $sablonItem = OrderItem::where('order_id', $this->order->id)
+                                                             ->where('product_name', $state)
+                                                             ->get()
+                                                             ->first(fn($i) => filled($i->size_and_request_details['sablon_jenis'] ?? null) || filled($i->size_and_request_details['sablon_lokasi'] ?? null));
+                                                         
+                                                         $sDetails = $sablonItem?->size_and_request_details ?? $details;
+                                                         $set('bulk_sablon_teknik', $sDetails['sablon_jenis'] ?? null);
+                                                         $set('bulk_sablon_lokasi', $sDetails['sablon_lokasi'] ?? null);
+                                                         $set('bulk_sablon_keterangan', $sDetails['sablon_keterangan'] ?? null);
                                                     }
 
                                                     Notification::make()->title("Spesifikasi '{$state}' disalin!")->success()->send();
@@ -1411,6 +1417,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 'model' => $group['bulk_model'] ?? 'biasa',
                                                 'group_label' => $group['group_label'] ?? null,
                                                 'spec_notes' => $group['spec_notes'] ?? null,
+                                                'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
+                                                'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
+                                                'sablon_keterangan' => $data['bulk_sablon_keterangan'] ?? null,
                                                 'person_notes' => $personData['notes'] ?? null,
                                                 'custom_measurements' => [
                                                     'ld' => $personData['ld'] ?? null,
