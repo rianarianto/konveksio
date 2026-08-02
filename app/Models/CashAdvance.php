@@ -14,6 +14,8 @@ class CashAdvance extends Model
         'cash_advanceable_type',
         'cash_advanceable_id',
         'type',
+        'status',
+        'rejection_reason',
         'amount',
         'date',
         'note',

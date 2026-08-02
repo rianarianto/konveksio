@@ -87,6 +87,22 @@ class KasbonResource extends Resource
                         });
                     }),
 
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                        'pending'  => '⏳ Pending',
+                        'approved' => '✅ Disetujui',
+                        'rejected' => '❌ Ditolak',
+                        default    => $state,
+                    })
+                    ->color(fn(string $state): string => match ($state) {
+                        'pending'  => 'warning',
+                        'approved' => 'success',
+                        'rejected' => 'danger',
+                        default    => 'gray',
+                    }),
+
                 TextColumn::make('type')
                     ->label('Jenis')
                     ->badge()
@@ -330,7 +346,77 @@ class KasbonResource extends Resource
                         }
                     }),
             ])
+            ->actions([
+                ActionGroup::make([
+                    Action::make('approve')
+                        ->label('Setujui & Cairkan')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn(CashAdvance $record) => $record->status === 'pending')
+                        ->requiresConfirmation()
+                        ->modalHeading('Setujui & Cairkan Kasbon?')
+                        ->modalDescription(fn(CashAdvance $record) => "Serahkan kasbon sebesar Rp " . number_format($record->amount, 0, ',', '.') . " ke " . ($record->cashAdvanceable?->name ?? 'karyawan') . "?")
+                        ->action(function (CashAdvance $record) {
+                            $person = $record->cashAdvanceable;
+                            if ($person) {
+                                $person->increment('current_cash_advance', $record->amount);
+                            }
+                            $record->update([
+                                'status'      => 'approved',
+                                'recorded_by' => auth()->id(),
+                            ]);
+
+                            // Auto-record to Expense (Buku Kas Keluar)
+                            Expense::create([
+                                'shop_id'      => $record->shop_id,
+                                'keperluan'    => 'Kasbon: ' . ($person?->name ?? 'Karyawan'),
+                                'amount'       => $record->amount,
+                                'expense_date' => $record->date ?? now()->toDateString(),
+                                'note'         => 'Pencairan Kasbon (Portal Worker)',
+                                'recorded_by'   => auth()->id(),
+                            ]);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Kasbon Disetujui & Dicairkan')
+                                ->body('Kasbon berhasil disetujui dan saldo kasbon karyawan telah bertambah.')
+                                ->send();
+                        }),
+
+                    Action::make('reject')
+                        ->label('Tolak Kasbon')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn(CashAdvance $record) => $record->status === 'pending')
+                        ->form([
+                            TextInput::make('rejection_reason')
+                                ->label('Alasan Penolakan (wajib)')
+                                ->required()
+                                ->maxLength(255),
+                        ])
+                        ->action(function (CashAdvance $record, array $data) {
+                            $record->update([
+                                'status'           => 'rejected',
+                                'rejection_reason' => $data['rejection_reason'],
+                                'recorded_by'      => auth()->id(),
+                            ]);
+
+                            Notification::make()
+                                ->warning()
+                                ->title('Kasbon Ditolak')
+                                ->body('Pengajuan kasbon telah ditolak.')
+                                ->send();
+                        }),
+                ]),
+            ])
             ->filters([
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'pending'  => '⏳ Pending',
+                        'approved' => '✅ Disetujui',
+                        'rejected' => '❌ Ditolak',
+                    ]),
                 SelectFilter::make('type')
                     ->label('Jenis')
                     ->options([

@@ -265,18 +265,16 @@ class TugasTukang extends Component
             'cash_advanceable_type' => \App\Models\Worker::class,
             'cash_advanceable_id'   => $worker->id,
             'type'                  => 'loan',
+            'status'                => 'pending',
             'amount'                => $amount,
             'note'                  => $this->kasbonNote ?: 'Pengajuan via portal tugas',
             'date'                  => now()->toDateString(),
             'recorded_by'           => null,
         ]);
 
-        // Update current_cash_advance
-        $worker->increment('current_cash_advance', $amount);
-
         $this->reset('kasbonAmount', 'kasbonNote', 'showKasbonForm');
         $this->loadWorkOrder();
-        session()->flash('kasbon_success', 'Kasbon berhasil diajukan!');
+        session()->flash('kasbon_success', 'Pengajuan kasbon berhasil dikirim! Menunggu persetujuan Admin.');
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

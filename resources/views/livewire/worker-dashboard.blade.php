@@ -514,13 +514,36 @@
         <div class="card" style="margin-bottom:8px; padding:12px 14px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>
-                    @php $isLoan = in_array($ca->type, ['loan', 'pinjaman']); @endphp
-                    <span style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; {{ $isLoan ? 'background:#fef2f2; color:#dc2626;' : 'background:#f0fdf4; color:#16a34a;' }}">
-                        {{ $isLoan ? 'PINJAMAN (KASBON)' : 'PELUNASAN' }}
-                    </span>
+                    @php 
+                        $isLoan = in_array($ca->type, ['loan', 'pinjaman']);
+                        $status = $ca->status ?? 'approved';
+                    @endphp
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <span style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; {{ $isLoan ? 'background:#fef2f2; color:#dc2626;' : 'background:#f0fdf4; color:#16a34a;' }}">
+                            {{ $isLoan ? 'PINJAMAN (KASBON)' : 'PELUNASAN' }}
+                        </span>
+                        @if($status === 'pending')
+                        <span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:6px; background:#fef3c7; color:#b45309;">
+                            ⏳ Menunggu Persetujuan
+                        </span>
+                        @elseif($status === 'rejected')
+                        <span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:6px; background:#fee2e2; color:#b91c1c;">
+                            ❌ Ditolak
+                        </span>
+                        @else
+                        <span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#15803d;">
+                            ✅ Cair
+                        </span>
+                        @endif
+                    </div>
                     <div style="font-size:12px; font-weight:600; color:#334155; margin-top:4px;">
                         {{ $ca->note ?? 'Pinjaman Kasbon' }}
                     </div>
+                    @if($status === 'rejected' && $ca->rejection_reason)
+                    <div style="font-size:11px; font-weight:600; color:#dc2626; margin-top:2px;">
+                        Alasan penolakan: {{ $ca->rejection_reason }}
+                    </div>
+                    @endif
                     <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
                         {{ $ca->date ? $ca->date->format('d M Y') : '-' }}
                     </div>

@@ -60,17 +60,16 @@ class WorkerFinance extends Component
             'cash_advanceable_type' => Worker::class,
             'cash_advanceable_id'   => $worker->id,
             'type'                  => 'loan',
+            'status'                => 'pending',
             'amount'                => $amount,
             'note'                  => $this->kasbonNote ?: 'Pengajuan via portal keuangan',
             'date'                  => now()->toDateString(),
             'recorded_by'           => null,
         ]);
 
-        $worker->increment('current_cash_advance', $amount);
-
         $this->reset('kasbonAmount', 'kasbonNote', 'showKasbonForm');
         $this->loadWorker();
-        session()->flash('kasbon_success', 'Kasbon berhasil diajukan!');
+        session()->flash('kasbon_success', 'Pengajuan kasbon berhasil dikirim! Menunggu persetujuan Admin.');
     }
 
     public function render()
