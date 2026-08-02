@@ -231,7 +231,16 @@
                         ->get();
                     $pendingOtherWorkerNames = $otherPendingTasks->map(fn($t) => $t->assignedTo?->name)->filter()->unique()->values()->toArray();
                     if (!empty($pendingOtherWorkerNames)) {
-                        $nextStageLabel = 'menunggu ' . implode(', ', $pendingOtherWorkerNames) . ' menyelesaikan tahap ' . str_replace('_', ' ', $myTask->stage_name);
+                        $count = count($pendingOtherWorkerNames);
+                        if ($count === 1) {
+                            $namesStr = $pendingOtherWorkerNames[0];
+                        } elseif ($count === 2) {
+                            $namesStr = $pendingOtherWorkerNames[0] . ' dan ' . $pendingOtherWorkerNames[1];
+                        } else {
+                            $last = array_pop($pendingOtherWorkerNames);
+                            $namesStr = implode(', ', $pendingOtherWorkerNames) . ', dan ' . $last;
+                        }
+                        $nextStageLabel = 'menunggu ' . $namesStr . ' menyelesaikan tahap ' . str_replace('_', ' ', $myTask->stage_name);
                     } else {
                         $nextStageLabel = 'saat ini tahap ' . str_replace('_', ' ', $wo->status_label);
                     }
