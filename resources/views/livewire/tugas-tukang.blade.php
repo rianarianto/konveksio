@@ -983,8 +983,10 @@
             @endif
         </div>
         @else
-        <div class="action-card">
-            <div class="action-title">🔧 Tugas Anda: {{ ($myActiveTask?->is_revision || $myActiveTask?->revision_source) ? 'Perbaikan Retur' : $statusLabel }}</div>
+            @php
+                $hasReturnItem = \App\Models\OrderReturn::where('order_item_id', $orderItem?->id)->whereIn('status', ['pending', 'diproses'])->exists();
+            @endphp
+            <div class="action-title">🔧 Tugas Anda: {{ $hasReturnItem ? 'Perbaikan Retur Customer' : ($myActiveTask?->is_revision ? 'Perbaikan Revisi QC' : $statusLabel) }}</div>
 
             @if($myActiveTask && $myActiveTask->status === 'pending')
             @php $isRevision = $myActiveTask->is_revision ?? false; @endphp
@@ -1017,10 +1019,12 @@
                     @php
                         $nextStatus = $wo->getNextStatus();
                         $isActiveTaskQcPrep = in_array(strtoupper($myActiveTask->stage_name ?? ''), ['QC_PREP', 'QC_PERSIAPAN']);
-                        $isRevisionTask = $myActiveTask?->is_revision || $myActiveTask?->revision_source === 'qc_akhir';
+                        $isQcAkhirRevision = ($myActiveTask?->revision_source === 'qc_akhir') || $hasReturnItem;
 
-                        if ($isRevisionTask) {
+                        if ($isQcAkhirRevision) {
                             $btnLabel = '✅ Selesai Perbaikan & Lanjut ke QC Akhir';
+                        } elseif ($myActiveTask?->is_revision) {
+                            $btnLabel = '✅ Selesai Perbaikan & Kirim ke QC';
                         } elseif ($isActiveTaskQcPrep) {
                             $btnLabel = '✅ Selesai & Lanjutkan';
                         } elseif ($nextStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
