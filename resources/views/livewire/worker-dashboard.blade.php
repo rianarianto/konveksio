@@ -243,7 +243,10 @@
                         <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
                         {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
                         @if($isRevision)
-                        <b style="color:#b91c1c;">{{ $task->quantity }} pcs retur</b>
+                        @php
+                            $hasReturnRec = \App\Models\OrderReturn::where('order_item_id', $task->order_item_id)->whereIn('status', ['pending', 'diproses'])->exists();
+                        @endphp
+                        <b style="color:#b91c1c;">{{ $task->quantity }} pcs {{ $hasReturnRec ? 'retur' : 'revisi' }}</b>
                         @else
                         {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
                         @endif

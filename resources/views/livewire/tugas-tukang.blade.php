@@ -250,22 +250,29 @@
 
 
 
-    {{-- ── HERO RETUR PERBAIKAN CARD (Tampil Utama Jika Tugas Adalah Retur) ── --}}
+    {{-- ── HERO PERBAIKAN / RETUR CARD (Tampil Utama Jika Task Adalah Revisi atau Retur) ── --}}
     @if($myTask && ($myTask->is_revision || $myTask->revision_source))
     @php
         $activeReturn = \App\Models\OrderReturn::where('order_item_id', $orderItem?->id)
             ->whereIn('status', ['pending', 'diproses'])
             ->latest('id')
             ->first();
+        $isCustomerReturn = !empty($activeReturn);
     @endphp
     <div class="card" style="border: 2px solid #ef4444; background: #fff5f5; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);">
         <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px dashed #fca5a5; padding-bottom: 10px; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
             <span style="background: #dc2626; color: white; font-weight: 800; font-size: 13px; padding: 4px 12px; border-radius: 20px;">
-                🔄 PERBAIKAN RETUR — {{ strtoupper(str_replace('_', ' ', $myTask->stage_name)) }}
+                {{ $isCustomerReturn ? '🔄 RETUR PESANAN' : '⚠️ REVISI QC' }} — {{ strtoupper(str_replace('_', ' ', $myTask->stage_name)) }}
             </span>
+            @if($isCustomerReturn)
             <span style="font-size: 12px; font-weight: 700; color: #b91c1c; background: #fee2e2; padding: 3px 10px; border-radius: 12px;">
-                {{ $activeReturn?->responsibility_type === 'customer_paid' ? '💳 Retur Berbayar' : '🛡️ Garansi Toko' }}
+                {{ $activeReturn->responsibility_type === 'customer_paid' ? '💳 Retur Berbayar' : '🛡️ Garansi Toko' }}
             </span>
+            @else
+            <span style="font-size: 12px; font-weight: 700; color: #b91c1c; background: #fee2e2; padding: 3px 10px; border-radius: 12px;">
+                ⚠️ Dikembalikan dari QC
+            </span>
+            @endif
         </div>
 
         <div style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 6px;">
@@ -293,13 +300,13 @@
         </div>
 
         <div style="font-size: 13px; font-weight: 700; color: #991b1b; margin-bottom: 4px;">
-            📝 Catatan & Instruksi Perbaikan Admin:
+            {{ $isCustomerReturn ? '📝 Catatan & Instruksi Retur Admin:' : '📝 Alasan Penolakan / Catatan Revisi dari QC:' }}
         </div>
         <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 10px 12px; border-radius: 0 8px 8px 0; font-size: 13px; color: #7f1d1d; font-weight: 700; line-height: 1.4;">
-            {{ $activeReturn?->items_description ?: ($myTask->note ?: 'Perbaiki item sesuai catatan retur admin.') }}
+            {{ $isCustomerReturn ? ($activeReturn->items_description ?: 'Perbaiki item sesuai catatan retur admin.') : ($wo->reject_reason ?: ($myTask->note ?: 'Perbaiki item sesuai instruksi revisi QC.')) }}
         </div>
 
-        @if($activeReturn?->expected_pickup_date)
+        @if($isCustomerReturn && $activeReturn->expected_pickup_date)
         <div style="margin-top: 12px; font-size: 12px; color: #dc2626; font-weight: 700; display: flex; align-items: center; gap: 6px;">
             🎯 <span>Target Selesai / Ambil Customer: <b>{{ $activeReturn->expected_pickup_date->format('d M Y') }}</b></span>
         </div>
