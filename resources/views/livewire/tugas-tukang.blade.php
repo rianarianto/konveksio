@@ -983,6 +983,7 @@
             @endif
         </div>
         @else
+        <div class="action-card">
             @php
                 $hasReturnItem = \App\Models\OrderReturn::where('order_item_id', $orderItem?->id)->whereIn('status', ['pending', 'diproses'])->exists();
             @endphp
