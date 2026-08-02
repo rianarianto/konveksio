@@ -78,6 +78,23 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
     {
         $this->order = $order;
         $this->notes = $order->notes;
+        $this->resetMountedActionState();
+    }
+
+    public function hydrate(): void
+    {
+        if (request()->isMethod('GET')) {
+            $this->resetMountedActionState();
+        }
+    }
+
+    protected function resetMountedActionState(): void
+    {
+        $this->mountedTableAction = null;
+        $this->mountedTableActions = [];
+        $this->mountedTableActionData = [];
+        $this->mountedTableActionsData = [];
+        $this->mountedTableActionArguments = [];
     }
 
     public function updatedNotes($value): void
@@ -518,7 +535,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->icon('heroicon-o-cog-6-tooth')
                     ->color('gray')
                     ->closeModalByClickingAway(false)
-                    ->visible(false)
+                    ->extraAttributes(['class' => 'hidden'])
                     ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Simpan Perubahan Produk'))
                     ->modalHeading('Edit Informasi Produk Utama')
                     ->fillForm(function (array $arguments) {
@@ -548,25 +565,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     })
                     ->form(function () use ($bahanOptions, $categoryOptions) {
                         return [
-                            Select::make('select_product_name')
-                                ->label('Pilih Produk yang Ingin Diedit')
-                                ->options(fn() => OrderItem::where('order_id', $this->order->id)->pluck('product_name', 'product_name')->unique())
-                                ->required()
-                                ->live()
-                                ->afterStateUpdated(function ($state, Set $set) {
-                                    if (!$state) return;
-                                    $sample = OrderItem::where('order_id', $this->order->id)->where('product_name', $state)->first();
-                                    if ($sample) {
-                                        $details = $sample->size_and_request_details ?? [];
-                                        $set('new_product_name', $sample->product_name);
-                                        $set('new_category', $sample->production_category === 'custom' ? 'produksi' : ($sample->production_category ?? 'produksi'));
-                                        $set('new_bahan_id', $sample->bahan_id);
-                                        $set('new_material_variant_id', $details['material_variant_id'] ?? null);
-                                        $set('new_sablon_teknik', $details['sablon_jenis'] ?? null);
-                                        $set('new_sablon_lokasi', $details['sablon_lokasi'] ?? null);
-                                        $set('new_sablon_keterangan', $details['sablon_keterangan'] ?? null);
-                                    }
-                                }),
+                            \Filament\Forms\Components\Hidden::make('select_product_name'),
 
                             Section::make('Informasi Produk & Bahan')
                                 ->schema([
@@ -607,7 +606,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 ])->compact(),
 
                             Section::make('Desain Sablon / Bordir Utama')
-                                ->visible(fn(Get $get) => filled($get('select_product_name')) && in_array($get('new_category'), ['produksi', 'custom']))
+                                ->visible(fn(Get $get) => in_array($get('new_category'), ['produksi', 'custom']))
                                 ->schema([
                                     Grid::make(2)->schema([
                                         Select::make('new_sablon_teknik')
@@ -663,6 +662,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         }
 
                         $this->refreshOrderData();
+                        $this->unmountTableAction();
                         Notification::make()->success()->title("Informasi Produk Utama '{$oldName}' berhasil diperbarui ke seluruh kelompok!")->send();
                     }),
 
@@ -670,7 +670,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Hapus Produk Utama')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
-                    ->visible(false)
+                    ->extraAttributes(['class' => 'hidden'])
                     ->requiresConfirmation()
                     ->modalHeading(fn(array $arguments) => "Hapus Seluruh Item Produk '" . ($arguments['product_name'] ?? '') . "'?")
                     ->modalDescription('Apakah Anda yakin ingin menghapus seluruh item di bawah produk ini? Tindakan ini tidak dapat dibatalkan.')
@@ -689,6 +689,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             ->send();
 
                         $this->refreshOrderData();
+                        $this->unmountTableAction();
                     }),
 
                 Action::make('bulk_generate')
@@ -1623,25 +1624,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ->options($modelOptions)
                                         ->required(),
                                 ]),
-                                Grid::make(2)->schema([
-                                    Select::make('edit_sablon_teknik')
-                                        ->label('Teknik Sablon / Bordir')
-                                        ->options(fn () => \App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
-                                        ->searchable()
-                                        ->placeholder('Tanpa Sablon/Bordir')
-                                        ->nullable(),
-                                    Select::make('edit_sablon_lokasi')
-                                        ->label('Titik Lokasi')
-                                        ->options(fn () => \App\Models\PrintType::where('category', 'lokasi')->pluck('name', 'name'))
-                                        ->searchable()
-                                        ->placeholder('Pilih titik lokasi...')
-                                        ->nullable(),
-                                ]),
-                                \Filament\Forms\Components\Textarea::make('edit_sablon_keterangan')
-                                    ->label('Keterangan Desain')
-                                    ->placeholder('misal: Logo depan dada atau rincian posisi')
-                                    ->rows(2)
-                                    ->nullable(),
                                 Textarea::make('edit_spec_notes')
                                     ->label('Catatan Khusus Spesifikasi Ini (Notes)')
                                     ->placeholder('Contoh: Pakai furing dalam, saku bagian dalam, karet pinggang, dll.')
@@ -1795,9 +1777,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             $newDetails['collar_model'] = $data['edit_collar'] ?? 'biasa';
                             $newDetails['model'] = $data['edit_model'] ?? 'biasa';
                             $newDetails['spec_notes'] = $data['edit_spec_notes'] ?? null;
-                            $newDetails['sablon_jenis'] = $data['edit_sablon_teknik'] ?? null;
-                            $newDetails['sablon_lokasi'] = $data['edit_sablon_lokasi'] ?? null;
-                            $newDetails['sablon_keterangan'] = $data['edit_sablon_keterangan'] ?? null;
+                            $newDetails['sablon_jenis'] = $details['sablon_jenis'] ?? null;
+                            $newDetails['sablon_lokasi'] = $details['sablon_lokasi'] ?? null;
+                            $newDetails['sablon_keterangan'] = $details['sablon_keterangan'] ?? null;
                         }
 
                         // Update base info for all existing items in this group
@@ -1816,9 +1798,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 $itemDetails['collar_model'] = $data['edit_collar'] ?? 'biasa';
                                 $itemDetails['model'] = $data['edit_model'] ?? 'biasa';
                                 $itemDetails['spec_notes'] = $data['edit_spec_notes'] ?? null;
-                                $itemDetails['sablon_jenis'] = $data['edit_sablon_teknik'] ?? null;
-                                $itemDetails['sablon_lokasi'] = $data['edit_sablon_lokasi'] ?? null;
-                                $itemDetails['sablon_keterangan'] = $data['edit_sablon_keterangan'] ?? null;
+                                $itemDetails['sablon_jenis'] = $itemDetails['sablon_jenis'] ?? ($details['sablon_jenis'] ?? null);
+                                $itemDetails['sablon_lokasi'] = $itemDetails['sablon_lokasi'] ?? ($details['sablon_lokasi'] ?? null);
+                                $itemDetails['sablon_keterangan'] = $itemDetails['sablon_keterangan'] ?? ($details['sablon_keterangan'] ?? null);
                             }
                             $itemToUpdate->update([
                                 'product_name' => $newProductName,
@@ -2067,31 +2049,35 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->getDescriptionUsing(function ($record) {
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
                         $hasTasks = \App\Models\ProductionTask::whereIn('order_item_id', $groupItemIds)->exists();
-
                         $unassignedBadge = !$hasTasks ? '<span class="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">⚠️ Belum Ditugaskan</span>' : '';
                         $escapedJsProduct = addslashes($record->product_name);
+                        $componentId = $this->getId();
 
                         $html = '
-                        <div class="flex items-center justify-between w-full mt-1.5" x-on:click.stop="">
-                            <div class="flex items-center gap-2" x-on:click.stop="">' . $unassignedBadge . '</div>
-                            <div x-data="{ open: false }" class="relative inline-block text-left" x-on:click.stop="">
-                                <button x-on:click.stop.prevent="open = !open" type="button" class="fi-icon-btn inline-flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-gray-500 focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-500 dark:hover:text-gray-400 transition-colors">
-                                    <svg class="fi-icon-btn-icon w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
-                                    </svg>
+                        <span x-on:click.stop="">' . $unassignedBadge . '</span>
+                        <span style="margin-left:auto;display:inline-flex;align-items:center;" x-on:click.stop="">
+                            <span x-data="{ open: false }" style="position:relative;display:inline-flex;align-items:center;" x-on:click.stop="">
+                                <button x-on:click.stop.prevent="open = !open" type="button" class="fi-icon-btn fi-size-md" style="display:inline-flex;align-items:center;justify-content:center;width:2.25rem;height:2.25rem;border-radius:0.5rem;background-color:#f9fafb;border:1px solid #e5e7eb;color:#6b7280;cursor:pointer;transition:all 0.15s ease;" aria-label="Aksi">
+                                    <span class="fi-icon fi-size-md">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" aria-hidden="true" data-slot="icon">
+                                            <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+                                        </svg>
+                                    </span>
                                 </button>
-                                <div x-show="open" x-on:click.away="open = false" style="display: none;" class="fi-dropdown-panel absolute right-0 z-50 mt-1 w-52 rounded-lg bg-white p-1 shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 text-left">
-                                    <button x-on:click.stop.prevent="$wire.openEditProductModal(\'' . $escapedJsProduct . '\'); open = false;" type="button" class="fi-dropdown-list-item flex w-full items-center gap-x-3 rounded-md px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5 transition-colors">
-                                        <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
-                                        Edit Info Produk Ini
-                                    </button>
-                                    <button x-on:click.stop.prevent="$wire.deleteProductGroup(\'' . $escapedJsProduct . '\'); open = false;" type="button" class="fi-dropdown-list-item flex w-full items-center gap-x-3 rounded-md px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10 transition-colors border-t border-gray-100 dark:border-gray-800">
-                                        <svg class="w-4 h-4 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                                        Hapus Seluruh Produk Ini
-                                    </button>
-                                </div>
-                            </div>
-                        </div>';
+                                <span x-show="open" x-on:click.away="open = false" style="display:none;position:absolute;right:0;top:calc(100% + 0.25rem);z-index:50;" class="fi-dropdown-panel">
+                                    <span style="display:flex;flex-direction:column;" class="fi-dropdown-list">
+                                        <button x-on:click.stop.prevent="open = false; window.Livewire.find(\'' . $componentId . '\').call(\'openEditProductModal\', \'' . $escapedJsProduct . '\');" type="button" class="fi-dropdown-list-item fi-dropdown-list-item-color-gray">
+                                            <span class="fi-icon fi-size-md"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span>
+                                            <span class="fi-dropdown-list-item-label">Edit Info Produk Ini</span>
+                                        </button>
+                                        <button x-on:click.stop.prevent="open = false; window.Livewire.find(\'' . $componentId . '\').call(\'deleteProductGroup\', \'' . $escapedJsProduct . '\');" type="button" class="fi-dropdown-list-item fi-dropdown-list-item-color-danger">
+                                            <span class="fi-icon fi-size-md"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></span>
+                                            <span class="fi-dropdown-list-item-label">Hapus Seluruh Produk Ini</span>
+                                        </button>
+                                    </span>
+                                </span>
+                            </span>
+                        </span>';
 
                         return new \Illuminate\Support\HtmlString($html);
                     })
@@ -2204,12 +2190,14 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
     public function openEditProductModal(string $productName): void
     {
+        $this->resetMountedActionState();
         $this->mountTableAction('edit_parent_product', arguments: ['product_name' => $productName]);
     }
 
     public function deleteProductGroup(string $productName): void
     {
         if (!in_array(auth()->user()->role, ['owner', 'admin'])) return;
+        $this->resetMountedActionState();
         $this->mountTableAction('delete_parent_product', arguments: ['product_name' => $productName]);
     }
 

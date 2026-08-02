@@ -265,7 +265,7 @@ class ControlProduksiResource extends Resource
                         $state === 'Belum Diatur' => 'gray',
                         $state === 'Antrian' => 'warning',
                         $state === 'Diproses' => 'info',
-                        $state === 'QC Persiapan' => 'purple',
+                        $state === 'QC Persiapan' => 'primary',
                         $state === 'QC Review' => 'warning',
                         $state === 'QC Akhir' => 'warning',
                         $state === 'Selesai' => 'success',
@@ -378,7 +378,10 @@ class ControlProduksiResource extends Resource
             ->actions([
                 ActionGroup::make([
                     Action::make('update_progress')
-                    ->hidden(function (OrderItem $record): bool {
+                    ->visible(function (OrderItem $record): bool {
+                        if (!$record->productionTasks()->exists()) {
+                            return false;
+                        }
                         $wo = $record->workOrder;
                         if (!$wo) {
                             $groupItemIds = $record->getItemsInGroup()->pluck('id');
@@ -386,10 +389,10 @@ class ControlProduksiResource extends Resource
                                 ->whereIn('order_item_id', $groupItemIds)
                                 ->first();
                         }
-                        if ($wo) {
-                            return $wo->isCompleted();
+                        if ($wo && $wo->isCompleted()) {
+                            return false;
                         }
-                        return false;
+                        return true;
                     })
                     ->label('Update Progress')
                     ->icon('heroicon-o-arrow-path')

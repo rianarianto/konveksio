@@ -39,30 +39,7 @@ class PDFController extends Controller
         if (!$wo) {
             $item = $order->orderItems()->first();
             if ($item) {
-                $totalQuantity = \App\Models\OrderItem::where('order_id', $item->order_id)
-                    ->where('product_name', $item->product_name)
-                    ->sum('quantity');
-
-                $allGroupItems = \App\Models\OrderItem::where('order_id', $item->order_id)
-                    ->where('product_name', $item->product_name)
-                    ->get();
-
-                $sizes = [];
-                $specGroups = [];
-
-                foreach ($allGroupItems as $gi) {
-                    $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-                    $sizes[$sz] = ($sizes[$sz] ?? 0) + $gi->quantity;
-                }
-
-                $data = [
-                    'record' => $item->load(['order.customer', 'productionTasks.assignedTo', 'bahan.material']),
-                    'totalQuantity' => $totalQuantity,
-                    'sizes' => $sizes,
-                    'specGroups' => $specGroups,
-                    'allGroupItems' => $allGroupItems,
-                ];
-
+                $data = $this->buildSpkData($item);
                 $pdf = app('dompdf.wrapper')->loadView('pdf.spk-produksi', $data);
                 $filename = 'SPK-' . str_replace('#', '', $order->order_number) . '.pdf';
 
@@ -86,15 +63,45 @@ class PDFController extends Controller
             abort(404, 'Data pesanan tidak ditemukan.');
         }
 
-        // Aggregate data for PDF (sama persis dengan ControlProduksiResource)
+        $data = $this->buildSpkData($record);
+
+        if ($request->query('html') == 1) {
+            return view('pdf.spk-produksi', $data);
+        }
+
+        $pdf = app('dompdf.wrapper')->loadView('pdf.spk-produksi', $data);
+
+        $filename = 'SPK-' . $record->order->order_number . '-' . \Illuminate\Support\Str::slug($record->product_name) . '.pdf';
+
+        if ($request->query('download') == 1) {
+            $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+            $pdf->save($tempPath);
+            return response()->download($tempPath, $filename)->deleteFileAfterSend(true);
+        }
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+        $pdf->save($tempPath);
+        return response()->file($tempPath, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
+    }
+
+    protected function buildSpkData(\App\Models\OrderItem $record): array
+    {
         $totalQuantity = \App\Models\OrderItem::where('order_id', $record->order_id)
             ->where('product_name', $record->product_name)
             ->where('design_status', 'approved')
             ->sum('quantity');
 
+        if ($totalQuantity <= 0) {
+            $totalQuantity = \App\Models\OrderItem::where('order_id', $record->order_id)
+                ->where('product_name', $record->product_name)
+                ->sum('quantity');
+        }
+
         $allGroupItems = \App\Models\OrderItem::where('order_id', $record->order_id)
             ->where('product_name', $record->product_name)
-            ->where('design_status', 'approved')
             ->get();
 
         $sizes = [];
@@ -138,12 +145,17 @@ class PDFController extends Controller
             $reqList = [];
             if (!empty($d['request_tambahan']) && is_array($d['request_tambahan'])) {
                 foreach ($d['request_tambahan'] as $rt) {
-                    $reqList[] = strtoupper($rt['jenis'] ?? '') . ": " . ($rt['keterangan'] ?? '');
+                    if (is_array($rt)) {
+                        $reqList[] = strtoupper($rt['jenis'] ?? '') . ": " . ($rt['keterangan'] ?? '');
+                    } else {
+                        $reqList[] = strtoupper($rt);
+                    }
                 }
             }
             sort($reqList);
             $reqStr = implode(' | ', $reqList);
 
+            $grpLabel = trim($d['group_label'] ?? '');
             $gen = trim($gen);
             $slv = trim($slv);
             $pck = trim($pck);
@@ -152,10 +164,11 @@ class PDFController extends Controller
             $sbStr = trim($sbStr);
             $reqStr = trim($reqStr);
 
-            $groupKey = "{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|{$sbStr}|{$reqStr}";
+            $groupKey = "{$grpLabel}|{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|{$sbStr}|{$reqStr}";
             
             if (!isset($specGroups[$groupKey])) {
                 $specGroups[$groupKey] = [
+                    'group_label' => $grpLabel,
                     'gender' => $gen === 'UMUM' ? 'UMUM' : ($gen === 'L' ? 'PRIA' : 'WANITA'),
                     'is_produksi' => $isProduksi,
                     'sleeve' => $slv,
@@ -166,22 +179,34 @@ class PDFController extends Controller
                     'use_stock' => ($stk === 'YES'),
                     'sablon_bordir' => $sbList,
                     'requests' => $reqList,
+                    'spec_notes' => [],
                     'total_qty' => 0,
                     'sizes' => [],
                     'recipients' => ['standard' => [], 'custom' => []],
                 ];
             }
             
+            if (!empty($d['spec_notes'])) {
+                if (!in_array($d['spec_notes'], $specGroups[$groupKey]['spec_notes'])) {
+                    $specGroups[$groupKey]['spec_notes'][] = $d['spec_notes'];
+                }
+            }
+
             $specGroups[$groupKey]['total_qty'] += $gi->quantity;
             $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
             $specGroups[$groupKey]['sizes'][$sz] = ($specGroups[$groupKey]['sizes'][$sz] ?? 0) + $gi->quantity;
+            $sizes[$sz] = ($sizes[$sz] ?? 0) + $gi->quantity;
 
             if (!empty($d['detail_custom'])) {
                 foreach ($d['detail_custom'] as $u) {
+                    $m = [];
+                    foreach (['LD', 'PB', 'PL', 'LB', 'LP', 'LPh'] as $mk) {
+                        if (!empty($u[$mk])) $m[] = "$mk:{$u[$mk]}";
+                    }
                     $specGroups[$groupKey]['recipients']['custom'][] = [
                         'nama' => $u['nama'] ?? '-',
                         'size' => $u['ukuran'] ?? 'Custom',
-                        'desc' => !empty($u['LD']) ? "LD:{$u['LD']} PB:{$u['PB']} PL:{$u['PL']} LB:{$u['LB']} LP:{$u['LP']} LPh:{$u['LPh']}" : ""
+                        'desc' => implode(' ', $m)
                     ];
                 }
             } elseif ($sz === 'CUSTOM') {
@@ -199,34 +224,13 @@ class PDFController extends Controller
             }
         }
 
-        $data = [
+        return [
             'record' => $record->load(['order.customer', 'productionTasks.assignedTo', 'bahan.material']),
             'totalQuantity' => $totalQuantity,
             'sizes' => $sizes,
             'specGroups' => $specGroups,
             'allGroupItems' => $allGroupItems,
         ];
-
-        if ($request->query('html') == 1) {
-            return view('pdf.spk-produksi', $data);
-        }
-
-        $pdf = app('dompdf.wrapper')->loadView('pdf.spk-produksi', $data);
-
-        $filename = 'SPK-' . $record->order->order_number . '-' . \Illuminate\Support\Str::slug($record->product_name) . '.pdf';
-
-        if ($request->query('download') == 1) {
-            $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
-            $pdf->save($tempPath);
-            return response()->download($tempPath, $filename)->deleteFileAfterSend(true);
-        }
-
-        $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
-        $pdf->save($tempPath);
-        return response()->file($tempPath, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $filename . '"',
-        ]);
     }
 }
 

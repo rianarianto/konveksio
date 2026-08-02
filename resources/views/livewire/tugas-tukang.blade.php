@@ -95,9 +95,11 @@
                     $reqList[] = ($rt['jenis'] ?? '') . ': ' . ($rt['keterangan'] ?? '');
                 }
             }
-            $groupKey = "{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|" . implode('|', $sbList);
+            $groupLabel = trim($d['group_label'] ?? '');
+            $groupKey = "{$groupLabel}|{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|" . implode('|', $sbList);
             if (!isset($specGroups[$groupKey])) {
                 $specGroups[$groupKey] = [
+                    'group_label'  => $groupLabel,
                     'gender'       => $gen === 'UMUM' ? 'UMUM' : ($gen === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN'),
                     'is_produksi'  => $isProduksi,
                     'sleeve'       => $slv,
@@ -107,10 +109,16 @@
                     'collar'       => $clr,
                     'sablon_bordir'=> $sbList,
                     'requests'     => $reqList,
+                    'spec_notes'   => [],
                     'total_qty'    => 0,
                     'sizes'        => [],
                     'recipients'   => ['standard' => [], 'custom' => []],
                 ];
+            }
+            if (!empty($d['spec_notes'])) {
+                if (!in_array($d['spec_notes'], $specGroups[$groupKey]['spec_notes'])) {
+                    $specGroups[$groupKey]['spec_notes'][] = $d['spec_notes'];
+                }
             }
             $specGroups[$groupKey]['total_qty'] += $gi->quantity;
             $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
@@ -489,6 +497,95 @@
                     $parsedItems = array_filter($parsedItems, fn($item) => !str_contains($item, 'CUSTOM'));
                 }
             }
+            // Build breakdown spesifik per varian untuk worker ini
+            $workerVariantBreakdown = [];
+            if (!$isQcTask && !empty($myTask->size_quantities)) {
+                $mySizes = $myTask->size_quantities;
+                $myCustomRecipients = $mySizes['_custom_recipients'] ?? [];
+
+                foreach ($groupItems as $gi) {
+                    $d = $gi->size_and_request_details ?? [];
+                    $groupLabel = trim($d['group_label'] ?? '');
+                    $gender = strtoupper($d['gender'] ?? 'L');
+                    $genderLabel = ($gender === 'P' || $gender === 'PEREMPUAN') ? 'PEREMPUAN' : 'LAKI-LAKI';
+
+                    $vTitle = $groupLabel ? strtoupper($groupLabel) : $genderLabel;
+                    $vKey = $vTitle . '|' . $genderLabel;
+
+                    $giSize = strtoupper($gi->size ?? 'TANPA_UKURAN');
+
+                    if ($giSize === 'CUSTOM' || $gi->production_category === 'custom') {
+                        if (isset($mySizes['CUSTOM']) && $mySizes['CUSTOM'] > 0) {
+                            $customDetails = $d['detail_custom'] ?? [];
+                            if (!empty($customDetails)) {
+                                foreach ($customDetails as $cd) {
+                                    $cName = trim($cd['nama'] ?? '');
+                                    if (empty($myCustomRecipients) || in_array($cName, $myCustomRecipients)) {
+                                        if (!isset($workerVariantBreakdown[$vKey])) {
+                                            $workerVariantBreakdown[$vKey] = [
+                                                'title' => $vTitle,
+                                                'gender' => $genderLabel,
+                                                'sizes' => [],
+                                                'customs' => [],
+                                            ];
+                                        }
+                                        $mArr = [];
+                                        foreach (['LD','PB','PL','LB','LP','LPh'] as $mk) {
+                                            if (!empty($cd[$mk])) $mArr[] = "$mk:{$cd[$mk]}";
+                                        }
+                                        $workerVariantBreakdown[$vKey]['customs'][] = [
+                                            'nama' => $cName ?: 'Custom',
+                                            'specs' => implode(' ', $mArr),
+                                        ];
+                                    }
+                                }
+                            } else {
+                                $cName = trim($gi->recipient_name ?? 'Custom');
+                                if (empty($myCustomRecipients) || in_array($cName, $myCustomRecipients)) {
+                                    if (!isset($workerVariantBreakdown[$vKey])) {
+                                        $workerVariantBreakdown[$vKey] = [
+                                            'title' => $vTitle,
+                                            'gender' => $genderLabel,
+                                            'sizes' => [],
+                                            'customs' => [],
+                                        ];
+                                    }
+                                    $mArr = [];
+                                    foreach (['LD','PB','PL','LB','LP','LPh'] as $mk) {
+                                        if (!empty($d[$mk])) $mArr[] = "$mk:{$d[$mk]}";
+                                    }
+                                    $workerVariantBreakdown[$vKey]['customs'][] = [
+                                        'nama' => $cName,
+                                        'specs' => implode(' ', $mArr),
+                                    ];
+                                }
+                            }
+                        }
+                    } else {
+                        $taskQtyForSize = $mySizes[$giSize] ?? 0;
+                        if ($taskQtyForSize > 0) {
+                            $gKey = ($gender === 'P' || $gender === 'PEREMPUAN') ? 'P' : 'L';
+                            if (isset($mySizes['_genders'][$giSize])) {
+                                $allocatedQty = (int) ($mySizes['_genders'][$giSize][$gKey] ?? 0);
+                            } else {
+                                $allocatedQty = (int) $taskQtyForSize;
+                            }
+                            
+                            if ($allocatedQty > 0) {
+                                if (!isset($workerVariantBreakdown[$vKey])) {
+                                    $workerVariantBreakdown[$vKey] = [
+                                        'title' => $vTitle,
+                                        'gender' => $genderLabel,
+                                        'sizes' => [],
+                                        'customs' => [],
+                                    ];
+                                }
+                                $workerVariantBreakdown[$vKey]['sizes'][$giSize] = ($workerVariantBreakdown[$vKey]['sizes'][$giSize] ?? 0) + $allocatedQty;
+                            }
+                        }
+                    }
+                }
+            }
         @endphp
 
         @if(!empty($adminNote))
@@ -539,6 +636,47 @@
                         @endforeach
                     </ul>
                 @endif
+
+                {{-- Breakdown Rinci Spesifik per Varian untuk Worker Ini --}}
+                @if(!empty($workerVariantBreakdown))
+                <div style="margin-top:12px; background:#faf5ff; border:1.5px solid #c4b5fd; border-radius:10px; padding:12px 14px;">
+                    <div style="font-size:11px; font-weight:800; color:#5b21b6; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
+                        🎯 RINCIAN PENUGASAN KHUSUS UNTUK KAMU (PER VARIAN):
+                    </div>
+                    
+                    @foreach($workerVariantBreakdown as $wv)
+                    <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed #ddd6fe;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                            <span style="font-size:11px; font-weight:800; color:#4338ca; background:#e0e7ff; padding:2px 8px; border-radius:4px; border:1px solid #c7d2fe;">
+                                VARIAN: {{ $wv['title'] }}
+                            </span>
+                            <span style="font-size:10px; font-weight:700; color:#64748b;">({{ $wv['gender'] }})</span>
+                        </div>
+
+                        @if(!empty($wv['sizes']))
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
+                            @foreach($wv['sizes'] as $sz => $q)
+                            <span style="font-size:11px; font-weight:800; color:#1e293b; background:#ffffff; border:1px solid #cbd5e1; padding:2px 8px; border-radius:4px;">
+                                Ukuran {{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}: <strong style="color:#7c3aed;">{{ $q }} pcs</strong>
+                            </span>
+                            @endforeach
+                        </div>
+                        @endif
+
+                        @if(!empty($wv['customs']))
+                        <div style="margin-top:6px; font-size:11px;">
+                            <div style="font-weight:800; color:#047857; margin-bottom:2px;">📐 Baju Custom Yang Kamu Kerjakan:</div>
+                            @foreach($wv['customs'] as $cItem)
+                            <div style="font-weight:700; color:#065f46; margin-left:6px;">
+                                • {{ $cItem['nama'] }} @if(!empty($cItem['specs'])) <span style="font-weight:600; color:#475569;">({{ $cItem['specs'] }})</span> @endif
+                            </div>
+                            @endforeach
+                        </div>
+                        @endif
+                    </div>
+                    @endforeach
+                </div>
+                @endif
             </div>
         </div>
     </div>
@@ -587,32 +725,51 @@
     @foreach($specGroups as $group)
     <div class="card spec-group-card">
         <div class="spec-group-header">
-            <span class="spec-gender">{{ $group['gender'] }}</span>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+                @if(!empty($group['group_label']))
+                <span style="font-size:13px; font-weight:800; color:#4338ca; background:#e0e7ff; padding:2px 8px; border-radius:6px; border:1px solid #c7d2fe; display:inline-block; margin-bottom:2px;">
+                    VARIAN: {{ strtoupper($group['group_label']) }}
+                </span>
+                @else
+                <span style="font-size:13px; font-weight:800; color:#4338ca; background:#e0e7ff; padding:2px 8px; border-radius:6px; border:1px solid #c7d2fe; display:inline-block; margin-bottom:2px;">
+                    VARIAN: {{ $group['gender'] }}
+                </span>
+                @endif
+            </div>
             <span class="spec-qty-badge">{{ $group['total_qty'] }} pcs</span>
         </div>
 
-        @if($group['is_produksi'] && $group['gender'] !== 'UMUM')
+        @if($group['is_produksi'])
         <div class="spec-model-row">
+            @if($group['gender'] !== 'UMUM')
+            <span class="spec-tag-item">JENIS KELAMIN: <strong>{{ $group['gender'] }}</strong></span>
+            <span class="spec-sep">|</span>
+            @endif
             <span class="spec-tag-item">LENGAN: <strong>{{ $group['sleeve'] }}</strong></span>
             <span class="spec-sep">|</span>
             <span class="spec-tag-item">SAKU: <strong>{{ $group['pocket'] }}</strong></span>
             <span class="spec-sep">|</span>
             <span class="spec-tag-item">KANCING: <strong>{{ $group['button'] }}</strong></span>
-        </div>
-        @if(!empty($group['collar']) && $group['collar'] !== 'BIASA')
-        <div class="spec-model-row" style="margin-top:4px;">
+            @if(!empty($group['collar']))
+            <span class="spec-sep">|</span>
             <span class="spec-tag-item">KERAH: <strong>{{ $group['collar'] }}</strong></span>
+            @endif
             @if($group['tunic'] === 'TUNIK')
             <span class="spec-sep">|</span>
             <span class="spec-tag-item">MODEL: <strong>TUNIK</strong></span>
             @endif
         </div>
         @endif
-        @endif
 
         @if(!empty($group['requests']))
         <div class="request-row">
             📌 {{ implode(' | ', $group['requests']) }}
+        </div>
+        @endif
+
+        @if(!empty($group['spec_notes']))
+        <div class="note-row" style="margin-top:6px; padding:6px 10px; background:#fffcf0; border:1px solid #fef3c7; border-radius:6px; font-size:12px; font-weight:700; color:#92400e;">
+            📝 Catatan Varian: {{ implode(', ', $group['spec_notes']) }}
         </div>
         @endif
 

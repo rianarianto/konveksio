@@ -9,7 +9,7 @@
             </div>
             <span class="brand-name">Konveksio</span>
         </div>
-        <div class="header-wo-badge">Dashboard</div>
+        <div class="header-wo-badge">Portal Pekerja</div>
     </header>
 
     @if(!$worker)
@@ -19,11 +19,12 @@
         <p>Akun tidak ditemukan atau sudah tidak aktif.</p>
     </div>
     @else
+
     {{-- ── GREETING ── --}}
     <div class="greeting-bar">
         <div>
             <div class="greeting-hello">Halo, {{ $worker->name }}!</div>
-            <div class="greeting-sub">Dashboard Tugas Produksi</div>
+            <div class="greeting-sub">Dashboard & Keuangan Produksi</div>
         </div>
         <div class="greeting-status">
             <span class="status-dot dot-purple"></span>
@@ -31,316 +32,513 @@
         </div>
     </div>
 
-    {{-- Flash Message --}}
+    {{-- ── TOP NAVIGATION TABS ── --}}
+    <div class="main-tabs-wrap">
+        <button wire:click="$set('activeTab', 'tugas')" class="tab-btn {{ $activeTab === 'tugas' ? 'active' : '' }}">
+            📋 Tugas
+            @if($tasks['in_progress']->count() + $tasks['pending']->count() > 0)
+            <span class="tab-badge">{{ $tasks['in_progress']->count() + $tasks['pending']->count() }}</span>
+            @endif
+        </button>
+        <button wire:click="$set('activeTab', 'riwayat')" class="tab-btn {{ $activeTab === 'riwayat' ? 'active' : '' }}">
+            📜 Riwayat
+        </button>
+        <button wire:click="$set('activeTab', 'keuangan')" class="tab-btn {{ $activeTab === 'keuangan' ? 'active' : '' }}">
+            💰 Keuangan
+        </button>
+    </div>
+
+    {{-- Flash Messages --}}
     @if(session()->has('success'))
     <div class="alert-success">✅ {{ session('success') }}</div>
     @endif
-
-    {{-- Error Message --}}
+    @if(session()->has('kasbon_success'))
+    <div class="alert-success">✅ {{ session('kasbon_success') }}</div>
+    @endif
+    @if(session()->has('kasbon_error'))
+    <div class="alert-error">⚠️ {{ session('kasbon_error') }}</div>
+    @endif
     @if($errors->has('aksi'))
     <div class="alert-error">{{ $errors->first('aksi') }}</div>
     @endif
-    @if($errors->has('qc'))
-    <div class="alert-error">{{ $errors->first('qc') }}</div>
-    @endif
 
-    {{-- ── QC REVIEW (for QC workers only) ── --}}
-    @if($qcReviews->count() > 0)
-    <div class="section-header">
-        <span class="section-dot dot-orange"></span>
-        <span class="section-title">Perlu QC Review</span>
-        <span class="section-count">{{ $qcReviews->count() }}</span>
-    </div>
+    {{-- ========================================================================= --}}
+    {{-- TAB 1: TUGAS PRODUKSI --}}
+    {{-- ========================================================================= --}}
+    @if($activeTab === 'tugas')
 
-    @foreach($qcReviews as $wo)
-    <div class="card task-card task-review" style="border:1.5px solid #fbbf24;">
-        <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}"
-           style="text-decoration:none;color:inherit;display:block;">
-            <div class="task-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:0;">
-                <div class="task-info" style="flex:1;">
-                    <div class="task-stage task-stage-review">Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}</div>
-                    <div class="task-product">{{ $wo->orderItem?->product_name ?? '-' }}</div>
-                    <div class="task-customer">
-                        <span class="mono" style="font-weight:600;color:#475569;">{{ $wo->orderItem?->order?->order_number ?? '-' }}</span> •
-                        {{ $wo->orderItem?->order?->customer?->name ?? '-' }} •
-                        {{ $wo->orderItem ? $wo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs
-                        @if($wo->orderItem?->order?->is_express)
-                        <span class="express-badge">⚡ Express</span>
-                        @endif
-                    </div>
-                </div>
-                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
-                    <span style="font-size:11px; font-weight:700; color:#d97706; background:#fef3c7; border-radius:20px; padding:4px 10px; white-space:nowrap;">
-                        🔍 Perlu Review
-                    </span>
-                    <span class="btn btn-warning btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; background:#f59e0b; color:white; font-weight:600; cursor:pointer;">
-                        Buka Detail
-                    </span>
-                </div>
-            </div>
-        </a>
-    </div>
-    @endforeach
-    @endif
-
-
-
-
-    {{-- ── QC AKHIR (untuk QC workers) ── --}}
-    @if($qcAkhir->count() > 0)
-    <div class="section-header">
-        <span class="section-dot" style="background:#7C3AED;"></span>
-        <span class="section-title">QC Akhir — Verifikasi Final</span>
-        <span class="section-count">{{ $qcAkhir->count() }}</span>
-    </div>
-
-    @foreach($qcAkhir as $qaWo)
-    <div class="card task-card" style="border:1.5px solid #C084FC;">
-        <a href="{{ route('work.task', ['wo_id' => $qaWo->id, 'token' => $qaWo->token, 'wt' => $worker->portal_token]) }}"
-           style="text-decoration:none;color:inherit;display:block;">
-            <div class="task-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:0;">
-                <div class="task-info" style="flex:1;">
-                    <div class="task-stage" style="background:#F3E8FF;color:#7C3AED; display:inline-block; padding:2px 8px; border-radius:6px; font-weight:700; font-size:12px; margin-bottom:4px;">QC Akhir</div>
-                    <div class="task-product">{{ $qaWo->orderItem?->product_name ?? '-' }}</div>
-                    <div class="task-customer">
-                        <span class="mono" style="font-weight:600;color:#475569;">{{ $qaWo->orderItem?->order?->order_number ?? '-' }}</span> •
-                        {{ $qaWo->orderItem?->order?->customer?->name ?? '-' }} •
-                        {{ $qaWo->orderItem ? $qaWo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs
-                        @if($qaWo->orderItem?->order?->is_express)
-                        <span class="express-badge">⚡ Express</span>
-                        @endif
-                    </div>
-                </div>
-                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
-                    <span style="font-size:11px; font-weight:700; color:#7c3aed; background:#f3e8ff; border-radius:20px; padding:4px 10px; white-space:nowrap;">
-                        🏁 QC Akhir
-                    </span>
-                    <span class="btn btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; background:#7c3aed; color:white; font-weight:600; cursor:pointer;">
-                        Buka Detail
-                    </span>
-                </div>
-            </div>
-        </a>
-    </div>
-    @endforeach
-    @endif
-
-    {{-- ── SEDANG DIKERJAKAN ── --}}
-    @if($tasks['in_progress']->count() > 0)
-    <div class="section-header">
-        <span class="section-dot dot-blue"></span>
-        <span class="section-title">Sedang Dikerjakan</span>
-        <span class="section-count">{{ $tasks['in_progress']->count() }}</span>
-    </div>
-
-    @foreach($tasks['in_progress'] as $task)
-    @php
-        $wo = $task->workOrder;
-    @endphp
-    @if($wo)
-    <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
-    @endif
-    <div class="card task-card task-working" style="cursor:pointer;">
-        <div class="task-header" style="display:flex; justify-content: space-between; align-items: center; gap:12px;">
-            <div class="task-info" style="flex:1;">
-                <div class="task-stage" style="color:#059669; font-weight:700;">{{ str_replace('_', ' ', $task->stage_name) }}</div>
-                <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
-                <div class="task-customer">
-                    <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
-                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
-                    {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
-                    @if($task->orderItem?->order?->is_express)
-                    <span class="express-badge">⚡ Express</span>
-                    @endif
-                </div>
-            </div>
-            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
-                <span style="font-size:11px;font-weight:700;color:#047857;background:#d1fae5;border-radius:20px;padding:4px 10px;white-space:nowrap;">
-                    ⚡ Dikerjakan
-                </span>
-                <span class="btn btn-primary btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer;">
-                    Buka Detail
-                </span>
-            </div>
+        {{-- Status Filter Sub-Pills --}}
+        <div class="sub-filter-wrap">
+            <button wire:click="$set('statusFilter', 'semua')" class="sub-pill {{ $statusFilter === 'semua' ? 'active' : '' }}">
+                Semua
+            </button>
+            <button wire:click="$set('statusFilter', 'in_progress')" class="sub-pill {{ $statusFilter === 'in_progress' ? 'active' : '' }}">
+                ⚡ Dikerjakan ({{ $tasks['in_progress']->count() }})
+            </button>
+            <button wire:click="$set('statusFilter', 'pending')" class="sub-pill {{ $statusFilter === 'pending' ? 'active' : '' }}">
+                ⏳ Antrian ({{ $tasks['pending']->count() }})
+            </button>
+            <button wire:click="$set('statusFilter', 'done')" class="sub-pill {{ $statusFilter === 'done' ? 'active' : '' }}">
+                ✅ Selesai ({{ $tasks['done']->count() }})
+            </button>
         </div>
 
-        {{-- Stage Progress --}}
-        @php
-            $progress = $this->getStageProgress($task);
-        @endphp
-        @if(count($progress) > 0)
-        <div class="stage-progress">
-            @foreach($progress as $stage)
-            <span class="stage-tag
-                @if($stage['status'] === 'done') stage-done
-                @elseif($stage['status'] === 'current') stage-current
-                @else stage-pending
-                @endif
-                @if($stage['is_task_stage']) stage-highlight
-                @endif">
-                {{ str_replace('_', ' ', $stage['name']) }}
-            </span>
-            @endforeach
+        {{-- ── QC REVIEW (for QC workers only) ── --}}
+        @if(in_array($statusFilter, ['semua', 'in_progress']) && $qcReviews->count() > 0)
+        <div class="section-header">
+            <span class="section-dot dot-orange"></span>
+            <span class="section-title">Perlu QC Review</span>
+            <span class="section-count">{{ $qcReviews->count() }}</span>
         </div>
+
+        @foreach($qcReviews as $wo)
+        <div class="card task-card task-review" style="border:1.5px solid #fbbf24;">
+            <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}"
+               style="text-decoration:none;color:inherit;display:block;">
+                <div class="task-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                    <div class="task-info" style="flex:1;">
+                        <div class="task-stage task-stage-review">Review: {{ str_replace('_', ' ', $wo->current_review_stage ?? '') }}</div>
+                        <div class="task-product">{{ $wo->orderItem?->product_name ?? '-' }}</div>
+                        <div class="task-customer">
+                            <span class="mono" style="font-weight:600;color:#475569;">{{ $wo->orderItem?->order?->order_number ?? '-' }}</span> •
+                            {{ $wo->orderItem?->order?->customer?->name ?? '-' }} •
+                            {{ $wo->orderItem ? $wo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs
+                            @if($wo->orderItem?->order?->is_express)
+                            <span class="express-badge">⚡ Express</span>
+                            @endif
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
+                        <span style="font-size:11px; font-weight:700; color:#d97706; background:#fef3c7; border-radius:20px; padding:4px 10px; white-space:nowrap;">
+                            🔍 Perlu Review
+                        </span>
+                        <span class="btn btn-warning btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; background:#f59e0b; color:white; font-weight:600; cursor:pointer;">
+                            Buka Detail
+                        </span>
+                    </div>
+                </div>
+            </a>
+        </div>
+        @endforeach
         @endif
-    </div>
-    @if($wo)</a>@endif
-    @endforeach
-    @endif
 
-    {{-- ── ANTRIAN ── --}}
-    @if($tasks['pending']->count() > 0)
-    <div class="section-header">
-        <span class="section-dot dot-yellow"></span>
-        <span class="section-title">Antrian</span>
-        <span class="section-count">{{ $tasks['pending']->count() }}</span>
-    </div>
+        {{-- ── QC AKHIR ── --}}
+        @if(in_array($statusFilter, ['semua', 'in_progress']) && $qcAkhir->count() > 0)
+        <div class="section-header">
+            <span class="section-dot" style="background:#7C3AED;"></span>
+            <span class="section-title">QC Akhir — Verifikasi Final</span>
+            <span class="section-count">{{ $qcAkhir->count() }}</span>
+        </div>
 
-    @foreach($tasks['pending'] as $task)
-    @php
-        $canStart = $this->canStartTask($task);
-        $blocking = $canStart ? null : $this->getBlockingStage($task);
-        $progress = $this->getStageProgress($task);
-        $isRevision = $task->is_revision ?? false;
-        $wo = $task->workOrder;
-    @endphp
-    @if($wo)
-    <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
-    @endif
-    <div class="card task-card {{ $canStart ? ($isRevision ? 'task-revision' : 'task-ready') : '' }}" style="cursor:pointer;">
-        <div class="task-header" style="display:flex; justify- space-between; align-items: center; gap:12px;">
-            <div class="task-info" style="flex:1;">
-                @if($isRevision)
-                <div style="background:#fee2e2;color:#b91c1c;font-weight:700;font-size:12px;padding:2px 10px;border-radius:20px;display:inline-block;margin-bottom:6px;">
-                    🔄 RETUR PERBAIKAN — {{ str_replace('_', ' ', $task->stage_name) }}
+        @foreach($qcAkhir as $qaWo)
+        <div class="card task-card" style="border:1.5px solid #C084FC;">
+            <a href="{{ route('work.task', ['wo_id' => $qaWo->id, 'token' => $qaWo->token, 'wt' => $worker->portal_token]) }}"
+               style="text-decoration:none;color:inherit;display:block;">
+                <div class="task-header" style="display:flex; justify-space-between; align-items:center; gap:12px;">
+                    <div class="task-info" style="flex:1;">
+                        <div class="task-stage" style="background:#F3E8FF;color:#7C3AED; display:inline-block; padding:2px 8px; border-radius:6px; font-weight:700; font-size:12px; margin-bottom:4px;">QC Akhir</div>
+                        <div class="task-product">{{ $qaWo->orderItem?->product_name ?? '-' }}</div>
+                        <div class="task-customer">
+                            <span class="mono" style="font-weight:600;color:#475569;">{{ $qaWo->orderItem?->order?->order_number ?? '-' }}</span> •
+                            {{ $qaWo->orderItem?->order?->customer?->name ?? '-' }} •
+                            {{ $qaWo->orderItem ? $qaWo->orderItem->getItemsInGroup()->sum('quantity') : 0 }} pcs
+                            @if($qaWo->orderItem?->order?->is_express)
+                            <span class="express-badge">⚡ Express</span>
+                            @endif
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
+                        <span style="font-size:11px; font-weight:700; color:#7c3aed; background:#f3e8ff; border-radius:20px; padding:4px 10px; white-space:nowrap;">
+                            🏁 QC Akhir
+                        </span>
+                        <span class="btn btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; background:#7c3aed; color:white; font-weight:600; cursor:pointer;">
+                            Buka Detail
+                        </span>
+                    </div>
                 </div>
-                @else
-                <div class="task-stage">
-                    {{ str_replace('_', ' ', $task->stage_name) }}
+            </a>
+        </div>
+        @endforeach
+        @endif
+
+        {{-- ── SEDANG DIKERJAKAN ── --}}
+        @if(in_array($statusFilter, ['semua', 'in_progress']) && $tasks['in_progress']->count() > 0)
+        <div class="section-header">
+            <span class="section-dot dot-blue"></span>
+            <span class="section-title">Sedang Dikerjakan</span>
+            <span class="section-count">{{ $tasks['in_progress']->count() }}</span>
+        </div>
+
+        @foreach($tasks['in_progress'] as $task)
+        @php $wo = $task->workOrder; @endphp
+        @if($wo)<a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">@endif
+        <div class="card task-card task-working">
+            <div class="task-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                <div class="task-info" style="flex:1;">
+                    <div class="task-stage" style="color:#059669; font-weight:700;">{{ str_replace('_', ' ', $task->stage_name) }}</div>
+                    <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
+                    <div class="task-customer">
+                        <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
+                        {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
+                        {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
+                        @if($task->orderItem?->order?->is_express)
+                        <span class="express-badge">⚡ Express</span>
+                        @endif
+                    </div>
                 </div>
-                @endif
-                <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
-                <div class="task-customer">
-                    <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
-                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
+                    <span style="font-size:11px;font-weight:700;color:#047857;background:#d1fae5;border-radius:20px;padding:4px 10px;white-space:nowrap;">
+                        ⚡ Dikerjakan
+                    </span>
+                    <span class="btn btn-primary btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer;">
+                        Buka Detail
+                    </span>
+                </div>
+            </div>
+
+            @php $progress = $this->getStageProgress($task); @endphp
+            @if(count($progress) > 0)
+            <div class="stage-progress">
+                @foreach($progress as $stage)
+                <span class="stage-tag @if($stage['status'] === 'done') stage-done @elseif($stage['status'] === 'current') stage-current @else stage-pending @endif @if($stage['is_task_stage']) stage-highlight @endif">
+                    {{ str_replace('_', ' ', $stage['name']) }}
+                </span>
+                @endforeach
+            </div>
+            @endif
+        </div>
+        @if($wo)</a>@endif
+        @endforeach
+        @endif
+
+        {{-- ── ANTRIAN PEKERJAAN ── --}}
+        @if(in_array($statusFilter, ['semua', 'pending']) && $tasks['pending']->count() > 0)
+        <div class="section-header">
+            <span class="section-dot dot-yellow"></span>
+            <span class="section-title">Antrian Pekerjaan</span>
+            <span class="section-count">{{ $tasks['pending']->count() }}</span>
+        </div>
+
+        @foreach($tasks['pending'] as $task)
+        @php
+            $canStart = $this->canStartTask($task);
+            $blocking = $canStart ? null : $this->getBlockingStage($task);
+            $progress = $this->getStageProgress($task);
+            $isRevision = $task->is_revision ?? false;
+            $wo = $task->workOrder;
+        @endphp
+        @if($wo)<a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">@endif
+        <div class="card task-card {{ $canStart ? ($isRevision ? 'task-revision' : 'task-ready') : '' }}">
+            <div class="task-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                <div class="task-info" style="flex:1;">
                     @if($isRevision)
-                    <b style="color:#b91c1c;">{{ $task->quantity }} pcs retur</b>
+                    <div style="background:#fee2e2;color:#b91c1c;font-weight:700;font-size:12px;padding:2px 10px;border-radius:20px;display:inline-block;margin-bottom:6px;">
+                        🔄 RETUR PERBAIKAN — {{ str_replace('_', ' ', $task->stage_name) }}
+                    </div>
                     @else
-                    {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
+                    <div class="task-stage">{{ str_replace('_', ' ', $task->stage_name) }}</div>
                     @endif
-                    @if($task->orderItem?->order?->is_express)
-                    <span class="express-badge">⚡ Express</span>
+                    <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
+                    <div class="task-customer">
+                        <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
+                        {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
+                        @if($isRevision)
+                        <b style="color:#b91c1c;">{{ $task->quantity }} pcs retur</b>
+                        @else
+                        {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
+                        @endif
+                        @if($task->orderItem?->order?->is_express)
+                        <span class="express-badge">⚡ Express</span>
+                        @endif
+                    </div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
+                    @if($canStart)
+                        <span class="btn btn-primary btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; font-weight:800; cursor:pointer; {{ $isRevision ? 'background:#dc2626; border-color:#dc2626; color:#ffffff !important;' : 'color:#ffffff !important;' }}">
+                            {{ $isRevision ? '🔧 Perbaiki Sekarang' : 'Buka Detail' }}
+                        </span>
+                    @else
+                        <span style="font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:20px;padding:4px 10px;white-space:nowrap;">
+                            🔒 Terkunci
+                        </span>
                     @endif
                 </div>
             </div>
-            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
-                @if($canStart)
-                    <span class="btn btn-primary btn-sm" style="font-size:11px; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer; {{ $isRevision ? 'background:#dc2626;border-color:#dc2626;' : '' }}">
-                        {{ $isRevision ? '🔧 Perbaiki Sekarang' : 'Buka Detail' }}
-                    </span>
-                @else
-                    <span style="font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:20px;padding:4px 10px;white-space:nowrap;">
-                        🔒 Terkunci
-                    </span>
-                @endif
+
+            @if(count($progress) > 0)
+            <div class="stage-progress">
+                @foreach($progress as $stage)
+                <span class="stage-tag @if($stage['status'] === 'done') stage-done @elseif($stage['status'] === 'current') stage-current @else stage-pending @endif @if($stage['is_task_stage']) stage-highlight @endif">
+                    {{ str_replace('_', ' ', $stage['name']) }}
+                </span>
+                @endforeach
+            </div>
+            @endif
+
+            @if(!$canStart && $blocking)
+            <div class="blocking-info">⏳ Menunggu: {{ str_replace('_', ' ', $blocking) }}</div>
+            @endif
+        </div>
+        @if($wo)</a>@endif
+        @endforeach
+        @endif
+
+        {{-- ── PEKERJAAN SELESAI ── --}}
+        @if(in_array($statusFilter, ['semua', 'done']) && $tasks['done']->count() > 0)
+        <div class="section-header">
+            <span class="section-dot dot-green"></span>
+            <span class="section-title">Pekerjaan Selesai</span>
+            <span class="section-count">{{ $tasks['done']->count() }}</span>
+        </div>
+
+        @foreach($tasks['done'] as $task)
+        @php $wo = $task->workOrder; @endphp
+        @if($wo)<a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">@endif
+        <div class="card task-card task-done">
+            <div class="task-header">
+                <div class="task-info">
+                    <div class="task-stage">{{ str_replace('_', ' ', $task->stage_name) }}</div>
+                    <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
+                    <div class="task-customer">
+                        <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
+                        {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
+                        {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
+                        @if($task->completed_at)
+                        <span class="task-date">• {{ $task->completed_at->format('d M') }}</span>
+                        @endif
+                    </div>
+                </div>
+                <span class="done-check">✓</span>
             </div>
         </div>
+        @if($wo)</a>@endif
+        @endforeach
+        @endif
 
-        {{-- Stage Progress --}}
-        @if(count($progress) > 0)
-        <div class="stage-progress">
-            @foreach($progress as $stage)
-            <span class="stage-tag
-                @if($stage['status'] === 'done') stage-done
-                @elseif($stage['status'] === 'current') stage-current
-                @else stage-pending
-                @endif
-                @if($stage['is_task_stage']) stage-highlight
-                @endif">
-                {{ str_replace('_', ' ', $stage['name']) }}
-            </span>
-            @endforeach
+        {{-- Empty State --}}
+        @if($tasks['in_progress']->count() === 0 && $tasks['pending']->count() === 0 && $tasks['done']->count() === 0 && $qcReviews->count() === 0)
+        <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <h2>Belum Ada Tugas</h2>
+            <p>Anda belum mendapat penugasan produksi.</p>
         </div>
         @endif
 
-        @if(!$canStart && $blocking)
-        <div class="blocking-info">⏳ Menunggu: {{ str_replace('_', ' ', $blocking) }}</div>
-        @endif
-    </div>
-    @if($wo)</a>@endif
-    @endforeach
     @endif
 
-    {{-- ── SELESAI ── --}}
-    @if($tasks['done']->count() > 0)
-    <div class="section-header">
-        <span class="section-dot dot-green"></span>
-        <span class="section-title">Selesai</span>
-        <span class="section-count">{{ $tasks['done']->count() }}</span>
+    {{-- ========================================================================= --}}
+    {{-- TAB 2: RIWAYAT PEKERJAAN (DATE RANGE FILTER) --}}
+    {{-- ========================================================================= --}}
+    @if($activeTab === 'riwayat')
+    <div class="card" style="padding:16px;">
+        <div style="font-size:14px; font-weight:800; color:#111827; margin-bottom:12px;">🗓️ Filter Periode Tanggal Selesai</div>
+        
+        {{-- Quick Date Presets --}}
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
+            <button wire:click="setQuickDate('today')" class="preset-btn">Hari Ini</button>
+            <button wire:click="setQuickDate('7days')" class="preset-btn">7 Hari Terakhir</button>
+            <button wire:click="setQuickDate('this_month')" class="preset-btn">Bulan Ini</button>
+            <button wire:click="setQuickDate('last_month')" class="preset-btn">Bulan Lalu</button>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div>
+                <label style="font-size:11px; font-weight:700; color:#6b7280; display:block; margin-bottom:4px;">Dari Tanggal</label>
+                <input type="date" wire:model.live="startDate" class="date-input">
+            </div>
+            <div>
+                <label style="font-size:11px; font-weight:700; color:#6b7280; display:block; margin-bottom:4px;">Sampai Tanggal</label>
+                <input type="date" wire:model.live="endDate" class="date-input">
+            </div>
+        </div>
     </div>
 
-    @foreach($tasks['done'] as $task)
-    @php
-        $wo = $task->workOrder;
-    @endphp
-    @if($wo)
-    <a href="{{ route('work.task', ['wo_id' => $wo->id, 'token' => $wo->token, 'wt' => $worker->portal_token]) }}" style="text-decoration:none;color:inherit;display:block;">
-    @endif
-    <div class="card task-card task-done" style="cursor:pointer;">
-        <div class="task-header">
-            <div class="task-info">
-                <div class="task-stage">{{ str_replace('_', ' ', $task->stage_name) }}</div>
-                <div class="task-product">{{ $task->orderItem?->product_name ?? '-' }}</div>
-                <div class="task-customer">
-                    <span class="mono" style="font-weight:600;color:#475569;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> •
-                    {{ $task->orderItem?->order?->customer?->name ?? '-' }} • 
-                    {{ $task->orderItem ? $task->orderItem->getItemsInGroup()->sum('quantity') : $task->quantity }} pcs
-                    @if($task->orderItem?->order?->is_express)
-                    <span class="express-badge">⚡ Express</span>
-                    @endif
+    {{-- Summary Cards --}}
+    @php $stats = $this->historyStats; @endphp
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:12px;">
+        <div class="summary-card" style="background:#f0fdf4; border:1px solid #bbf7d0;">
+            <div class="summary-label" style="color:#166534;">Pcs Selesai</div>
+            <div class="summary-val" style="color:#15803d;">{{ number_format($stats['total_pcs']) }}</div>
+        </div>
+        <div class="summary-card" style="background:#f3e8ff; border:1px solid #e9d5ff;">
+            <div class="summary-label" style="color:#6b21a8;">Total Upah</div>
+            <div class="summary-val" style="color:#7e22ce;">Rp {{ number_format($stats['total_upah'], 0, ',', '.') }}</div>
+        </div>
+        <div class="summary-card" style="background:#eff6ff; border:1px solid #bfdbfe;">
+            <div class="summary-label" style="color:#1e40af;">Total Tugas</div>
+            <div class="summary-val" style="color:#1d4ed8;">{{ number_format($stats['total_tugas']) }}</div>
+        </div>
+    </div>
+
+    {{-- Detailed History List --}}
+    <div style="margin-top:16px;">
+        <div class="section-header" style="margin-bottom:8px;">
+            <span class="section-dot dot-green"></span>
+            <span class="section-title">Detail Pekerjaan Selesai</span>
+            <span class="section-count">{{ $this->filteredHistory->count() }}</span>
+        </div>
+
+        @forelse($this->filteredHistory as $task)
+        <div class="card task-card" style="margin-bottom:8px; padding:12px 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                <div style="flex:1;">
+                    <div style="font-size:11px; font-weight:800; color:#8000FF; text-transform:uppercase;">
+                        {{ str_replace('_', ' ', $task->stage_name) }}
+                    </div>
+                    <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:2px;">
+                        {{ $task->orderItem?->product_name ?? '-' }}
+                    </div>
+                    <div style="font-size:12px; color:#64748b; margin-top:2px;">
+                        <span class="mono" style="font-weight:600;">{{ $task->orderItem?->order?->order_number ?? '-' }}</span> • 
+                        {{ $task->orderItem?->order?->customer?->name ?? '-' }}
+                    </div>
                     @if($task->completed_at)
-                    <span class="task-date">• {{ $task->completed_at->format('d M') }}</span>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">
+                        📅 Selesai: {{ $task->completed_at->format('d M Y H:i') }}
+                    </div>
                     @endif
                 </div>
-            </div>
-            <span class="done-check">✓</span>
-        </div>
 
-        {{-- Stage Progress --}}
-        @php
-            $progress = $this->getStageProgress($task);
-        @endphp
-        @if(count($progress) > 0)
-        <div class="stage-progress">
-            @foreach($progress as $stage)
-            <span class="stage-tag
-                @if($stage['status'] === 'done') stage-done
-                @elseif($stage['status'] === 'current') stage-current
-                @else stage-pending
-                @endif
-                @if($stage['is_task_stage']) stage-highlight
-                @endif">
-                {{ str_replace('_', ' ', $stage['name']) }}
-            </span>
-            @endforeach
+                <div style="text-align:right; flex-shrink:0;">
+                    <div style="font-size:12px; font-weight:700; color:#1e293b;">
+                        {{ $task->quantity }} pcs
+                    </div>
+                    <div style="font-size:13px; font-weight:800; color:#16a34a; margin-top:2px;">
+                        Rp {{ number_format($task->wage_amount, 0, ',', '.') }}
+                    </div>
+                </div>
+            </div>
         </div>
-        @endif
+        @empty
+        <div class="empty-state" style="padding:24px 16px;">
+            <div class="empty-icon">📂</div>
+            <h3>Tidak Ada Riwayat</h3>
+            <p>Tidak ditemukan pekerjaan selesai pada periode tanggal yang dipilih.</p>
+        </div>
+        @endforelse
     </div>
-    @if($wo)</a>@endif
-    @endforeach
     @endif
 
-    {{-- Empty State --}}
-    @if($tasks['in_progress']->count() === 0 && $tasks['pending']->count() === 0 && $tasks['done']->count() === 0 && $qcReviews->count() === 0)
-    <div class="empty-state">
-        <div class="empty-icon">📋</div>
-        <h2>Belum Ada Tugas</h2>
-        <p>Anda belum mendapat penugasan produksi.</p>
+    {{-- ========================================================================= --}}
+    {{-- TAB 3: KEUANGAN & KASBON WORKER --}}
+    {{-- ========================================================================= --}}
+    @if($activeTab === 'keuangan')
+    @php
+        $totalEarned = (int) $worker->total_earned;
+        $kasbon = (int) $worker->current_cash_advance;
+        $limit = (int) $worker->max_cash_advance;
+        $sisaLimit = max(0, $limit - $kasbon);
+        $netEarned = max(0, $totalEarned - $kasbon);
+        $unpaid = (int) $worker->unpaid_wage;
+    @endphp
+
+    {{-- Hero Keuangan --}}
+    <div class="wallet-hero" style="margin: 12px 0 0; background: linear-gradient(135deg, #8000FF 0%, #5B00B7 100%); border-radius: 20px; padding: 24px 20px; color: white; box-shadow: 0 8px 32px rgba(128,0,255,0.25);">
+        <div class="wallet-label" style="font-size: 11px; font-weight: 700; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Pendapatan Bersih Saat Ini</div>
+        <div class="wallet-total" style="font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-bottom: 16px;">Rp {{ number_format($netEarned, 0, ',', '.') }}</div>
+        
+        <div class="wallet-breakdown" style="display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.12); padding:12px 14px; border-radius:12px;">
+            <div class="wallet-sub" style="flex: 1;">
+                <div class="sub-label" style="font-size: 10px; opacity: 0.8;">Pendapatan Kotor</div>
+                <div class="sub-value" style="font-size: 14px; font-weight: 800;">Rp {{ number_format($totalEarned, 0, ',', '.') }}</div>
+            </div>
+            <div class="wallet-divider" style="width: 1px; height: 32px; background: rgba(255,255,255,0.25);"></div>
+            <div class="wallet-sub" style="flex: 1;">
+                <div class="sub-label" style="font-size: 10px; opacity: 0.8;">Kasbon Aktif</div>
+                <div class="sub-value" style="font-size: 14px; font-weight: 800; color: #fca5a5;">Rp {{ number_format($kasbon, 0, ',', '.') }}</div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Limit & Action Ajukan Kasbon --}}
+    <div class="card" style="margin-top:12px; padding:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-size:13px; font-weight:800; color:#1e293b;">💳 Limit Kasbon Pekerja</div>
+            <span style="font-size:12px; font-weight:800; color:{{ $sisaLimit > 0 ? '#16a34a' : '#dc2626' }}; background:{{ $sisaLimit > 0 ? '#f0fdf4' : '#fef2f2' }}; padding:2px 8px; border-radius:12px;">
+                Sisa Limit: Rp {{ number_format($sisaLimit, 0, ',', '.') }}
+            </span>
+        </div>
+
+        @if($limit > 0)
+        @php $pct = min(100, round(($kasbon / $limit) * 100)); @endphp
+        <div class="progress-bar-wrap" style="height:8px; background:#e5e7eb; border-radius:4px; overflow:hidden; margin-bottom:8px;">
+            <div class="progress-bar-fill" style="width: {{ $pct }}%; height:100%; background: {{ $pct >= 80 ? '#ef4444' : '#8000FF' }}"></div>
+        </div>
+        <div style="font-size:11px; color:#6b7280; display:flex; justify-content:space-between; margin-bottom:12px;">
+            <span>Terpakai: {{ $pct }}%</span>
+            <span>Max Limit: Rp {{ number_format($limit, 0, ',', '.') }}</span>
+        </div>
+        @endif
+
+        <button wire:click="$toggle('showKasbonModal')" class="btn btn-primary btn-sm" style="width:100%; padding:10px; font-size:13px; font-weight:700; border-radius:10px; background:#8000FF; color:white; border:none; cursor:pointer;">
+            ➕ {{ $showKasbonModal ? 'Tutup Form Pengajuan' : 'Ajukan Kasbon Baru' }}
+        </button>
+    </div>
+
+    {{-- Form Ajukan Kasbon --}}
+    @if($showKasbonModal)
+    <div class="card" style="margin-top:12px; padding:16px; border:2px solid #c4b5fd; background:#faf5ff;">
+        <div style="font-size:14px; font-weight:800; color:#5b21b6; margin-bottom:12px;">💸 Form Pengajuan Kasbon</div>
+        
+        <form wire:submit.prevent="ajukanKasbon">
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:700; color:#4c1d95; display:block; margin-bottom:4px;">Nominal Kasbon (Rp)</label>
+                <input type="number" wire:model="kasbonAmount" placeholder="Contoh: 50000" class="date-input" style="font-size:14px; font-weight:700;">
+                @error('kasbonAmount') <span style="font-size:11px; color:#dc2626; font-weight:600;">{{ $message }}</span> @enderror
+            </div>
+
+            <div style="margin-bottom:14px;">
+                <label style="font-size:12px; font-weight:700; color:#4c1d95; display:block; margin-bottom:4px;">Catatan / Keperluan (Opsional)</label>
+                <input type="text" wire:model="kasbonNote" placeholder="misal: Kebutuhan harian / keperluan mendesak" class="date-input">
+                @error('kasbonNote') <span style="font-size:11px; color:#dc2626; font-weight:600;">{{ $message }}</span> @enderror
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%; padding:12px; font-size:13px; font-weight:800; background:#7c3aed; color:white; border-radius:10px; border:none; cursor:pointer;">
+                🚀 Kirim Pengajuan Kasbon
+            </button>
+        </form>
+    </div>
+    @endif
+
+    {{-- Riwayat Transaksi Kasbon --}}
+    <div style="margin-top:16px;">
+        <div class="section-header" style="margin-bottom:8px;">
+            <span class="section-dot dot-purple"></span>
+            <span class="section-title">Riwayat Kasbon & Pembayaran</span>
+        </div>
+
+        @forelse($this->cashAdvanceHistory as $ca)
+        <div class="card" style="margin-bottom:8px; padding:12px 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <span style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; {{ $ca->type === 'pinjaman' ? 'background:#fef2f2; color:#dc2626;' : 'background:#f0fdf4; color:#16a34a;' }}">
+                        {{ strtoupper($ca->type) }}
+                    </span>
+                    <div style="font-size:12px; font-weight:600; color:#334155; margin-top:4px;">
+                        {{ $ca->note ?? 'Pinjaman Kasbon' }}
+                    </div>
+                    <div style="font-size:10px; color:#94a3b8; margin-top:2px;">
+                        {{ $ca->date ? $ca->date->format('d M Y') : '-' }}
+                    </div>
+                </div>
+
+                <div style="font-size:14px; font-weight:800; color:{{ $ca->type === 'pinjaman' ? '#dc2626' : '#16a34a' }};">
+                    {{ $ca->type === 'pinjaman' ? '-' : '+' }} Rp {{ number_format($ca->amount, 0, ',', '.') }}
+                </div>
+            </div>
+        </div>
+        @empty
+        <div class="empty-state" style="padding:24px 16px;">
+            <div class="empty-icon">💳</div>
+            <h3>Belum Ada Riwayat Kasbon</h3>
+            <p>Anda belum pernah mengajukan pinjaman atau transaksi kasbon.</p>
+        </div>
+        @endforelse
     </div>
     @endif
 
     {{-- ── FOOTER ── --}}
-    <footer class="app-footer">
+    <footer class="app-footer" style="margin-top:24px;">
         <p>© {{ date('Y') }} Konveksio · Portal Produksi</p>
     </footer>
     @endif
@@ -353,8 +551,9 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    padding-bottom: 32px;
+    padding: 0 16px 32px;
     background: #F9FAFB;
+    font-family: inherit;
 }
 
 /* ── Header ── */
@@ -362,9 +561,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px 14px;
-    background: white;
-    border-bottom: 1px solid #F3F4F6;
+    padding: 16px 0 14px;
+    background: #F9FAFB;
+    border-bottom: 1px solid #E5E7EB;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -388,214 +587,160 @@
 /* ── Greeting ── */
 .greeting-bar {
     display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 16px 20px;
-    background: white;
-    border-bottom: 1px solid #F3F4F6;
+    padding: 14px 0;
 }
 .greeting-hello { font-size: 20px; font-weight: 800; color: #111827; letter-spacing: -0.3px; }
-.greeting-sub { font-size: 13px; color: #9CA3AF; margin-top: 2px; }
+.greeting-sub { font-size: 13px; color: #6B7280; margin-top: 2px; }
 .greeting-status { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .dot-purple { background: #8000FF; }
 .dot-blue { background: #3B82F6; }
-.dot-green { background: #22C55E; }
 .dot-yellow { background: #F59E0B; }
-.status-text { font-size: 12px; font-weight: 600; color: #374151; }
+.dot-orange { background: #F97316; }
+.dot-green { background: #10B981; }
+.status-text { font-size: 12px; font-weight: 600; color: #4B5563; }
 
-/* ── Section Header ── */
-.section-header {
-    display: flex; align-items: center; gap: 8px;
-    padding: 16px 20px 8px;
+/* ── Main Tabs ── */
+.main-tabs-wrap {
+    display: flex;
+    background: #E5E7EB;
+    padding: 4px;
+    border-radius: 12px;
+    gap: 4px;
+    margin-bottom: 14px;
 }
-.section-title { font-size: 13px; font-weight: 700; color: #374151; }
-.section-count {
-    font-size: 11px; font-weight: 700;
-    background: #F3F4F6; color: #6B7280;
-    padding: 2px 8px; border-radius: 10px;
+.tab-btn {
+    flex: 1;
+    padding: 10px 6px;
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4B5563;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.tab-btn.active {
+    background: white;
+    color: #8000FF;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.tab-badge {
+    background: #8000FF;
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 10px;
 }
 
-/* ── Cards ── */
+/* ── Sub Filter Pills ── */
+.sub-filter-wrap {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+}
+.sub-pill {
+    white-space: nowrap;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 20px;
+    background: #F3F4F6;
+    color: #6B7280;
+    border: 1px solid #E5E7EB;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.sub-pill.active {
+    background: #8000FF;
+    color: white;
+    border-color: #8000FF;
+}
+
+/* ── Cards & Tasks ── */
 .card {
     background: white;
     border-radius: 14px;
-    padding: 14px 16px;
-    margin: 8px 16px 0;
+    border: 1px solid #E5E7EB;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    border: 1px solid #F3F4F6;
 }
-.task-card { transition: all 0.15s ease; }
-.task-ready { border-color: #BBF7D0; background: #F0FDF4; }
-.task-working { border-color: #A7F3D0; background: #ECFDF5; }
-.task-done { opacity: 0.6; }
+.task-card {
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: transform 0.15s ease;
+}
+.task-working { border-left: 4px solid #10B981; }
+.task-ready { border-left: 4px solid #8000FF; }
+.task-revision { border-left: 4px solid #EF4444; background: #FEF2F2; }
+.task-done { border-left: 4px solid #9CA3AF; opacity: 0.95; }
 
-/* ── Task Layout ── */
-.task-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.task-info { flex: 1; min-width: 0; }
-.task-stage { font-size: 14px; font-weight: 700; color: #111827; }
-.task-product { font-size: 13px; color: #374151; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.task-customer { font-size: 12px; color: #9CA3AF; margin-top: 1px; }
-.task-date { color: #D1D5DB; }
-.done-check { font-size: 20px; font-weight: 700; color: #22C55E; }
+.task-stage { font-size: 12px; font-weight: 800; color: #8000FF; text-transform: uppercase; letter-spacing: 0.3px; }
+.task-product { font-size: 15px; font-weight: 800; color: #111827; margin-top: 2px; }
+.task-customer { font-size: 12px; color: #6B7280; margin-top: 2px; }
+.express-badge { background: #FEF2F2; color: #DC2626; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
+.done-check { font-size: 18px; font-weight: 900; color: #10B981; }
 
-/* ── Stage Progress ── */
-.stage-progress {
-    display: flex; flex-wrap: wrap; gap: 4px;
-    margin-top: 10px; padding-top: 10px;
-    border-top: 1px solid #F3F4F6;
-}
-.stage-tag {
-    font-size: 10px; font-weight: 600;
-    padding: 3px 7px; border-radius: 6px;
-}
-.stage-tag.stage-done { background: #DCFCE7; color: #166534; }
-.stage-tag.stage-current { background: #DBEAFE; color: #1E40AF; font-weight: 700; }
-.stage-tag.stage-pending { background: #F3F4F6; color: #9CA3AF; }
-.stage-tag.stage-highlight { box-shadow: 0 0 0 2px #8000FF; }
+.stage-progress { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 10px; }
+.stage-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: #F3F4F6; color: #9CA3AF; }
+.stage-done { background: #D1FAE5; color: #065F46; }
+.stage-current { background: #DBEAFE; color: #1E40AF; }
+.stage-highlight { ring: 2px solid #8000FF; }
+.blocking-info { font-size: 11px; font-weight: 700; color: #D97706; margin-top: 8px; }
 
-/* ── Blocking Info ── */
-.blocking-info {
-    margin-top: 8px;
-    font-size: 11px; color: #D97706;
-    padding: 6px 10px;
-    background: #FFFBEB;
-    border-radius: 8px;
-}
+.section-header { display: flex; align-items: center; gap: 8px; margin: 16px 0 10px; }
+.section-dot { width: 8px; height: 8px; border-radius: 50%; }
+.section-title { font-size: 13px; font-weight: 800; color: #374151; letter-spacing: 0.2px; text-transform: uppercase; }
+.section-count { font-size: 11px; font-weight: 800; background: #E5E7EB; color: #374151; padding: 2px 8px; border-radius: 10px; }
 
-/* ── Buttons ── */
-.btn {
-    display: flex; align-items: center; justify-content: center; gap: 4px;
-    padding: 10px 14px;
-    border: none;
-    border-radius: 10px;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    white-space: nowrap;
-}
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-sm { padding: 8px 12px; font-size: 12px; }
-.btn-primary { background: #8000FF; color: white; }
-.btn-primary:not(:disabled):hover { background: #6600CC; }
-.btn-success { background: #16A34A; color: white; }
-.btn-success:not(:disabled):hover { background: #15803D; }
-.btn-locked { background: #F3F4F6; color: #9CA3AF; cursor: not-allowed; }
-.btn-warning { background: #F59E0B; color: white; }
-.btn-warning:not(:disabled):hover { background: #D97706; }
-.btn-danger { background: #DC2626; color: white; }
-.btn-danger:not(:disabled):hover { background: #B91C1C; }
-.btn-full { width: 100%; padding: 14px; font-size: 14px; }
-
-/* ── QC Review ── */
-.dot-orange { background: #F59E0B; }
-.task-review { border-color: #FDE68A; background: #FFFBEB; }
-.task-stage-review { color: #D97706; font-weight: 700; }
-.review-actions-inline {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #FDE68A;
-}
-.review-actions-inline .btn {
-    flex: 1;
-    justify-content: center;
-}
-
-/* ── Modal ── */
-.modal-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.5);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 1000;
-    padding: 16px;
-}
-.modal-content {
-    background: white;
-    border-radius: 16px;
+/* ── Date Filter & Inputs ── */
+.date-input {
     width: 100%;
-    max-width: 400px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-}
-.modal-header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 20px;
-    border-bottom: 1px solid #E5E7EB;
-}
-.modal-header h3 { font-size: 18px; font-weight: 800; margin: 0; }
-.modal-close {
-    background: none; border: none; font-size: 24px;
-    color: #9CA3AF; cursor: pointer; padding: 0; line-height: 1;
-}
-.modal-body { padding: 20px; }
-.review-info {
-    background: #F9FAFB;
-    padding: 16px;
-    border-radius: 12px;
-    margin-bottom: 16px;
-}
-.review-stage { font-weight: 700; color: #D97706; font-size: 14px; }
-.review-product { font-weight: 600; color: #111827; font-size: 15px; margin-top: 4px; }
-.review-customer { font-size: 12px; color: #6B7280; margin-top: 2px; }
-.review-actions { display: flex; flex-direction: column; gap: 12px; }
-.reject-section { margin-top: 8px; padding-top: 16px; border-top: 1px solid #E5E7EB; }
-.reject-label { font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 8px; }
-.reject-textarea {
-    width: 100%;
-    padding: 12px;
+    padding: 8px 10px;
     border: 1px solid #D1D5DB;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #111827;
+    background: white;
+}
+.preset-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #F3F4F6;
+    color: #4B5563;
+    border: 1px solid #D1D5DB;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.preset-btn:hover { background: #E5E7EB; }
+
+/* ── Summary Card ── */
+.summary-card {
+    padding: 10px 12px;
     border-radius: 10px;
-    font-family: inherit;
-    font-size: 14px;
-    resize: none;
-    margin-bottom: 12px;
+    text-align: center;
 }
-.reject-textarea:focus { outline: none; border-color: #8000FF; }
-.field-error { font-size: 11px; color: #DC2626; display: block; margin-top: -8px; margin-bottom: 8px; }
+.summary-label { font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.summary-val { font-size: 15px; font-weight: 800; margin-top: 2px; }
 
-/* ── Revision ── */
-.task-revision { border-color: #FCA5A5; background: #FEF2F2; }
-.task-stage-revision { color: #DC2626; }
-.revision-badge {
-    display: inline-block;
-    font-size: 9px;
-    font-weight: 700;
-    background: #DC2626;
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-left: 6px;
-    vertical-align: middle;
-}
-.express-badge {
-    display: inline-block;
-    font-size: 9px;
-    font-weight: 700;
-    background: #F59E0B;
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-left: 4px;
-    vertical-align: middle;
-}
+/* ── Alerts & Empty ── */
+.alert-success { background: #D1FAE5; color: #065F46; padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+.alert-error { background: #FEE2E2; color: #991B1B; padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 700; margin-bottom: 12px; }
 
-/* ── Alerts ── */
-.alert-success { margin: 12px 16px 0; padding: 12px 16px; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; color: #15803D; font-size: 13px; font-weight: 600; }
-.alert-error { margin: 12px 16px 0; padding: 12px 16px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; color: #991B1B; font-size: 13px; }
+.empty-state { text-align: center; padding: 36px 16px; background: white; border-radius: 16px; border: 1px solid #E5E7EB; margin-top: 12px; }
+.empty-icon { font-size: 36px; margin-bottom: 8px; }
+.empty-state h2, .empty-state h3 { font-size: 16px; font-weight: 800; color: #111827; }
+.empty-state p { font-size: 13px; color: #6B7280; margin-top: 4px; }
 
-/* ── Empty State ── */
-.empty-state {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 60px 32px; text-align: center; gap: 12px;
-}
-.empty-icon { font-size: 48px; }
-.empty-state h2 { font-size: 20px; font-weight: 800; color: #111827; }
-.empty-state p { font-size: 14px; color: #9CA3AF; }
-
-/* ── Footer ── */
-.app-footer { margin-top: auto; padding: 24px; text-align: center; font-size: 12px; color: #D1D5DB; }
+.app-footer { text-align: center; font-size: 11px; color: #9CA3AF; padding: 16px 0; }
 </style>
 </div>

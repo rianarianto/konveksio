@@ -13,15 +13,23 @@ class WorkerDashboard extends Component
     public string $token;
     public ?Worker $worker = null;
 
-    // Selected task for detail view
-    public ?int $selectedTaskId = null;
+    public string $activeTab = 'tugas'; // 'tugas', 'riwayat', 'keuangan'
+    public string $statusFilter = 'semua'; // 'semua', 'in_progress', 'pending', 'done'
 
+    // History Date Filter
+    public string $startDate = '';
+    public string $endDate = '';
 
-
+    // Kasbon form
+    public string $kasbonAmount = '';
+    public string $kasbonNote = '';
+    public bool $showKasbonModal = false;
 
     public function mount(string $token): void
     {
         $this->token = $token;
+        $this->startDate = now()->startOfMonth()->toDateString();
+        $this->endDate = now()->toDateString();
         $this->loadWorker();
     }
 
@@ -31,6 +39,107 @@ class WorkerDashboard extends Component
             ->where('portal_token', $this->token)
             ->where('is_active', true)
             ->first();
+    }
+
+    public function setQuickDate(string $preset): void
+    {
+        if ($preset === 'today') {
+            $this->startDate = now()->toDateString();
+            $this->endDate = now()->toDateString();
+        } elseif ($preset === '7days') {
+            $this->startDate = now()->subDays(6)->toDateString();
+            $this->endDate = now()->toDateString();
+        } elseif ($preset === 'this_month') {
+            $this->startDate = now()->startOfMonth()->toDateString();
+            $this->endDate = now()->toDateString();
+        } elseif ($preset === 'last_month') {
+            $this->startDate = now()->subMonth()->startOfMonth()->toDateString();
+            $this->endDate = now()->subMonth()->endOfMonth()->toDateString();
+        }
+    }
+
+    public function getFilteredHistoryProperty()
+    {
+        if (!$this->worker) return collect();
+
+        $query = ProductionTask::withoutGlobalScopes()
+            ->where('assigned_to', $this->worker->id)
+            ->where('status', 'done')
+            ->with(['orderItem.order.customer', 'orderItem.order', 'workOrder']);
+
+        if (!empty($this->startDate)) {
+            $query->whereDate('completed_at', '>=', $this->startDate);
+        }
+        if (!empty($this->endDate)) {
+            $query->whereDate('completed_at', '<=', $this->endDate);
+        }
+
+        return $query->orderBy('completed_at', 'desc')->get();
+    }
+
+    public function getHistoryStatsProperty(): array
+    {
+        $history = $this->filteredHistory;
+        return [
+            'total_pcs' => $history->sum('quantity'),
+            'total_upah' => $history->sum('wage_amount'),
+            'total_tugas' => $history->count(),
+        ];
+    }
+
+    public function ajukanKasbon(): void
+    {
+        $this->validate([
+            'kasbonAmount' => 'required|numeric|min:10000',
+            'kasbonNote'   => 'nullable|string|max:255',
+        ], [
+            'kasbonAmount.required' => 'Nominal kasbon wajib diisi.',
+            'kasbonAmount.min'      => 'Minimal kasbon Rp 10.000.',
+        ]);
+
+        $worker = $this->worker;
+        if (!$worker) {
+            session()->flash('kasbon_error', 'Data pekerja tidak ditemukan.');
+            return;
+        }
+
+        $amount = (int) str_replace(['.', ','], '', $this->kasbonAmount);
+        $limit  = max(0, (int) $worker->max_cash_advance - (int) $worker->current_cash_advance);
+
+        if ($amount > $limit) {
+            session()->flash('kasbon_error', 'Nominal melebihi sisa limit kasbon Anda (Rp ' . number_format($limit, 0, ',', '.') . ').');
+            return;
+        }
+
+        \App\Models\CashAdvance::create([
+            'shop_id'               => $worker->shop_id,
+            'cash_advanceable_type' => Worker::class,
+            'cash_advanceable_id'   => $worker->id,
+            'type'                  => 'pinjaman',
+            'amount'                => $amount,
+            'note'                  => $this->kasbonNote ?: 'Pengajuan kasbon via portal worker',
+            'date'                  => now()->toDateString(),
+            'recorded_by'           => null,
+        ]);
+
+        $worker->increment('current_cash_advance', $amount);
+
+        $this->reset('kasbonAmount', 'kasbonNote', 'showKasbonModal');
+        $this->loadWorker();
+        session()->flash('kasbon_success', 'Pengajuan kasbon sebesar Rp ' . number_format($amount, 0, ',', '.') . ' berhasil!');
+    }
+
+    public function getCashAdvanceHistoryProperty()
+    {
+        if (!$this->worker) return collect();
+
+        return \App\Models\CashAdvance::withoutGlobalScopes()
+            ->where('cash_advanceable_type', Worker::class)
+            ->where('cash_advanceable_id', $this->worker->id)
+            ->orderBy('date', 'desc')
+            ->orderBy('id', 'desc')
+            ->take(20)
+            ->get();
     }
 
     /**

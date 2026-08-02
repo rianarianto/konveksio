@@ -2,9 +2,12 @@
      x-init="
         $nextTick(() => {
             if (!collapsed) {
-                // Find all grouping toggle buttons that are currently expanded
+                // Only click the collapse toggle button, NOT action dropdown buttons
                 document.querySelectorAll('.fi-ta-group-header button').forEach(button => {
-                    button.click();
+                    const clickAttr = button.getAttribute('x-on:click') || '';
+                    if (clickAttr.includes('isGroupCollapsed') || clickAttr.includes('toggleCollapseGroup')) {
+                        button.click();
+                    }
                 });
                 collapsed = true;
             }
@@ -82,7 +85,30 @@
             z-index: 9999 !important;
         }
         
-        /* Ultra premium table grouping styles */
+        .fi-ta-group-header {
+            padding: 0.75rem 1rem !important;
+        }
+        /* Make inner div of group header a flex row so title and badge/button are inline */
+        .fi-ta-group-header > div:not(.fi-ta-group-checkbox):first-of-type {
+            display: flex !important;
+            align-items: center !important;
+            flex: 1 !important;
+            gap: 0.5rem !important;
+            min-width: 0 !important;
+        }
+        .fi-ta-group-heading {
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
+            margin: 0 !important;
+        }
+        .fi-ta-group-description {
+            display: flex !important;
+            align-items: center !important;
+            flex: 1 !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
         tr.fi-ta-group-header, 
         tr.fi-ta-group-header td, 
         tr.fi-ta-group-header th {

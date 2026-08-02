@@ -238,7 +238,9 @@ const api = async (req, res) => {
 
     try {
         console.log('📤 Sending message...');
-        await client.sendMessage(formattedNumber, messageText);
+        const sendPromise = client.sendMessage(formattedNumber, messageText);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('WhatsApp sendMessage timeout (12s)')), 12000));
+        await Promise.race([sendPromise, timeoutPromise]);
         console.log('✅ Message sent successfully!');
         res.json({ status: "berhasil terkirim", pesan: messageText, to: formattedNumber });
     } catch (error) {

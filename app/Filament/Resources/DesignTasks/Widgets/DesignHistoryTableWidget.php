@@ -213,19 +213,24 @@ class DesignHistoryTableWidget extends BaseWidget
                                         $genders[$g] = ['qty' => 0, 'models' => []];
                                     $genders[$g]['qty'] += $item->quantity;
 
-                                    $mParts = [];
-                                    if ($isProduksi) {
-                                        if (isset($idtl['sleeve_model']))
-                                            $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
-                                        if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku')
-                                            $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
-                                        if (!empty($idtl['is_tunic']))
-                                            $mParts[] = 'Tunik';
+                                    $mLabel = !empty($idtl['group_label']) ? $idtl['group_label'] : null;
+                                    if (!$mLabel) {
+                                        $mParts = [];
+                                        if ($isProduksi) {
+                                            if (isset($idtl['sleeve_model']))
+                                                $mParts[] = 'Lengan ' . $idtl['sleeve_model'];
+                                            if (isset($idtl['pocket_model']) && $idtl['pocket_model'] !== 'tanpa_saku')
+                                                $mParts[] = 'Saku ' . str_replace('_', ' ', $idtl['pocket_model']);
+                                            if (!empty($idtl['is_tunic']))
+                                                $mParts[] = 'Tunik';
+                                        }
+                                        $mLabel = empty($mParts) ? ($isProduksi ? 'Model Standar' : 'Rincian Pesanan') : implode(', ', $mParts);
                                     }
-                                    $mKey = empty($mParts) ? ($isProduksi ? 'Model Standar' : 'Rincian Pesanan') : implode(', ', $mParts);
+                                    $mKey = $mLabel;
 
                                     if (!isset($genders[$g]['models'][$mKey])) {
                                         $genders[$g]['models'][$mKey] = [
+                                            'label' => $mLabel,
                                             'qty' => 0,
                                             'sizes' => [],
                                             'notes' => [],
@@ -245,7 +250,7 @@ class DesignHistoryTableWidget extends BaseWidget
 
                                 $html .= '<div>';
                                 $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">RINCIAN PRODUKSI</div>';
-                                $html .= '<div style="display:flex; flex-direction:column; gap:8px;">';
+                                $html .= '<div style="display:flex; flex-direction:column; gap:10px;">';
 
                                 if (count($genders) > 0) {
                                      foreach ($genders as $gCode => $gData) {
@@ -253,52 +258,46 @@ class DesignHistoryTableWidget extends BaseWidget
                                          $html .= '<div x-data="{ open: true }" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:white;">';
                                          $html .= '<div @click="open = !open" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:#f9fafb;">';
                                          $html .= '<div style="display:flex; align-items:center; gap:8px;">';
-                                         $html .= '<span style="font-size:12px; font-weight:800; color:#374151;">' . $gName . '</span>';
-                                         $html .= '<span style="font-size:12px; font-weight:900; color:' . $primaryColor . ';">' . $gData['qty'] . ' pcs</span>';
+                                         $html .= '<span style="font-size:13px; font-weight:800; color:#1e293b;">' . $gName . '</span>';
+                                         $html .= '<span style="font-size:12px; font-weight:900; color:' . $primaryColor . '; background:#f3e8ff; padding:2px 8px; border-radius:12px;">' . $gData['qty'] . ' pcs</span>';
                                          $html .= '</div>';
                                          $html .= '<svg :class="open ? \'rotate-180\' : \'\'" style="width:14px; height:14px; transition:0.2s;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>';
                                          $html .= '</div>';
 
-                                         $html .= '<div x-show="open" style="padding:16px; border-top:1px solid #f1f5f9; display:flex; flex-direction:column; gap:16px;">';
-                                         $hasMultipleModels = count($gData['models']) > 1;
+                                         $html .= '<div x-show="open" style="padding:14px; border-top:1px solid #f1f5f9; display:flex; flex-direction:column; gap:12px;">';
                                          foreach ($gData['models'] as $mKey => $mData) {
-                                             $html .= '<div>';
-
-                                             // Hanya tampilkan sub-header model jika ada lebih dari 1 varian
-                                             if ($hasMultipleModels) {
-                                                 $html .= '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:6px 10px; background:#f3e8ff; border-radius:6px;">';
-                                                 $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . '; text-transform:uppercase;">' . $mKey . '</span>';
-                                                 $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . ';">' . $mData['qty'] . ' pcs</span>';
-                                                 $html .= '</div>';
-                                             }
+                                             $html .= '<div style="background:#fafafa; border:1px solid #f1f5f9; border-radius:6px; padding:10px 12px;">';
+                                             $html .= '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
+                                             $html .= '<span style="font-size:11px; font-weight:800; color:#4338ca; background:#e0e7ff; padding:2px 8px; border-radius:4px; border:1px solid #c7d2fe;">VARIAN: ' . htmlspecialchars(strtoupper($mData['label'])) . '</span>';
+                                             $html .= '<span style="font-size:11px; font-weight:800; color:' . $primaryColor . '; background:#ede9fe; padding:1px 6px; border-radius:4px;">' . $mData['qty'] . ' pcs</span>';
+                                             $html .= '</div>';
 
                                              // Attributes (Compact style)
                                              $atxt = [];
                                              foreach ($mData['attrs'] as $ak => $av) {
-                                                 $atxt[] = '<span style="color:#9ca3af; font-size:10px;">' . $ak . ':</span><span style="color:#4b5563; margin-left:2px;">' . $av . '</span>';
+                                                 $atxt[] = '<span style="color:#64748b; font-size:10px;">' . $ak . ':</span> <strong style="color:#334155; font-size:10px;">' . $av . '</strong>';
                                              }
                                              if (!empty($atxt)) {
-                                                 $html .= '<div style="display:flex; gap:12px; font-size:11px; font-weight:700; margin-bottom:8px;">' . implode('<span style="color:#e5e7eb;">|</span>', $atxt) . '</div>';
+                                                 $html .= '<div style="display:flex; flex-wrap:wrap; gap:8px; font-size:10px; margin-bottom:8px; background:#ffffff; padding:4px 8px; border-radius:4px; border:1px solid #e2e8f0;">' . implode('<span style="color:#cbd5e1;">|</span>', $atxt) . '</div>';
                                              }
 
                                              // Sizes (Pill style)
                                              $stxt = [];
                                              foreach ($mData['sizes'] as $sz => $sqty) {
-                                                 $stxt[] = '<div style="padding:4px 8px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:4px; font-size:12px; font-weight:800; color:#1e293b;">' . $sz . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
+                                                 $stxt[] = '<div style="padding:3px 8px; background:#ffffff; border:1px solid #e2e8f0; border-radius:4px; font-size:11px; font-weight:800; color:#1e293b;">' . $sz . ': <span style="color:' . $primaryColor . ';">' . $sqty . '</span></div>';
                                              }
                                              $html .= '<div style="display:flex; flex-wrap:wrap; gap:6px;">' . implode('', $stxt) . '</div>';
 
                                              // Notes
                                              if (!empty($mData['notes'])) {
-                                                 $html .= '<div style="margin-top:8px; padding:8px 12px; background:#fffcf0; border:1px solid #fef3c7; border-radius:6px;">';
-                                                 $html .= '<div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; margin-bottom:4px;">CATATAN:</div>';
-                                                 foreach ($mData['notes'] as $n) {
-                                                     $html .= '<div style="font-size:12px; font-weight:700; color:#92400e;">- ' . htmlspecialchars($n) . '</div>';
+                                                 $html .= '<div style="margin-top:8px; padding:6px 10px; background:#fffcf0; border:1px solid #fef3c7; border-radius:4px;">';
+                                                 $html .= '<div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; margin-bottom:2px;">CATATAN KHUSUS:</div>';
+                                                 foreach (array_unique($mData['notes']) as $n) {
+                                                     $html .= '<div style="font-size:11px; font-weight:700; color:#92400e;">- ' . htmlspecialchars(is_array($n) ? json_encode($n) : $n) . '</div>';
                                                  }
                                                  $html .= '</div>';
                                              }
                                              $html .= '</div>';
-                                             if ($hasMultipleModels && next($gData['models']))
                                                  $html .= '<hr style="border:none; border-top:1px dashed #e2e8f0; margin:4px 0;">';
                                          }
                                          $html .= '</div></div>';
