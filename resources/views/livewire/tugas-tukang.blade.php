@@ -216,10 +216,25 @@
         $myTask = $myActiveTask ?: $futureTask;
 
         $nextStageLabel = 'selesai dikerjakan';
+        $pendingOtherWorkerNames = [];
+
         if ($myTask) {
             if ($myTask->status === 'done') {
                 if ($wo->status === \App\Models\WorkOrder::STATUS_COMPLETED) {
                     $nextStageLabel = 'produksi telah selesai';
+                } elseif ($wo->status === $myTask->stage_name) {
+                    $otherPendingTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                        ->whereIn('order_item_id', $groupItems->pluck('id'))
+                        ->where('stage_name', $myTask->stage_name)
+                        ->where('status', '!=', 'done')
+                        ->with('assignedTo')
+                        ->get();
+                    $pendingOtherWorkerNames = $otherPendingTasks->map(fn($t) => $t->assignedTo?->name)->filter()->unique()->values()->toArray();
+                    if (!empty($pendingOtherWorkerNames)) {
+                        $nextStageLabel = 'menunggu ' . implode(', ', $pendingOtherWorkerNames) . ' menyelesaikan tahap ' . str_replace('_', ' ', $myTask->stage_name);
+                    } else {
+                        $nextStageLabel = 'saat ini tahap ' . str_replace('_', ' ', $wo->status_label);
+                    }
                 } else {
                     $nextStageLabel = 'saat ini tahap ' . str_replace('_', ' ', $wo->status_label);
                 }
