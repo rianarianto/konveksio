@@ -30,11 +30,11 @@ class CashAdvancesRelationManager extends RelationManager
                 Forms\Components\Select::make('type')
                     ->label('Tipe')
                     ->options([
-                        'pinjaman' => '💸 Pinjaman (Kasbon)',
-                        'pelunasan' => '📥 Pelunasan',
+                        'loan' => '💸 Pinjaman (Kasbon)',
+                        'repayment' => '📥 Pelunasan',
                     ])
                     ->required()
-                    ->default('pinjaman'),
+                    ->default('loan'),
                 Forms\Components\TextInput::make('amount')
                     ->label('Nominal (Rp)')
                     ->numeric()
@@ -62,13 +62,13 @@ class CashAdvancesRelationManager extends RelationManager
                     ->label('Tipe')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'pinjaman' => 'warning',
-                        'pelunasan' => 'success',
+                        'loan', 'pinjaman' => 'warning',
+                        'repayment', 'pelunasan' => 'success',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'pinjaman' => '💸 Pinjaman',
-                        'pelunasan' => '📥 Pelunasan',
+                        'loan', 'pinjaman' => '💸 Pinjaman',
+                        'repayment', 'pelunasan' => '📥 Pelunasan',
                         default => $state,
                     }),
 
@@ -76,7 +76,7 @@ class CashAdvancesRelationManager extends RelationManager
                     ->label('Nominal')
                     ->money('IDR')
                     ->weight('bold')
-                    ->color(fn ($record) => $record->type === 'pelunasan' ? 'success' : 'danger'),
+                    ->color(fn ($record) => in_array($record->type, ['repayment', 'pelunasan']) ? 'success' : 'danger'),
 
                 TextColumn::make('note')
                     ->label('Catatan')
@@ -89,8 +89,8 @@ class CashAdvancesRelationManager extends RelationManager
             ->filters([
                 Tables\Filters\SelectFilter::make('type')
                     ->options([
-                        'pinjaman' => '💸 Pinjaman',
-                        'pelunasan' => '📥 Pelunasan',
+                        'loan' => '💸 Pinjaman',
+                        'repayment' => '📥 Pelunasan',
                     ]),
             ])
             ->headerActions([
@@ -105,7 +105,7 @@ class CashAdvancesRelationManager extends RelationManager
                         // Update current_cash_advance of the worker
                         $worker = $record->cashAdvanceable;
                         if ($worker) {
-                            if ($record->type === 'pinjaman') {
+                            if (in_array($record->type, ['loan', 'pinjaman'])) {
                                 $worker->increment('current_cash_advance', $record->amount);
                             } else {
                                 $worker->decrement('current_cash_advance', min($worker->current_cash_advance, $record->amount));
@@ -119,7 +119,7 @@ class CashAdvancesRelationManager extends RelationManager
                         // Revert current_cash_advance of the worker before deleting
                         $worker = $record->cashAdvanceable;
                         if ($worker) {
-                            if ($record->type === 'pinjaman') {
+                            if (in_array($record->type, ['loan', 'pinjaman'])) {
                                 $worker->decrement('current_cash_advance', min($worker->current_cash_advance, $record->amount));
                             } else {
                                 $worker->increment('current_cash_advance', $record->amount);

@@ -261,9 +261,10 @@ class TugasTukang extends Component
         }
 
         CashAdvance::create([
+            'shop_id'               => $worker->shop_id,
             'cash_advanceable_type' => \App\Models\Worker::class,
             'cash_advanceable_id'   => $worker->id,
-            'type'                  => 'pinjaman',
+            'type'                  => 'loan',
             'amount'                => $amount,
             'note'                  => $this->kasbonNote ?: 'Pengajuan via portal tugas',
             'date'                  => now()->toDateString(),

@@ -115,7 +115,7 @@ class WorkerDashboard extends Component
             'shop_id'               => $worker->shop_id,
             'cash_advanceable_type' => Worker::class,
             'cash_advanceable_id'   => $worker->id,
-            'type'                  => 'pinjaman',
+            'type'                  => 'loan',
             'amount'                => $amount,
             'note'                  => $this->kasbonNote ?: 'Pengajuan kasbon via portal worker',
             'date'                  => now()->toDateString(),

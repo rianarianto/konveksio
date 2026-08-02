@@ -514,8 +514,9 @@
         <div class="card" style="margin-bottom:8px; padding:12px 14px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>
-                    <span style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; {{ $ca->type === 'pinjaman' ? 'background:#fef2f2; color:#dc2626;' : 'background:#f0fdf4; color:#16a34a;' }}">
-                        {{ strtoupper($ca->type) }}
+                    @php $isLoan = in_array($ca->type, ['loan', 'pinjaman']); @endphp
+                    <span style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; {{ $isLoan ? 'background:#fef2f2; color:#dc2626;' : 'background:#f0fdf4; color:#16a34a;' }}">
+                        {{ $isLoan ? 'PINJAMAN (KASBON)' : 'PELUNASAN' }}
                     </span>
                     <div style="font-size:12px; font-weight:600; color:#334155; margin-top:4px;">
                         {{ $ca->note ?? 'Pinjaman Kasbon' }}
@@ -525,8 +526,8 @@
                     </div>
                 </div>
 
-                <div style="font-size:14px; font-weight:800; color:{{ $ca->type === 'pinjaman' ? '#dc2626' : '#16a34a' }};">
-                    {{ $ca->type === 'pinjaman' ? '-' : '+' }} Rp {{ number_format($ca->amount, 0, ',', '.') }}
+                <div style="font-size:14px; font-weight:800; color:{{ $isLoan ? '#dc2626' : '#16a34a' }};">
+                    {{ $isLoan ? '-' : '+' }} Rp {{ number_format($ca->amount, 0, ',', '.') }}
                 </div>
             </div>
         </div>

@@ -56,9 +56,10 @@ class WorkerFinance extends Component
         }
 
         CashAdvance::create([
+            'shop_id'               => $worker->shop_id,
             'cash_advanceable_type' => Worker::class,
             'cash_advanceable_id'   => $worker->id,
-            'type'                  => 'pinjaman',
+            'type'                  => 'loan',
             'amount'                => $amount,
             'note'                  => $this->kasbonNote ?: 'Pengajuan via portal keuangan',
             'date'                  => now()->toDateString(),
