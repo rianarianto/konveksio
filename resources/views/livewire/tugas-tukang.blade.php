@@ -1228,12 +1228,11 @@
                                 {{ $qaTask->quantity }} pcs
                                 @if($qaRevision)
                                 <span style="margin-left:4px;font-size:11px;font-weight:600;color:#dc2626;background:#fee2e2;border-radius:10px;padding:2px 6px;">Revisi</span>
+                                @elseif(!$qaDone)
+                                <span style="margin-left:4px;font-size:11px;font-weight:600;color:#6b7280;background:#f3f4f6;border-radius:10px;padding:2px 6px;">Belum Dikerjakan</span>
                                 @endif
                                 @if($qaHasOwnQc)
                                 <span style="margin-left:4px;font-size:11px;font-weight:600;color:#2563eb;background:#dbeafe;border-radius:10px;padding:2px 6px;">Sudah QC</span>
-                                @endif
-                                @if(!$qaDone && !$qaRevision)
-                                <span style="margin-left:4px;font-size:11px;font-weight:600;color:#d97706;background:#fef3c7;border-radius:10px;padding:2px 6px;">Dalam Revisi</span>
                                 @endif
                             </div>
                         </div>
@@ -1243,9 +1242,13 @@
                                          border-radius:20px;padding:5px 12px;white-space:nowrap;flex-shrink:0;">
                                 {{ $qaHasOwnQc ? '✅ Sudah QC' : '✅ Disetujui' }}
                             </span>
-                        @elseif(!$qaDone)
+                        @elseif(!$qaDone && $qaRevision)
                             <span style="font-size:12px;font-weight:600;color:#dc2626;background:#fee2e2;border-radius:20px;padding:5px 12px;white-space:nowrap;flex-shrink:0;">
                                 🔧 Dalam Revisi
+                            </span>
+                        @elseif(!$qaDone)
+                            <span style="font-size:12px;font-weight:600;color:#4b5563;background:#f3f4f6;border-radius:20px;padding:5px 12px;white-space:nowrap;flex-shrink:0;">
+                                ⏳ Belum Dikerjakan
                             </span>
                         @else
                             <div style="display:flex;gap:6px;flex-shrink:0;">
