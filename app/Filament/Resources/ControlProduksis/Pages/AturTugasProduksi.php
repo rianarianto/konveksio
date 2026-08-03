@@ -977,27 +977,41 @@ class AturTugasProduksi extends Page
         // ══════════════════════════════════════════════════════════════
         // PERSIAPAN DATA KAPASITAS ASLI
         // ══════════════════════════════════════════════════════════════
-        $allGroupItems = OrderItem::where('order_id', $item->order_id)
-            ->where('product_name', $item->product_name)
-            ->where('bahan_id', $item->bahan_id)
-            ->where('production_category', $item->production_category)
-            ->where('design_status', 'approved')
-            ->get();
-
-        $originalSizes = [];
-        foreach ($allGroupItems as $gi) {
-            $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-            $originalSizes[$sz] = ($originalSizes[$sz] ?? 0) + (int) $gi->quantity;
-        }
-
-        if ($item->production_category === 'custom') {
-            $details = $item->size_and_request_details ?? [];
-            $count = count($details['detail_custom'] ?? []);
-            if ($count > 0) {
-                $originalSizes['CUSTOM'] = ($originalSizes['CUSTOM'] ?? 0) + $count;
+        $activeReturTask = $item->productionTasks()->where('is_revision', true)->where('status', '!=', 'done')->latest('id')->first();
+        
+        if ($activeReturTask) {
+            $originalSizes = [];
+            if (is_array($activeReturTask->size_quantities)) {
+                foreach ($activeReturTask->size_quantities as $rSz => $rQty) {
+                    if (str_starts_with($rSz, '_')) continue;
+                    $cleanSz = trim(str_replace(['SIZE ', 'SIZE'], '', strtoupper($rSz)));
+                    $originalSizes[$cleanSz] = (int) $rQty;
+                }
             }
+            $totalOrderQty = (int) $activeReturTask->quantity;
+        } else {
+            $allGroupItems = OrderItem::where('order_id', $item->order_id)
+                ->where('product_name', $item->product_name)
+                ->where('bahan_id', $item->bahan_id)
+                ->where('production_category', $item->production_category)
+                ->where('design_status', 'approved')
+                ->get();
+
+            $originalSizes = [];
+            foreach ($allGroupItems as $gi) {
+                $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                $originalSizes[$sz] = ($originalSizes[$sz] ?? 0) + (int) $gi->quantity;
+            }
+
+            if ($item->production_category === 'custom') {
+                $details = $item->size_and_request_details ?? [];
+                $count = count($details['detail_custom'] ?? []);
+                if ($count > 0) {
+                    $originalSizes['CUSTOM'] = ($originalSizes['CUSTOM'] ?? 0) + $count;
+                }
+            }
+            $totalOrderQty = array_sum($originalSizes);
         }
-        $totalOrderQty = array_sum($originalSizes);
 
         // ══════════════════════════════════════════════════════════════
         // VALIDASI
