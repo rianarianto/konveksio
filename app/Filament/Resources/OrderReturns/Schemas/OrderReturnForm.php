@@ -221,36 +221,15 @@ class OrderReturnForm
                     $item = OrderItem::find($itemId);
                     if (!$item) return [];
 
-                    $groupItemIds = $item->getItemsInGroup()->pluck('id');
-                    $wo = \App\Models\WorkOrder::whereIn('order_item_id', $groupItemIds)->first();
                     $options = [];
-
-                    if (!$wo || ($wo && $wo->has_qc_prep)) {
-                        $options['QC_PERSIAPAN'] = '🔍 QC Persiapan Bahan';
-                    }
-
-                    $stages = [];
-                    if ($wo && !empty($wo->stage_sequence)) {
-                        $stages = $wo->stage_sequence;
+                    $cat = $item->production_category ?? 'produksi';
+                    if ($cat === 'non_produksi' || $cat === 'jasa') {
+                        $stages = ['Bordir/Sablon', 'Finishing'];
                     } else {
-                        $stages = \App\Models\ProductionTask::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->pluck('stage_name')
-                            ->unique()
-                            ->toArray();
-                    }
-
-                    if (empty($stages)) {
-                        $cat = $item->production_category ?? 'produksi';
-                        if ($cat === 'non_produksi' || $cat === 'jasa') {
-                            $stages = ['Bordir/Sablon', 'Finishing'];
-                        } else {
-                            $stages = ['Potong', 'Bordir/Sablon', 'Jahit', 'Finishing'];
-                        }
+                        $stages = ['Potong', 'Bordir/Sablon', 'Jahit', 'Kancing', 'Finishing'];
                     }
 
                     foreach ($stages as $stg) {
-                        if (in_array($stg, ['QC_PERSIAPAN', 'QC_AKHIR'])) continue;
                         $label = match($stg) {
                             'Potong'        => '✂️ Divisi Potong',
                             'Bordir/Sablon' => '🧵 Divisi Bordir / Sablon',
@@ -261,10 +240,6 @@ class OrderReturnForm
                             default         => '🛠️ Divisi ' . $stg,
                         };
                         $options[$stg] = $label;
-                    }
-
-                    if (!$wo || ($wo && ($wo->has_qc_selesai ?? true))) {
-                        $options['QC_AKHIR'] = '🏁 QC Akhir / Pemeriksaan Final';
                     }
 
                     return $options;
