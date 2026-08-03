@@ -379,17 +379,23 @@ class ControlProduksiResource extends Resource
                 ActionGroup::make([
                     Action::make('update_progress')
                     ->visible(function (OrderItem $record): bool {
-                        if (!$record->productionTasks()->exists()) {
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->exists();
+                        if (!$hasTasks) {
                             return false;
                         }
-                        $wo = $record->workOrder;
-                        if (!$wo) {
-                            $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
-                                ->whereIn('order_item_id', $groupItemIds)
-                                ->first();
-                        }
-                        if ($wo && $wo->isCompleted()) {
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->first();
+
+                        $hasUnfinishedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('status', '!=', 'done')
+                            ->exists();
+
+                        if ($wo && $wo->isCompleted() && !$hasUnfinishedTasks) {
                             return false;
                         }
                         return true;
@@ -754,8 +760,28 @@ class ControlProduksiResource extends Resource
 
 
                 Action::make('atur_tugas')
-                    ->hidden(fn(OrderItem $record) => $record->productionTasks()->exists() && $record->productionTasks()->where('status', '!=', 'done')->count() === 0)
-                    ->label(fn(OrderItem $record) => $record->productionTasks()->exists() ? 'Edit Tugas' : 'Atur Tugas')
+                    ->hidden(function (OrderItem $record): bool {
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->exists();
+                        if (!$hasTasks) {
+                            return false;
+                        }
+                        $hasUnfinishedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('status', '!=', 'done')
+                            ->exists();
+
+                        return !$hasUnfinishedTasks;
+                    })
+                    ->label(function (OrderItem $record): string {
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->exists();
+                        return $hasTasks ? 'Edit Tugas' : 'Atur Tugas';
+                    })
                     ->icon('heroicon-o-clipboard-document-list')
                     ->color('primary')
                     ->url(fn (OrderItem $record): string => AturTugasProduksi::getUrl(['record' => $record])),

@@ -83,6 +83,12 @@ class OrderReturn extends Model
             if (!$item) return;
 
             $wo = $item->workOrder;
+            if (!$wo) {
+                $groupItemIds = $item->getItemsInGroup()->pluck('id');
+                $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItemIds)
+                    ->first();
+            }
             $isCustomerPaid = $return->responsibility_type === 'customer_paid';
 
             $taskSizeQty = !empty($return->size_breakdown) ? $return->size_breakdown : null;
@@ -164,6 +170,8 @@ class OrderReturn extends Model
                         'status' => $stageName,
                         'current_stage_index' => $idx !== false ? $idx : 0,
                         'stage_entered_at' => now(),
+                        'completed_at' => null,
+                        'delivered_at' => null,
                     ]);
                     
                     try {
