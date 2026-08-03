@@ -75,6 +75,14 @@ class AturTugasProduksi extends Page
 
         $tasksForRepeater = [];
         $groupedTasks = $item->productionTasks->groupBy('stage_name');
+
+        // If this item has an active retur revision task, only show the retur target stage!
+        $activeReturTask = $item->productionTasks()->where('is_revision', true)->where('status', '!=', 'done')->latest('id')->first();
+        if ($activeReturTask) {
+            $returStage = $activeReturTask->stage_name;
+            $groupedTasks = $groupedTasks->filter(fn($tasks, $stageName) => $stageName === $returStage);
+        }
+
         foreach ($groupedTasks as $stageName => $tasks) {
             // Skip QC stages - dikontrol oleh toggle di atas, bukan row repeater
             if (str_starts_with($stageName, 'QC_')) {

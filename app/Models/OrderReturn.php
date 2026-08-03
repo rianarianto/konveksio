@@ -129,19 +129,20 @@ class OrderReturn extends Model
                             'status' => 'pending',
                             'is_revision' => true,
                             'revision_source' => 'qc_akhir',
-                            'assigned_by' => $task->assigned_by ?? auth()->id() ?? 1,
-                            'assigned_to' => $task->assigned_to,
+                            'assigned_by' => auth()->id() ?? 1,
+                            'assigned_to' => null,
                             'size_quantities' => $taskSizeQty,
                             'note' => '⚠️ REVISI RETUR (' . ($isCustomerPaid ? 'Berbayar' : 'Garansi') . '): ' . $return->reason,
                         ]);
                     } else {
-                        // Reset status to pending for redo
+                        // Reset status to pending for redo, clear assigned_to so Admin can select worker
                         $task->update([
                             'status' => 'pending',
                             'is_revision' => true,
                             'revision_source' => 'qc_akhir',
+                            'assigned_to' => null,
                             'quantity' => $return->quantity,
-                            'wage_amount' => 0,
+                            'wage_amount' => $repairWage,
                             'size_quantities' => $taskSizeQty,
                             'note' => ($task->note ? $task->note . ' | ' : '') . '⚠️ REVISI RETUR: ' . $return->reason,
                         ]);
@@ -158,6 +159,7 @@ class OrderReturn extends Model
                         'is_revision' => true,
                         'revision_source' => 'qc_akhir',
                         'assigned_by' => auth()->id() ?? 1,
+                        'assigned_to' => null,
                         'size_quantities' => $taskSizeQty,
                         'note' => '⚠️ REVISI RETUR (New): ' . $return->reason,
                     ]);

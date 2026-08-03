@@ -194,7 +194,9 @@
         <table style="width: 100%;">
             <tr>
                 <td>
-                    <h1 class="header-title">SURAT PERINTAH KERJA (SPK)</h1>
+                    <h1 class="header-title" style="{{ !empty($activeReturn) ? 'color:#dc2626;' : '' }}">
+                        {{ !empty($activeReturn) ? 'SURAT PERINTAH KERJA (SPK PERBAIKAN RETUR)' : 'SURAT PERINTAH KERJA (SPK)' }}
+                    </h1>
                     <div class="header-meta">
                         ORDER: <strong>{{ $record->order->order_number }}</strong> | 
                         TANGGAL CETAK: {{ now()->format('d/m/Y H:i') }}
@@ -202,8 +204,8 @@
                 </td>
                 <td style="text-align: right;">
                     <div style="font-size: 12pt; font-weight: bold; color:#111827;">{{ strtoupper($record->product_name) }}</div>
-                    <div class="badge badge-primary" style="margin-top:2px;">
-                        KATEGORI: {{ match($record->production_category) {
+                    <div class="badge {{ !empty($activeReturn) ? 'badge-danger' : 'badge-primary' }}" style="margin-top:2px; {{ !empty($activeReturn) ? 'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;' : '' }}">
+                        {{ !empty($activeReturn) ? '🔄 REVISI RETUR' : 'KATEGORI: ' . match($record->production_category) {
                             'custom' => 'PRODUKSI',
                             'non_produksi' => 'NON-PRODUKSI',
                             'jasa' => 'JASA',
@@ -214,6 +216,22 @@
             </tr>
         </table>
     </div>
+
+    @if(!empty($activeReturn))
+    <div style="margin-bottom: 10px; padding: 8px 12px; background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 6px; color: #991b1b;">
+        <div style="font-weight: bold; font-size: 10pt;">🔄 SPK PERBAIKAN RETUR — {{ $activeReturn->responsibility_type === 'customer_paid' ? 'RETUR BERBAYAR' : 'GARANSI TOKO' }}</div>
+        <div style="font-size: 8.5pt; margin-top: 3px;">
+            📌 <strong>Jumlah yang Perlu Diperbaiki:</strong> {{ $activeReturn->quantity }} pcs 
+            @if(!empty($activeReturn->size_breakdown))
+                ({{ implode(', ', array_map(fn($k,$v) => "$k: $v pcs", array_keys($activeReturn->size_breakdown), $activeReturn->size_breakdown)) }})
+            @endif
+            | 🎯 <strong>Tahap Pengerjaan:</strong> {{ $activeReturn->target_stage ?: 'Bordir/Sablon' }} ➔ Direct ke QC Akhir
+        </div>
+        <div style="font-size: 8.5pt; margin-top: 2px;">
+            📝 <strong>Alasan Komplain Pelanggan:</strong> {{ $activeReturn->reason ?: $activeReturn->items_description }}
+        </div>
+    </div>
+    @endif
 
     @php
         $totalStockUsed = collect($allGroupItems)->sum(function($i) {

@@ -224,12 +224,19 @@ class PDFController extends Controller
             }
         }
 
+        $groupItemIds = collect($allGroupItems)->pluck('id')->toArray();
+        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+            ->where('status', '!=', 'selesai')
+            ->latest('id')
+            ->first();
+
         return [
             'record' => $record->load(['order.customer', 'productionTasks.assignedTo', 'bahan.material']),
             'totalQuantity' => $totalQuantity,
             'sizes' => $sizes,
             'specGroups' => $specGroups,
             'allGroupItems' => $allGroupItems,
+            'activeReturn' => $activeReturn,
         ];
     }
 }
