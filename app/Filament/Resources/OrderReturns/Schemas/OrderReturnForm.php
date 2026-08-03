@@ -122,15 +122,15 @@ class OrderReturnForm
                         $reqDetails = $item->size_and_request_details ?? [];
                         
                         if (!empty($reqDetails['group_label'])) {
-                            $details[] = "VARIAN: " . strtoupper($reqDetails['group_label']);
+                            $details[] = "Varian: {$reqDetails['group_label']}";
                         }
 
                         if (!empty($reqDetails['gender'])) {
-                            $details[] = "JK: " . ($reqDetails['gender'] === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN');
+                            $details[] = $reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan';
                         }
 
                         if (!empty($item->recipient_name)) {
-                            $details[] = "PEMESAN: {$item->recipient_name}";
+                            $details[] = "Penerima: {$item->recipient_name}";
                         }
 
                         $specs = [];
@@ -138,29 +138,12 @@ class OrderReturnForm
                             $sleeve = str_replace('_', ' ', (string)$reqDetails['sleeve_model']);
                             $specs[] = "Lengan " . ucfirst($sleeve);
                         }
-                        if (!empty($reqDetails['pocket_model'])) {
-                            $pocket = str_replace('_', ' ', (string)$reqDetails['pocket_model']);
-                            $specs[] = "Saku " . ucfirst($pocket);
-                        }
-                        if (!empty($reqDetails['button_model'])) {
-                            $button = str_replace('_', ' ', (string)$reqDetails['button_model']);
-                            $specs[] = "Kancing " . ucfirst($button);
-                        }
                         if (!empty($reqDetails['collar_model'])) {
                             $collar = str_replace('_', ' ', (string)$reqDetails['collar_model']);
                             $specs[] = "Kerah " . ucfirst($collar);
                         }
-                        if (!empty($reqDetails['clothing_model'])) {
-                            $model = str_replace('_', ' ', (string)$reqDetails['clothing_model']);
-                            $specs[] = "Model " . ucfirst($model);
-                        }
-
                         if (count($specs) > 0) {
                             $details[] = implode(', ', $specs);
-                        }
-
-                        if (!empty($reqDetails['spec_notes'])) {
-                            $details[] = "Catatan: " . $reqDetails['spec_notes'];
                         }
 
                         if ($item->is_addition) {
