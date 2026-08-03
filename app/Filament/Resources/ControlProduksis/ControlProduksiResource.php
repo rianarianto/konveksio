@@ -672,6 +672,24 @@ class ControlProduksiResource extends Resource
                     ->modalDescription(fn(OrderItem $record) => $record->productionTasks()->where('is_revision', true)->where('status', '!=', 'done')->exists() ? 'Sistem akan mengirim pesan WhatsApp perbaikan retur khusus ke 1 tukang yang ditugaskan.' : 'Sistem akan mengirim pesan WhatsApp ke pekerja yang ditugaskan pada item ini.')
                     ->modalSubmitActionLabel('Ya, Kirim Sekarang')
                     ->action(function (OrderItem $record) {
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('status', '!=', 'done')
+                            ->whereNull('assigned_to')
+                            ->get();
+
+                        if ($unassignedTasks->isNotEmpty()) {
+                            $stages = $unassignedTasks->pluck('stage_name')->unique()->implode(', ');
+                            \Filament\Notifications\Notification::make()
+                                ->title('❌ Gagal Mengirim Tugas!')
+                                ->body("Tugas tidak dapat dikirim karena ada pekerja yang belum ditunjuk pada tahap: <strong>{$stages}</strong>. Silakan atur tukangnya terlebih dahulu melalui menu Edit Tugas.")
+                                ->danger()
+                                ->persistent()
+                                ->send();
+                            return;
+                        }
+
                         \App\Helpers\NotificationHelper::notifyAllWorkers($record);
 
                         \Filament\Notifications\Notification::make()
