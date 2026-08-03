@@ -114,7 +114,7 @@ class AturTugasProduksi extends Page
 
                 if (is_array($task->size_quantities)) {
                     foreach ($task->size_quantities as $sz => $qty) {
-                        $upperSz = strtoupper($sz);
+                        $upperSz = trim(str_replace(['SIZE ', 'SIZE'], '', strtoupper($sz)));
                         if (str_starts_with($sz, '_')) {
                             if ($sz === '_custom_recipients') {
                                 $workerRow['_custom_recipients'] = $qty;
