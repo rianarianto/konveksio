@@ -1876,36 +1876,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         Notification::make()->success()->title('Ukuran & Spesifikasi berhasil diperbarui!')->send();
                     }),
 
-                Action::make('edit_measurements')
-                    ->label('Ukur')
-                    ->icon('heroicon-m-viewfinder-circle')
-                    ->color('warning')
-                    ->closeModalByClickingAway(false)
-                    ->modalHeading(fn(OrderItem $record) => 'Rekam Ukuran Badan: ' . ($record->recipient_name ?: 'Orang'))
-                    ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Simpan Ukuran'))
-                    ->modalWidth('xl')
-                    ->visible(fn(OrderItem $record) => $record->size === 'Custom' && in_array(auth()->user()->role, ['owner', 'admin']) && $record->canBeEdited())
-                    ->form([
-                        Grid::make(3)->schema([
-                            TextInput::make('LD')->label('LD')->numeric()->suffix('cm'),
-                            TextInput::make('PB')->label('PB')->numeric()->suffix('cm'),
-                            TextInput::make('PL')->label('PL')->numeric()->suffix('cm'),
-                            TextInput::make('LB')->label('LB')->numeric()->suffix('cm'),
-                            TextInput::make('LP')->label('LP')->numeric()->suffix('cm'),
-                            TextInput::make('LPh')->label('LPh')->numeric()->suffix('cm'),
-                        ]),
-                        \Filament\Forms\Components\Textarea::make('note')
-                            ->label('Catatan Khusus')
-                            ->rows(2),
-                    ])
-                    ->fillForm(fn(OrderItem $record) => $record->size_and_request_details ?? [])
-                    ->action(function (OrderItem $record, array $data): void {
-                        $details = $record->size_and_request_details ?? [];
-                        $record->update([
-                            'size_and_request_details' => array_merge($details, $data),
-                        ]);
-                        Notification::make()->success()->title('Ukuran disimpan!')->send();
-                    }),
+
 
                 DeleteAction::make()
                     ->visible(fn(OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin']) && $record->canBeEdited())

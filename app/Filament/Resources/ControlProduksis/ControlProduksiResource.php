@@ -679,7 +679,22 @@ class ControlProduksiResource extends Resource
                     ->label('Batalkan Tugas')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
-                    ->visible(fn(OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin', 'designer']) && $record->productionTasks()->exists())
+                    ->visible(function (OrderItem $record): bool {
+                        if (!in_array(auth()->user()->role, ['owner', 'admin', 'designer']) || !$record->productionTasks()->exists()) {
+                            return false;
+                        }
+                        $wo = $record->workOrder;
+                        if (!$wo) {
+                            $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->first();
+                        }
+                        if ($wo && $wo->isCompleted()) {
+                            return false;
+                        }
+                        return true;
+                    })
                     ->disabled(fn(OrderItem $record) => auth()->user()->role !== 'owner' && $record->productionTasks()->where('status', 'done')->exists())
                     ->requiresConfirmation()
                     ->modalHeading('Batalkan Tugas?')
