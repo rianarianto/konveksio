@@ -355,16 +355,21 @@ class NotificationHelper
         $totalGroupQty = \App\Models\OrderItem::whereIn('id', $groupItemIds)->sum('quantity');
 
         // Cek jika item ini sedang dalam status RETUR PERBAIKAN
-        $activeRevisionTask = \App\Models\ProductionTask::withoutGlobalScopes()
-            ->whereIn('order_item_id', $groupItemIds)
-            ->where('is_revision', true)
-            ->where('status', '!=', 'done')
+        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+            ->where('status', '!=', 'selesai')
             ->latest('id')
             ->first();
 
-        if ($activeRevisionTask) {
-            // MODE RETUR: Hanya ambil task revisi retur tersebut (HANYA kirim ke 1 tukang retur!)
-            $tasks = collect([$activeRevisionTask]);
+        $activeRevisionTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->whereIn('order_item_id', $groupItemIds)
+            ->where('is_revision', true)
+            ->where('status', '!=', 'done')
+            ->with('assignedTo')
+            ->get();
+
+        if ($activeReturn || $activeRevisionTasks->isNotEmpty()) {
+            // MODE RETUR: Hanya ambil task revisi retur yang memiliki assigned_to!
+            $tasks = $activeRevisionTasks->filter(fn($t) => !empty($t->assigned_to));
         } else {
             // MODE NORMAL: Hanya ambil task yang statusnya pending atau in_progress
             $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
@@ -390,9 +395,12 @@ class NotificationHelper
                 : url('/');
 
             // Rincian tugas per tahap
-            // QC_PERSIAPAN: tampilkan total qty group (bukan qty task individual yg hanya 1 item)
             $rincian = '';
+            $isReturMsg = false;
             foreach ($workerTaskList as $task) {
+                if ($task->is_revision) {
+                    $isReturMsg = true;
+                }
                 $displayQty = ($task->stage_name === 'QC_PERSIAPAN' && !$task->is_revision)
                     ? $totalGroupQty
                     : $task->quantity;
@@ -404,17 +412,37 @@ class NotificationHelper
                 }
             }
 
-            $pesan = "📋 *PENUGASAN PRODUKSI — {$produk}*\n\n"
-                . "Halo {$worker->name},\n"
-                . "Anda mendapat penugasan baru di Konveksio.\n\n"
-                . "🧾 *Detail Pesanan:*\n"
-                . "• Produk: {$produk}\n"
-                . "• Pelanggan: {$customer}\n"
-                . "• Deadline: {$deadline}\n\n"
-                . "⚙️ *Tugas Anda:*\n"
-                . $rincian
-                . "\nKlik link di bawah untuk melihat dan memperbarui status tugas Anda:\n"
-                . "🔗 {$link}";
+            if ($isReturMsg || $activeReturn) {
+                $garansiText = ($activeReturn?->responsibility_type === 'customer_paid') ? 'Retur Berbayar' : 'Garansi Toko';
+                $reasonText = $activeReturn?->reason ?: $activeReturn?->items_description ?: 'Perbaikan barang komplain';
+
+                $pesan = "🔄 *PENUGASAN PERBAIKAN RETUR — {$produk}*\n\n"
+                    . "Halo {$worker->name},\n"
+                    . "Anda mendapat penugasan *PERBAIKAN RETUR* di Konveksio.\n\n"
+                    . "🧾 *Detail Pesanan:*\n"
+                    . "• Produk: {$produk}\n"
+                    . "• Pelanggan: {$customer}\n"
+                    . "• Deadline: {$deadline}\n"
+                    . "• Tipe Garansi: {$garansiText}\n"
+                    . "• Alasan Komplain: {$reasonText}\n\n"
+                    . "⚙️ *Tugas Perbaikan Anda:*\n"
+                    . $rincian
+                    . "\n📌 *Catatan*: Setelah perbaikan selesai dikerjakan, barang akan langsung menuju QC Akhir.\n\n"
+                    . "Klik link di bawah untuk melihat dan memperbarui status tugas perbaikan Anda:\n"
+                    . "🔗 {$link}";
+            } else {
+                $pesan = "📋 *PENUGASAN PRODUKSI — {$produk}*\n\n"
+                    . "Halo {$worker->name},\n"
+                    . "Anda mendapat penugasan baru di Konveksio.\n\n"
+                    . "🧾 *Detail Pesanan:*\n"
+                    . "• Produk: {$produk}\n"
+                    . "• Pelanggan: {$customer}\n"
+                    . "• Deadline: {$deadline}\n\n"
+                    . "⚙️ *Tugas Anda:*\n"
+                    . $rincian
+                    . "\nKlik link di bawah untuk melihat dan memperbarui status tugas Anda:\n"
+                    . "🔗 {$link}";
+            }
 
             try {
                 Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
