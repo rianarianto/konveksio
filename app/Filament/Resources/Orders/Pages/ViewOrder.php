@@ -20,6 +20,10 @@ class ViewOrder extends ViewRecord
                 ->label('Serahkan Pesanan')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
+                ->button()
+                ->extraAttributes([
+                    'style' => 'background-color: #16a34a !important; color: #ffffff !important; font-weight: 800; border-color: #16a34a !important;',
+                ])
                 ->form(\App\Filament\Resources\Orders\Schemas\OrderDeliveryForm::getComponents())
                 ->action(function (array $data): void {
                     \App\Filament\Resources\Orders\Schemas\OrderDeliveryForm::processDelivery($this->record, $data);
