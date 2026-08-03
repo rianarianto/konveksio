@@ -54,22 +54,25 @@ class ProduksiStats extends Widget
             ],
         ];
 
-        // Specific categories mapped to possible stage names
         $categoriesMap = [
             'Potong'       => ['Potong'],
             'Jahit'        => ['Jahit'],
             'Bordir/Sablon'=> ['Bordir', 'Sablon', 'Bordir/Sablon'],
             'Kancing'      => ['Kancing'],
             'Finishing'    => ['Finishing'],
-            'QC'           => ['QC', 'Quality Control'],
         ];
 
         foreach ($categoriesMap as $categoryLabel => $stageNames) {
-            // Hanya hitung task yang sedang AKTIF dikerjakan di tahap ini (in_progress)
-            // Task berstatus 'pending' di tahap ini berarti belum sampai di sini
+            // Hitung task yang aktif dikerjakan (in_progress) ATAU WorkOrder yang statusnya sedang di tahap ini
             $qty = ProductionTask::where('shop_id', $shopId)
                 ->whereIn('stage_name', $stageNames)
-                ->where('status', 'in_progress')
+                ->where('status', '!=', 'done')
+                ->where(function ($q) use ($stageNames) {
+                    $q->where('status', 'in_progress')
+                      ->orWhereHas('orderItem.workOrder', function ($woQuery) use ($stageNames) {
+                          $woQuery->whereIn('status', $stageNames);
+                      });
+                })
                 ->sum('quantity');
 
             $stages[] = [
@@ -77,6 +80,24 @@ class ProduksiStats extends Widget
                 'qty'  => (int) $qty,
             ];
         }
+
+        // Hitung beban aktif yang sedang berada di tahap QC (QC Persiapan, QC Review, atau QC Akhir)
+        $qcQty = \App\Models\WorkOrder::where('shop_id', $shopId)
+            ->whereIn('status', [
+                \App\Models\WorkOrder::STATUS_QC_PREP,
+                \App\Models\WorkOrder::STATUS_QC_REVIEW,
+                \App\Models\WorkOrder::STATUS_QC_AKHIR,
+                'QC_PERSIAPAN',
+            ])
+            ->get()
+            ->sum(function ($wo) {
+                return $wo->orderItem?->quantity ?? 0;
+            });
+
+        $stages[] = [
+            'name' => 'QC',
+            'qty'  => (int) $qcQty,
+        ];
 
         return [
             'totalBeban' => (int) $totalBeban,
