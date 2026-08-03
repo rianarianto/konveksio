@@ -170,7 +170,24 @@ class OrderDeliveryForm
             return false;
         }
 
-        // Serahkan Pesanan only appears when the entire order is ready for pickup ('siap_diambil')
-        return $record->status === 'siap_diambil';
+        if (in_array($record->status, ['selesai', 'batal'])) {
+            return false;
+        }
+
+        $itemIds = $record->orderItems()->pluck('id');
+        $totalTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->whereIn('order_item_id', $itemIds)
+            ->count();
+
+        if ($totalTasks === 0) {
+            return false;
+        }
+
+        $doneTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+            ->whereIn('order_item_id', $itemIds)
+            ->where('status', 'done')
+            ->count();
+
+        return $doneTasks === $totalTasks;
     }
 }
