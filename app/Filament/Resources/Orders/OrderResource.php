@@ -1099,9 +1099,31 @@ class OrderResource extends Resource
                         ])
                         ->visible(fn (Order $record): bool => $record->status === 'selesai' || !empty($record->pickup_proof)),
 
-                    // Delete
+                    // Delete Order
                     \Filament\Actions\DeleteAction::make()
-                        ->visible(fn() => auth()->user()->role === 'owner'),
+                        ->label('Batalkan / Hapus Pesanan')
+                        ->modalHeading('Batalkan / Hapus Pesanan Ini?')
+                        ->modalDescription('Tindakan ini akan menghapus pesanan beserta item dan pembayaran terkait secara permanen.')
+                        ->visible(function (Order $record): bool {
+                            $role = auth()->user()->role;
+                            if ($role === 'owner') {
+                                return true;
+                            }
+                            if ($role === 'admin') {
+                                // Admin BISA hapus pesanan SELAGI BELUM NAIK PRODUKSI
+                                $hasTasksStarted = $record->orderItems()->whereHas('productionTasks', function ($q) {
+                                    $q->whereIn('status', ['in_progress', 'done']);
+                                })->exists();
+
+                                $hasWoStarted = \App\Models\WorkOrder::withoutGlobalScopes()
+                                    ->whereIn('order_item_id', $record->orderItems()->pluck('id'))
+                                    ->whereNotIn('status', [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO'])
+                                    ->exists();
+
+                                return !$hasTasksStarted && !$hasWoStarted;
+                            }
+                            return false;
+                        }),
                 ])
                 ->icon('heroicon-m-ellipsis-vertical')
                 ->color('gray')

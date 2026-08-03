@@ -695,7 +695,34 @@ class ControlProduksiResource extends Resource
                         }
                         return true;
                     })
-                    ->disabled(fn(OrderItem $record) => auth()->user()->role !== 'owner' && $record->productionTasks()->where('status', 'done')->exists())
+                    ->disabled(function (OrderItem $record): bool {
+                        if (auth()->user()->role === 'owner') {
+                            return false;
+                        }
+                        $hasTasksStarted = $record->productionTasks()->whereIn('status', ['in_progress', 'done'])->exists();
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->first();
+                        $woStarted = $wo && !in_array($wo->status, [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO']);
+
+                        return $hasTasksStarted || $woStarted;
+                    })
+                    ->tooltip(function (OrderItem $record): ?string {
+                        if (auth()->user()->role !== 'owner') {
+                            $hasTasksStarted = $record->productionTasks()->whereIn('status', ['in_progress', 'done'])->exists();
+                            $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->first();
+                            $woStarted = $wo && !in_array($wo->status, [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO']);
+
+                            if ($hasTasksStarted || $woStarted) {
+                                return 'Produksi sudah dimulai. Pembatalan tugas hanya dapat dilakukan oleh Owner.';
+                            }
+                        }
+                        return null;
+                    })
                     ->requiresConfirmation()
                     ->modalHeading('Batalkan Tugas?')
                     ->modalDescription('Tindakan ini akan menghapus seluruh penugasan kerja untuk item ini secara permanen. Status pengerjaan item akan kembali ke Belum Diatur.')
