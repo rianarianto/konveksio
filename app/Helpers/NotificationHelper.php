@@ -360,16 +360,25 @@ class NotificationHelper
             ->latest('id')
             ->first();
 
-        $activeRevisionTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-            ->whereIn('order_item_id', $groupItemIds)
-            ->where('is_revision', true)
-            ->where('status', '!=', 'done')
-            ->with('assignedTo')
-            ->get();
+        if ($activeReturn) {
+            $targetStage = match(strtolower((string)$activeReturn->target_stage)) {
+                'potong' => 'Potong',
+                'bordir/sablon', 'sablon/bordir', 'sablon', 'bordir' => 'Bordir/Sablon',
+                'finishing' => 'Finishing',
+                'kancing' => 'Kancing',
+                default => $activeReturn->target_stage ?: 'Jahit',
+            };
 
-        if ($activeReturn || $activeRevisionTasks->isNotEmpty()) {
-            // MODE RETUR: Hanya ambil task revisi retur yang memiliki assigned_to!
-            $tasks = $activeRevisionTasks->filter(fn($t) => !empty($t->assigned_to));
+            $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where(function ($q) use ($targetStage) {
+                    $q->where('stage_name', $targetStage)
+                      ->orWhere('is_revision', true);
+                })
+                ->where('status', '!=', 'done')
+                ->whereNotNull('assigned_to')
+                ->with('assignedTo')
+                ->get();
         } else {
             // MODE NORMAL: Hanya ambil task yang statusnya pending atau in_progress
             $tasks = \App\Models\ProductionTask::withoutGlobalScopes()

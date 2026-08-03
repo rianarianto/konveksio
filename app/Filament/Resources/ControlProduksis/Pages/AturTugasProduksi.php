@@ -1251,6 +1251,9 @@ class AturTugasProduksi extends Page
                 $lookupKey = $stage . '_' . $workerId;
                 $oldTask = isset($existingTasks[$lookupKey]) ? $existingTasks[$lookupKey]->first() : null;
 
+                $isRevision = $oldTask?->is_revision ?? ($activeReturTask ? true : false);
+                $revisionSource = $oldTask?->revision_source ?? ($activeReturTask ? 'qc_akhir' : null);
+
                 $taskData = [
                     'stage_name' => $stage,
                     'assigned_to' => $workerId,
@@ -1262,6 +1265,8 @@ class AturTugasProduksi extends Page
                     'assigned_by' => $oldTask?->assigned_by ?? auth()->id(),
                     'status' => $oldTask?->status ?? 'pending',
                     'is_paid' => $oldTask?->is_paid ?? false,
+                    'is_revision' => $isRevision,
+                    'revision_source' => $revisionSource,
                     'wajib_qc' => $wajibQc,
                     'worker_payroll_id' => $oldTask?->worker_payroll_id ?? null,
                     'completed_at' => $oldTask?->completed_at ?? null,
