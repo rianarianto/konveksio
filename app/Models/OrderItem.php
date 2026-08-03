@@ -353,10 +353,14 @@ class OrderItem extends Model
             return true;
         }
 
-        // Lock item if any production task has started (in_progress) or completed
+        // Lock item if WorkOrder has moved beyond CREATED or any production task has started/done
+        if (!in_array($wo->status, [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO'])) {
+            return false;
+        }
+
         $hasStartedTask = \App\Models\ProductionTask::withoutGlobalScopes()
             ->where('order_item_id', $this->id)
-            ->whereIn('status', ['in_progress', 'completed'])
+            ->whereIn('status', ['in_progress', 'done', 'completed'])
             ->exists();
 
         if ($hasStartedTask) {
