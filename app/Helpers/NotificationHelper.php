@@ -393,7 +393,7 @@ class NotificationHelper
             // QC_PERSIAPAN: tampilkan total qty group (bukan qty task individual yg hanya 1 item)
             $rincian = '';
             foreach ($workerTaskList as $task) {
-                $displayQty = ($task->stage_name === 'QC_PERSIAPAN')
+                $displayQty = ($task->stage_name === 'QC_PERSIAPAN' && !$task->is_revision)
                     ? $totalGroupQty
                     : $task->quantity;
                 $stgLabel = strtoupper(str_replace('_', ' ', $task->stage_name));
