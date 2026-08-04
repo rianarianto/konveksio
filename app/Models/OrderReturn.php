@@ -51,6 +51,9 @@ class OrderReturn extends Model
     protected static function booted(): void
     {
         static::creating(function ($return) {
+            if (isset($return->target_stages) && is_array($return->target_stages)) {
+                $return->target_stage = implode(',', $return->target_stages);
+            }
             if (empty($return->status)) {
                 $return->status = 'pending';
             }
@@ -94,32 +97,74 @@ class OrderReturn extends Model
             $taskSizeQty = !empty($return->size_breakdown) ? $return->size_breakdown : null;
 
             if ($return->action_type === 'repair') {
-                $stageName = match(strtolower((string)$return->target_stage)) {
-                    'potong' => 'Potong',
-                    'bordir/sablon', 'sablon/bordir', 'sablon', 'bordir' => 'Bordir/Sablon',
-                    'finishing' => 'Finishing',
-                    'kancing' => 'Kancing',
-                    'qc_persiapan', 'qc_prep' => 'QC_PERSIAPAN',
-                    'qc_akhir', 'qc_selesai', 'qc' => 'QC_AKHIR',
-                    default => $return->target_stage ?: 'Jahit',
-                };
+                $rawStages = !empty($return->target_stages) && is_array($return->target_stages)
+                    ? $return->target_stages
+                    : explode(',', (string)$return->target_stage);
 
-                // Find the latest task for this stage
-                $task = \App\Models\ProductionTask::where('order_item_id', $item->id)
-                    ->where('stage_name', $stageName)
-                    ->latest('id')
-                    ->first();
-
-                $originalWagePerPcs = 0;
-                if ($task && $task->quantity > 0) {
-                    $originalWagePerPcs = $task->wage_amount / $task->quantity;
+                $rawStages = array_filter(array_map('trim', $rawStages));
+                if (empty($rawStages)) {
+                    $rawStages = ['Jahit'];
                 }
 
-                $repairWage = $isCustomerPaid ? ($originalWagePerPcs * $return->quantity) : 0;
+                $firstStageName = null;
 
-                if ($task) {
-                    if ($task->is_paid || $isCustomerPaid) {
-                        // If already paid OR paid by customer, create a new revision task
+                foreach ($rawStages as $stg) {
+                    $stageName = match(strtolower((string)$stg)) {
+                        'potong' => 'Potong',
+                        'bordir/sablon', 'sablon/bordir', 'sablon', 'bordir' => 'Bordir/Sablon',
+                        'finishing' => 'Finishing',
+                        'kancing' => 'Kancing',
+                        'qc_persiapan', 'qc_prep' => 'QC_PERSIAPAN',
+                        'qc_akhir', 'qc_selesai', 'qc' => 'QC_AKHIR',
+                        default => $stg ?: 'Jahit',
+                    };
+
+                    if (!$firstStageName) {
+                        $firstStageName = $stageName;
+                    }
+
+                    // Find the latest task for this stage
+                    $task = \App\Models\ProductionTask::where('order_item_id', $item->id)
+                        ->where('stage_name', $stageName)
+                        ->latest('id')
+                        ->first();
+
+                    $originalWagePerPcs = 0;
+                    if ($task && $task->quantity > 0) {
+                        $originalWagePerPcs = $task->wage_amount / $task->quantity;
+                    }
+
+                    $repairWage = $isCustomerPaid ? ($originalWagePerPcs * $return->quantity) : 0;
+
+                    if ($task) {
+                        if ($task->is_paid || $isCustomerPaid) {
+                            \App\Models\ProductionTask::create([
+                                'shop_id' => $return->shop_id,
+                                'order_item_id' => $item->id,
+                                'stage_name' => $stageName,
+                                'quantity' => $return->quantity,
+                                'wage_amount' => $repairWage,
+                                'status' => 'pending',
+                                'is_revision' => true,
+                                'revision_source' => 'qc_akhir',
+                                'assigned_by' => auth()->id() ?? 1,
+                                'assigned_to' => null,
+                                'size_quantities' => $taskSizeQty,
+                                'note' => '⚠️ REVISI RETUR (' . ($isCustomerPaid ? 'Berbayar' : 'Garansi') . '): ' . $return->reason,
+                            ]);
+                        } else {
+                            $task->update([
+                                'status' => 'pending',
+                                'is_revision' => true,
+                                'revision_source' => 'qc_akhir',
+                                'assigned_to' => null,
+                                'quantity' => $return->quantity,
+                                'wage_amount' => $repairWage,
+                                'size_quantities' => $taskSizeQty,
+                                'note' => ($task->note ? $task->note . ' | ' : '') . '⚠️ REVISI RETUR: ' . $return->reason,
+                            ]);
+                        }
+                    } else {
                         \App\Models\ProductionTask::create([
                             'shop_id' => $return->shop_id,
                             'order_item_id' => $item->id,
@@ -132,44 +177,16 @@ class OrderReturn extends Model
                             'assigned_by' => auth()->id() ?? 1,
                             'assigned_to' => null,
                             'size_quantities' => $taskSizeQty,
-                            'note' => '⚠️ REVISI RETUR (' . ($isCustomerPaid ? 'Berbayar' : 'Garansi') . '): ' . $return->reason,
-                        ]);
-                    } else {
-                        // Reset status to pending for redo, clear assigned_to so Admin can select worker
-                        $task->update([
-                            'status' => 'pending',
-                            'is_revision' => true,
-                            'revision_source' => 'qc_akhir',
-                            'assigned_to' => null,
-                            'quantity' => $return->quantity,
-                            'wage_amount' => $repairWage,
-                            'size_quantities' => $taskSizeQty,
-                            'note' => ($task->note ? $task->note . ' | ' : '') . '⚠️ REVISI RETUR: ' . $return->reason,
+                            'note' => '⚠️ REVISI RETUR (New): ' . $return->reason,
                         ]);
                     }
-                } else {
-                    // Create new task
-                    \App\Models\ProductionTask::create([
-                        'shop_id' => $return->shop_id,
-                        'order_item_id' => $item->id,
-                        'stage_name' => $stageName,
-                        'quantity' => $return->quantity,
-                        'wage_amount' => $repairWage,
-                        'status' => 'pending',
-                        'is_revision' => true,
-                        'revision_source' => 'qc_akhir',
-                        'assigned_by' => auth()->id() ?? 1,
-                        'assigned_to' => null,
-                        'size_quantities' => $taskSizeQty,
-                        'note' => '⚠️ REVISI RETUR (New): ' . $return->reason,
-                    ]);
                 }
 
-                // Revert WorkOrder status to target stage & trigger WA to worker
-                if ($wo) {
-                    $idx = array_search($stageName, $wo->stage_sequence);
+                // Revert WorkOrder status to first target stage & trigger WA to worker
+                if ($wo && $firstStageName) {
+                    $idx = array_search($firstStageName, $wo->stage_sequence);
                     $wo->update([
-                        'status' => $stageName,
+                        'status' => $firstStageName,
                         'current_stage_index' => $idx !== false ? $idx : 0,
                         'stage_entered_at' => now(),
                         'completed_at' => null,
@@ -177,7 +194,7 @@ class OrderReturn extends Model
                     ]);
                     
                     try {
-                        \App\Helpers\NotificationHelper::notify($wo, $stageName);
+                        \App\Helpers\NotificationHelper::notify($wo, $firstStageName);
                     } catch (\Throwable $e) {
                         \Illuminate\Support\Facades\Log::error("[WA Retur] Gagal kirim WA retur: " . $e->getMessage());
                     }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\OrderReturns\Schemas;
 
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -203,7 +204,7 @@ class OrderReturnForm
                 ->default('repair'),
 
             // 5. Divisi Tujuan Perbaikan
-            Select::make('target_stage')
+            CheckboxList::make('target_stages')
                 ->label('5. Kirim Ke Divisi Mana? (Untuk Perbaikan)')
                 ->options(function ($get) {
                     $itemId = $get('order_item_id');

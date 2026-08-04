@@ -76,11 +76,16 @@ class AturTugasProduksi extends Page
         $tasksForRepeater = [];
         $groupedTasks = $item->productionTasks->groupBy('stage_name');
 
-        // If this item has an active retur revision task, only show the retur target stage!
-        $activeReturTask = $item->productionTasks()->where('is_revision', true)->where('status', '!=', 'done')->latest('id')->first();
-        if ($activeReturTask) {
-            $returStage = $activeReturTask->stage_name;
-            $groupedTasks = $groupedTasks->filter(fn($tasks, $stageName) => $stageName === $returStage);
+        // If this item has active retur revision tasks, show all active retur target stages!
+        $activeReturStages = $item->productionTasks()
+            ->where('is_revision', true)
+            ->where('status', '!=', 'done')
+            ->pluck('stage_name')
+            ->unique()
+            ->toArray();
+
+        if (!empty($activeReturStages)) {
+            $groupedTasks = $groupedTasks->filter(fn($tasks, $stageName) => in_array($stageName, $activeReturStages));
         }
 
         foreach ($groupedTasks as $stageName => $tasks) {
