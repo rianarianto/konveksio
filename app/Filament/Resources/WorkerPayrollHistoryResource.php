@@ -32,7 +32,7 @@ class WorkerPayrollHistoryResource extends Resource
 
     public static function canAccess(): bool
     {
-        return in_array(auth()->user()->role, ['owner', 'admin']);
+        return auth()->user()->role === 'owner';
     }
 
     public static function canCreate(): bool

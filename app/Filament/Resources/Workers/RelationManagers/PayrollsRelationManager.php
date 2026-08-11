@@ -15,6 +15,11 @@ class PayrollsRelationManager extends RelationManager
 
     protected static ?string $title = 'Riwayat Slip Gaji';
 
+    public static function canViewForRecord(\Illuminate\Database\Eloquent\Model $ownerRecord, string $pageClass): bool
+    {
+        return auth()->user()->role === 'owner';
+    }
+
     public function table(Table $table): Table
     {
         return $table
