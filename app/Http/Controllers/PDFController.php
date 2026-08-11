@@ -89,20 +89,8 @@ class PDFController extends Controller
 
     protected function buildSpkData(\App\Models\OrderItem $record): array
     {
-        $totalQuantity = \App\Models\OrderItem::where('order_id', $record->order_id)
-            ->where('product_name', $record->product_name)
-            ->where('design_status', 'approved')
-            ->sum('quantity');
-
-        if ($totalQuantity <= 0) {
-            $totalQuantity = \App\Models\OrderItem::where('order_id', $record->order_id)
-                ->where('product_name', $record->product_name)
-                ->sum('quantity');
-        }
-
-        $allGroupItems = \App\Models\OrderItem::where('order_id', $record->order_id)
-            ->where('product_name', $record->product_name)
-            ->get();
+        $allGroupItems = $record->getItemsInGroup();
+        $totalQuantity = $allGroupItems->sum('quantity');
 
         $sizes = [];
         $specGroups = [];
