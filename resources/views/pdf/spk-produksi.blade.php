@@ -476,6 +476,14 @@
                                     $vTitle = $groupLabel ? strtoupper($groupLabel) : $genderLabel;
                                     $vKey = $vTitle . '|' . $genderLabel;
 
+                                    $modelSpecs = [];
+                                    if (!empty($d['sleeve_model'])) $modelSpecs[] = strtoupper($d['sleeve_model']);
+                                    if (!empty($d['pocket_model']) && $d['pocket_model'] !== 'tanpa_saku') $modelSpecs[] = strtoupper(str_replace('_', ' ', $d['pocket_model']));
+                                    if (!empty($d['collar_model'])) $modelSpecs[] = strtoupper($d['collar_model']);
+                                    if (!empty($d['button_model']) && $d['button_model'] !== 'biasa') $modelSpecs[] = strtoupper($d['button_model']);
+                                    if (!empty($d['is_tunic'])) $modelSpecs[] = 'TUNIK';
+                                    $modelSummary = implode(' • ', $modelSpecs);
+
                                     $giSize = strtoupper($gi->size ?? 'TANPA_UKURAN');
 
                                     if ($giSize === 'CUSTOM' || $gi->production_category === 'custom') {
@@ -489,6 +497,7 @@
                                                             $taskVariantBreakdown[$vKey] = [
                                                                 'title' => $vTitle,
                                                                 'gender' => $genderLabel,
+                                                                'model_summary' => $modelSummary,
                                                                 'sizes' => [],
                                                                 'customs' => [],
                                                             ];
@@ -510,6 +519,7 @@
                                                         $taskVariantBreakdown[$vKey] = [
                                                             'title' => $vTitle,
                                                             'gender' => $genderLabel,
+                                                            'model_summary' => $modelSummary,
                                                             'sizes' => [],
                                                             'customs' => [],
                                                         ];
@@ -528,9 +538,13 @@
                                     } else {
                                         $taskQtyForSize = $taskSizes[$giSize] ?? 0;
                                         if ($taskQtyForSize > 0) {
-                                            $gKey = ($gender === 'P' || $gender === 'PEREMPUAN') ? 'P' : 'L';
                                             if (isset($taskSizes['_genders'][$giSize])) {
-                                                $allocatedQty = (int) ($taskSizes['_genders'][$giSize][$gKey] ?? 0);
+                                                $gList = $taskSizes['_genders'][$giSize];
+                                                if ($gender === 'P' || $gender === 'PEREMPUAN') {
+                                                    $allocatedQty = (int) ($gList['P'] ?? $gList['PEREMPUAN'] ?? $gList['WANITA'] ?? 0);
+                                                } else {
+                                                    $allocatedQty = (int) ($gList['L'] ?? $gList['LAKI-LAKI'] ?? $gList['PRIA'] ?? 0);
+                                                }
                                             } else {
                                                 $allocatedQty = (int) $taskQtyForSize;
                                             }
@@ -540,6 +554,7 @@
                                                     $taskVariantBreakdown[$vKey] = [
                                                         'title' => $vTitle,
                                                         'gender' => $genderLabel,
+                                                        'model_summary' => $modelSummary,
                                                         'sizes' => [],
                                                         'customs' => [],
                                                     ];
@@ -560,12 +575,15 @@
                                 @if(!empty($taskVariantBreakdown))
                                     @foreach($taskVariantBreakdown as $tv)
                                         <div style="font-size: 7.5pt; color: #4338ca; font-weight: bold; margin-top: 3px;">
-                                            [{{ $tv['title'] }} - {{ $tv['gender'] }}]:
+                                            [{{ $tv['title'] }} - {{ $tv['gender'] }}]
+                                            @if(!empty($tv['model_summary']))
+                                                <span style="font-weight: normal; color: #6b7280; font-size: 7pt;">({{ $tv['model_summary'] }})</span>
+                                            @endif
                                         </div>
                                         <div style="font-size: 7.5pt; color: #374151;">
                                             @if(!empty($tv['sizes']))
                                                 @foreach($tv['sizes'] as $sz => $q)
-                                                    {{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}:<strong>{{ $q }}</strong>{{ !$loop->last ? ', ' : '' }}
+                                                    {{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}:<strong>{{ $q }} pcs</strong>{{ !$loop->last ? ', ' : '' }}
                                                 @endforeach
                                             @endif
                                             @if(!empty($tv['customs']))
