@@ -43,18 +43,21 @@ class CashAdvance extends Model
                         ->get();
 
                     foreach ($recipients as $recipient) {
-                        $notifData = \Filament\Notifications\Notification::make()
-                            ->title('Pengajuan Kasbon Baru')
-                            ->body("{$recipientName} mengajukan kasbon sebesar {$amountFormatted}.")
-                            ->icon('heroicon-o-banknotes')
-                            ->iconColor('warning')
-                            ->actions([
-                                \Filament\Actions\Action::make('view')
-                                    ->label('Lihat Kasbon')
-                                    ->url('/app/' . $cashAdvance->shop_id . '/kasbon')
-                                    ->markAsRead(),
-                            ])
-                            ->toArray();
+                        $notifData = array_merge(
+                            \Filament\Notifications\Notification::make()
+                                ->title('Pengajuan Kasbon Baru')
+                                ->body("{$recipientName} mengajukan kasbon sebesar {$amountFormatted}.")
+                                ->icon('heroicon-o-banknotes')
+                                ->iconColor('warning')
+                                ->actions([
+                                    \Filament\Actions\Action::make('view')
+                                        ->label('Lihat Kasbon')
+                                        ->url('/app/' . $cashAdvance->shop_id . '/kasbon')
+                                        ->markAsRead(),
+                                ])
+                                ->toArray(),
+                            ['format' => 'filament']
+                        );
 
                         $recipient->notifications()->create([
                             'id' => (string) \Illuminate\Support\Str::uuid(),
