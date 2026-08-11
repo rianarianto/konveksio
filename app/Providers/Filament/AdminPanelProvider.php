@@ -31,6 +31,7 @@ class AdminPanelProvider extends PanelProvider
             ->tenantRegistration(\App\Filament\Pages\Tenancy\RegisterShop::class)
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
             ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->colors([
                 'primary' => [
                     50 => '#F2E6FF',
