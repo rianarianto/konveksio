@@ -58,6 +58,13 @@ class OrderDeliveryForm
                         ->label('Nominal Pelunasan (Rp)')
                         ->numeric()
                         ->prefix('Rp')
+                        ->helperText(function ($record) {
+                            if (!$record) return null;
+                            $order = $record instanceof Order ? $record : $record->order ?? null;
+                            if (!$order) return null;
+                            $rem = max(0, (int) $order->total_price - (int) $order->payments()->sum('amount'));
+                            return 'Maksimal pelunasan sesuai sisa tagihan: Rp ' . number_format($rem, 0, ',', '.');
+                        })
                         ->default(function ($record) {
                             if (!$record) return 0;
                             $order = $record instanceof Order ? $record : $record->order ?? null;
@@ -74,6 +81,7 @@ class OrderDeliveryForm
                         })
                         ->validationMessages([
                             'max' => 'Nominal pelunasan tidak boleh melebihi sisa tagihan.',
+                            'lte' => 'Nominal pelunasan tidak boleh melebihi sisa tagihan.',
                         ]),
 
                     Select::make('payment_method')
@@ -90,7 +98,11 @@ class OrderDeliveryForm
                         ->label('Foto Bukti Pembayaran / Pelunasan')
                         ->image()
                         ->disk('public')
-                        ->directory('payments/proofs'),
+                        ->directory('payments/proofs')
+                        ->maxSize(15360)
+                        ->validationMessages([
+                            'max' => 'Ukuran file foto bukti pembayaran terlalu besar (maksimal 15MB).',
+                        ]),
 
                     Textarea::make('payment_note')
                         ->label('Catatan Pembayaran')
@@ -110,9 +122,12 @@ class OrderDeliveryForm
                     FileUpload::make('pickup_proof')
                         ->label('Foto Bukti Pengambilan / Penyerahan Barang')
                         ->image()
-                        ->extraInputAttributes(['capture' => 'camera'])
                         ->disk('public')
                         ->directory('pickup-proofs')
+                        ->maxSize(15360)
+                        ->validationMessages([
+                            'max' => 'Ukuran file foto penyerahan terlalu besar (maksimal 15MB).',
+                        ])
                         ->required(),
 
                     Textarea::make('pickup_note')
