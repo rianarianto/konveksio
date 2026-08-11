@@ -311,28 +311,64 @@ class PiutangTableWidget extends BaseWidget
                                 ? $rawShopName
                                 : 'Dunia Bordir Komputer';
 
-                            $customerName = $record->customer->name ?? 'Pelanggan';
+                            $customerName = trim($record->customer->name ?? 'Pelanggan');
                             
                             $totalTagihan = number_format($record->total_price, 0, ',', '.');
                             $paidAmount = number_format($record->payments()->sum('amount'), 0, ',', '.');
                             $sisaTagihan = number_format($record->remaining_balance, 0, ',', '.');
                             
-                            $statusText = match($record->status) {
-                                'siap_diambil' => 'telah siap untuk diambil',
-                                'selesai'     => 'telah selesai diproses',
-                                default       => 'sedang dalam proses pengerjaan',
+                            $statusText = match(strtolower($record->status ?? '')) {
+                                'desain', 'draft' => 'sedang dalam tahap perancangan desain',
+                                'antrian'        => 'sedang dalam antrian pengerjaan produksi',
+                                'diproses'       => 'sedang dalam proses produksi/pengerjaan',
+                                'siap_diambil'   => 'telah SELESAI diproduksi dan SIAP DILUNASI / DIAMBIL',
+                                'selesai'        => 'telah selesai diproses dan diserahkan',
+                                'batal', 'dibatalkan' => 'telah dibatalkan',
+                                default          => 'sedang dalam proses pengerjaan',
                             };
 
-                            // Group order items for WhatsApp breakdown
+                            // Group order items by product_name and variant/group_label for WhatsApp breakdown
                             $itemLines = [];
                             if ($record->orderItems && $record->orderItems->count() > 0) {
-                                $groupedItems = $record->orderItems->groupBy(fn($i) => $i->product_name ?: 'Item');
-                                foreach ($groupedItems as $productName => $items) {
-                                    $qty = $items->sum('quantity');
-                                    $itemLines[] = "• " . $qty . "x " . $productName;
+                                foreach ($record->orderItems as $item) {
+                                    $pName = $item->product_name ?: 'Item';
+                                    $d = $item->size_and_request_details ?? [];
+                                    $groupLabel = trim($d['group_label'] ?? '');
+                                    $gender = strtoupper($d['gender'] ?? 'L');
+                                    $genderLabel = ($gender === 'P' || $gender === 'PEREMPUAN') ? 'Wanita' : 'Pria';
+
+                                    $variantName = $groupLabel ? "{$groupLabel} ({$genderLabel})" : $genderLabel;
+                                    $sizeStr = strtoupper($item->size ?? 'TANPA_UKURAN');
+                                    $sizeLabel = $sizeStr === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sizeStr;
+
+                                    $key = "{$pName}|{$variantName}";
+                                    if (!isset($itemLines[$key])) {
+                                        $itemLines[$key] = [
+                                            'product'   => $pName,
+                                            'variant'   => $variantName,
+                                            'total_qty' => 0,
+                                            'sizes'     => [],
+                                        ];
+                                    }
+
+                                    $itemLines[$key]['total_qty'] += $item->quantity;
+                                    $itemLines[$key]['sizes'][$sizeLabel] = ($itemLines[$key]['sizes'][$sizeLabel] ?? 0) + $item->quantity;
                                 }
+
+                                $formattedLines = [];
+                                foreach ($itemLines as $entry) {
+                                    $sizeBreakdownArr = [];
+                                    foreach ($entry['sizes'] as $sz => $q) {
+                                        $sizeBreakdownArr[] = "{$sz}: {$q} pcs";
+                                    }
+                                    $sizeText = implode(', ', $sizeBreakdownArr);
+                                    $formattedLines[] = "• " . $entry['product'] . " — Varian: " . $entry['variant'] . "\n  Total: " . $entry['total_qty'] . " pcs (" . $sizeText . ")";
+                                }
+
+                                $itemBreakdown = implode("\n", $formattedLines);
+                            } else {
+                                $itemBreakdown = "• 1x " . $record->order_number;
                             }
-                            $itemBreakdown = count($itemLines) > 0 ? implode("\n", $itemLines) : "• 1x " . $record->order_number;
 
                             $msg = "Selamat pagi/siang Kak *" . $customerName . "*,\n\n"
                                 . "Kami dari *" . $businessName . "* ingin menginformasikan bahwa pesanan Kakak dengan nomor *" . $record->order_number . "* " . $statusText . ".\n\n"
