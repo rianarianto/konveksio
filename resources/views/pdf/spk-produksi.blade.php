@@ -476,14 +476,6 @@
                                     $vTitle = $groupLabel ? strtoupper($groupLabel) : $genderLabel;
                                     $vKey = $vTitle . '|' . $genderLabel;
 
-                                    $modelSpecs = [];
-                                    if (!empty($d['sleeve_model'])) $modelSpecs[] = strtoupper($d['sleeve_model']);
-                                    if (!empty($d['pocket_model']) && $d['pocket_model'] !== 'tanpa_saku') $modelSpecs[] = strtoupper(str_replace('_', ' ', $d['pocket_model']));
-                                    if (!empty($d['collar_model'])) $modelSpecs[] = strtoupper($d['collar_model']);
-                                    if (!empty($d['button_model']) && $d['button_model'] !== 'biasa') $modelSpecs[] = strtoupper($d['button_model']);
-                                    if (!empty($d['is_tunic'])) $modelSpecs[] = 'TUNIK';
-                                    $modelSummary = implode(' • ', $modelSpecs);
-
                                     $giSize = strtoupper($gi->size ?? 'TANPA_UKURAN');
 
                                     if ($giSize === 'CUSTOM' || $gi->production_category === 'custom') {
@@ -497,19 +489,11 @@
                                                             $taskVariantBreakdown[$vKey] = [
                                                                 'title' => $vTitle,
                                                                 'gender' => $genderLabel,
-                                                                'model_summary' => $modelSummary,
                                                                 'sizes' => [],
                                                                 'customs' => [],
                                                             ];
                                                         }
-                                                        $mArr = [];
-                                                        foreach (['LD','PB','PL','LB','LP','LPh'] as $mk) {
-                                                            if (!empty($cd[$mk])) $mArr[] = "$mk:{$cd[$mk]}";
-                                                        }
-                                                        $taskVariantBreakdown[$vKey]['customs'][] = [
-                                                            'nama' => $cName ?: 'Custom',
-                                                            'specs' => implode(' ', $mArr),
-                                                        ];
+                                                        $taskVariantBreakdown[$vKey]['customs'][] = $cName ?: 'Custom';
                                                     }
                                                 }
                                             } else {
@@ -519,19 +503,11 @@
                                                         $taskVariantBreakdown[$vKey] = [
                                                             'title' => $vTitle,
                                                             'gender' => $genderLabel,
-                                                            'model_summary' => $modelSummary,
                                                             'sizes' => [],
                                                             'customs' => [],
                                                         ];
                                                     }
-                                                    $mArr = [];
-                                                    foreach (['LD','PB','PL','LB','LP','LPh'] as $mk) {
-                                                        if (!empty($d[$mk])) $mArr[] = "$mk:{$d[$mk]}";
-                                                    }
-                                                    $taskVariantBreakdown[$vKey]['customs'][] = [
-                                                        'nama' => $cName,
-                                                        'specs' => implode(' ', $mArr),
-                                                    ];
+                                                    $taskVariantBreakdown[$vKey]['customs'][] = $cName;
                                                 }
                                             }
                                         }
@@ -554,7 +530,6 @@
                                                     $taskVariantBreakdown[$vKey] = [
                                                         'title' => $vTitle,
                                                         'gender' => $genderLabel,
-                                                        'model_summary' => $modelSummary,
                                                         'sizes' => [],
                                                         'customs' => [],
                                                     ];
@@ -568,28 +543,31 @@
                         @endphp
 
                         <tr style="page-break-inside: avoid;">
-                            <td class="text-bold" style="vertical-align:top; font-size:8.5pt;">{{ $task->assignedTo->name ?? 'BELUM ADA' }}</td>
+                            <td class="text-bold" style="vertical-align:top; font-size:8.5pt; color:#1e293b;">
+                                {{ $task->assignedTo->name ?? 'BELUM ADA' }}
+                            </td>
 
                             <td style="vertical-align:top;">
                                 <span style="font-size: 9pt; font-weight: bold; color:#111827;">{{ $task->quantity }} pcs</span>
                                 @if(!empty($taskVariantBreakdown))
                                     @foreach($taskVariantBreakdown as $tv)
-                                        <div style="font-size: 7.5pt; color: #4338ca; font-weight: bold; margin-top: 3px;">
-                                            [{{ $tv['title'] }} - {{ $tv['gender'] }}]
-                                            @if(!empty($tv['model_summary']))
-                                                <span style="font-weight: normal; color: #6b7280; font-size: 7pt;">({{ $tv['model_summary'] }})</span>
-                                            @endif
-                                        </div>
-                                        <div style="font-size: 7.5pt; color: #374151;">
+                                        <div style="margin-top: 4px; padding-left: 6px; border-left: 2px solid #6366f1;">
+                                            <div style="font-size: 7.5pt; color: #4338ca; font-weight: bold;">
+                                                📌 {{ $tv['title'] }} ({{ $tv['gender'] }})
+                                            </div>
                                             @if(!empty($tv['sizes']))
-                                                @foreach($tv['sizes'] as $sz => $q)
-                                                    {{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}:<strong>{{ $q }} pcs</strong>{{ !$loop->last ? ', ' : '' }}
-                                                @endforeach
+                                                <div style="font-size: 7.5pt; color: #1e293b; margin-top: 1px;">
+                                                    <strong>Ukuran:</strong>
+                                                    @foreach($tv['sizes'] as $sz => $q)
+                                                        <span style="background: #f1f5f9; padding: 1px 4px; border-radius: 3px; border: 1px solid #cbd5e1; font-weight: 700;">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}: {{ $q }} pcs</span>{{ !$loop->last ? ' ' : '' }}
+                                                    @endforeach
+                                                </div>
                                             @endif
                                             @if(!empty($tv['customs']))
-                                                <div style="color:#047857; font-weight:bold; margin-top:1px;">
-                                                    @foreach($tv['customs'] as $cItem)
-                                                        • {{ $cItem['nama'] }} @if(!empty($cItem['specs'])) <span style="font-weight:normal; color:#4b5563;">({{ $cItem['specs'] }})</span> @endif {{ !$loop->last ? ' | ' : '' }}
+                                                <div style="font-size: 7.5pt; color: #047857; font-weight: bold; margin-top: 2px;">
+                                                    <strong>Custom ({{ count($tv['customs']) }} pcs):</strong>
+                                                    @foreach(array_unique($tv['customs']) as $cName)
+                                                        <span style="background: #dcfce7; color: #15803d; padding: 1px 5px; border-radius: 3px; border: 1px solid #86efac; margin-right: 3px; display: inline-block;">• {{ $cName }}</span>
                                                     @endforeach
                                                 </div>
                                             @endif
