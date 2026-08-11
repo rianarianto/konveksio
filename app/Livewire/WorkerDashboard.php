@@ -111,6 +111,16 @@ class WorkerDashboard extends Component
             return;
         }
 
+        $hasPending = \App\Models\CashAdvance::where('cash_advanceable_type', Worker::class)
+            ->where('cash_advanceable_id', $worker->id)
+            ->where('status', 'pending')
+            ->exists();
+
+        if ($hasPending) {
+            session()->flash('kasbon_error', 'Anda masih memiliki pengajuan kasbon yang belum direspon Admin/Owner. Harap tunggu persetujuan sebelumnya.');
+            return;
+        }
+
         \App\Models\CashAdvance::create([
             'shop_id'               => $worker->shop_id,
             'cash_advanceable_type' => Worker::class,

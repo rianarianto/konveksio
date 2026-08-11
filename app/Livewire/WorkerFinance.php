@@ -55,6 +55,16 @@ class WorkerFinance extends Component
             return;
         }
 
+        $hasPending = CashAdvance::where('cash_advanceable_type', Worker::class)
+            ->where('cash_advanceable_id', $worker->id)
+            ->where('status', 'pending')
+            ->exists();
+
+        if ($hasPending) {
+            $this->addError('kasbon', 'Anda masih memiliki pengajuan kasbon yang belum direspon Admin/Owner.');
+            return;
+        }
+
         CashAdvance::create([
             'shop_id'               => $worker->shop_id,
             'cash_advanceable_type' => Worker::class,
