@@ -16,14 +16,40 @@ class WorkerDashboard extends Component
     public string $activeTab = 'tugas'; // 'tugas', 'riwayat', 'keuangan'
     public string $statusFilter = 'semua'; // 'semua', 'in_progress', 'pending', 'done'
 
-    // History Date Filter
-    public string $startDate = '';
-    public string $endDate = '';
+    // Pagination State (5 items per page)
+    public int $pageDone = 1;
+    public int $pageHistory = 1;
+    public int $pageKasbon = 1;
+    public int $perPage = 5;
 
-    // Kasbon form
-    public string $kasbonAmount = '';
-    public string $kasbonNote = '';
-    public bool $showKasbonModal = false;
+    public function updatedStatusFilter(): void
+    {
+        $this->pageDone = 1;
+    }
+
+    public function updatedStartDate(): void
+    {
+        $this->pageHistory = 1;
+    }
+
+    public function updatedEndDate(): void
+    {
+        $this->pageHistory = 1;
+    }
+
+    public function nextPage(string $type): void
+    {
+        if ($type === 'done') $this->pageDone++;
+        elseif ($type === 'history') $this->pageHistory++;
+        elseif ($type === 'kasbon') $this->pageKasbon++;
+    }
+
+    public function prevPage(string $type): void
+    {
+        if ($type === 'done' && $this->pageDone > 1) $this->pageDone--;
+        elseif ($type === 'history' && $this->pageHistory > 1) $this->pageHistory--;
+        elseif ($type === 'kasbon' && $this->pageKasbon > 1) $this->pageKasbon--;
+    }
 
     public function mount(string $token): void
     {
@@ -151,6 +177,36 @@ class WorkerDashboard extends Component
             ->get();
     }
 
+    public function getPaginatedHistoryProperty(): array
+    {
+        $all = $this->filteredHistory;
+        $total = $all->count();
+        $totalPages = max(1, (int) ceil($total / $this->perPage));
+        $items = $all->slice(($this->pageHistory - 1) * $this->perPage, $this->perPage)->values();
+
+        return [
+            'items' => $items,
+            'total' => $total,
+            'current_page' => $this->pageHistory,
+            'total_pages' => $totalPages,
+        ];
+    }
+
+    public function getPaginatedCashAdvanceProperty(): array
+    {
+        $all = $this->cashAdvanceHistory;
+        $total = $all->count();
+        $totalPages = max(1, (int) ceil($total / $this->perPage));
+        $items = $all->slice(($this->pageKasbon - 1) * $this->perPage, $this->perPage)->values();
+
+        return [
+            'items' => $items,
+            'total' => $total,
+            'current_page' => $this->pageKasbon,
+            'total_pages' => $totalPages,
+        ];
+    }
+
     /**
      * Get all tasks for this worker, grouped by status.
      * Sort: Express first, then FIFO (created_at ASC).
@@ -158,7 +214,13 @@ class WorkerDashboard extends Component
     public function getTasksProperty(): array
     {
         if (!$this->worker) {
-            return ['in_progress' => collect(), 'pending' => collect(), 'done' => collect()];
+            return [
+                'in_progress' => collect(),
+                'pending' => collect(),
+                'done' => collect(),
+                'done_total' => 0,
+                'done_pages' => 1,
+            ];
         }
 
         $tasks = ProductionTask::withoutGlobalScopes()
@@ -169,11 +231,17 @@ class WorkerDashboard extends Component
 
         // Sort: express first, then by created_at (already sorted)
         $sortedTasks = $tasks->sortByDesc(fn($t) => $t->orderItem?->order?->is_express ?? false);
+        $doneCollection = $sortedTasks->where('status', 'done')->values();
+        $totalDone = $doneCollection->count();
+        $totalDonePages = max(1, (int) ceil($totalDone / $this->perPage));
+        $donePaginated = $doneCollection->slice(($this->pageDone - 1) * $this->perPage, $this->perPage)->values();
 
         return [
             'in_progress' => $sortedTasks->where('status', 'in_progress')->values(),
-            'pending' => $sortedTasks->where('status', 'pending')->values(),
-            'done' => $sortedTasks->where('status', 'done')->take(20)->values(), // Limit history
+            'pending'     => $sortedTasks->where('status', 'pending')->values(),
+            'done'        => $donePaginated,
+            'done_total'  => $totalDone,
+            'done_pages'  => $totalDonePages,
         ];
     }
 

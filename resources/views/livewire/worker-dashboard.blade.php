@@ -291,7 +291,7 @@
         <div class="section-header">
             <span class="section-dot dot-green"></span>
             <span class="section-title">Pekerjaan Selesai</span>
-            <span class="section-count">{{ $tasks['done']->count() }}</span>
+            <span class="section-count">{{ $tasks['done_total'] }}</span>
         </div>
 
         @foreach($tasks['done'] as $task)
@@ -316,6 +316,20 @@
         </div>
         @if($wo)</a>@endif
         @endforeach
+
+        @if($tasks['done_pages'] > 1)
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px; padding:10px 14px; background:#ffffff; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <button wire:click="prevPage('done')" @if($pageDone <= 1) disabled @endif style="padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px; border:1px solid #cbd5e1; background:{{ $pageDone <= 1 ? '#f1f5f9' : '#ffffff' }}; color:{{ $pageDone <= 1 ? '#94a3b8' : '#1e293b' }}; cursor:{{ $pageDone <= 1 ? 'not-allowed' : 'pointer' }};">
+                ◀ Sebelum
+            </button>
+            <div style="font-size:12px; font-weight:800; color:#334155;">
+                Halaman <span style="color:#8000ff;">{{ $pageDone }}</span> dari {{ $tasks['done_pages'] }}
+            </div>
+            <button wire:click="nextPage('done')" @if($pageDone >= $tasks['done_pages']) disabled @endif style="padding:6px 12px; font-size:12px; font-weight:700; border-radius:8px; border:1px solid #cbd5e1; background:{{ $pageDone >= $tasks['done_pages'] ? '#f1f5f9' : '#ffffff' }}; color:{{ $pageDone >= $tasks['done_pages'] ? '#94a3b8' : '#1e293b' }}; cursor:{{ $pageDone >= $tasks['done_pages'] ? 'not-allowed' : 'pointer' }};">
+                Selanjutnya ▶
+            </button>
+        </div>
+        @endif
         @endif
 
         {{-- Empty State --}}
@@ -373,15 +387,16 @@
         </div>
     </div>
 
+    @php $histData = $this->paginatedHistory; @endphp
     {{-- Detailed History List --}}
     <div style="margin-top:16px;">
         <div class="section-header" style="margin-bottom:8px;">
             <span class="section-dot dot-green"></span>
             <span class="section-title">Detail Pekerjaan Selesai</span>
-            <span class="section-count">{{ $this->filteredHistory->count() }}</span>
+            <span class="section-count">{{ $histData['total'] }}</span>
         </div>
 
-        @forelse($this->filteredHistory as $task)
+        @forelse($histData['items'] as $task)
         <div class="card task-card" style="margin-bottom:8px; padding:12px 14px;">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
                 <div style="flex:1;">
@@ -419,6 +434,20 @@
             <p>Tidak ditemukan pekerjaan selesai pada periode tanggal yang dipilih.</p>
         </div>
         @endforelse
+
+        @if($histData['total_pages'] > 1)
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px; padding:10px 14px; background:#ffffff; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <button wire:click="prevPage('history')" @if($pageHistory <= 1) disabled @endif style="padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px; border:1px solid #cbd5e1; background:{{ $pageHistory <= 1 ? '#f1f5f9' : '#ffffff' }}; color:{{ $pageHistory <= 1 ? '#94a3b8' : '#1e293b' }}; cursor:{{ $pageHistory <= 1 ? 'not-allowed' : 'pointer' }};">
+                ◀ Sebelum
+            </button>
+            <div style="font-size:12px; font-weight:800; color:#334155;">
+                Halaman <span style="color:#8000ff;">{{ $pageHistory }}</span> dari {{ $histData['total_pages'] }}
+            </div>
+            <button wire:click="nextPage('history')" @if($pageHistory >= $histData['total_pages']) disabled @endif style="padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px; border:1px solid #cbd5e1; background:{{ $pageHistory >= $histData['total_pages'] ? '#f1f5f9' : '#ffffff' }}; color:{{ $pageHistory >= $histData['total_pages'] ? '#94a3b8' : '#1e293b' }}; cursor:{{ $pageHistory >= $histData['total_pages'] ? 'not-allowed' : 'pointer' }};">
+                Selanjutnya ▶
+            </button>
+        </div>
+        @endif
     </div>
     @endif
 
@@ -503,14 +532,16 @@
     </div>
     @endif
 
+    @php $kasData = $this->paginatedCashAdvance; @endphp
     {{-- Riwayat Transaksi Kasbon --}}
     <div style="margin-top:16px;">
         <div class="section-header" style="margin-bottom:8px;">
             <span class="section-dot dot-purple"></span>
             <span class="section-title">Riwayat Kasbon & Pembayaran</span>
+            <span class="section-count">{{ $kasData['total'] }}</span>
         </div>
 
-        @forelse($this->cashAdvanceHistory as $ca)
+        @forelse($kasData['items'] as $ca)
         <div class="card" style="margin-bottom:8px; padding:12px 14px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>
@@ -561,6 +592,20 @@
             <p>Anda belum pernah mengajukan pinjaman atau transaksi kasbon.</p>
         </div>
         @endforelse
+
+        @if($kasData['total_pages'] > 1)
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px; padding:10px 14px; background:#ffffff; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <button wire:click="prevPage('kasbon')" @if($pageKasbon <= 1) disabled @endif style="padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px; border:1px solid #cbd5e1; background:{{ $pageKasbon <= 1 ? '#f1f5f9' : '#ffffff' }}; color:{{ $pageKasbon <= 1 ? '#94a3b8' : '#1e293b' }}; cursor:{{ $pageKasbon <= 1 ? 'not-allowed' : 'pointer' }};">
+                ◀ Sebelum
+            </button>
+            <div style="font-size:12px; font-weight:800; color:#334155;">
+                Halaman <span style="color:#8000ff;">{{ $pageKasbon }}</span> dari {{ $kasData['total_pages'] }}
+            </div>
+            <button wire:click="nextPage('kasbon')" @if($pageKasbon >= $kasData['total_pages']) disabled @endif style="padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px; border:1px solid #cbd5e1; background:{{ $pageKasbon >= $kasData['total_pages'] ? '#f1f5f9' : '#ffffff' }}; color:{{ $pageKasbon >= $kasData['total_pages'] ? '#94a3b8' : '#1e293b' }}; cursor:{{ $pageKasbon >= $kasData['total_pages'] ? 'not-allowed' : 'pointer' }};">
+                Selanjutnya ▶
+            </button>
+        </div>
+        @endif
     </div>
     @endif
 
