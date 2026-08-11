@@ -122,6 +122,33 @@ class AdminPanelProvider extends PanelProvider
                         /* Global table vertical alignment */
                         .fi-ta-table td { vertical-align: top !important; }
 
+                        /* Spacing & Vibrant Red styling for Notification Bell Icon */
+                        .fi-topbar-database-notifications-btn,
+                        .fi-modal-open-btn,
+                        [x-data*="databaseNotifications"] {
+                            margin-left: 0.5rem !important;
+                            margin-right: 0.75rem !important;
+                        }
+                        .fi-topbar-database-notifications-btn button,
+                        button[aria-label*="Notification"],
+                        button[aria-label*="notifikasi"] {
+                            padding-left: 0.5rem !important;
+                            padding-right: 0.5rem !important;
+                        }
+
+                        /* Red Dot Indicator & Badge */
+                        .fi-topbar-database-notifications-btn .fi-badge,
+                        .fi-topbar-database-notifications-btn span[class*="bg-danger"],
+                        .fi-topbar-database-notifications-btn span[class*="bg-primary"],
+                        .fi-topbar-database-notifications-btn span[class*="bg-custom"],
+                        button[aria-label*="Notification"] span[class*="bg-"],
+                        button[aria-label*="notifikasi"] span[class*="bg-"] {
+                            background-color: #dc2626 !important;
+                            color: #ffffff !important;
+                            font-weight: 800 !important;
+                            box-shadow: 0 0 6px rgba(220, 38, 38, 0.6) !important;
+                        }
+
                         /* Tombol actions tabel rata atas */
                         .fi-ta-record-actions { vertical-align: top !important; }
 
