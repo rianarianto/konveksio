@@ -106,6 +106,7 @@ class ControlProduksiResource extends Resource
                         'product_name',
                         'production_category',
                         'bahan_id',
+                        'is_addition',
                     ]);
             });
     }
@@ -126,8 +127,7 @@ class ControlProduksiResource extends Resource
                 TextColumn::make('product_name')
                     ->label('Produk')
                     ->searchable()
-                    ->sortable()
-                    ->weight('bold')
+                    ->html()
                     ->getStateUsing(function(OrderItem $record): string {
                         $items = $record->getItemsInGroup();
                         $hasCustom = $items->contains(fn($item) => $item->size === 'Custom');
@@ -136,17 +136,19 @@ class ControlProduksiResource extends Resource
                         $suffix = '';
                         if ($record->production_category !== 'non_produksi' && $record->production_category !== 'jasa') {
                             if ($hasCustom && $hasStandard) {
-                                $suffix = ' (Standar & Custom)';
+                                $suffix = ' <span style="font-size:12px;font-weight:600;color:#64748b;">(Standar & Custom)</span>';
                             } elseif ($hasCustom) {
-                                $suffix = ' (Custom)';
+                                $suffix = ' <span style="font-size:12px;font-weight:600;color:#64748b;">(Custom)</span>';
                             } else {
-                                $suffix = ' (Standar)';
+                                $suffix = ' <span style="font-size:12px;font-weight:600;color:#64748b;">(Standar)</span>';
                             }
                         }
                         
-                        $additionTag = $record->is_addition ? ' ➕ [Item Tambahan]' : '';
+                        $additionBadge = $record->is_addition 
+                            ? ' <span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-weight:700; font-size:11px; padding:2px 8px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; margin-left:4px;">Penambahan Baru</span>' 
+                            : '';
 
-                        return $record->product_name . $suffix . $additionTag;
+                        return '<span class="font-bold text-gray-900 dark:text-gray-100">' . e($record->product_name) . '</span>' . $suffix . $additionBadge;
                     })
                     ->description(function(OrderItem $record): string {
                         $baseCategory = match ($record->production_category) {
@@ -185,12 +187,7 @@ class ControlProduksiResource extends Resource
                                 return $activeReturn->quantity;
                             }
 
-                            $query = OrderItem::where('order_id', $record->order_id)
-                                ->where('product_name', $record->product_name)
-                                ->where('bahan_id', $record->bahan_id)
-                                ->where('design_status', 'approved');
-                            
-                            return $query->sum('quantity');
+                            return $items->sum('quantity');
                         })()
                     )
                     ->description(function (OrderItem $record) {
@@ -201,10 +198,7 @@ class ControlProduksiResource extends Resource
                             ->first();
 
                         if ($activeReturn) {
-                            $totalOrderQty = OrderItem::where('order_id', $record->order_id)
-                                ->where('product_name', $record->product_name)
-                                ->where('bahan_id', $record->bahan_id)
-                                ->sum('quantity');
+                            $totalOrderQty = $items->sum('quantity');
                             return "dari total {$totalOrderQty} pcs";
                         }
                         return null;

@@ -76,10 +76,40 @@
             ring: 1px #6366f1 !important;
         }
 
-        /* Allow table container to display overflowing dropdowns without clipping */
-        .fi-ta-content {
-            overflow: visible !important;
+        /* Visible Horizontal Scrollbar styling for Order Items Table */
+        .fi-ta-content, 
+        .fi-ta-table-container,
+        .fi-ta-ctn {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding-bottom: 6px !important;
         }
+        .fi-ta-content::-webkit-scrollbar, 
+        .fi-ta-table-container::-webkit-scrollbar,
+        .fi-ta-ctn::-webkit-scrollbar {
+            height: 10px !important;
+            width: 10px !important;
+            display: block !important;
+        }
+        .fi-ta-content::-webkit-scrollbar-track, 
+        .fi-ta-table-container::-webkit-scrollbar-track,
+        .fi-ta-ctn::-webkit-scrollbar-track {
+            background: #e2e8f0 !important;
+            border-radius: 6px !important;
+        }
+        .fi-ta-content::-webkit-scrollbar-thumb, 
+        .fi-ta-table-container::-webkit-scrollbar-thumb,
+        .fi-ta-ctn::-webkit-scrollbar-thumb {
+            background: #6366f1 !important;
+            border-radius: 6px !important;
+            border: 2px solid #e2e8f0 !important;
+        }
+        .fi-ta-content::-webkit-scrollbar-thumb:hover, 
+        .fi-ta-table-container::-webkit-scrollbar-thumb:hover,
+        .fi-ta-ctn::-webkit-scrollbar-thumb:hover {
+            background: #4f46e5 !important;
+        }
+
         /* Ensure dropdown sits on top */
         .fi-dropdown-panel {
             z-index: 9999 !important;
@@ -208,20 +238,40 @@
             max-height: 500px;
             overflow-y: auto !important;
             overflow-x: auto !important;
-            padding-bottom: 24px !important;
         }
-        
-        /* Buat header tabel (th) menempel di atas saat di-scroll */
-        .fi-ta-table th {
-            position: sticky !important;
-            top: 0;
-            z-index: 10;
+
+        .fi-ta-content-ctn,
+        .fi-ta-ctn {
+            overflow-x: auto !important;
+            overflow-y: visible !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding-bottom: 6px !important;
         }
-        .dark .fi-ta-table th {
-            background-color: #111827 !important; /* Biar tidak transparan saat scroll di dark mode */
+
+        .fi-ta-table {
+            width: max-content !important;
+            min-width: 100% !important;
         }
-        .fi-ta-table th {
-            background-color: #ffffff !important; /* Biar tidak transparan saat scroll di light mode */
+
+        .fi-ta-content-ctn::-webkit-scrollbar,
+        .fi-ta-ctn::-webkit-scrollbar {
+            height: 10px !important;
+            width: 10px !important;
+            display: block !important;
+        }
+        .fi-ta-content-ctn::-webkit-scrollbar-track,
+        .fi-ta-ctn::-webkit-scrollbar-track {
+            background: #e2e8f0 !important;
+            border-radius: 6px !important;
+        }
+        .fi-ta-content-ctn::-webkit-scrollbar-thumb,
+        .fi-ta-ctn::-webkit-scrollbar-thumb {
+            background-color: #6366f1 !important;
+            border-radius: 6px !important;
+        }
+        .fi-ta-content-ctn::-webkit-scrollbar-thumb:hover,
+        .fi-ta-ctn::-webkit-scrollbar-thumb:hover {
+            background-color: #4f46e5 !important;
         }
     </style>
 

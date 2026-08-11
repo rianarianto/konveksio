@@ -78,7 +78,8 @@ class OrderResource extends Resource
 
     public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
     {
-        if (in_array($record->status, ['diproses', 'selesai', 'siap_diambil'])) {
+        /** @var Order $record */
+        if ($record->hasStartedProduction() || in_array($record->status, ['diproses', 'selesai', 'siap_diambil', 'produksi'])) {
             return false;
         }
         return in_array(auth()->user()->role, ['owner', 'admin']);
@@ -1022,7 +1023,7 @@ class OrderResource extends Resource
                         ->label('Lihat Detail')
                         ->icon('heroicon-o-eye')
                         ->color('primary')
-                        ->url(fn (Order $record): string => \App\Filament\Resources\Orders\OrderResource::getUrl($record->status === 'produksi' || $record->status === 'draft' ? 'edit' : 'view', ['record' => $record])),
+                        ->url(fn (Order $record): string => \App\Filament\Resources\Orders\OrderResource::getUrl(static::canEdit($record) ? 'edit' : 'view', ['record' => $record])),
 
                     // Kuitansi
                     \Filament\Actions\Action::make('print_receipt')
@@ -1099,31 +1100,12 @@ class OrderResource extends Resource
                         ])
                         ->visible(fn (Order $record): bool => $record->status === 'selesai' || !empty($record->pickup_proof)),
 
-                    // Delete Order
+                    // Delete Order (Khusus Owner)
                     \Filament\Actions\DeleteAction::make()
                         ->label('Batalkan / Hapus Pesanan')
                         ->modalHeading('Batalkan / Hapus Pesanan Ini?')
                         ->modalDescription('Tindakan ini akan menghapus pesanan beserta item dan pembayaran terkait secara permanen.')
-                        ->visible(function (Order $record): bool {
-                            $role = auth()->user()->role;
-                            if ($role === 'owner') {
-                                return true;
-                            }
-                            if ($role === 'admin') {
-                                // Admin BISA hapus pesanan SELAGI BELUM NAIK PRODUKSI
-                                $hasTasksStarted = $record->orderItems()->whereHas('productionTasks', function ($q) {
-                                    $q->whereIn('status', ['in_progress', 'done']);
-                                })->exists();
-
-                                $hasWoStarted = \App\Models\WorkOrder::withoutGlobalScopes()
-                                    ->whereIn('order_item_id', $record->orderItems()->pluck('id'))
-                                    ->whereNotIn('status', [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO'])
-                                    ->exists();
-
-                                return !$hasTasksStarted && !$hasWoStarted;
-                            }
-                            return false;
-                        }),
+                        ->visible(fn (): bool => auth()->user()->role === 'owner'),
                 ])
                 ->icon('heroicon-m-ellipsis-vertical')
                 ->color('gray')

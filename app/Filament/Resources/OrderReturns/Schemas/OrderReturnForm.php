@@ -208,36 +208,32 @@ class OrderReturnForm
                 ->label('5. Kirim Ke Divisi Mana? (Untuk Perbaikan)')
                 ->options(function ($get) {
                     $itemId = $get('order_item_id');
-                    if (!$itemId) {
-                        return [
-                            'QC_PERSIAPAN'  => '🔍 QC Persiapan Bahan',
-                            'Potong'        => '✂️ Divisi Potong',
-                            'Bordir/Sablon' => '🧵 Divisi Bordir / Sablon',
-                            'Jahit'         => '🪡 Divisi Jahit',
-                            'Finishing'     => '✨ Divisi Finishing / Packing',
-                            'QC_AKHIR'      => '🏁 QC Akhir / Pemeriksaan Final',
-                        ];
+                    $dbStages = \App\Models\ProductionStage::where('name', '!=', 'QC')
+                        ->orderBy('order_sequence')
+                        ->pluck('name')
+                        ->toArray();
+
+                    if (empty($dbStages)) {
+                        $dbStages = ['Potong', 'Jahit', 'Kancing', 'Bordir/Sablon', 'Finishing'];
                     }
 
-                    $item = OrderItem::find($itemId);
-                    if (!$item) return [];
+                    $item = $itemId ? OrderItem::find($itemId) : null;
+                    $cat = $item?->production_category ?? 'produksi';
+
+                    if ($cat === 'non_produksi' || $cat === 'jasa') {
+                        $stages = array_filter($dbStages, fn($s) => in_array($s, ['Bordir/Sablon', 'Finishing']));
+                    } else {
+                        $stages = $dbStages;
+                    }
 
                     $options = [];
-                    $cat = $item->production_category ?? 'produksi';
-                    if ($cat === 'non_produksi' || $cat === 'jasa') {
-                        $stages = ['Bordir/Sablon', 'Finishing'];
-                    } else {
-                        $stages = ['Potong', 'Bordir/Sablon', 'Jahit', 'Kancing', 'Finishing'];
-                    }
-
                     foreach ($stages as $stg) {
                         $label = match($stg) {
                             'Potong'        => '✂️ Divisi Potong',
-                            'Bordir/Sablon' => '🧵 Divisi Bordir / Sablon',
-                            'Sablon/Bordir' => '🧵 Divisi Bordir / Sablon',
                             'Jahit'         => '🪡 Divisi Jahit',
-                            'Finishing'     => '✨ Divisi Finishing / Packing',
                             'Kancing'       => '🔘 Divisi Kancing',
+                            'Bordir/Sablon', 'Sablon/Bordir' => '🧵 Divisi Bordir / Sablon',
+                            'Finishing'     => '✨ Divisi Finishing / Packing',
                             default         => '🛠️ Divisi ' . $stg,
                         };
                         $options[$stg] = $label;

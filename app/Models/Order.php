@@ -169,18 +169,13 @@ class Order extends Model
             ->whereIn('order_item_id', $itemIds)
             ->get();
         
+        if ($wos->isEmpty()) {
+            return false;
+        }
+
         foreach ($wos as $wo) {
-            if (!in_array($wo->status, [WorkOrder::STATUS_CREATED, WorkOrder::STATUS_QC_PREP])) {
+            if (!in_array($wo->status, [WorkOrder::STATUS_CREATED, 'NO_WO'])) {
                 return true;
-            }
-            if ($wo->status === WorkOrder::STATUS_QC_PREP) {
-                $qcTask = ProductionTask::withoutGlobalScopes()
-                    ->where('order_item_id', $wo->order_item_id)
-                    ->where('stage_name', 'QC_PERSIAPAN')
-                    ->first();
-                if ($qcTask && $qcTask->status !== 'pending') {
-                    return true;
-                }
             }
         }
 

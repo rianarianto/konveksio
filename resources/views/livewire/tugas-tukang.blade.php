@@ -189,6 +189,13 @@
                         'description' => 'Lakukan verifikasi final untuk seluruh tahapan produksi. Berikan persetujuan pada panel QC Akhir di bawah atau kirim revisi jika diperlukan.',
                         'status'      => 'in_progress',
                     ]);
+                } elseif (in_array($wo->status, [\App\Models\WorkOrder::STATUS_QC_PREP, 'QC_PERSIAPAN'])) {
+                    $myActiveTask = new \App\Models\ProductionTask([
+                        'stage_name'  => 'QC_PERSIAPAN',
+                        'quantity'    => $totalQty,
+                        'description' => 'Lakukan pemeriksaan bahan & peralatan sebelum produksi dimulai. Tekan Approve untuk membuka tahap produksi (Potong).',
+                        'status'      => 'pending',
+                    ]);
                 }
             }
 
@@ -631,41 +638,43 @@
         <div class="task-detail-row" style="flex-direction: column; align-items: flex-start; text-align: left; width: 100%;">
             <div class="task-detail-label" style="margin-bottom: 6px;">Instruksi Kerja</div>
             <div class="task-detail-value text-note" style="text-align: left; width: 100%;">
-                {{-- List ukuran dari rawText (Pembagian Ukuran / Size Toko) --}}
-                @if(!empty($parsedItems))
-                    @if(!empty($parsedTitle))
-                        <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            {{ $parsedTitle }}
-                        </div>
+                {{-- Render ringkasan / instruksi umum HANYA jika TIDAK ADA breakdown per varian --}}
+                @if(empty($workerVariantBreakdown))
+                    @if(!empty($parsedItems))
+                        @if(!empty($parsedTitle))
+                            <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                {{ $parsedTitle }}
+                            </div>
+                        @endif
+                        <ul class="instruction-list">
+                            @foreach($parsedItems as $item)
+                            <li class="instruction-item">
+                                <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                                {!! nl2br(e($item)) !!}
+                            </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        {!! nl2br(e($rawText)) !!}
                     @endif
-                    <ul class="instruction-list">
-                        @foreach($parsedItems as $item)
-                        <li class="instruction-item">
-                            <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
-                            {!! nl2br(e($item)) !!}
-                        </li>
-                        @endforeach
-                    </ul>
-                @else
-                    {!! nl2br(e($rawText)) !!}
-                @endif
 
-                {{-- Detail Size Custom: hanya jika ada custom recipients --}}
-                @if($hasCustom)
-                    <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-top: {{ ($hasPipe && !empty($parsedItems)) ? '14px' : '0' }}; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
-                        Detail Size Custom :
-                    </div>
-                    <ul class="instruction-list">
-                        @foreach($taskCustomRecipients as $c)
-                        <li class="instruction-item">
-                            <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
-                            <span style="font-weight: 600; color: #1e293b;">{{ $c['nama'] }}</span>
-                            @if($c['ukuran_badan'])
-                            <div style="font-size: 13px; color: #475569; margin-top: 2px;">({{ $c['ukuran_badan'] }})</div>
-                            @endif
-                        </li>
-                        @endforeach
-                    </ul>
+                    {{-- Detail Size Custom: hanya jika ada custom recipients --}}
+                    @if($hasCustom)
+                        <div style="font-weight: 700; color: #4B5563; font-size: 13px; margin-top: {{ ($hasPipe && !empty($parsedItems)) ? '14px' : '0' }}; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Detail Size Custom :
+                        </div>
+                        <ul class="instruction-list">
+                            @foreach($taskCustomRecipients as $c)
+                            <li class="instruction-item">
+                                <span class="instruction-pin" style="color:#8000FF;font-weight:900;font-size:16px;line-height:1;">•</span>
+                                <span style="font-weight: 600; color: #1e293b;">{{ $c['nama'] }}</span>
+                                @if($c['ukuran_badan'])
+                                <div style="font-size: 13px; color: #475569; margin-top: 2px;">({{ $c['ukuran_badan'] }})</div>
+                                @endif
+                            </li>
+                            @endforeach
+                        </ul>
+                    @endif
                 @endif
 
                 {{-- Breakdown Rinci Spesifik per Varian untuk Worker Ini --}}
@@ -774,19 +783,14 @@
         <div class="spec-model-row">
             @if($group['gender'] !== 'UMUM')
             <span class="spec-tag-item">JENIS KELAMIN: <strong>{{ $group['gender'] }}</strong></span>
-            <span class="spec-sep">|</span>
             @endif
             <span class="spec-tag-item">LENGAN: <strong>{{ $group['sleeve'] }}</strong></span>
-            <span class="spec-sep">|</span>
             <span class="spec-tag-item">SAKU: <strong>{{ $group['pocket'] }}</strong></span>
-            <span class="spec-sep">|</span>
             <span class="spec-tag-item">KANCING: <strong>{{ $group['button'] }}</strong></span>
             @if(!empty($group['collar']))
-            <span class="spec-sep">|</span>
             <span class="spec-tag-item">KERAH: <strong>{{ $group['collar'] }}</strong></span>
             @endif
             @if($group['tunic'] === 'TUNIK')
-            <span class="spec-sep">|</span>
             <span class="spec-tag-item">MODEL: <strong>TUNIK</strong></span>
             @endif
         </div>
@@ -889,17 +893,19 @@
                 
                 // Normalisasi status saat ini untuk pencocokan indeks
                 $currentStatus = $wo->status;
-                if ($currentStatus === 'QC_PERSIAPAN') { $currentStatus = 'QC_PREP'; }
-                if ($currentStatus === 'QC_REVIEW') {
+                if (in_array(strtoupper($currentStatus), ['QC_PERSIAPAN', 'QC_PREP'])) { $currentStatus = 'QC_PREP'; }
+                if (strtoupper($currentStatus) === 'QC_REVIEW') {
                     $currentStatus = $wo->current_review_stage;
-                    if ($currentStatus === 'QC_PERSIAPAN') { $currentStatus = 'QC_PREP'; }
+                    if (in_array(strtoupper($currentStatus ?? ''), ['QC_PERSIAPAN', 'QC_PREP'])) { $currentStatus = 'QC_PREP'; }
                 }
-                if ($currentStatus === 'QC_AKHIR') {
+                if (strtoupper($currentStatus) === 'QC_AKHIR') {
                     $currentStatus = end($normalizedStages) ?: 'COMPLETED';
                 }
                 
-                $currentIdx = array_search($currentStatus, $allStages);
-                if ($currentIdx === false) { $currentIdx = 1; } // fallback ke tahap awal jika tidak cocok
+                $upperAllStages = array_map('strtoupper', $allStages);
+                $upperCurrentStatus = strtoupper($currentStatus ?? '');
+                $currentIdx = array_search($upperCurrentStatus, $upperAllStages);
+                if ($currentIdx === false) { $currentIdx = 1; }
                 
                 $stageLabels = [
                     'CREATED'       => 'Dibuat',
@@ -911,11 +917,11 @@
             @endphp
             @foreach($allStages as $s)
             @php
-                $idx = array_search($s, $allStages);
+                $idx = array_search(strtoupper($s), $upperAllStages);
                 $isDone = $idx < $currentIdx;
                 $isCurrent = $idx === $currentIdx;
-                $label = $stageLabels[$s] ?? str_replace('_', ' ', $s);
-                if ($wo->status === 'QC_REVIEW' && $s === $wo->current_review_stage) {
+                $label = $stageLabels[strtoupper($s)] ?? str_replace('_', ' ', $s);
+                if (strtoupper($wo->status) === 'QC_REVIEW' && strtoupper($s) === strtoupper($wo->current_review_stage ?? '')) {
                     $isCurrent = true;
                     $label = 'QC ' . str_replace('_', ' ', $s);
                 }
@@ -947,7 +953,7 @@
 
     @elseif($isQcStage)
     {{-- QC Actions --}}
-    @if($worker?->id === $wo->qc_worker_id && $isMyActiveStage && $wo->status === 'QC_PREP')
+    @if($worker?->id === $wo->qc_worker_id && in_array($wo->status, ['QC_PREP', 'QC_PERSIAPAN']))
     <div class="action-card">
         {{-- QC Persiapan: hanya approve (tidak ada reject) --}}
         <div class="action-title">📋 QC Persiapan Bahan & Peralatan</div>
@@ -1662,22 +1668,28 @@
     border-radius: 6px;
 }
 .spec-model-row {
-    font-size: 11px;
-    color: #4B5563;
-    background: #F9FAFB;
-    padding: 6px 10px;
-    border-radius: 6px;
-    display: inline-flex;
+    display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 6px;
     align-items: center;
     margin-bottom: 8px;
+    background: transparent;
+    padding: 0;
 }
 .spec-tag-item {
-    font-weight: 500;
+    display: inline-block;
+    white-space: nowrap;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #64748B;
+    font-weight: 600;
 }
-.spec-sep {
-    color: #D1D5DB;
+.spec-tag-item strong {
+    color: #1E293B;
+    font-weight: 800;
 }
 .request-row {
     font-size: 12px;

@@ -340,27 +340,44 @@ class OrderItem extends Model
             ->get();
     }
 
+    public function getWorkOrderObject(): ?WorkOrder
+    {
+        $wo = WorkOrder::withoutGlobalScopes()
+            ->where('order_item_id', $this->id)
+            ->first();
+
+        if ($wo) {
+            return $wo;
+        }
+
+        $groupItemIds = $this->getItemsInGroup()->pluck('id');
+        return WorkOrder::withoutGlobalScopes()
+            ->whereIn('order_item_id', $groupItemIds)
+            ->first();
+    }
+
     /**
      * Check if this item can still be edited or deleted by Admin/Owner.
-     * 1. Belum Ditugaskan (Belum ada WorkOrder/SPK) -> BISA DIEDIT (Semua data).
-     * 2. Sudah Ditugaskan, tapi BELUM DIMULAI (Seluruh ProductionTask masih pending) -> BISA DIEDIT (Spesifikasi & Qty).
-     * 3. Sudah Dimulai (Ada ProductionTask dengan status in_progress / completed) -> LOCKED (TIDAK BISA DIUBAH SAMA SEKALI).
      */
     public function canBeEdited(): bool
     {
-        $wo = $this->workOrder;
+        $wo = $this->getWorkOrderObject();
         if (!$wo) {
             return true;
         }
 
-        // Lock item if WorkOrder has moved beyond CREATED or any production task has started/done
+        // Lock item if WorkOrder has moved beyond CREATED (e.g. QC_PREP / QC_PERSIAPAN / Potong etc.)
         if (!in_array($wo->status, [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO'])) {
             return false;
         }
 
+        $groupItemIds = $this->getItemsInGroup()->pluck('id');
         $hasStartedTask = \App\Models\ProductionTask::withoutGlobalScopes()
-            ->where('order_item_id', $this->id)
-            ->whereIn('status', ['in_progress', 'done', 'completed'])
+            ->whereIn('order_item_id', $groupItemIds)
+            ->where(function ($q) {
+                $q->whereIn('status', ['in_progress', 'done', 'completed'])
+                  ->orWhere('qc_approved', true);
+            })
             ->exists();
 
         if ($hasStartedTask) {

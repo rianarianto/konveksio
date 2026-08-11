@@ -45,12 +45,7 @@ class AturTugasProduksi extends Page
         $item = $this->record->load('productionTasks');
         
         // Aggregate max quantities for the whole group to determine _fill_all state
-        $allGroupItems = OrderItem::where('order_id', $item->order_id)
-            ->where('product_name', $item->product_name)
-            ->where('bahan_id', $item->bahan_id)
-            ->where('production_category', $item->production_category)
-            ->where('design_status', 'approved')
-            ->get();
+        $allGroupItems = $item->getItemsInGroup();
             
         $maxSizes = [];
         foreach ($allGroupItems as $gi) {
@@ -76,17 +71,28 @@ class AturTugasProduksi extends Page
         $tasksForRepeater = [];
         $groupedTasks = $item->productionTasks->groupBy('stage_name');
 
-        // If this item has active retur revision tasks, show all active retur target stages!
-        $activeReturStages = $item->productionTasks()
-            ->where('is_revision', true)
-            ->where('status', '!=', 'done')
-            ->pluck('stage_name')
-            ->unique()
-            ->toArray();
+        // If this item has active retur revision tasks & active OrderReturn, show active retur target stages!
+        $hasActiveReturn = \App\Models\OrderReturn::where('order_item_id', $item->id)
+            ->whereIn('status', ['pending', 'diproses'])
+            ->exists();
 
-        if (!empty($activeReturStages)) {
-            $groupedTasks = $groupedTasks->filter(fn($tasks, $stageName) => in_array($stageName, $activeReturStages));
+        $activeReturStages = [];
+        if ($hasActiveReturn) {
+            $activeReturStages = $item->productionTasks()
+                ->where('is_revision', true)
+                ->where('status', '!=', 'done')
+                ->where('stage_name', 'not like', 'QC_%')
+                ->pluck('stage_name')
+                ->unique()
+                ->toArray();
+        } else {
+            // If return was deleted or no active return, clean up lingering is_revision flags
+            $item->productionTasks()
+                ->where('is_revision', true)
+                ->update(['is_revision' => false]);
         }
+
+
 
         foreach ($groupedTasks as $stageName => $tasks) {
             // Skip QC stages - dikontrol oleh toggle di atas, bukan row repeater
@@ -392,10 +398,9 @@ class AturTugasProduksi extends Page
                                                 ->rows(2)
                                                 ->columnSpanFull()
                                                 ->placeholder('Catatan instruksi ini berlaku untuk seluruh pekerja di tahap ini...'),
-
                                             \Filament\Schemas\Components\Actions::make([
-                                                    \Filament\Actions\Action::make('autoDistribute')
-                                                        ->label('Bagi Tugas Otomatis')
+                                                \Filament\Actions\Action::make('autoDistribute')
+                                                    ->label('Bagi Tugas Otomatis')
                                                     ->icon('heroicon-m-sparkles')
                                                     ->color('primary')
                                                     ->action(function (Set $set, Get $get) use ($item) {
@@ -410,11 +415,7 @@ class AturTugasProduksi extends Page
                                                         }
 
                                                         // 1. Kumpulkan ukuran dari semua item di grup
-                                                        $allGroupItems = \App\Models\OrderItem::where('order_id', $item->order_id)
-                                                            ->where('product_name', $item->product_name)
-                                                            ->where('bahan_id', $item->bahan_id)
-                                                            ->where('design_status', 'approved')
-                                                            ->get();
+                                                        $allGroupItems = $item->getItemsInGroup();
 
                                                         $standardSizes = [];
                                                         foreach ($allGroupItems as $gi) {
@@ -450,38 +451,83 @@ class AturTugasProduksi extends Page
                                                             $workers[$wKey]['_custom_recipients'] = [];
                                                         }
 
-                                                        // 3. Distribusikan qty setiap ukuran standar secara merata ke semua worker
-                                                        foreach ($standardSizes as $sz => $qty) {
-                                                            $baseQty = floor($qty / $numWorkers);
-                                                            $remainder = $qty % $numWorkers;
-
-                                                            foreach ($workerKeys as $idx => $wKey) {
-                                                                $allocated = $baseQty + ($idx < $remainder ? 1 : 0);
-                                                                $workers[$wKey][$sz] = $allocated;
-                                                                $workers[$wKey]['quantity'] += $allocated;
-                                                            }
+                                                        // 3. Hitung target kuantitas per worker (seimbang & adil)
+                                                        $baseShare = intdiv($totalQty, $numWorkers);
+                                                        $remainder = $totalQty % $numWorkers;
+                                                        $workerTargets = [];
+                                                        foreach ($workerKeys as $idx => $wKey) {
+                                                            $workerTargets[$wKey] = $baseShare + ($idx < $remainder ? 1 : 0);
                                                         }
 
-                                                        // 4. Distribusikan CUSTOM secara merata ke semua worker
+                                                        // 4. Kumpulkan semua blok ukuran dalam bentuk array datar agar bisa dialokasikan secara seri
+                                                        $flatSizeQueue = [];
+                                                        foreach ($standardSizes as $szName => $szQty) {
+                                                            if ($szQty > 0) {
+                                                                $flatSizeQueue[] = [
+                                                                    'key'   => $szName,
+                                                                    'qty'   => $szQty,
+                                                                    'type'  => 'standard',
+                                                                    'names' => []
+                                                                ];
+                                                            }
+                                                        }
                                                         if ($customQtyTotal > 0) {
-                                                            $baseQty = floor($customQtyTotal / $numWorkers);
-                                                            $remainder = $customQtyTotal % $numWorkers;
+                                                            $flatSizeQueue[] = [
+                                                                'key'   => 'CUSTOM',
+                                                                'qty'   => $customQtyTotal,
+                                                                'type'  => 'custom',
+                                                                'names' => $customNames
+                                                            ];
+                                                        }
 
-                                                            // Bagi customNames ke masing-masing worker
-                                                            $customOffset = 0;
-                                                            foreach ($workerKeys as $idx => $wKey) {
-                                                                $allocated = $baseQty + ($idx < $remainder ? 1 : 0);
-                                                                $workers[$wKey]['CUSTOM'] = $allocated;
-                                                                $workers[$wKey]['quantity'] += $allocated;
-                                                                
-                                                                if ($allocated > 0) {
-                                                                    $workers[$wKey]['_custom_recipients'] = array_slice($customNames, $customOffset, $allocated);
-                                                                    $customOffset += $allocated;
+                                                        // 5. Alokasikan ukuran secara SERI (Batching per ukuran utuh semaksimal mungkin)
+                                                        $workerIdx = 0;
+                                                        $currentWorkerKey = $workerKeys[$workerIdx];
+                                                        $currentWorkerQuotaRemaining = $workerTargets[$currentWorkerKey];
+
+                                                        $customOffset = 0;
+                                                        foreach ($flatSizeQueue as $sizeItem) {
+                                                            $sizeKey = $sizeItem['key'];
+                                                            $sizeQtyRemaining = $sizeItem['qty'];
+
+                                                            while ($sizeQtyRemaining > 0 && $workerIdx < $numWorkers) {
+                                                                $allocation = min($sizeQtyRemaining, $currentWorkerQuotaRemaining);
+
+                                                                if ($allocation <= 0) {
+                                                                    if ($workerIdx < ($numWorkers - 1)) {
+                                                                        $workerIdx++;
+                                                                        $currentWorkerKey = $workerKeys[$workerIdx];
+                                                                        $currentWorkerQuotaRemaining = $workerTargets[$currentWorkerKey];
+                                                                        $allocation = min($sizeQtyRemaining, $currentWorkerQuotaRemaining);
+                                                                    } else {
+                                                                        break;
+                                                                    }
+                                                                }
+
+                                                                $workers[$currentWorkerKey][$sizeKey] = ($workers[$currentWorkerKey][$sizeKey] ?? 0) + $allocation;
+                                                                $workers[$currentWorkerKey]['quantity'] = ($workers[$currentWorkerKey]['quantity'] ?? 0) + $allocation;
+
+                                                                $currentWorkerQuotaRemaining -= $allocation;
+                                                                $sizeQtyRemaining -= $allocation;
+
+                                                                if ($sizeItem['type'] === 'custom' && !empty($sizeItem['names'])) {
+                                                                    $assignedNames = array_slice($sizeItem['names'], $customOffset, $allocation);
+                                                                    $workers[$currentWorkerKey]['_custom_recipients'] = array_merge(
+                                                                        $workers[$currentWorkerKey]['_custom_recipients'] ?? [],
+                                                                        $assignedNames
+                                                                    );
+                                                                    $customOffset += $allocation;
+                                                                }
+
+                                                                if ($currentWorkerQuotaRemaining <= 0 && $workerIdx < ($numWorkers - 1)) {
+                                                                    $workerIdx++;
+                                                                    $currentWorkerKey = $workerKeys[$workerIdx];
+                                                                    $currentWorkerQuotaRemaining = $workerTargets[$currentWorkerKey];
                                                                 }
                                                             }
                                                         }
 
-                                                        // 5. Bersihkan nilai 0 → null agar UI tetap rapi
+                                                        // 6. Bersihkan nilai 0 → null agar UI tetap rapi
                                                         foreach ($workerKeys as $wKey) {
                                                             foreach ($allSizeKeys as $sz) {
                                                                 if (isset($workers[$wKey][$sz]) && $workers[$wKey][$sz] === 0) {
@@ -492,8 +538,8 @@ class AturTugasProduksi extends Page
 
                                                         $set('workers', $workers);
                                                         \Filament\Notifications\Notification::make()
-                                                            ->title('Tugas Terbagi')
-                                                            ->body('Kuantitas setiap ukuran telah dibagi rata ke seluruh pekerja.')
+                                                            ->title('Tugas Terbagi (Metode Seri/Batching)')
+                                                            ->body('Ukuran dialokasikan secara utuh per blok untuk memaksimalkan efisiensi tukang.')
                                                             ->success()
                                                             ->send();
                                                     })
@@ -529,11 +575,7 @@ class AturTugasProduksi extends Page
 
                                                     Fieldset::make('Distribusi Qty Per Ukuran')
                                                         ->schema(function (Get $get, Set $set) use ($item) {
-                                                            $allGroupItems = OrderItem::where('order_id', $item->order_id)
-                                                                ->where('product_name', $item->product_name)
-                                                                ->where('bahan_id', $item->bahan_id)
-                                                                ->where('design_status', 'approved')
-                                                                ->get();
+                                                            $allGroupItems = $item->getItemsInGroup();
 
                                                             $standardSizes = [];
                                                             $requestPerSize = [];
@@ -729,7 +771,7 @@ class AturTugasProduksi extends Page
                                             $cat = $item->production_category ?? 'produksi';
                                             $details = $item->size_and_request_details ?? [];
                                             $bahan = $item->bahan;
-                                            $allOrderItems = OrderItem::where('order_id', $item->order_id)->where('product_name', $item->product_name)->get();
+                                            $allOrderItems = $item->getItemsInGroup();
 
                                             $catLabel = match ($cat) {
                                                 'non_produksi' => 'NON-PRODUKSI',
@@ -905,9 +947,9 @@ class AturTugasProduksi extends Page
                                                         if (!empty($mData['attrs'])) {
                                                             $atxt = [];
                                                             foreach ($mData['attrs'] as $ak => $av) {
-                                                                $atxt[] = '<span style="color:#64748b; font-size:10px;">' . $ak . ':</span> <strong style="color:#334155; font-size:10px;">' . $av . '</strong>';
+                                                                $atxt[] = '<span style="display:inline-block; white-space:nowrap; background:#f8fafc; border:1px solid #e2e8f0; padding:2px 8px; border-radius:4px; font-size:11px;"><span style="color:#64748b; font-weight:600;">' . htmlspecialchars($ak) . ':</span> <strong style="color:#1e293b; font-weight:800;">' . htmlspecialchars($av) . '</strong></span>';
                                                             }
-                                                            $html .= '<div style="display:flex; flex-wrap:wrap; gap:8px; font-size:10px; margin-bottom:8px; background:#ffffff; padding:4px 8px; border-radius:4px; border:1px solid #e2e8f0;">' . implode('<span style="color:#cbd5e1;">|</span>', $atxt) . '</div>';
+                                                            $html .= '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">' . implode('', $atxt) . '</div>';
                                                         }
                                                         $stxt = [];
                                                         foreach ($mData['sizes'] as $szKey => $sqty) {
@@ -995,12 +1037,7 @@ class AturTugasProduksi extends Page
             }
             $totalOrderQty = (int) $activeReturTask->quantity;
         } else {
-            $allGroupItems = OrderItem::where('order_id', $item->order_id)
-                ->where('product_name', $item->product_name)
-                ->where('bahan_id', $item->bahan_id)
-                ->where('production_category', $item->production_category)
-                ->where('design_status', 'approved')
-                ->get();
+            $allGroupItems = $item->getItemsInGroup();
 
             $originalSizes = [];
             foreach ($allGroupItems as $gi) {
@@ -1147,8 +1184,21 @@ class AturTugasProduksi extends Page
             }
         }
 
-        // Delete all existing tasks for this item
-        $item->productionTasks()->delete();
+        // Sort sizeGenders by frequency descending so the largest gender group is allocated continuously
+        foreach ($sizeGenders as $sz => $gList) {
+            $counts = array_count_values($gList);
+            arsort($counts);
+            $sortedList = [];
+            foreach ($counts as $gLabel => $cnt) {
+                for ($c = 0; $c < $cnt; $c++) {
+                    $sortedList[] = $gLabel;
+                }
+            }
+            $sizeGenders[$sz] = $sortedList;
+        }
+
+        // Delete existing non-revision tasks for this item (preserve retur tasks)
+        $item->productionTasks()->where('is_revision', false)->delete();
 
         // Keep local pools of custom names and genders per stage
         $stageCustomPools = [];
@@ -1256,9 +1306,6 @@ class AturTugasProduksi extends Page
                 $lookupKey = $stage . '_' . $workerId;
                 $oldTask = isset($existingTasks[$lookupKey]) ? $existingTasks[$lookupKey]->first() : null;
 
-                $isRevision = $oldTask?->is_revision ?? ($activeReturTask ? true : false);
-                $revisionSource = $oldTask?->revision_source ?? ($activeReturTask ? 'qc_akhir' : null);
-
                 $taskData = [
                     'stage_name' => $stage,
                     'assigned_to' => $workerId,
@@ -1270,8 +1317,8 @@ class AturTugasProduksi extends Page
                     'assigned_by' => $oldTask?->assigned_by ?? auth()->id(),
                     'status' => $oldTask?->status ?? 'pending',
                     'is_paid' => $oldTask?->is_paid ?? false,
-                    'is_revision' => $isRevision,
-                    'revision_source' => $revisionSource,
+                    'is_revision' => false,
+                    'revision_source' => null,
                     'wajib_qc' => $wajibQc,
                     'worker_payroll_id' => $oldTask?->worker_payroll_id ?? null,
                     'completed_at' => $oldTask?->completed_at ?? null,
@@ -1280,9 +1327,12 @@ class AturTugasProduksi extends Page
             }
         }
 
-        // Sync to WorkOrder
+        // Sync to original WorkOrder
         $groupItemIds = $item->getItemsInGroup()->pluck('id');
-        $workOrder = \App\Models\WorkOrder::withoutGlobalScopes()->whereIn('order_item_id', $groupItemIds)->first();
+        $workOrder = \App\Models\WorkOrder::withoutGlobalScopes()
+            ->whereIn('order_item_id', $groupItemIds)
+            ->where('wo_number', 'not like', '%-R%')
+            ->first();
 
         // Ambil is_express dari order
         $isExpress = (bool) ($item->order?->is_express ?? false);
@@ -1378,6 +1428,9 @@ class AturTugasProduksi extends Page
                     ->where('stage_name', 'QC_PERSIAPAN')
                     ->first();
                 
+                $isWoPastQcPrep = $workOrder && !in_array($workOrder->status, [\App\Models\WorkOrder::STATUS_CREATED, \App\Models\WorkOrder::STATUS_QC_PREP, 'QC_PERSIAPAN']);
+                $qcTaskStatus = $isWoPastQcPrep ? 'done' : 'pending';
+
                 if (!$existingQcTask) {
                     \App\Models\ProductionTask::create([
                         'order_item_id' => $item->id,
@@ -1387,18 +1440,26 @@ class AturTugasProduksi extends Page
                         'description' => $qcDesc,
                         'assigned_to' => $qcWorkerId,
                         'assigned_by' => auth()->id(),
-                        'status' => 'pending',
+                        'status' => $qcTaskStatus,
+                        'qc_approved' => $isWoPastQcPrep,
+                        'completed_at' => $isWoPastQcPrep ? now() : null,
                         'is_paid' => false,
                         'wajib_qc' => false,
                         'shop_id' => \Filament\Facades\Filament::getTenant()->id,
                     ]);
                 } else {
-                    $existingQcTask->update([
+                    $updateQcData = [
                         'quantity' => $totalGroupQty,
                         'size_quantities' => $groupSizeQuantities,
                         'description' => $qcDesc,
                         'assigned_to' => $qcWorkerId,
-                    ]);
+                    ];
+                    if ($isWoPastQcPrep && $existingQcTask->status !== 'done') {
+                        $updateQcData['status'] = 'done';
+                        $updateQcData['qc_approved'] = true;
+                        $updateQcData['completed_at'] = now();
+                    }
+                    $existingQcTask->update($updateQcData);
                 }
             }
 

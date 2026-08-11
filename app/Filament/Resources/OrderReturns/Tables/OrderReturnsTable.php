@@ -108,34 +108,25 @@ class OrderReturnsTable
                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make()
-                    ->requiresConfirmation()
-                    ->before(function (OrderReturn $record) {
-                        $itemId = $record->order_item_id;
+                    ->visible(function (OrderReturn $record): bool {
+                        $user = auth()->user();
+                        if (!$user) return false;
+                        if ($user->role === 'owner') return true;
 
-                        // 1. Hapus task revisi retur
-                        if ($itemId) {
-                            \App\Models\ProductionTask::withoutGlobalScopes()
+                        if ($user->role === 'admin') {
+                            $itemId = $record->order_item_id;
+                            $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->where('order_item_id', $itemId)
                                 ->where('is_revision', true)
-                                ->delete();
-
-                            // 2. Jika tidak ada retur aktif lainnya, kembalikan status WorkOrder ke COMPLETED
-                            $hasOtherReturns = OrderReturn::where('order_item_id', $itemId)
-                                ->where('id', '!=', $record->id)
-                                ->whereIn('status', ['pending', 'diproses'])
+                                ->whereIn('status', ['in_progress', 'done'])
                                 ->exists();
 
-                            if (!$hasOtherReturns) {
-                                $wo = \App\Models\WorkOrder::where('order_item_id', $itemId)->first();
-                                if ($wo) {
-                                    $wo->update([
-                                        'status' => \App\Models\WorkOrder::STATUS_COMPLETED,
-                                        'current_review_stage' => null,
-                                    ]);
-                                }
-                            }
+                            return !$hasTasksStarted;
                         }
-                    }),
+
+                        return false;
+                    })
+                    ->requiresConfirmation(),
             ])
             ->bulkActions([
                 BulkActionGroup::make([

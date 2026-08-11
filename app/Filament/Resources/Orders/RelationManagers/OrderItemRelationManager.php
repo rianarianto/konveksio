@@ -484,7 +484,8 @@ class OrderItemRelationManager extends RelationManager
                         $record->update(['size_and_request_details' => $details]);
                     }),
 
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->visible(fn(OrderItem $record) => auth()->user()->role === 'owner' && $record->canBeEdited()),
             ])
 
             ->bulkActions([
@@ -541,6 +542,7 @@ class OrderItemRelationManager extends RelationManager
                     ->deselectRecordsAfterCompletion(),
 
                 DeleteBulkAction::make()
+                    ->visible(fn() => auth()->user()->role === 'owner')
                     ->after(function () {
                         $this->updateOrderSubtotal();
                     }),

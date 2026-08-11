@@ -122,10 +122,25 @@ class WorkOrderService
                     : ($wo->current_review_stage ?? $wo->status);
 
                 if ($stageToApprove) {
-                    \App\Models\ProductionTask::withoutGlobalScopes()
-                        ->whereIn('order_item_id', $groupItemIds)
-                        ->where('stage_name', $stageToApprove)
-                        ->update(['qc_approved' => true, 'qc_reviewed_at' => $now]);
+                    if ($stageToApprove === 'QC_PERSIAPAN' || $stageToApprove === \App\Models\WorkOrder::STATUS_QC_PREP) {
+                        \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->whereIn('stage_name', ['QC_PERSIAPAN', 'QC_PREP'])
+                            ->update([
+                                'status'         => 'done',
+                                'qc_approved'    => true,
+                                'qc_reviewed_at' => $now,
+                                'completed_at'   => $now,
+                            ]);
+                    } else {
+                        \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('stage_name', $stageToApprove)
+                            ->update([
+                                'qc_approved'    => true,
+                                'qc_reviewed_at' => $now,
+                            ]);
+                    }
                 }
             }
 
@@ -268,7 +283,7 @@ class WorkOrderService
                     'reject_reason' => $reason,
                 ]);
 
-                if ($wo->status === WorkOrder::STATUS_QC_REVIEW || $wo->status === WorkOrder::STATUS_QC_AKHIR) {
+                if ($wo->status === WorkOrder::STATUS_QC_AKHIR) {
                     $wo->update([
                         'status' => $task->stage_name,
                         'current_review_stage' => null,

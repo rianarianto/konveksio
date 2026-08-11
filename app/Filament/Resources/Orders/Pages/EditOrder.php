@@ -15,10 +15,38 @@ class EditOrder extends EditRecord
 {
     protected static string $resource = OrderResource::class;
 
+    public function content(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
+    {
+        return $schema
+            ->components([
+                \Filament\Schemas\Components\Form::make([\Filament\Schemas\Components\EmbeddedSchema::make('form')])
+                    ->id('form')
+                    ->livewireSubmitHandler($this->getSubmitFormLivewireMethodName()),
+                $this->getRelationManagersContentComponent(),
+                $this->getFormActionsContentComponent(),
+            ]);
+    }
+
     protected function getSaveFormAction(): \Filament\Actions\Action
     {
         return parent::getSaveFormAction()
-            ->label('Simpan Pesanan');
+            ->label('Simpan Pesanan')
+            ->color('primary');
+    }
+
+    protected function getCancelFormAction(): \Filament\Actions\Action
+    {
+        return parent::getCancelFormAction()
+            ->label('Cancel')
+            ->color('gray');
+    }
+
+    protected function getFormActions(): array
+    {
+        return [
+            $this->getSaveFormAction(),
+            $this->getCancelFormAction(),
+        ];
     }
 
     /**

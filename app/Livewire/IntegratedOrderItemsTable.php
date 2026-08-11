@@ -233,7 +233,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         ELSE COALESCE(materials.name, 'Tanpa Bahan')
                                     END,
                                     ' | ',
-                                    COALESCE(material_variants.color_name, product_variants.color_name, 'Tanpa Warna')
+                                    COALESCE(material_variants.color_name, product_variants.color_name, 'Tanpa Warna'),
+                                    IF(COALESCE(order_items.is_addition, 0) = 1, ' | PENAMBAHAN_BARU', ' | UTAMA')
                                 ) as item_group_identity
                             "),
                         'raw_items'
@@ -252,6 +253,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         'sablon_jenis',
                         'sablon_lokasi',
                         'sablon_keterangan',
+                        'is_addition',
                     ])
                     ->selectRaw('MIN(id) as id')
                     ->selectRaw('MAX(order_id) as order_id')
@@ -280,10 +282,12 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         'sablon_jenis',
                         'sablon_lokasi',
                         'sablon_keterangan',
+                        'is_addition',
                         \Illuminate\Support\Facades\DB::raw("(IF(raw_items.size = 'Custom', id, 0))")
                     ]),
                     'order_items'
                 )
+                ->orderBy('item_group_identity', 'asc')
                 ->orderBy('is_custom_sort', 'asc')
                 ->orderBy('id', 'asc')
              )
@@ -1879,7 +1883,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
 
                 DeleteAction::make()
-                    ->visible(fn(OrderItem $record) => in_array(auth()->user()->role, ['owner', 'admin']) && $record->canBeEdited())
+                    ->visible(fn(OrderItem $record) => auth()->user()->role === 'owner' && $record->canBeEdited())
                     ->action(function (OrderItem $record) {
                         if ($record->size === 'Custom') {
                             $record->delete();
@@ -1929,7 +1933,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Update Variasi (Massal)')
                     ->icon('heroicon-m-pencil-square')
                     ->color('warning')
-                    ->visible(fn () => (auth()->user()->role === 'owner' || (auth()->user()->role === 'admin' && !in_array($this->order->status, ['diproses', 'selesai']))))
+                    ->visible(fn () => (auth()->user()->role === 'owner' || auth()->user()->role === 'admin') && !$this->order->hasStartedProduction())
                     ->form(function() use ($genderOptions, $sleeveOptions, $pocketOptions, $buttonOptions, $collarOptions, $modelOptions) {
                         return [
                             Section::make('Harga (Opsional)')
@@ -1994,7 +1998,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         $this->refreshOrderData();
                     }),
                 DeleteBulkAction::make()
-                    ->visible(fn () => (auth()->user()->role === 'owner' || (auth()->user()->role === 'admin' && !in_array($this->order->status, ['diproses', 'selesai']))))
+                    ->visible(fn () => auth()->user()->role === 'owner')
                     ->action(function (Collection $records) {
                         foreach ($records as $record) {
                             if ($record->size === 'Custom') {
@@ -2015,17 +2019,30 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Kelompok Spesifikasi')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
-                        return "📦 {$record->product_name}";
+                        return $record->is_addition
+                            ? "📦 {$record->product_name} ➕ [Penambahan Baru]"
+                            : "📦 {$record->product_name}";
                     })
                     ->getDescriptionUsing(function ($record) {
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                        $hasTasks = \App\Models\ProductionTask::whereIn('order_item_id', $groupItemIds)->exists();
-                        $unassignedBadge = !$hasTasks ? '<span class="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">⚠️ Belum Ditugaskan</span>' : '';
+                        $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()->whereIn('order_item_id', $groupItemIds)->exists();
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->first();
+
+                        if (!$hasTasks || !$wo) {
+                            $statusBadge = '<span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-weight:700; font-size:11px; padding:3px 10px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">⚠️ Belum Ditugaskan</span>';
+                        } elseif ($wo->status === \App\Models\WorkOrder::STATUS_COMPLETED) {
+                            $statusBadge = '<span style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-weight:700; font-size:11px; padding:3px 10px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">✅ Selesai</span>';
+                        } else {
+                            $statusBadge = '<span style="background:#ffedd5; color:#c2410c; border:1px solid #fed7aa; font-weight:700; font-size:11px; padding:3px 10px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">⚡ Diproses</span>';
+                        }
+
                         $escapedJsProduct = addslashes($record->product_name);
                         $componentId = $this->getId();
 
                         $html = '
-                        <span x-on:click.stop="">' . $unassignedBadge . '</span>
+                        <span x-on:click.stop="">' . $statusBadge . '</span>
                         <span style="margin-left:auto;display:inline-flex;align-items:center;" x-on:click.stop="">
                             <span x-data="{ open: false }" style="position:relative;display:inline-flex;align-items:center;" x-on:click.stop="">
                                 <button x-on:click.stop.prevent="open = !open" type="button" class="fi-icon-btn fi-size-md" style="display:inline-flex;align-items:center;justify-content:center;width:2.25rem;height:2.25rem;border-radius:0.5rem;background-color:#f9fafb;border:1px solid #e5e7eb;color:#6b7280;cursor:pointer;transition:all 0.15s ease;" aria-label="Aksi">

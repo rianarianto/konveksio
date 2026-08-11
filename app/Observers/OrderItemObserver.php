@@ -24,7 +24,7 @@ class OrderItemObserver
             ->where('design_status', 'approved')
             ->first();
 
-        if ($existingApproved && !$item->is_addition) {
+        if ($existingApproved) {
             $item->design_status = 'approved';
             $item->design_image = $existingApproved->design_image;
         }
@@ -49,7 +49,7 @@ class OrderItemObserver
         }
 
         $groupItemIds = $item->getItemsInGroup()->pluck('id');
-        $existingWo = WorkOrder::whereIn('order_item_id', $groupItemIds)->exists();
+        $existingWo = WorkOrder::withoutGlobalScopes()->whereIn('order_item_id', $groupItemIds)->exists();
         if ($existingWo) {
             return;
         }

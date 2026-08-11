@@ -19,11 +19,29 @@ class OrderReturn extends Model
         'status', // pending, diproses, selesai
         'action_type',
         'target_stage',
+        'target_stages',
         'responsibility_type', // store_guarantee, customer_paid
         'additional_fee',
         'size_breakdown',
         'photo_path',
     ];
+
+    public function setTargetStagesAttribute($value): void
+    {
+        if (is_array($value)) {
+            $this->attributes['target_stage'] = implode(',', $value);
+        } else {
+            $this->attributes['target_stage'] = $value;
+        }
+    }
+
+    public function getTargetStagesAttribute(): array
+    {
+        if (!empty($this->attributes['target_stage'])) {
+            return array_filter(array_map('trim', explode(',', $this->attributes['target_stage'])));
+        }
+        return [];
+    }
 
     protected $casts = [
         'return_date' => 'date',
@@ -51,9 +69,6 @@ class OrderReturn extends Model
     protected static function booted(): void
     {
         static::creating(function ($return) {
-            if (isset($return->target_stages) && is_array($return->target_stages)) {
-                $return->target_stage = implode(',', $return->target_stages);
-            }
             if (empty($return->status)) {
                 $return->status = 'pending';
             }
@@ -85,15 +100,15 @@ class OrderReturn extends Model
             $item = $return->orderItem;
             if (!$item) return;
 
-            $wo = $item->workOrder;
-            if (!$wo) {
+            $origWo = $item->workOrder;
+            if (!$origWo) {
                 $groupItemIds = $item->getItemsInGroup()->pluck('id');
-                $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                $origWo = \App\Models\WorkOrder::withoutGlobalScopes()
                     ->whereIn('order_item_id', $groupItemIds)
+                    ->where('wo_number', 'not like', '%-R%')
                     ->first();
             }
             $isCustomerPaid = $return->responsibility_type === 'customer_paid';
-
             $taskSizeQty = !empty($return->size_breakdown) ? $return->size_breakdown : null;
 
             if ($return->action_type === 'repair') {
@@ -106,8 +121,7 @@ class OrderReturn extends Model
                     $rawStages = ['Jahit'];
                 }
 
-                $firstStageName = null;
-
+                $mappedStages = [];
                 foreach ($rawStages as $stg) {
                     $stageName = match(strtolower((string)$stg)) {
                         'potong' => 'Potong',
@@ -118,12 +132,8 @@ class OrderReturn extends Model
                         'qc_akhir', 'qc_selesai', 'qc' => 'QC_AKHIR',
                         default => $stg ?: 'Jahit',
                     };
+                    $mappedStages[] = $stageName;
 
-                    if (!$firstStageName) {
-                        $firstStageName = $stageName;
-                    }
-
-                    // Find the latest task for this stage
                     $task = \App\Models\ProductionTask::where('order_item_id', $item->id)
                         ->where('stage_name', $stageName)
                         ->latest('id')
@@ -136,69 +146,46 @@ class OrderReturn extends Model
 
                     $repairWage = $isCustomerPaid ? ($originalWagePerPcs * $return->quantity) : 0;
 
-                    if ($task) {
-                        if ($task->is_paid || $isCustomerPaid) {
-                            \App\Models\ProductionTask::create([
-                                'shop_id' => $return->shop_id,
-                                'order_item_id' => $item->id,
-                                'stage_name' => $stageName,
-                                'quantity' => $return->quantity,
-                                'wage_amount' => $repairWage,
-                                'status' => 'pending',
-                                'is_revision' => true,
-                                'revision_source' => 'qc_akhir',
-                                'assigned_by' => auth()->id() ?? 1,
-                                'assigned_to' => null,
-                                'size_quantities' => $taskSizeQty,
-                                'note' => '⚠️ REVISI RETUR (' . ($isCustomerPaid ? 'Berbayar' : 'Garansi') . '): ' . $return->reason,
-                            ]);
-                        } else {
-                            $task->update([
-                                'status' => 'pending',
-                                'is_revision' => true,
-                                'revision_source' => 'qc_akhir',
-                                'assigned_to' => null,
-                                'quantity' => $return->quantity,
-                                'wage_amount' => $repairWage,
-                                'size_quantities' => $taskSizeQty,
-                                'note' => ($task->note ? $task->note . ' | ' : '') . '⚠️ REVISI RETUR: ' . $return->reason,
-                            ]);
-                        }
-                    } else {
-                        \App\Models\ProductionTask::create([
-                            'shop_id' => $return->shop_id,
-                            'order_item_id' => $item->id,
-                            'stage_name' => $stageName,
-                            'quantity' => $return->quantity,
-                            'wage_amount' => $repairWage,
-                            'status' => 'pending',
-                            'is_revision' => true,
-                            'revision_source' => 'qc_akhir',
-                            'assigned_by' => auth()->id() ?? 1,
-                            'assigned_to' => null,
-                            'size_quantities' => $taskSizeQty,
-                            'note' => '⚠️ REVISI RETUR (New): ' . $return->reason,
-                        ]);
-                    }
+                    \App\Models\ProductionTask::create([
+                        'shop_id' => $return->shop_id,
+                        'order_item_id' => $item->id,
+                        'stage_name' => $stageName,
+                        'quantity' => $return->quantity,
+                        'wage_amount' => $repairWage,
+                        'status' => 'pending',
+                        'is_revision' => true,
+                        'revision_source' => 'qc_akhir',
+                        'assigned_by' => auth()->id() ?? 1,
+                        'assigned_to' => null,
+                        'size_quantities' => $taskSizeQty,
+                        'note' => '⚠️ REVISI RETUR (' . ($isCustomerPaid ? 'Berbayar' : 'Garansi') . '): ' . $return->reason,
+                    ]);
                 }
 
-                // Revert WorkOrder status to first target stage & trigger WA to worker
-                if ($wo && $firstStageName) {
-                    $idx = array_search($firstStageName, $wo->stage_sequence);
-                    $wo->update([
-                        'status' => $firstStageName,
-                        'current_stage_index' => $idx !== false ? $idx : 0,
-                        'stage_entered_at' => now(),
-                        'completed_at' => null,
-                        'delivered_at' => null,
-                    ]);
-                    
-                    try {
-                        \App\Helpers\NotificationHelper::notify($wo, $firstStageName);
-                    } catch (\Throwable $e) {
-                        \Illuminate\Support\Facades\Log::error("[WA Retur] Gagal kirim WA retur: " . $e->getMessage());
-                    }
-                }
+                // Create NEW Work Order dedicated for Retur (WO-XXXX-R1)
+                $firstStageName = $mappedStages[0] ?? 'Jahit';
+                $returCount = \App\Models\WorkOrder::withoutGlobalScopes()
+                    ->where('order_item_id', $item->id)
+                    ->where('wo_number', 'like', '%-R%')
+                    ->count() + 1;
+
+                $baseWoNum = $origWo ? $origWo->wo_number : ('WO-' . str_pad((string)$item->id, 5, '0', STR_PAD_LEFT));
+                $returWoNum = $baseWoNum . '-R' . $returCount;
+
+                \App\Models\WorkOrder::create([
+                    'shop_id' => $return->shop_id,
+                    'order_item_id' => $item->id,
+                    'wo_number' => $returWoNum,
+                    'status' => $firstStageName,
+                    'stage_sequence' => $mappedStages,
+                    'current_stage_index' => 0,
+                    'stage_entered_at' => now(),
+                    'token' => \Illuminate\Support\Str::random(64),
+                    'is_express' => (bool) ($origWo?->is_express ?? false),
+                    'has_qc_prep' => false,
+                    'has_qc_selesai' => true,
+                ]);
+
             } elseif ($return->action_type === 'remake') {
                 $stages = ['Potong', 'Sablon/Bordir', 'Jahit', 'QC'];
                 
@@ -219,20 +206,33 @@ class OrderReturn extends Model
                         'quantity' => $return->quantity,
                         'wage_amount' => $wagePerPcs * $return->quantity,
                         'status' => 'pending',
+                        'is_revision' => true,
                         'size_quantities' => $taskSizeQty,
                         'note' => '⚠️ REMAKE RETUR: ' . $return->reason,
                     ]);
                 }
 
-                // Reset WorkOrder status to first stage
-                if ($wo && !empty($wo->stage_sequence)) {
-                    $firstStage = $wo->stage_sequence[0];
-                    $wo->update([
-                        'status' => $firstStage,
-                        'current_stage_index' => 0,
-                        'stage_entered_at' => now(),
-                    ]);
-                }
+                $returCount = \App\Models\WorkOrder::withoutGlobalScopes()
+                    ->where('order_item_id', $item->id)
+                    ->where('wo_number', 'like', '%-R%')
+                    ->count() + 1;
+
+                $baseWoNum = $origWo ? $origWo->wo_number : ('WO-' . str_pad((string)$item->id, 5, '0', STR_PAD_LEFT));
+                $returWoNum = $baseWoNum . '-R' . $returCount;
+
+                \App\Models\WorkOrder::create([
+                    'shop_id' => $return->shop_id,
+                    'order_item_id' => $item->id,
+                    'wo_number' => $returWoNum,
+                    'status' => 'Potong',
+                    'stage_sequence' => $stages,
+                    'current_stage_index' => 0,
+                    'stage_entered_at' => now(),
+                    'token' => \Illuminate\Support\Str::random(64),
+                    'is_express' => (bool) ($origWo?->is_express ?? false),
+                    'has_qc_prep' => false,
+                    'has_qc_selesai' => true,
+                ]);
             }
 
             // Handles additional fee if customer paid
@@ -241,11 +241,22 @@ class OrderReturn extends Model
                 if ($isCustomerPaid && $return->additional_fee > 0) {
                     $order->increment('total_amount', $return->additional_fee);
                 }
-                
-                // Revert Order status to 'diproses' if it was 'selesai' or 'siap_diambil'
-                if (in_array($order->status, ['selesai', 'siap_diambil'])) {
-                    $order->update(['status' => 'diproses']);
-                }
+            }
+        });
+
+        static::deleting(function ($return) {
+            $item = $return->orderItem;
+            if ($item) {
+                // Delete revision tasks
+                \App\Models\ProductionTask::where('order_item_id', $item->id)
+                    ->where('is_revision', true)
+                    ->delete();
+
+                // Delete retur Work Order (WO-XXXX-R*)
+                \App\Models\WorkOrder::withoutGlobalScopes()
+                    ->where('order_item_id', $item->id)
+                    ->where('wo_number', 'like', '%-R%')
+                    ->delete();
             }
         });
     }

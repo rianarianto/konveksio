@@ -262,13 +262,56 @@ class AdminPanelProvider extends PanelProvider
                             z-index: 30 !important;
                         }
 
-                        /* Allow table card container and its wrappers to overflow vertically */
-                        .fi-ta,
+                        /* Global Table Horizontal Scrollbar Fix for Filament */
+                        .fi-ta-content-ctn,
                         .fi-ta-ctn,
-                        .fi-ta-content,
-                        .orders-main-table-container,
-                        .orders-main-table-container > div {
-                            overflow: visible !important;
+                        .orders-main-table-container {
+                            overflow-x: auto !important;
+                            overflow-y: visible !important;
+                            -webkit-overflow-scrolling: touch !important;
+                            padding-bottom: 6px !important;
+                        }
+
+                        /* Allow Table to expand naturally to max-content */
+                        .fi-ta-table {
+                            width: max-content !important;
+                            min-width: 100% !important;
+                        }
+
+                        .fi-ta-content-ctn::-webkit-scrollbar,
+                        .fi-ta-ctn::-webkit-scrollbar,
+                        .orders-main-table-container::-webkit-scrollbar {
+                            height: 10px !important;
+                            width: 10px !important;
+                            display: block !important;
+                        }
+                        .fi-ta-content-ctn::-webkit-scrollbar-track,
+                        .fi-ta-ctn::-webkit-scrollbar-track,
+                        .orders-main-table-container::-webkit-scrollbar-track {
+                            background: #e2e8f0 !important;
+                            border-radius: 6px !important;
+                        }
+                        .fi-ta-content-ctn::-webkit-scrollbar-thumb,
+                        .fi-ta-ctn::-webkit-scrollbar-thumb,
+                        .orders-main-table-container::-webkit-scrollbar-thumb {
+                            background-color: #6366f1 !important;
+                            border-radius: 6px !important;
+                        }
+                        .fi-ta-content-ctn::-webkit-scrollbar-thumb:hover,
+                        .fi-ta-ctn::-webkit-scrollbar-thumb:hover,
+                        .orders-main-table-container::-webkit-scrollbar-thumb:hover {
+                            background-color: #4f46e5 !important;
+                        }
+
+                        .dark .fi-ta-content-ctn::-webkit-scrollbar-track,
+                        .dark .fi-ta-ctn::-webkit-scrollbar-track,
+                        .dark .orders-main-table-container::-webkit-scrollbar-track {
+                            background: #1e293b !important;
+                        }
+                        .dark .fi-ta-content-ctn::-webkit-scrollbar-thumb,
+                        .dark .fi-ta-ctn::-webkit-scrollbar-thumb,
+                        .dark .orders-main-table-container::-webkit-scrollbar-thumb {
+                            background-color: #6366f1 !important;
                         }
 
                         /* Style Filament native icon buttons globally to look like rounded squares */
@@ -297,10 +340,17 @@ class AdminPanelProvider extends PanelProvider
                         .dark .fi-icon-btn.fi-ac-action-group:hover {
                             background-color: #4b5563 !important;
                         }
-
-
-
                     </style>
+                    <script>
+                        document.addEventListener("wheel", function(e) {
+                            var tableCtn = e.target.closest(".fi-ta-content-ctn, .fi-ta-ctn, .orders-main-table-container, .order-items-scroll-wrapper");
+                            if (tableCtn && tableCtn.scrollWidth > tableCtn.clientWidth) {
+                                if (e.deltaY && !e.deltaX) {
+                                    tableCtn.scrollLeft += e.deltaY * 1.5;
+                                }
+                            }
+                        }, { passive: true });
+                    </script>
                 '),
             )
             ->userMenuItems([

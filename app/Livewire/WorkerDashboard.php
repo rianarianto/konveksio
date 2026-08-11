@@ -203,9 +203,10 @@ class WorkerDashboard extends Component
             if ($wo->has_qc_prep) {
                 $stages = $wo->stage_sequence ?? [];
                 if (!empty($stages) && $stages[0] === $task->stage_name) {
+                    $groupItemIds = $task->orderItem ? $task->orderItem->getItemsInGroup()->pluck('id') : [$task->order_item_id];
                     $qcTask = \App\Models\ProductionTask::withoutGlobalScopes()
-                        ->where('order_item_id', $task->order_item_id)
-                        ->where('stage_name', 'QC_PERSIAPAN')
+                        ->whereIn('order_item_id', $groupItemIds)
+                        ->whereIn('stage_name', ['QC_PERSIAPAN', 'QC_PREP'])
                         ->first();
                     if ($qcTask && $qcTask->status !== 'done') {
                         return false;
