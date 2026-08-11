@@ -453,8 +453,8 @@
                         <td colspan="2" style="padding: 6px 10px; font-weight: bold; font-size: 9pt; color: #5b21b6;">
                             TAHAP: {{ str_replace('_', ' ', $stageName) }}
                             @if(!empty($stageInst))
-                                <span style="font-weight: bold; color: #431407; font-size: 8.5pt; margin-left: 12px; background: #ffedd5; padding: 2px 8px; border-radius: 4px; border: 1.5px solid #fdba74;">
-                                    {{ $stageInst }}
+                                <span style="font-weight: bold; color: #1e293b; font-size: 8.5pt; margin-left: 10px;">
+                                    (Instruksi: {{ $stageInst }})
                                 </span>
                             @endif
                         </td>
