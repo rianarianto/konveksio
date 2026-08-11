@@ -450,11 +450,11 @@
 
                     {{-- Stage Sub-Header Banner (Full Width, Page-Break Safe) --}}
                     <tr style="background: #f3e8ff; border-top: 1.5px solid #7c3aed; page-break-inside: avoid;">
-                        <td colspan="2" style="padding: 4px 8px; font-weight: bold; font-size: 8.5pt; color: #6d28d9;">
+                        <td colspan="2" style="padding: 6px 10px; font-weight: bold; font-size: 9pt; color: #5b21b6;">
                             TAHAP: {{ str_replace('_', ' ', $stageName) }}
                             @if(!empty($stageInst))
-                                <span style="font-weight: normal; color: #4b5563; font-size: 8pt; margin-left: 10px;">
-                                    (Instruksi: {{ $stageInst }})
+                                <span style="font-weight: bold; color: #431407; font-size: 8.5pt; margin-left: 12px; background: #ffedd5; padding: 2px 8px; border-radius: 4px; border: 1.5px solid #fdba74;">
+                                    Catatan/Instruksi: {{ $stageInst }}
                                 </span>
                             @endif
                         </td>
@@ -543,33 +543,48 @@
                         @endphp
 
                         <tr style="page-break-inside: avoid;">
-                            <td class="text-bold" style="vertical-align:top; font-size:8.5pt; color:#1e293b;">
+                            <td class="text-bold" style="vertical-align:top; font-size:8.5pt; color:#1e293b; padding: 6px;">
                                 {{ $task->assignedTo->name ?? 'BELUM ADA' }}
                             </td>
 
-                            <td style="vertical-align:top;">
+                            <td style="vertical-align:top; padding: 6px;">
                                 <span style="font-size: 9pt; font-weight: bold; color:#111827;">{{ $task->quantity }} pcs</span>
                                 @if(!empty($taskVariantBreakdown))
                                     @foreach($taskVariantBreakdown as $tv)
-                                        <div style="margin-top: 4px; padding-left: 6px; border-left: 2px solid #6366f1;">
-                                            <div style="font-size: 7.5pt; color: #4338ca; font-weight: bold;">
-                                                📌 {{ $tv['title'] }} ({{ $tv['gender'] }})
+                                        <div style="margin-top: 5px; padding-left: 8px; border-left: 3px solid #6366f1;">
+                                            <div style="font-size: 8pt; color: #4338ca; font-weight: bold;">
+                                                VARIAN: {{ $tv['title'] }} ({{ $tv['gender'] }})
                                             </div>
                                             @if(!empty($tv['sizes']))
-                                                <div style="font-size: 7.5pt; color: #1e293b; margin-top: 1px;">
-                                                    <strong>Ukuran:</strong>
+                                                <div style="font-size: 7.5pt; color: #1e293b; margin-top: 2px;">
+                                                    <strong>Ukuran Standar:</strong>
                                                     @foreach($tv['sizes'] as $sz => $q)
-                                                        <span style="background: #f1f5f9; padding: 1px 4px; border-radius: 3px; border: 1px solid #cbd5e1; font-weight: 700;">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}: {{ $q }} pcs</span>{{ !$loop->last ? ' ' : '' }}
+                                                        <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 3px; border: 1px solid #cbd5e1; font-weight: 700; display: inline-block; margin-right: 4px;">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}: {{ $q }} pcs</span>
                                                     @endforeach
                                                 </div>
                                             @endif
                                             @if(!empty($tv['customs']))
-                                                <div style="font-size: 7.5pt; color: #047857; font-weight: bold; margin-top: 2px;">
-                                                    <strong>Custom ({{ count($tv['customs']) }} pcs):</strong>
-                                                    @foreach(array_unique($tv['customs']) as $cName)
-                                                        <span style="background: #dcfce7; color: #15803d; padding: 1px 5px; border-radius: 3px; border: 1px solid #86efac; margin-right: 3px; display: inline-block;">• {{ $cName }}</span>
-                                                    @endforeach
+                                                @php
+                                                    $uniqueCustoms = array_values(array_unique($tv['customs']));
+                                                    $chunks = array_chunk($uniqueCustoms, 3);
+                                                @endphp
+                                                <div style="font-size: 7.5pt; color: #047857; font-weight: bold; margin-top: 3px;">
+                                                    Daftar Penerima Custom ({{ count($uniqueCustoms) }} pcs):
                                                 </div>
+                                                <table style="width: 100%; border-collapse: collapse; margin-top: 2px;">
+                                                    @foreach($chunks as $cRow)
+                                                        <tr>
+                                                            @foreach($cRow as $cName)
+                                                                <td style="width: 33.33%; padding: 2px 6px; font-size: 7.5pt; color: #15803d; border: 1px solid #a7f3d0; background: #f0fdf4; font-weight: 600; vertical-align: middle;">
+                                                                    • {{ $cName }}
+                                                                </td>
+                                                            @endforeach
+                                                            @for($i = count($cRow); $i < 3; $i++)
+                                                                <td style="width: 33.33%; border: none;"></td>
+                                                            @endfor
+                                                        </tr>
+                                                    @endforeach
+                                                </table>
                                             @endif
                                         </div>
                                     @endforeach
