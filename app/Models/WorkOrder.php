@@ -106,6 +106,36 @@ class WorkOrder extends Model
     {
         static::addGlobalScope(new ShopScope());
 
+        static::saved(function (WorkOrder $wo) {
+            if ($wo->isDirty('status') && $wo->orderItem?->order) {
+                try {
+                    $order = $wo->orderItem->order;
+                    $groupItemIds = $order->orderItems()->pluck('id');
+                    $wos = WorkOrder::withoutGlobalScopes()
+                        ->whereIn('order_item_id', $groupItemIds)
+                        ->get();
+
+                    if ($wos->isNotEmpty()) {
+                        $allCompleted = $wos->every(fn($w) => $w->isCompleted());
+                        $anyInProgress = $wos->some(fn($w) => !$w->isCompleted() && $w->status !== WorkOrder::STATUS_CREATED);
+
+                        $newStatus = 'antrian';
+                        if ($allCompleted) {
+                            $newStatus = 'siap_diambil';
+                        } elseif ($anyInProgress) {
+                            $newStatus = 'diproses';
+                        }
+
+                        if ($order->status !== $newStatus && !in_array($order->status, ['selesai', 'dibatalkan', 'batal'])) {
+                            $order->update(['status' => $newStatus]);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        });
+
         static::creating(function (WorkOrder $wo) {
             // Auto-generate token unik
             if (empty($wo->token)) {
