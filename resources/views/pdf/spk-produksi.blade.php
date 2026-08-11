@@ -454,7 +454,7 @@
                             TAHAP: {{ str_replace('_', ' ', $stageName) }}
                             @if(!empty($stageInst))
                                 <span style="font-weight: bold; color: #431407; font-size: 8.5pt; margin-left: 12px; background: #ffedd5; padding: 2px 8px; border-radius: 4px; border: 1.5px solid #fdba74;">
-                                    Catatan/Instruksi: {{ $stageInst }}
+                                    {{ $stageInst }}
                                 </span>
                             @endif
                         </td>
