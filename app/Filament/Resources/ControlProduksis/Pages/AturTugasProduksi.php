@@ -600,7 +600,7 @@ class AturTugasProduksi extends Page
                                                 ->addActionLabel('+ Tambah Pekerja')
                                                 ->addAction(fn($action) => $action->color('primary')),
 
-                                            \Filament\Forms\Components\Actions::make([
+                                            \Filament\Schemas\Components\Actions::make([
                                                 \Filament\Actions\Action::make('autoDistribute')
                                                     ->label('✨ Bagi Tugas Otomatis')
                                                     ->icon('heroicon-m-sparkles')
