@@ -556,13 +556,13 @@
                                                 VARIAN: {{ $tv['title'] }} ({{ $tv['gender'] }})
                                             </div>
                                             @if(!empty($tv['sizes']))
-                                                <table style="border-collapse: collapse; margin-top: 3px;">
-                                                    <tr>
-                                                        <td style="padding: 0 4px 0 0; vertical-align: middle; font-size: 8pt; font-weight: bold; color: #334155; white-space: nowrap;">
+                                                <table style="border-collapse: collapse; margin-top: 3px; border: none !important;">
+                                                    <tr style="border: none !important;">
+                                                        <td style="padding: 0 4px 0 0; vertical-align: middle; font-size: 8pt; font-weight: bold; color: #334155; white-space: nowrap; border: none !important; background: transparent !important;">
                                                             Ukuran Standar:
                                                         </td>
                                                         @foreach($tv['sizes'] as $sz => $q)
-                                                            <td style="padding: 0 3px; vertical-align: middle;">
+                                                            <td style="padding: 0 3px; vertical-align: middle; border: none !important; background: transparent !important;">
                                                                 <div style="background: #f1f5f9; color: #0f172a; padding: 1px 6px; border-radius: 3px; border: 1px solid #cbd5e1; font-weight: 700; font-size: 7.5pt; white-space: nowrap;">
                                                                     {{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}: {{ $q }} pcs
                                                                 </div>
