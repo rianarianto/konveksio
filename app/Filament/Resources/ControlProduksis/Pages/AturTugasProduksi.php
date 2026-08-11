@@ -603,7 +603,7 @@ class AturTugasProduksi extends Page
 
                                             \Filament\Schemas\Components\Actions::make([
                                                 \Filament\Actions\Action::make('autoDistribute')
-                                                    ->label('✨ Bagi Tugas Otomatis')
+                                                    ->label('Bagi Tugas Otomatis')
                                                     ->icon('heroicon-m-sparkles')
                                                     ->color('primary')
                                                     ->action(function (Set $set, Get $get) use ($item) {
