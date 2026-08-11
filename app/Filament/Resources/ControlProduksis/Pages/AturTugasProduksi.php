@@ -598,6 +598,7 @@ class AturTugasProduksi extends Page
                                                 ])
                                                 ->columnSpanFull()
                                                 ->addActionLabel('+ Tambah Pekerja')
+                                                ->addActionAlignment(\Filament\Support\Enums\Alignment::Start)
                                                 ->addAction(fn($action) => $action->color('primary')),
 
                                             \Filament\Schemas\Components\Actions::make([
