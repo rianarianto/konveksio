@@ -745,7 +745,7 @@ class AturTugasProduksi extends Page
                                                             ->success()
                                                             ->send();
                                                     })
-                                            ]),
+                                            ])->alignLeft(),
                                         ])
                                         ->columnSpanFull()
                                         ->addActionLabel('+ Tambah Tugas Baru')
