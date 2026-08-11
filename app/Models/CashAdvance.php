@@ -54,7 +54,7 @@ class CashAdvance extends Model
                                     ->url('/app/' . $cashAdvance->shop_id . '/kasbon')
                                     ->markAsRead(),
                             ])
-                            ->toDatabase();
+                            ->toArray();
 
                         $recipient->notifications()->create([
                             'id' => (string) \Illuminate\Support\Str::uuid(),
