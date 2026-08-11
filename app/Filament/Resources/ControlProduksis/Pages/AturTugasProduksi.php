@@ -398,156 +398,8 @@ class AturTugasProduksi extends Page
                                                 ->rows(2)
                                                 ->columnSpanFull()
                                                 ->placeholder('Catatan instruksi ini berlaku untuk seluruh pekerja di tahap ini...'),
-                                             Repeater::make('workers')
-                                                 ->label('Daftar Pekerja & Kuantitas')
-                                                 ->collapsible()
-                                                 ->extraActions([
-                                                     \Filament\Actions\Action::make('autoDistribute')
-                                                         ->label('✨ Bagi Tugas Otomatis')
-                                                         ->icon('heroicon-m-sparkles')
-                                                         ->color('primary')
-                                                         ->action(function (Set $set, Get $get) use ($item) {
-                                                             $workers = $get('workers') ?? [];
-                                                             if (empty($workers)) {
-                                                                 \Filament\Notifications\Notification::make()
-                                                                     ->title('Pekerja Kosong')
-                                                                     ->body('Silakan tambahkan pekerja terlebih dahulu sebelum melakukan pembagian otomatis.')
-                                                                     ->warning()
-                                                                     ->send();
-                                                                 return;
-                                                             }
 
-                                                             // 1. Kumpulkan ukuran dari semua item di grup
-                                                             $allGroupItems = $item->getItemsInGroup();
-
-                                                             $standardSizes = [];
-                                                             foreach ($allGroupItems as $gi) {
-                                                                 $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-                                                                 $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
-                                                             }
-
-                                                             // Hitung CUSTOM (ukuran perorangan)
-                                                             $customQtyTotal = 0;
-                                                             $customNames = [];
-                                                             if ($item->production_category === 'custom') {
-                                                                 $details = $item->size_and_request_details ?? [];
-                                                                 $customNames = array_values(array_filter(
-                                                                     array_map(fn($u) => $u['nama'] ?? null, $details['detail_custom'] ?? [])
-                                                                 ));
-                                                                 $customQtyTotal = count($customNames);
-                                                             }
-
-                                                             $totalQty = array_sum($standardSizes) + $customQtyTotal;
-                                                             if ($totalQty <= 0) return;
-
-                                                             $allSizeKeys   = array_merge(array_keys($standardSizes), $customQtyTotal > 0 ? ['CUSTOM'] : []);
-                                                             $workerKeys    = array_keys($workers);
-                                                             $numWorkers    = count($workerKeys);
-
-                                                             // 2. Reset semua alokasi
-                                                             foreach ($workerKeys as $wKey) {
-                                                                 foreach ($allSizeKeys as $sz) {
-                                                                     $workers[$wKey][$sz] = null;
-                                                                 }
-                                                                 $workers[$wKey]['qty']               = null;
-                                                                 $workers[$wKey]['quantity']          = 0;
-                                                                 $workers[$wKey]['_custom_recipients'] = [];
-                                                             }
-
-                                                             // 3. Hitung target kuantitas per worker (seimbang & adil)
-                                                             $baseShare = intdiv($totalQty, $numWorkers);
-                                                             $remainder = $totalQty % $numWorkers;
-                                                             $workerTargets = [];
-                                                             foreach ($workerKeys as $idx => $wKey) {
-                                                                 $workerTargets[$wKey] = $baseShare + ($idx < $remainder ? 1 : 0);
-                                                             }
-
-                                                             // 4. Kumpulkan semua blok ukuran dalam bentuk array datar agar bisa dialokasikan secara seri
-                                                             $flatSizeQueue = [];
-                                                             foreach ($standardSizes as $szName => $szQty) {
-                                                                 if ($szQty > 0) {
-                                                                     $flatSizeQueue[] = [
-                                                                         'key'   => $szName,
-                                                                         'qty'   => $szQty,
-                                                                         'type'  => 'standard',
-                                                                         'names' => []
-                                                                     ];
-                                                                 }
-                                                             }
-                                                             if ($customQtyTotal > 0) {
-                                                                 $flatSizeQueue[] = [
-                                                                     'key'   => 'CUSTOM',
-                                                                     'qty'   => $customQtyTotal,
-                                                                     'type'  => 'custom',
-                                                                     'names' => $customNames
-                                                                 ];
-                                                             }
-
-                                                             // 5. Alokasikan ukuran secara SERI (Batching per ukuran utuh semaksimal mungkin)
-                                                             $workerIdx = 0;
-                                                             $currentWorkerKey = $workerKeys[$workerIdx];
-                                                             $currentWorkerQuotaRemaining = $workerTargets[$currentWorkerKey];
-
-                                                             $customOffset = 0;
-                                                             foreach ($flatSizeQueue as $sizeItem) {
-                                                                 $sizeKey = $sizeItem['key'];
-                                                                 $sizeQtyRemaining = $sizeItem['qty'];
-
-                                                                 while ($sizeQtyRemaining > 0 && $workerIdx < $numWorkers) {
-                                                                     $allocation = min($sizeQtyRemaining, $currentWorkerQuotaRemaining);
-
-                                                                     if ($allocation <= 0) {
-                                                                         if ($workerIdx < ($numWorkers - 1)) {
-                                                                             $workerIdx++;
-                                                                             $currentWorkerKey = $workerKeys[$workerIdx];
-                                                                             $currentWorkerQuotaRemaining = $workerTargets[$currentWorkerKey];
-                                                                             $allocation = min($sizeQtyRemaining, $currentWorkerQuotaRemaining);
-                                                                         } else {
-                                                                             break;
-                                                                         }
-                                                                     }
-
-                                                                     $workers[$currentWorkerKey][$sizeKey] = ($workers[$currentWorkerKey][$sizeKey] ?? 0) + $allocation;
-                                                                     $workers[$currentWorkerKey]['quantity'] = ($workers[$currentWorkerKey]['quantity'] ?? 0) + $allocation;
-
-                                                                     $currentWorkerQuotaRemaining -= $allocation;
-                                                                     $sizeQtyRemaining -= $allocation;
-
-                                                                     if ($sizeItem['type'] === 'custom' && !empty($sizeItem['names'])) {
-                                                                         $assignedNames = array_slice($sizeItem['names'], $customOffset, $allocation);
-                                                                         $workers[$currentWorkerKey]['_custom_recipients'] = array_merge(
-                                                                             $workers[$currentWorkerKey]['_custom_recipients'] ?? [],
-                                                                             $assignedNames
-                                                                         );
-                                                                         $customOffset += $allocation;
-                                                                     }
-
-                                                                     if ($currentWorkerQuotaRemaining <= 0 && $workerIdx < ($numWorkers - 1)) {
-                                                                         $workerIdx++;
-                                                                         $currentWorkerKey = $workerKeys[$workerIdx];
-                                                                         $currentWorkerQuotaRemaining = $workerTargets[$currentWorkerKey];
-                                                                     }
-                                                                 }
-                                                             }
-
-                                                             // 6. Bersihkan nilai 0 → null agar UI tetap rapi
-                                                             foreach ($workerKeys as $wKey) {
-                                                                 foreach ($allSizeKeys as $sz) {
-                                                                     if (isset($workers[$wKey][$sz]) && $workers[$wKey][$sz] === 0) {
-                                                                         $workers[$wKey][$sz] = null;
-                                                                     }
-                                                                 }
-                                                             }
-
-                                                             $set('workers', $workers);
-                                                             \Filament\Notifications\Notification::make()
-                                                                 ->title('Tugas Terbagi (Metode Seri/Batching)')
-                                                                 ->body('Ukuran dialokasikan secara utuh per blok untuk memaksimalkan efisiensi tukang.')
-                                                                 ->success()
-                                                                 ->send();
-                                                         })
-                                                 ])
-                                                ->label('Daftar Pekerja & Kuantitas')
+                                            Repeater::make('workers')              ->label('Daftar Pekerja & Kuantitas')
                                                 ->collapsible()
                                                 ->extraAttributes([
                                                     'data-auto-collapse-new' => true,
@@ -747,11 +599,158 @@ class AturTugasProduksi extends Page
                                                 ->columnSpanFull()
                                                 ->addActionLabel('+ Tambah Pekerja')
                                                 ->addAction(fn($action) => $action->color('primary')),
+
+                                            \Filament\Forms\Components\Actions::make([
+                                                \Filament\Actions\Action::make('autoDistribute')
+                                                    ->label('✨ Bagi Tugas Otomatis')
+                                                    ->icon('heroicon-m-sparkles')
+                                                    ->color('primary')
+                                                    ->action(function (Set $set, Get $get) use ($item) {
+                                                        $workers = $get('workers') ?? [];
+                                                        if (empty($workers)) {
+                                                            \Filament\Notifications\Notification::make()
+                                                                ->title('Pekerja Kosong')
+                                                                ->body('Silakan tambahkan pekerja terlebih dahulu sebelum melakukan pembagian otomatis.')
+                                                                ->warning()
+                                                                ->send();
+                                                            return;
+                                                        }
+
+                                                        // 1. Kumpulkan ukuran dari semua item di grup
+                                                        $allGroupItems = $item->getItemsInGroup();
+
+                                                        $standardSizes = [];
+                                                        foreach ($allGroupItems as $gi) {
+                                                            $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                                                            $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
+                                                        }
+
+                                                        // Hitung CUSTOM (ukuran perorangan)
+                                                        $customQtyTotal = 0;
+                                                        $customNames = [];
+                                                        if ($item->production_category === 'custom') {
+                                                            $details = $item->size_and_request_details ?? [];
+                                                            $customNames = array_values(array_filter(
+                                                                array_map(fn($u) => $u['nama'] ?? null, $details['detail_custom'] ?? [])
+                                                            ));
+                                                            $customQtyTotal = count($customNames);
+                                                        }
+
+                                                        $totalQty = array_sum($standardSizes) + $customQtyTotal;
+                                                        if ($totalQty <= 0) return;
+
+                                                        $allSizeKeys   = array_merge(array_keys($standardSizes), $customQtyTotal > 0 ? ['CUSTOM'] : []);
+                                                        $workerKeys    = array_keys($workers);
+                                                        $numWorkers    = count($workerKeys);
+
+                                                        // 2. Reset semua alokasi
+                                                        foreach ($workerKeys as $wKey) {
+                                                            foreach ($allSizeKeys as $sz) {
+                                                                $workers[$wKey][$sz] = null;
+                                                            }
+                                                            $workers[$wKey]['qty']               = null;
+                                                            $workers[$wKey]['quantity']          = 0;
+                                                            $workers[$wKey]['_custom_recipients'] = [];
+                                                        }
+
+                                                        // 3. Hitung target kuantitas per worker (seimbang & adil)
+                                                        $baseShare = intdiv($totalQty, $numWorkers);
+                                                        $remainder = $totalQty % $numWorkers;
+                                                        $workerTargets = [];
+                                                        foreach ($workerKeys as $idx => $wKey) {
+                                                            $workerTargets[$wKey] = $baseShare + ($idx < $remainder ? 1 : 0);
+                                                        }
+
+                                                        // 4. Kumpulkan semua blok ukuran dalam bentuk array datar agar bisa dialokasikan secara seri
+                                                        $flatSizeQueue = [];
+                                                        foreach ($standardSizes as $szName => $szQty) {
+                                                            if ($szQty > 0) {
+                                                                $flatSizeQueue[] = [
+                                                                    'key'   => $szName,
+                                                                    'qty'   => $szQty,
+                                                                    'type'  => 'standard',
+                                                                    'names' => []
+                                                                ];
+                                                            }
+                                                        }
+                                                        if ($customQtyTotal > 0) {
+                                                            $flatSizeQueue[] = [
+                                                                'key'   => 'CUSTOM',
+                                                                'qty'   => $customQtyTotal,
+                                                                'type'  => 'custom',
+                                                                'names' => $customNames
+                                                            ];
+                                                        }
+
+                                                        // 5. Alokasikan ukuran secara SERI (Batching per ukuran utuh semaksimal mungkin)
+                                                        $workerIdx = 0;
+                                                        $currentWorkerKey = $workerKeys[$workerIdx];
+                                                        $currentWorkerQuotaRemaining = $workerTargets[$currentWorkerKey];
+
+                                                        $customOffset = 0;
+                                                        foreach ($flatSizeQueue as $sizeItem) {
+                                                            $sizeKey = $sizeItem['key'];
+                                                            $sizeQtyRemaining = $sizeItem['qty'];
+
+                                                            while ($sizeQtyRemaining > 0 && $workerIdx < $numWorkers) {
+                                                                $allocation = min($sizeQtyRemaining, $currentWorkerQuotaRemaining);
+
+                                                                if ($allocation <= 0) {
+                                                                    if ($workerIdx < ($numWorkers - 1)) {
+                                                                        $workerIdx++;
+                                                                        $currentWorkerKey = $workerKeys[$workerIdx];
+                                                                        $currentWorkerQuotaRemaining = $workerTargets[$currentWorkerKey];
+                                                                        $allocation = min($sizeQtyRemaining, $currentWorkerQuotaRemaining);
+                                                                    } else {
+                                                                        break;
+                                                                    }
+                                                                }
+
+                                                                $workers[$currentWorkerKey][$sizeKey] = ($workers[$currentWorkerKey][$sizeKey] ?? 0) + $allocation;
+                                                                $workers[$currentWorkerKey]['quantity'] = ($workers[$currentWorkerKey]['quantity'] ?? 0) + $allocation;
+
+                                                                $currentWorkerQuotaRemaining -= $allocation;
+                                                                $sizeQtyRemaining -= $allocation;
+
+                                                                if ($sizeItem['type'] === 'custom' && !empty($sizeItem['names'])) {
+                                                                    $assignedNames = array_slice($sizeItem['names'], $customOffset, $allocation);
+                                                                    $workers[$currentWorkerKey]['_custom_recipients'] = array_merge(
+                                                                        $workers[$currentWorkerKey]['_custom_recipients'] ?? [],
+                                                                        $assignedNames
+                                                                    );
+                                                                    $customOffset += $allocation;
+                                                                }
+
+                                                                if ($currentWorkerQuotaRemaining <= 0 && $workerIdx < ($numWorkers - 1)) {
+                                                                    $workerIdx++;
+                                                                    $currentWorkerKey = $workerKeys[$workerIdx];
+                                                                    $currentWorkerQuotaRemaining = $workerTargets[$currentWorkerKey];
+                                                                }
+                                                            }
+                                                        }
+
+                                                        // 6. Bersihkan nilai 0 → null agar UI tetap rapi
+                                                        foreach ($workerKeys as $wKey) {
+                                                            foreach ($allSizeKeys as $sz) {
+                                                                if (isset($workers[$wKey][$sz]) && $workers[$wKey][$sz] === 0) {
+                                                                    $workers[$wKey][$sz] = null;
+                                                                }
+                                                            }
+                                                        }
+
+                                                        $set('workers', $workers);
+                                                        \Filament\Notifications\Notification::make()
+                                                            ->title('Tugas Terbagi (Metode Seri/Batching)')
+                                                            ->body('Ukuran dialokasikan secara utuh per blok untuk memaksimalkan efisiensi tukang.')
+                                                            ->success()
+                                                            ->send();
+                                                    })
+                                            ]),
                                         ])
                                         ->columnSpanFull()
                                         ->addActionLabel('+ Tambah Tugas Baru')
                                         ->addAction(fn($action) => $action->color('primary')),
-                                    ]),
+                                     ]),
                                      \Filament\Forms\Components\ViewField::make('submit_buttons')
                                          ->hiddenLabel()
                                          ->view('filament.resources.control-produksi.components.submit-buttons'),
