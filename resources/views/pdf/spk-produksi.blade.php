@@ -556,14 +556,20 @@
                                                 VARIAN: {{ $tv['title'] }} ({{ $tv['gender'] }})
                                             </div>
                                             @if(!empty($tv['sizes']))
-                                                <div style="font-size: 8pt; color: #1e293b; margin-top: 3px; line-height: 1.4;">
-                                                    <span style="font-weight: bold; color: #334155;">Ukuran Standar:</span>
-                                                    @foreach($tv['sizes'] as $sz => $q)
-                                                        <span style="display: inline-block; background: #f1f5f9; color: #0f172a; padding: 2px 6px; border-radius: 3px; border: 1px solid #cbd5e1; font-weight: 700; font-size: 7.5pt; vertical-align: middle; margin-left: 3px;">
-                                                            {{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}: {{ $q }} pcs
-                                                        </span>
-                                                    @endforeach
-                                                </div>
+                                                <table style="border-collapse: collapse; margin-top: 3px;">
+                                                    <tr>
+                                                        <td style="padding: 0 4px 0 0; vertical-align: middle; font-size: 8pt; font-weight: bold; color: #334155; white-space: nowrap;">
+                                                            Ukuran Standar:
+                                                        </td>
+                                                        @foreach($tv['sizes'] as $sz => $q)
+                                                            <td style="padding: 0 3px; vertical-align: middle;">
+                                                                <div style="background: #f1f5f9; color: #0f172a; padding: 1px 6px; border-radius: 3px; border: 1px solid #cbd5e1; font-weight: 700; font-size: 7.5pt; white-space: nowrap;">
+                                                                    {{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}: {{ $q }} pcs
+                                                                </div>
+                                                            </td>
+                                                        @endforeach
+                                                    </tr>
+                                                </table>
                                             @endif
                                             @if(!empty($tv['customs']))
                                                 @php
