@@ -502,8 +502,18 @@
         </div>
         @endif
 
-        <button wire:click="$toggle('showKasbonModal')" class="btn btn-primary btn-sm" style="width:100%; padding:10px; font-size:13px; font-weight:700; border-radius:10px; background:#8000FF; color:white; border:none; cursor:pointer;">
-            ➕ {{ $showKasbonModal ? 'Tutup Form Pengajuan' : 'Ajukan Kasbon Baru' }}
+        <button wire:click="$toggle('showKasbonModal')" class="btn btn-primary btn-sm" style="width:100%; padding:10px; font-size:13px; font-weight:800; border-radius:10px; background:#8000FF; color:#ffffff; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+            @if($showKasbonModal)
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="color:#ffffff;">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+                <span>Tutup Form Pengajuan</span>
+            @else
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="color:#ffffff;">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+                <span>Ajukan Kasbon Baru</span>
+            @endif
         </button>
     </div>
 
