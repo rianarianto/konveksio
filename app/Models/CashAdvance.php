@@ -49,6 +49,7 @@ class CashAdvance extends Model
                                 ->body("{$recipientName} mengajukan kasbon sebesar {$amountFormatted}.")
                                 ->icon('heroicon-o-banknotes')
                                 ->iconColor('danger')
+                                ->persistent()
                                 ->actions([
                                     \Filament\Actions\Action::make('view')
                                         ->label('Lihat Kasbon')
