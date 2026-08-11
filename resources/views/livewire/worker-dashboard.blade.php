@@ -58,7 +58,7 @@
     @if(session()->has('kasbon_error'))
     <div class="alert-error">⚠️ {{ session('kasbon_error') }}</div>
     @endif
-    @if($errors->has('aksi'))
+    @if(isset($errors) && $errors->has('aksi'))
     <div class="alert-error">{{ $errors->first('aksi') }}</div>
     @endif
 

@@ -16,6 +16,15 @@ class WorkerDashboard extends Component
     public string $activeTab = 'tugas'; // 'tugas', 'riwayat', 'keuangan'
     public string $statusFilter = 'semua'; // 'semua', 'in_progress', 'pending', 'done'
 
+    // History Date Filter
+    public string $startDate = '';
+    public string $endDate = '';
+
+    // Kasbon form
+    public string $kasbonAmount = '';
+    public string $kasbonNote = '';
+    public bool $showKasbonModal = false;
+
     // Pagination State (5 items per page)
     public int $pageDone = 1;
     public int $pageHistory = 1;
@@ -554,9 +563,17 @@ class WorkerDashboard extends Component
     public function render()
     {
         return view('livewire.worker-dashboard', [
-            'tasks'     => $this->tasks,
-            'qcReviews' => $this->qcReviews,
-            'qcAkhir'   => $this->qcAkhir,
+            'worker'          => $this->worker,
+            'activeTab'       => $this->activeTab,
+            'statusFilter'    => $this->statusFilter,
+            'startDate'       => $this->startDate,
+            'endDate'         => $this->endDate,
+            'kasbonAmount'    => $this->kasbonAmount,
+            'kasbonNote'      => $this->kasbonNote,
+            'showKasbonModal' => $this->showKasbonModal,
+            'tasks'           => $this->tasks,
+            'qcReviews'       => $this->qcReviews,
+            'qcAkhir'         => $this->qcAkhir,
         ]);
     }
 
