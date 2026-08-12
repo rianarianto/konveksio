@@ -190,7 +190,23 @@ class OrderReturnForm
                 ->numeric()
                 ->default(1)
                 ->minValue(1)
-                ->helperText('Jumlah pcs/potong yang cacat dari ukuran tersebut.'),
+                ->maxValue(function ($get) {
+                    $itemId = $get('order_item_id');
+                    if (!$itemId) return null;
+                    $item = OrderItem::find($itemId);
+                    return $item ? (int)$item->quantity : null;
+                })
+                ->helperText(function ($get) {
+                    $itemId = $get('order_item_id');
+                    if (!$itemId) return 'Jumlah pcs/potong yang cacat dari ukuran tersebut.';
+                    $item = OrderItem::find($itemId);
+                    if (!$item) return 'Jumlah pcs/potong yang cacat dari ukuran tersebut.';
+                    return "Maksimal yang dapat diretur untuk item ini: {$item->quantity} pcs.";
+                })
+                ->validationMessages([
+                    'max' => 'Jumlah pcs diretur tidak boleh melebihi total pcs dari item yang dipilih.',
+                    'lte' => 'Jumlah pcs diretur tidak boleh melebihi total pcs dari item yang dipilih.',
+                ]),
 
             // 4. Tindakan Retur (Perbaikan / Buat Baru)
             Select::make('action_type')
