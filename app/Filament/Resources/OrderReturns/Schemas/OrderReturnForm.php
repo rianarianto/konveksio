@@ -137,19 +137,7 @@ class OrderReturnForm
 
                                 $sz = $item->size ? "Ukuran {$item->size}" : "Tanpa Ukuran";
                                 $qty = " ({$item->quantity} pcs)";
-                                
-                                $details = [];
-                                if (!empty($item->recipient_name)) {
-                                    $details[] = "👤 Penerima: {$item->recipient_name}";
-                                }
-
-                                if (!empty($reqDetails['person_notes'])) {
-                                    $details[] = "📝 {$reqDetails['person_notes']}";
-                                } elseif (!empty($reqDetails['spec_notes']) && strtolower((string)$reqDetails['spec_notes']) !== strtolower((string)($reqDetails['group_label'] ?? ''))) {
-                                    $details[] = "📝 {$reqDetails['spec_notes']}";
-                                }
-
-                                $extra = count($details) > 0 ? " — " . implode(' | ', $details) : "";
+                                $extra = !empty($item->recipient_name) ? " — 👤 Penerima: {$item->recipient_name}" : "";
                                 $label = "{$sz}{$qty}{$extra}";
 
                                 $groupedOptions[$groupName][$item->id] = $label;
