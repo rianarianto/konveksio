@@ -92,6 +92,44 @@ class ControlProduksiResource extends Resource
         // Override and do nothing.
     }
 
+    public static function getReturMapping(): array
+    {
+        static $map = null;
+        if ($map !== null) return $map;
+
+        $returns = \App\Models\OrderReturn::whereIn('status', ['pending', 'diproses'])->get();
+        $normalIds = \DB::table('order_items')
+            ->selectRaw('MIN(id) as id')
+            ->where('design_status', 'approved')
+            ->groupBy([
+                'order_id',
+                'product_name',
+                'production_category',
+                'bahan_id',
+                'is_addition',
+            ])
+            ->pluck('id')
+            ->toArray();
+
+        $map = [];
+        $usedIds = $normalIds;
+
+        foreach ($returns as $retur) {
+            $cId = $retur->order_item_id;
+            if (in_array($cId, $usedIds)) {
+                $alt = \DB::table('order_items')
+                    ->where('order_id', $retur->order_id)
+                    ->whereNotIn('id', $usedIds)
+                    ->value('id');
+                if ($alt) $cId = $alt;
+            }
+            $map[$cId] = $retur;
+            $usedIds[] = $cId;
+        }
+
+        return $map;
+    }
+
     public static function getEloquentQuery(): Builder
     {
         $normalIds = \DB::table('order_items')
@@ -107,12 +145,8 @@ class ControlProduksiResource extends Resource
             ->pluck('id')
             ->toArray();
 
-        $returIds = \DB::table('order_returns')
-            ->whereIn('status', ['pending', 'diproses'])
-            ->pluck('order_item_id')
-            ->toArray();
-
-        $allIds = array_unique(array_merge($normalIds, $returIds));
+        $returMap = static::getReturMapping();
+        $allIds = array_unique(array_merge($normalIds, array_keys($returMap)));
 
         return parent::getEloquentQuery()
             ->where('order_items.design_status', 'approved')
@@ -138,17 +172,23 @@ class ControlProduksiResource extends Resource
                     ->searchable()
                     ->html()
                     ->getStateUsing(function(OrderItem $record): string {
-                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
-                            ->whereIn('status', ['pending', 'diproses'])
-                            ->latest('id')
-                            ->first();
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
 
-                        if ($activeReturn) {
+                        if ($retur) {
                             $returWo = \App\Models\WorkOrder::withoutGlobalScopes()
                                 ->where('order_item_id', $record->id)
                                 ->where('wo_number', 'like', '%-R%')
                                 ->latest('id')
                                 ->first();
+
+                            if (!$returWo) {
+                                $returWo = \App\Models\WorkOrder::withoutGlobalScopes()
+                                    ->where('order_item_id', $retur->order_item_id)
+                                    ->where('wo_number', 'like', '%-R%')
+                                    ->latest('id')
+                                    ->first();
+                            }
 
                             $woNum = $returWo ? " ({$returWo->wo_number})" : '';
                             $badge = ' <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-weight:800; font-size:11px; padding:2px 8px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; margin-left:4px;">🔄 REVISI RETUR' . $woNum . '</span>';
@@ -184,13 +224,11 @@ class ControlProduksiResource extends Resource
                             default => '🏭 Produksi',
                         };
 
-                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
-                            ->whereIn('status', ['pending', 'diproses'])
-                            ->latest('id')
-                            ->first();
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
 
-                        if ($activeReturn) {
-                            $garansi = $activeReturn->responsibility_type === 'customer_paid' ? '💳 Retur Berbayar' : '🛡️ Retur Garansi Toko';
+                        if ($retur) {
+                            $garansi = $retur->responsibility_type === 'customer_paid' ? '💳 Retur Berbayar' : '🛡️ Retur Garansi Toko';
                             return "{$baseCategory} — {$garansi}";
                         }
 
@@ -201,26 +239,22 @@ class ControlProduksiResource extends Resource
                     ->label('Total Qty')
                     ->getStateUsing(
                         function (OrderItem $record): int {
-                            $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
-                                ->whereIn('status', ['pending', 'diproses'])
-                                ->latest('id')
-                                ->first();
+                            $returMap = static::getReturMapping();
+                            $retur = $returMap[$record->id] ?? null;
 
-                            if ($activeReturn) {
-                                return $activeReturn->quantity;
+                            if ($retur) {
+                                return $retur->quantity;
                             }
 
                             return $record->getItemsInGroup()->sum('quantity');
                         }
                     )
                     ->description(function (OrderItem $record) {
-                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
-                            ->whereIn('status', ['pending', 'diproses'])
-                            ->latest('id')
-                            ->first();
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
 
-                        if ($activeReturn) {
-                            $origTotal = $record->getItemsInGroup()->sum('quantity');
+                        if ($retur) {
+                            $origTotal = $retur->orderItem ? $retur->orderItem->quantity : $record->getItemsInGroup()->sum('quantity');
                             return "dari total {$origTotal} pcs";
                         }
                         return null;
@@ -238,13 +272,11 @@ class ControlProduksiResource extends Resource
                     ->label('Status Produksi')
                     ->badge()
                     ->state(function (OrderItem $record) {
-                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
-                            ->whereIn('status', ['pending', 'diproses'])
-                            ->latest('id')
-                            ->first();
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
 
-                        if ($activeReturn) {
-                            $target = $activeReturn->target_stage ?: 'Jahit';
+                        if ($retur) {
+                            $target = $retur->target_stage ?: 'Jahit';
                             return '🔄 Retur (' . ucfirst($target) . ')';
                         }
 
