@@ -94,21 +94,30 @@ class ControlProduksiResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
+        $normalIds = \DB::table('order_items')
+            ->selectRaw('MIN(id) as id')
+            ->where('design_status', 'approved')
+            ->groupBy([
+                'order_id',
+                'product_name',
+                'production_category',
+                'bahan_id',
+                'is_addition',
+            ])
+            ->pluck('id')
+            ->toArray();
+
+        $returIds = \DB::table('order_returns')
+            ->whereIn('status', ['pending', 'diproses'])
+            ->pluck('order_item_id')
+            ->toArray();
+
+        $allIds = array_unique(array_merge($normalIds, $returIds));
+
         return parent::getEloquentQuery()
             ->where('order_items.design_status', 'approved')
             ->with(['order.customer', 'productionTasks'])
-            ->whereIn('order_items.id', function (\Illuminate\Database\Query\Builder $query) {
-                $query->selectRaw('MIN(id)')
-                    ->from('order_items')
-                    ->where('design_status', 'approved')
-                    ->groupBy([
-                        'order_id',
-                        'product_name',
-                        'production_category',
-                        'bahan_id',
-                        'is_addition',
-                    ]);
-            });
+            ->whereIn('order_items.id', empty($allIds) ? [0] : $allIds);
     }
 
 
@@ -129,6 +138,23 @@ class ControlProduksiResource extends Resource
                     ->searchable()
                     ->html()
                     ->getStateUsing(function(OrderItem $record): string {
+                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
+                            ->whereIn('status', ['pending', 'diproses'])
+                            ->latest('id')
+                            ->first();
+
+                        if ($activeReturn) {
+                            $returWo = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->where('order_item_id', $record->id)
+                                ->where('wo_number', 'like', '%-R%')
+                                ->latest('id')
+                                ->first();
+
+                            $woNum = $returWo ? " ({$returWo->wo_number})" : '';
+                            $badge = ' <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-weight:800; font-size:11px; padding:2px 8px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; margin-left:4px;">🔄 REVISI RETUR' . $woNum . '</span>';
+                            return '<span class="font-bold text-gray-900 dark:text-gray-100">' . e($record->product_name) . '</span>' . $badge;
+                        }
+
                         $items = $record->getItemsInGroup();
                         $hasCustom = $items->contains(fn($item) => $item->size === 'Custom');
                         $hasStandard = $items->contains(fn($item) => $item->size !== 'Custom' && $item->size !== null);
@@ -158,8 +184,7 @@ class ControlProduksiResource extends Resource
                             default => '🏭 Produksi',
                         };
 
-                        $items = $record->getItemsInGroup();
-                        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $items->pluck('id'))
+                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
                             ->whereIn('status', ['pending', 'diproses'])
                             ->latest('id')
                             ->first();
@@ -175,17 +200,28 @@ class ControlProduksiResource extends Resource
                 TextColumn::make('total_quantity')
                     ->label('Total Qty')
                     ->getStateUsing(
-                        fn(OrderItem $record): int => $record->getItemsInGroup()->sum('quantity')
+                        function (OrderItem $record): int {
+                            $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
+                                ->whereIn('status', ['pending', 'diproses'])
+                                ->latest('id')
+                                ->first();
+
+                            if ($activeReturn) {
+                                return $activeReturn->quantity;
+                            }
+
+                            return $record->getItemsInGroup()->sum('quantity');
+                        }
                     )
                     ->description(function (OrderItem $record) {
-                        $items = $record->getItemsInGroup();
-                        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $items->pluck('id'))
+                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
                             ->whereIn('status', ['pending', 'diproses'])
                             ->latest('id')
                             ->first();
 
                         if ($activeReturn) {
-                            return "⚠️ {$activeReturn->quantity} pcs diretur";
+                            $origTotal = $record->getItemsInGroup()->sum('quantity');
+                            return "dari total {$origTotal} pcs";
                         }
                         return null;
                     })
@@ -202,6 +238,16 @@ class ControlProduksiResource extends Resource
                     ->label('Status Produksi')
                     ->badge()
                     ->state(function (OrderItem $record) {
+                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
+                            ->whereIn('status', ['pending', 'diproses'])
+                            ->latest('id')
+                            ->first();
+
+                        if ($activeReturn) {
+                            $target = $activeReturn->target_stage ?: 'Jahit';
+                            return '🔄 Retur (' . ucfirst($target) . ')';
+                        }
+
                         $groupItemIds = OrderItem::where('order_id', $record->order_id)
                             ->where('product_name', $record->product_name)
                             ->where('bahan_id', $record->bahan_id)
@@ -223,15 +269,13 @@ class ControlProduksiResource extends Resource
                         }
 
                         $tasks = $record->productionTasks;
-                        if ($tasks->count() === 0)
-                            return 'Belum Diatur';
-                        if ($tasks->where('status', '!=', 'done')->count() === 0)
-                            return 'Selesai';
-                        if ($tasks->where('status', 'in_progress')->count() > 0)
-                            return 'Diproses';
+                        if ($tasks->count() === 0) return 'Belum Diatur';
+                        if ($tasks->where('status', '!=', 'done')->count() === 0) return 'Selesai';
+                        if ($tasks->where('status', 'in_progress')->count() > 0) return 'Diproses';
                         return 'Antrian';
                     })
                     ->color(fn(string $state): string => match (true) {
+                        str_contains($state, 'Retur') => 'danger',
                         $state === 'Belum Diatur' => 'gray',
                         $state === 'Antrian' => 'warning',
                         $state === 'Diproses' => 'info',
@@ -242,46 +286,31 @@ class ControlProduksiResource extends Resource
                         default => 'gray',
                     })
                     ->description(function (OrderItem $record) {
-                        $groupItemIds = OrderItem::where('order_id', $record->order_id)
-                            ->where('product_name', $record->product_name)
-                            ->where('bahan_id', $record->bahan_id)
-                            ->where('production_category', $record->production_category)
-                            ->where('is_addition', $record->is_addition ?? false)
-                            ->where(function($q) use ($record) {
-                                if ($record->size === 'Custom') {
-                                    $q->where('size', 'Custom');
-                                } else {
-                                    $q->where('size', '!=', 'Custom')->orWhereNull('size');
-                                }
-                            })
-                            ->pluck('id');
-
-                        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
                             ->whereIn('status', ['pending', 'diproses'])
                             ->latest('id')
                             ->first();
 
                         if ($activeReturn) {
-                            $returWo = \App\Models\WorkOrder::withoutGlobalScopes()
-                                ->whereIn('order_item_id', $groupItemIds)
-                                ->where('wo_number', 'like', '%-R%')
-                                ->latest('id')
-                                ->first();
-
                             $revTask = \App\Models\ProductionTask::withoutGlobalScopes()
-                                ->whereIn('order_item_id', $groupItemIds)
+                                ->where('order_item_id', $record->id)
                                 ->where('is_revision', true)
                                 ->latest('id')
                                 ->first();
 
                             $workerName = $revTask?->assignedTo?->name ?: 'Belum ditunjuk';
                             $note = $activeReturn->items_description ? \Illuminate\Support\Str::limit($activeReturn->items_description, 20) : '-';
-                            $target = $activeReturn->target_stage ?: 'Jahit';
-                            $woNum = $returWo ? " ({$returWo->wo_number})" : '';
 
-                            return "🔄 RETUR REVISI{$woNum}: {$target} | 👷 Tukang: {$workerName} | 📝 {$note}";
+                            return "👷 Tukang: {$workerName} | 📝 {$note}";
                         }
                         
+                        $groupItemIds = OrderItem::where('order_id', $record->order_id)
+                            ->where('product_name', $record->product_name)
+                            ->where('bahan_id', $record->bahan_id)
+                            ->where('production_category', $record->production_category)
+                            ->where('is_addition', $record->is_addition ?? false)
+                            ->pluck('id');
+
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
                             ->where('wo_number', 'not like', '%-R%')
