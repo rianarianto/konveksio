@@ -185,28 +185,94 @@ class ReturnsRelationManager extends RelationManager
                         $stagesText = implode(', ', array_map('ucfirst', explode(',', (string)$record->target_stage)));
 
                         return [
-                            \Filament\Forms\Components\Placeholder::make('product_info')
-                                ->label('📦 Nama Produk & Batch')
-                                ->content($record->orderItem?->product_name . ($record->orderItem?->is_addition ? ' (Batch Penambahan Baru)' : ' (Batch Utama)')),
+                            \Filament\Schemas\Components\Grid::make(2)
+                                ->schema([
+                                    \Filament\Forms\Components\Placeholder::make('product_info')
+                                        ->label('📦 Nama Produk & Batch')
+                                        ->content($record->orderItem?->product_name . ($record->orderItem?->is_addition ? ' (Batch Penambahan Baru)' : ' (Batch Utama)')),
 
-                            \Filament\Forms\Components\Placeholder::make('total_qty_info')
-                                ->label('📊 Total Qty & Rincian Ukuran Cacat')
-                                ->content(new \Illuminate\Support\HtmlString("<strong>Total Retur: {$record->quantity} pcs</strong><br><pre style=\"margin-top:4px;font-family:sans-serif;background:#f8fafc;padding:8px;border-radius:6px;\">{$breakdownText}</pre>")),
+                                    \Filament\Forms\Components\Placeholder::make('garansi_info')
+                                        ->label('🛡️ Garansi & Tanggung Jawab')
+                                        ->content($garansiText),
 
-                            \Filament\Forms\Components\Placeholder::make('garansi_info')
-                                ->label('🛡️ Garansi & Tanggung Jawab')
-                                ->content($garansiText),
+                                    \Filament\Forms\Components\Placeholder::make('stages_info')
+                                        ->label('🔧 Divisi Tujuan Perbaikan')
+                                        ->content($stagesText),
 
-                            \Filament\Forms\Components\Placeholder::make('stages_info')
-                                ->label('🔧 Divisi Tujuan Perbaikan')
-                                ->content($stagesText),
+                                    \Filament\Forms\Components\Placeholder::make('total_qty_info')
+                                        ->label('📊 Total Qty & Rincian Ukuran Cacat')
+                                        ->content(new \Illuminate\Support\HtmlString("<strong>Total Retur: {$record->quantity} pcs</strong><br><pre style=\"margin-top:4px;font-family:sans-serif;background:#f8fafc;padding:8px;border-radius:6px;\">{$breakdownText}</pre>")),
+                                ]),
 
                             \Filament\Forms\Components\Textarea::make('full_reason')
                                 ->label('📝 Detail Cacat & Catatan Perbaikan')
                                 ->default($record->items_description ?: $record->reason)
-                                ->rows(6)
+                                ->rows(5)
+                                ->columnSpanFull()
                                 ->disabled(),
                         ];
+                    }),
+
+                \Filament\Actions\Action::make('edit_return')
+                    ->label('Edit')
+                    ->icon('heroicon-o-pencil')
+                    ->color('warning')
+                    ->visible(function (OrderReturn $record): bool {
+                        $user = auth()->user();
+                        if (!$user) return false;
+                        if ($user->role === 'owner') return true;
+
+                        if ($user->role === 'admin') {
+                            $itemId = $record->order_item_id;
+                            $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $itemId)
+                                ->where('is_revision', true)
+                                ->whereIn('status', ['in_progress', 'done'])
+                                ->exists();
+
+                            return !$hasTasksStarted;
+                        }
+
+                        return false;
+                    })
+                    ->fillForm(fn (OrderReturn $record): array => [
+                        'shop_id' => $record->shop_id,
+                        'order_id' => $record->order_id,
+                        'selected_product_name' => $record->orderItem?->product_name,
+                        'order_item_id' => $record->order_item_id,
+                        'quantity' => $record->quantity,
+                        'action_type' => $record->action_type,
+                        'target_stages' => explode(',', (string)$record->target_stage),
+                        'responsibility_type' => $record->responsibility_type,
+                        'additional_fee' => $record->additional_fee,
+                        'return_date' => $record->return_date,
+                        'expected_pickup_date' => $record->expected_pickup_date,
+                        'items_description' => $record->items_description ?: $record->reason,
+                    ])
+                    ->form(OrderReturnForm::getComponents(true))
+                    ->action(function (OrderReturn $record, array $data): void {
+                        if (isset($data['target_stages'])) {
+                            $record->target_stages = $data['target_stages'];
+                            unset($data['target_stages']);
+                        }
+                        if (isset($data['multi_size_items'])) {
+                            $record->multi_size_items = $data['multi_size_items'];
+                            unset($data['multi_size_items']);
+                        }
+                        if (isset($data['selected_product_name'])) {
+                            unset($data['selected_product_name']);
+                        }
+                        if (isset($data['selection_mode'])) {
+                            unset($data['selection_mode']);
+                        }
+
+                        $record->fill($data);
+                        $record->save();
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Retur Pesanan Berhasil Diperbarui')
+                            ->success()
+                            ->send();
                     }),
 
                 \Filament\Actions\Action::make('delete_return')
