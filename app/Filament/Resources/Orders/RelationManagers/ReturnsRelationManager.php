@@ -89,6 +89,7 @@ class ReturnsRelationManager extends RelationManager
                         if (!empty($record->size_breakdown) && is_array($record->size_breakdown)) {
                             $parts = [];
                             foreach ($record->size_breakdown as $sz => $q) {
+                                if ($sz === '_raw' || is_array($q)) continue;
                                 $parts[] = "{$sz}: {$q} pcs";
                             }
                             return implode(', ', $parts);
