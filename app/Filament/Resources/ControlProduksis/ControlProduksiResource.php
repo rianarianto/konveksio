@@ -175,20 +175,7 @@ class ControlProduksiResource extends Resource
                 TextColumn::make('total_quantity')
                     ->label('Total Qty')
                     ->getStateUsing(
-                        fn(OrderItem $record): int => (function() use ($record) {
-                            $items = $record->getItemsInGroup();
-
-                            $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $items->pluck('id'))
-                                ->whereIn('status', ['pending', 'diproses'])
-                                ->latest('id')
-                                ->first();
-
-                            if ($activeReturn) {
-                                return $activeReturn->quantity;
-                            }
-
-                            return $items->sum('quantity');
-                        })()
+                        fn(OrderItem $record): int => $record->getItemsInGroup()->sum('quantity')
                     )
                     ->description(function (OrderItem $record) {
                         $items = $record->getItemsInGroup();
@@ -198,8 +185,7 @@ class ControlProduksiResource extends Resource
                             ->first();
 
                         if ($activeReturn) {
-                            $totalOrderQty = $items->sum('quantity');
-                            return "dari total {$totalOrderQty} pcs";
+                            return "⚠️ {$activeReturn->quantity} pcs diretur";
                         }
                         return null;
                     })
@@ -223,18 +209,9 @@ class ControlProduksiResource extends Resource
                             ->where('is_addition', $record->is_addition ?? false)
                             ->pluck('id');
 
-                        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
-                            ->whereIn('status', ['pending', 'diproses'])
-                            ->latest('id')
-                            ->first();
-
-                        if ($activeReturn) {
-                            $target = $activeReturn->target_stage ?: 'Jahit';
-                            return '🔄 Retur (' . ucfirst($target) . ')';
-                        }
-                        
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
+                            ->where('wo_number', 'not like', '%-R%')
                             ->first();
 
                         if ($wo) {
@@ -255,7 +232,6 @@ class ControlProduksiResource extends Resource
                         return 'Antrian';
                     })
                     ->color(fn(string $state): string => match (true) {
-                        str_contains($state, 'Retur') => 'danger',
                         $state === 'Belum Diatur' => 'gray',
                         $state === 'Antrian' => 'warning',
                         $state === 'Diproses' => 'info',
@@ -286,6 +262,12 @@ class ControlProduksiResource extends Resource
                             ->first();
 
                         if ($activeReturn) {
+                            $returWo = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->where('wo_number', 'like', '%-R%')
+                                ->latest('id')
+                                ->first();
+
                             $revTask = \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->whereIn('order_item_id', $groupItemIds)
                                 ->where('is_revision', true)
@@ -293,12 +275,16 @@ class ControlProduksiResource extends Resource
                                 ->first();
 
                             $workerName = $revTask?->assignedTo?->name ?: 'Belum ditunjuk';
-                            $note = $activeReturn->items_description ? \Illuminate\Support\Str::limit($activeReturn->items_description, 25) : '-';
-                            return "👷 Tukang: {$workerName} | 📝 {$note}";
+                            $note = $activeReturn->items_description ? \Illuminate\Support\Str::limit($activeReturn->items_description, 20) : '-';
+                            $target = $activeReturn->target_stage ?: 'Jahit';
+                            $woNum = $returWo ? " ({$returWo->wo_number})" : '';
+
+                            return "🔄 RETUR REVISI{$woNum}: {$target} | 👷 Tukang: {$workerName} | 📝 {$note}";
                         }
                         
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
+                            ->where('wo_number', 'not like', '%-R%')
                             ->first();
 
                         if ($wo) {
