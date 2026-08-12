@@ -47,10 +47,15 @@ class ReturnsRelationManager extends RelationManager
                         $item = $record->orderItem;
                         if (!$item) return '-';
                         
+                        $additionTag = $item->is_addition ? ' ➕ [Batch Penambahan]' : ' 📦 [Batch Utama]';
+                        
+                        if (!empty($record->size_breakdown) && is_array($record->size_breakdown) && count($record->size_breakdown) > 1) {
+                            return "{$item->product_name} (Beberapa Ukuran){$additionTag}";
+                        }
+
                         $size = $item->size ?: 'All Size';
                         $gender = $item->size_and_request_details['gender'] ?? null;
                         $genderLabel = $gender ? ($gender === 'L' ? 'Laki-laki' : 'Perempuan') : null;
-                        $additionTag = $item->is_addition ? ' ➕ [Tambahan]' : '';
                         
                         return "{$item->product_name} [Size {$size}" . ($genderLabel ? " - {$genderLabel}" : '') . "]{$additionTag}";
                     })
@@ -75,11 +80,12 @@ class ReturnsRelationManager extends RelationManager
 
                 TextColumn::make('target_stage')
                     ->label('Tujuan Perbaikan')
-                    ->formatStateUsing(fn ($state) => '🔧 ' . ucfirst($state ?: 'Jahit')),
+                    ->formatStateUsing(fn ($state) => '🔧 ' . implode(', ', array_map('ucfirst', explode(',', (string)$state)))),
 
                 TextColumn::make('quantity')
                     ->label('Qty Retur')
-                    ->formatStateUsing(function ($state, OrderReturn $record) {
+                    ->getStateUsing(fn (OrderReturn $record): string => $record->quantity . ' pcs')
+                    ->description(function (OrderReturn $record) {
                         if (!empty($record->size_breakdown) && is_array($record->size_breakdown)) {
                             $parts = [];
                             foreach ($record->size_breakdown as $sz => $q) {
@@ -87,7 +93,7 @@ class ReturnsRelationManager extends RelationManager
                             }
                             return implode(', ', $parts);
                         }
-                        return $state . ' pcs';
+                        return null;
                     })
                     ->weight('bold'),
 
@@ -155,6 +161,54 @@ class ReturnsRelationManager extends RelationManager
                     }),
             ])
             ->actions([
+                \Filament\Actions\Action::make('view_detail')
+                    ->label('Detail')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+                    ->modalHeading('🎯 Detail Lengkap Retur & Garansi Pesanan')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup Modal')
+                    ->form(function (OrderReturn $record): array {
+                        $breakdownText = '-';
+                        if (!empty($record->size_breakdown) && is_array($record->size_breakdown)) {
+                            $lines = [];
+                            foreach ($record->size_breakdown as $sz => $q) {
+                                $lines[] = "• {$sz} ➔ {$q} pcs";
+                            }
+                            $breakdownText = implode("\n", $lines);
+                        }
+
+                        $garansiText = $record->responsibility_type === 'customer_paid' 
+                            ? '💳 Berbayar Customer' . ($record->additional_fee > 0 ? ' (Biaya Tambahan: Rp ' . number_format($record->additional_fee, 0, ',', '.') . ')' : '')
+                            : '🛡️ Garansi Toko / Cacat Produksi (Gratis)';
+
+                        $stagesText = implode(', ', array_map('ucfirst', explode(',', (string)$record->target_stage)));
+
+                        return [
+                            \Filament\Forms\Components\Placeholder::make('product_info')
+                                ->label('📦 Nama Produk & Batch')
+                                ->content($record->orderItem?->product_name . ($record->orderItem?->is_addition ? ' (Batch Penambahan Baru)' : ' (Batch Utama)')),
+
+                            \Filament\Forms\Components\Placeholder::make('total_qty_info')
+                                ->label('📊 Total Qty & Rincian Ukuran Cacat')
+                                ->content(new \Illuminate\Support\HtmlString("<strong>Total Retur: {$record->quantity} pcs</strong><br><pre style=\"margin-top:4px;font-family:sans-serif;background:#f8fafc;padding:8px;border-radius:6px;\">{$breakdownText}</pre>")),
+
+                            \Filament\Forms\Components\Placeholder::make('garansi_info')
+                                ->label('🛡️ Garansi & Tanggung Jawab')
+                                ->content($garansiText),
+
+                            \Filament\Forms\Components\Placeholder::make('stages_info')
+                                ->label('🔧 Divisi Tujuan Perbaikan')
+                                ->content($stagesText),
+
+                            \Filament\Forms\Components\Textarea::make('full_reason')
+                                ->label('📝 Detail Cacat & Catatan Perbaikan')
+                                ->default($record->items_description ?: $record->reason)
+                                ->rows(6)
+                                ->disabled(),
+                        ];
+                    }),
+
                 \Filament\Actions\Action::make('delete_return')
                     ->label('Hapus')
                     ->icon('heroicon-o-trash')
