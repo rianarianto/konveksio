@@ -324,15 +324,55 @@ class NotificationHelper
 
             if ($recipients->isNotEmpty()) {
                 try {
+                    $shopId = $wo->shop_id ?: 1;
+                    $orderId = $wo->order_id ?? ($wo->orderItem?->order_id ?? 31);
+
                     \Filament\Notifications\Notification::make()
-                        ->title('Work Order Selesai!')
-                        ->body("Work Order **{$wo->wo_number}** untuk produk **{$produk}** telah selesai.")
+                        ->title('🎉 Produksi Selesai: ' . $produk)
+                        ->body("Work Order **{$wo->wo_number}** ({$totalQty} pcs) untuk customer **{$customer}** telah **SELESAI** diproduksi!")
                         ->success()
                         ->icon('heroicon-o-check-badge')
                         ->iconColor('success')
+                        ->actions([
+                            \Filament\Notifications\Actions\Action::make('view')
+                                ->label('Lihat Pesanan')
+                                ->url("/app/{$shopId}/orders/{$orderId}?relation=2"),
+                        ])
                         ->sendToDatabase($recipients);
                 } catch (\Exception $e) {
                     Log::error('[Notification] Gagal kirim database notification: ' . $e->getMessage());
+                }
+            }
+        }
+
+        // 4. Database Notification for Admin/Owner when WO advances to a new stage
+        if ($newStatus !== WorkOrder::STATUS_COMPLETED && !$isReject) {
+            $recipients = \App\Models\User::where(function ($q) use ($wo) {
+                    $q->where('shop_id', $wo->shop_id)
+                      ->orWhere('role', 'owner');
+                })
+                ->whereIn('role', ['owner', 'admin'])
+                ->get();
+
+            if ($recipients->isNotEmpty()) {
+                try {
+                    $shopId = $wo->shop_id ?: 1;
+                    $stageTitle = self::formatStageLabel($newStatus);
+
+                    \Filament\Notifications\Notification::make()
+                        ->title('⚡ Progress Produksi: ' . $produk)
+                        ->body("Work Order **{$wo->wo_number}** ({$totalQty} pcs) telah lanjut ke tahap **{$stageTitle}**.")
+                        ->info()
+                        ->icon('heroicon-o-arrow-right-circle')
+                        ->iconColor('info')
+                        ->actions([
+                            \Filament\Notifications\Actions\Action::make('view')
+                                ->label('Control Produksi')
+                                ->url("/app/{$shopId}/control-produksis"),
+                        ])
+                        ->sendToDatabase($recipients);
+                } catch (\Exception $e) {
+                    Log::error('[Notification] Gagal kirim stage database notification: ' . $e->getMessage());
                 }
             }
         }
