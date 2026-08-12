@@ -19,13 +19,10 @@ class OrderReturn extends Model
         'status', // pending, diproses, selesai
         'action_type',
         'target_stage',
-        'target_stages',
         'responsibility_type', // store_guarantee, customer_paid
         'additional_fee',
         'size_breakdown',
         'photo_path',
-        'selection_mode',
-        'multi_size_items',
     ];
 
     public $multi_size_items = [];

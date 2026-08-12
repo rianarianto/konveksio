@@ -128,7 +128,25 @@ class ReturnsRelationManager extends RelationManager
                         if ($order) {
                             $data['order_id'] = $order->id;
                         }
-                        OrderReturn::create($data);
+
+                        $retur = new OrderReturn();
+                        if (isset($data['target_stages'])) {
+                            $retur->target_stages = $data['target_stages'];
+                            unset($data['target_stages']);
+                        }
+                        if (isset($data['multi_size_items'])) {
+                            $retur->multi_size_items = $data['multi_size_items'];
+                            unset($data['multi_size_items']);
+                        }
+                        if (isset($data['selected_product_name'])) {
+                            unset($data['selected_product_name']);
+                        }
+                        if (isset($data['selection_mode'])) {
+                            unset($data['selection_mode']);
+                        }
+
+                        $retur->fill($data);
+                        $retur->save();
 
                         \Filament\Notifications\Notification::make()
                             ->title('Retur Pesanan Berhasil Dicatat')
