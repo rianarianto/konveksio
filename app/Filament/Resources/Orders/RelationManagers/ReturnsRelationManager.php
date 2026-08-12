@@ -227,6 +227,7 @@ class ReturnsRelationManager extends RelationManager
                             $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->where('order_item_id', $itemId)
                                 ->where('is_revision', true)
+                                ->where('created_at', '>=', $record->created_at?->subSeconds(10) ?? now())
                                 ->whereIn('status', ['in_progress', 'done'])
                                 ->exists();
 
@@ -289,6 +290,7 @@ class ReturnsRelationManager extends RelationManager
                             $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->where('order_item_id', $itemId)
                                 ->where('is_revision', true)
+                                ->where('created_at', '>=', $record->created_at?->subSeconds(10) ?? now())
                                 ->whereIn('status', ['in_progress', 'done'])
                                 ->exists();
 
