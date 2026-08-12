@@ -85,147 +85,10 @@ class OrderReturnForm
                 ->afterStateUpdated(fn (callable $set) => $set('order_item_id', null))
                 ->helperText('Pilih nama produk dari pesanan ini yang mengalami komplain/cacat.'),
 
-            // Mode Pemilihan Retur
-            Select::make('selection_mode')
-                ->label('Cara Memilih Barang Diretur')
-                ->options([
-                    'single' => '📌 Mode 1: Pilih 1 Ukuran / Item Spesifik (Per-Orang / Per-Ukuran)',
-                    'multi'  => '📋 Mode 2: Pilih Banyak Ukuran Sekaligus (Grid Cacat Massal)',
-                ])
-                ->default('single')
-                ->reactive()
-                ->visible(fn ($get) => !empty($get('selected_product_name')))
-                ->helperText('Gunakan Mode 2 jika ada beberapa ukuran sekaligus yang mengalami komplain/cacat yang sama.'),
-
-            // 2. Pilih Ukuran / Varian Spesifik (Mode 1)
-            Select::make('order_item_id')
-                ->label('2. Pilih Ukuran / Varian yang Diretur')
-                ->options(function ($get, $record) {
-                    $pName = $get('selected_product_name');
-                    $orderId = $get('order_id');
-                    if (!$orderId && $record) {
-                        if ($record instanceof \App\Models\Order) {
-                            $orderId = $record->id;
-                        } elseif (isset($record->order_id)) {
-                            $orderId = $record->order_id;
-                        }
-                    }
-                    if (!$orderId) {
-                        $routeRecord = request()->route()?->parameter('record');
-                        if ($routeRecord instanceof \App\Models\Order) {
-                            $orderId = $routeRecord->id;
-                        } elseif (is_numeric($routeRecord)) {
-                            $orderId = (int) $routeRecord;
-                        }
-                    }
-                    if (!$orderId || !$pName) return [];
-
-                    $items = OrderItem::where('order_id', $orderId)
-                        ->where('product_name', $pName)
-                        ->get();
-
-                    $options = [];
-                    $labelCounts = [];
-                    $itemLabels = [];
-
-                    foreach ($items as $item) {
-                        $sz = $item->size ? "Ukuran {$item->size}" : "Tanpa Ukuran";
-                        $qty = " ({$item->quantity} pcs)";
-                        
-                        $details = [];
-                        $reqDetails = $item->size_and_request_details ?? [];
-                        
-                        if (!empty($reqDetails['group_label'])) {
-                            $details[] = "Varian: {$reqDetails['group_label']}";
-                        }
-
-                        if (!empty($reqDetails['gender'])) {
-                            $details[] = $reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan';
-                        }
-
-                        if (!empty($item->recipient_name)) {
-                            $details[] = "Penerima: {$item->recipient_name}";
-                        }
-
-                        $specs = [];
-                        if (!empty($reqDetails['sleeve_model'])) {
-                            $sleeve = str_replace('_', ' ', (string)$reqDetails['sleeve_model']);
-                            $specs[] = "Lengan " . ucfirst($sleeve);
-                        }
-                        if (!empty($reqDetails['collar_model'])) {
-                            $collar = str_replace('_', ' ', (string)$reqDetails['collar_model']);
-                            $specs[] = "Kerah " . ucfirst($collar);
-                        }
-                        if (count($specs) > 0) {
-                            $details[] = implode(', ', $specs);
-                        }
-
-                        if ($item->is_addition) {
-                            $details[] = "➕ Item Tambahan";
-                        }
-
-                        $extra = count($details) > 0 ? " — " . implode(' | ', $details) : "";
-                        $baseLabel = "{$sz}{$qty}{$extra}";
-
-                        $itemLabels[$item->id] = [
-                            'baseLabel' => $baseLabel,
-                            'is_addition' => $item->is_addition,
-                        ];
-
-                        $labelCounts[$baseLabel] = ($labelCounts[$baseLabel] ?? 0) + 1;
-                    }
-
-                    $seenCounts = [];
-                    foreach ($itemLabels as $itemId => $data) {
-                        $baseLabel = $data['baseLabel'];
-                        if (($labelCounts[$baseLabel] ?? 0) > 1) {
-                            $seenCounts[$baseLabel] = ($seenCounts[$baseLabel] ?? 0) + 1;
-                            $idx = $seenCounts[$baseLabel];
-                            $tag = $idx === 1 ? " [Item Awal]" : " ➕ [Penambahan #{$idx}]";
-                            $options[$itemId] = "{$baseLabel}{$tag}";
-                        } else {
-                            $options[$itemId] = $baseLabel;
-                        }
-                    }
-
-                    return $options;
-                })
-                ->visible(fn ($get) => !empty($get('selected_product_name')) && ($get('selection_mode') ?? 'single') === 'single')
-                ->searchable()
-                ->required(fn ($get) => ($get('selection_mode') ?? 'single') === 'single')
-                ->reactive()
-                ->helperText('Pilih ukuran spesifik baju yang mengalami kerusakan.'),
-
-            // 3. Jumlah Pcs yang Diretur (Mode 1)
-            TextInput::make('quantity')
-                ->label('3. Jumlah Pcs yang Diretur')
-                ->visible(fn ($get) => ($get('selection_mode') ?? 'single') === 'single')
-                ->required(fn ($get) => ($get('selection_mode') ?? 'single') === 'single')
-                ->numeric()
-                ->default(1)
-                ->minValue(1)
-                ->maxValue(function ($get) {
-                    $itemId = $get('order_item_id');
-                    if (!$itemId) return null;
-                    $item = OrderItem::find($itemId);
-                    return $item ? (int)$item->quantity : null;
-                })
-                ->helperText(function ($get) {
-                    $itemId = $get('order_item_id');
-                    if (!$itemId) return 'Jumlah pcs/potong yang cacat dari ukuran tersebut.';
-                    $item = OrderItem::find($itemId);
-                    if (!$item) return 'Jumlah pcs/potong yang cacat dari ukuran tersebut.';
-                    return "Maksimal yang dapat diretur untuk item ini: {$item->quantity} pcs.";
-                })
-                ->validationMessages([
-                    'max' => 'Jumlah pcs diretur tidak boleh melebihi total pcs dari item yang dipilih.',
-                    'lte' => 'Jumlah pcs diretur tidak boleh melebihi total pcs dari item yang dipilih.',
-                ]),
-
-            // Mode 2: Multi-Size Grid Input
+            // 2. Grid Rincian Item / Ukuran yang Diretur
             Repeater::make('multi_size_items')
-                ->label('📋 Grid Rincian Pcs Diretur Per-Ukuran / Varian')
-                ->visible(fn ($get) => !empty($get('selected_product_name')) && ($get('selection_mode') ?? 'single') === 'multi')
+                ->label('2. Pilih Ukuran & Input Jumlah Pcs Diretur')
+                ->visible(fn ($get) => !empty($get('selected_product_name')))
                 ->schema([
                     Select::make('order_item_id')
                         ->label('Ukuran / Varian Item')
@@ -254,14 +117,73 @@ class OrderReturnForm
                                 ->get();
 
                             $options = [];
+                            $labelCounts = [];
+                            $itemLabels = [];
+
                             foreach ($items as $item) {
                                 $sz = $item->size ? "Ukuran {$item->size}" : "Tanpa Ukuran";
                                 $qty = " ({$item->quantity} pcs)";
-                                $options[$item->id] = "{$sz}{$qty}" . ($item->recipient_name ? " — {$item->recipient_name}" : "");
+                                
+                                $details = [];
+                                $reqDetails = $item->size_and_request_details ?? [];
+                                
+                                if (!empty($reqDetails['group_label'])) {
+                                    $details[] = "Varian: {$reqDetails['group_label']}";
+                                }
+
+                                if (!empty($reqDetails['gender'])) {
+                                    $details[] = $reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan';
+                                }
+
+                                if (!empty($item->recipient_name)) {
+                                    $details[] = "Penerima: {$item->recipient_name}";
+                                }
+
+                                $specs = [];
+                                if (!empty($reqDetails['sleeve_model'])) {
+                                    $sleeve = str_replace('_', ' ', (string)$reqDetails['sleeve_model']);
+                                    $specs[] = "Lengan " . ucfirst($sleeve);
+                                }
+                                if (!empty($reqDetails['collar_model'])) {
+                                    $collar = str_replace('_', ' ', (string)$reqDetails['collar_model']);
+                                    $specs[] = "Kerah " . ucfirst($collar);
+                                }
+                                if (count($specs) > 0) {
+                                    $details[] = implode(', ', $specs);
+                                }
+
+                                if ($item->is_addition) {
+                                    $details[] = "➕ Item Tambahan";
+                                }
+
+                                $extra = count($details) > 0 ? " — " . implode(' | ', $details) : "";
+                                $baseLabel = "{$sz}{$qty}{$extra}";
+
+                                $itemLabels[$item->id] = [
+                                    'baseLabel' => $baseLabel,
+                                    'is_addition' => $item->is_addition,
+                                ];
+
+                                $labelCounts[$baseLabel] = ($labelCounts[$baseLabel] ?? 0) + 1;
                             }
+
+                            $seenCounts = [];
+                            foreach ($itemLabels as $itemId => $data) {
+                                $baseLabel = $data['baseLabel'];
+                                if (($labelCounts[$baseLabel] ?? 0) > 1) {
+                                    $seenCounts[$baseLabel] = ($seenCounts[$baseLabel] ?? 0) + 1;
+                                    $idx = $seenCounts[$baseLabel];
+                                    $tag = $idx === 1 ? " [Item Awal]" : " ➕ [Penambahan #{$idx}]";
+                                    $options[$itemId] = "{$baseLabel}{$tag}";
+                                } else {
+                                    $options[$itemId] = $baseLabel;
+                                }
+                            }
+
                             return $options;
                         })
                         ->required()
+                        ->reactive()
                         ->searchable(),
 
                     TextInput::make('return_qty')
@@ -269,12 +191,19 @@ class OrderReturnForm
                         ->numeric()
                         ->default(1)
                         ->minValue(1)
+                        ->maxValue(function ($get) {
+                            $itemId = $get('order_item_id');
+                            if (!$itemId) return null;
+                            $item = OrderItem::find($itemId);
+                            return $item ? (int)$item->quantity : null;
+                        })
                         ->required(),
                 ])
                 ->columns(2)
                 ->defaultItems(1)
+                ->addActionLabel('+ Tambah Ukuran Diretur')
                 ->itemLabel(fn (array $state): ?string => isset($state['return_qty']) ? "{$state['return_qty']} pcs diretur" : null)
-                ->helperText('Tambahkan setiap ukuran yang bermasalah pada tahapan ini.'),
+                ->helperText('Untuk retur 1 ukuran: isi 1 baris di atas. Untuk retur banyak ukuran sekaligus: klik + Tambah Ukuran Diretur.'),
 
             // 4. Tindakan Retur (Perbaikan / Buat Baru)
             Select::make('action_type')
