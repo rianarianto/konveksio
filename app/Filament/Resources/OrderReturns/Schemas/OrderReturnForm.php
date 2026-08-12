@@ -116,71 +116,51 @@ class OrderReturnForm
                                 ->where('product_name', $pName)
                                 ->get();
 
-                            $options = [];
-                            $labelCounts = [];
-                            $itemLabels = [];
+                            $groupedOptions = [];
 
                             foreach ($items as $item) {
+                                $reqDetails = $item->size_and_request_details ?? [];
+                                $groupName = !empty($reqDetails['group_label']) 
+                                    ? "📦 Varian: " . $reqDetails['group_label']
+                                    : "📦 Varian Utama";
+
+                                if (!empty($reqDetails['gender'])) {
+                                    $groupName .= " (" . ($reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan') . ")";
+                                }
+
+                                if ($item->is_addition) {
+                                    $groupName = "➕ Batch Penambahan Baru";
+                                    if (!empty($reqDetails['group_label'])) {
+                                        $groupName .= " — " . $reqDetails['group_label'];
+                                    }
+                                }
+
                                 $sz = $item->size ? "Ukuran {$item->size}" : "Tanpa Ukuran";
                                 $qty = " ({$item->quantity} pcs)";
                                 
                                 $details = [];
-                                $reqDetails = $item->size_and_request_details ?? [];
-                                
-                                if (!empty($reqDetails['group_label'])) {
-                                    $details[] = "Varian: {$reqDetails['group_label']}";
-                                }
-
-                                if (!empty($reqDetails['gender'])) {
-                                    $details[] = $reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan';
-                                }
-
                                 if (!empty($item->recipient_name)) {
-                                    $details[] = "Penerima: {$item->recipient_name}";
+                                    $details[] = "👤 Penerima: {$item->recipient_name}";
                                 }
 
                                 $specs = [];
                                 if (!empty($reqDetails['sleeve_model'])) {
-                                    $sleeve = str_replace('_', ' ', (string)$reqDetails['sleeve_model']);
-                                    $specs[] = "Lengan " . ucfirst($sleeve);
+                                    $specs[] = "Lengan " . ucfirst(str_replace('_', ' ', (string)$reqDetails['sleeve_model']));
                                 }
                                 if (!empty($reqDetails['collar_model'])) {
-                                    $collar = str_replace('_', ' ', (string)$reqDetails['collar_model']);
-                                    $specs[] = "Kerah " . ucfirst($collar);
+                                    $specs[] = "Kerah " . ucfirst(str_replace('_', ' ', (string)$reqDetails['collar_model']));
                                 }
                                 if (count($specs) > 0) {
                                     $details[] = implode(', ', $specs);
                                 }
 
-                                if ($item->is_addition) {
-                                    $details[] = "➕ Item Tambahan";
-                                }
-
                                 $extra = count($details) > 0 ? " — " . implode(' | ', $details) : "";
-                                $baseLabel = "{$sz}{$qty}{$extra}";
+                                $label = "{$sz}{$qty}{$extra}";
 
-                                $itemLabels[$item->id] = [
-                                    'baseLabel' => $baseLabel,
-                                    'is_addition' => $item->is_addition,
-                                ];
-
-                                $labelCounts[$baseLabel] = ($labelCounts[$baseLabel] ?? 0) + 1;
+                                $groupedOptions[$groupName][$item->id] = $label;
                             }
 
-                            $seenCounts = [];
-                            foreach ($itemLabels as $itemId => $data) {
-                                $baseLabel = $data['baseLabel'];
-                                if (($labelCounts[$baseLabel] ?? 0) > 1) {
-                                    $seenCounts[$baseLabel] = ($seenCounts[$baseLabel] ?? 0) + 1;
-                                    $idx = $seenCounts[$baseLabel];
-                                    $tag = $idx === 1 ? " [Item Awal]" : " ➕ [Penambahan #{$idx}]";
-                                    $options[$itemId] = "{$baseLabel}{$tag}";
-                                } else {
-                                    $options[$itemId] = $baseLabel;
-                                }
-                            }
-
-                            return $options;
+                            return $groupedOptions;
                         })
                         ->required()
                         ->reactive()
