@@ -24,7 +24,12 @@ class OrderReturn extends Model
         'additional_fee',
         'size_breakdown',
         'photo_path',
+        'selection_mode',
+        'multi_size_items',
     ];
+
+    public $multi_size_items = [];
+    public $selection_mode = 'single';
 
     public function setTargetStagesAttribute($value): void
     {
@@ -84,6 +89,32 @@ class OrderReturn extends Model
             if (empty($return->items_description) && !empty($return->reason)) {
                 $return->items_description = $return->reason;
             }
+            if (!empty($return->multi_size_items) && is_array($return->multi_size_items)) {
+                $breakdown = [];
+                $totQty = 0;
+                $firstItemId = null;
+
+                foreach ($return->multi_size_items as $mItem) {
+                    $itemId = $mItem['order_item_id'] ?? null;
+                    $rQty = (int)($mItem['return_qty'] ?? 1);
+                    if ($itemId && $rQty > 0) {
+                        if (!$firstItemId) $firstItemId = $itemId;
+                        $itemObj = \App\Models\OrderItem::find($itemId);
+                        if ($itemObj) {
+                            $label = ($itemObj->size ? "Size {$itemObj->size}" : "Tanpa Ukuran") . ($itemObj->recipient_name ? " ({$itemObj->recipient_name})" : "");
+                            $breakdown[$label] = ($breakdown[$label] ?? 0) + $rQty;
+                            $totQty += $rQty;
+                        }
+                    }
+                }
+
+                if ($firstItemId) {
+                    $return->order_item_id = $firstItemId;
+                    $return->quantity = $totQty;
+                    $return->size_breakdown = $breakdown;
+                }
+            }
+
             if (empty($return->size_breakdown) && $return->order_item_id) {
                 $item = \App\Models\OrderItem::find($return->order_item_id);
                 if ($item) {

@@ -84,7 +84,19 @@ class OrderReturnForm
                 ->afterStateUpdated(fn (callable $set) => $set('order_item_id', null))
                 ->helperText('Pilih nama produk dari pesanan ini yang mengalami komplain/cacat.'),
 
-            // 2. Pilih Ukuran / Varian Spesifik yang Diretur
+            // Mode Pemilihan Retur
+            Select::make('selection_mode')
+                ->label('Cara Memilih Barang Diretur')
+                ->options([
+                    'single' => '📌 Mode 1: Pilih 1 Ukuran / Item Spesifik (Per-Orang / Per-Ukuran)',
+                    'multi'  => '📋 Mode 2: Pilih Banyak Ukuran Sekaligus (Grid Cacat Massal)',
+                ])
+                ->default('single')
+                ->reactive()
+                ->visible(fn ($get) => !empty($get('selected_product_name')))
+                ->helperText('Gunakan Mode 2 jika ada beberapa ukuran sekaligus yang mengalami komplain/cacat yang sama.'),
+
+            // 2. Pilih Ukuran / Varian Spesifik (Mode 1)
             Select::make('order_item_id')
                 ->label('2. Pilih Ukuran / Varian yang Diretur')
                 ->options(function ($get, $record) {
@@ -177,16 +189,17 @@ class OrderReturnForm
 
                     return $options;
                 })
-                ->visible(fn ($get) => !empty($get('selected_product_name')))
+                ->visible(fn ($get) => !empty($get('selected_product_name')) && ($get('selection_mode') ?? 'single') === 'single')
                 ->searchable()
-                ->required()
+                ->required(fn ($get) => ($get('selection_mode') ?? 'single') === 'single')
                 ->reactive()
                 ->helperText('Pilih ukuran spesifik baju yang mengalami kerusakan.'),
 
-            // 3. Jumlah Pcs yang Diretur
+            // 3. Jumlah Pcs yang Diretur (Mode 1)
             TextInput::make('quantity')
                 ->label('3. Jumlah Pcs yang Diretur')
-                ->required()
+                ->visible(fn ($get) => ($get('selection_mode') ?? 'single') === 'single')
+                ->required(fn ($get) => ($get('selection_mode') ?? 'single') === 'single')
                 ->numeric()
                 ->default(1)
                 ->minValue(1)
@@ -207,6 +220,60 @@ class OrderReturnForm
                     'max' => 'Jumlah pcs diretur tidak boleh melebihi total pcs dari item yang dipilih.',
                     'lte' => 'Jumlah pcs diretur tidak boleh melebihi total pcs dari item yang dipilih.',
                 ]),
+
+            // Mode 2: Multi-Size Grid Input
+            Repeater::make('multi_size_items')
+                ->label('📋 Grid Rincian Pcs Diretur Per-Ukuran / Varian')
+                ->visible(fn ($get) => !empty($get('selected_product_name')) && ($get('selection_mode') ?? 'single') === 'multi')
+                ->schema([
+                    Select::make('order_item_id')
+                        ->label('Ukuran / Varian Item')
+                        ->options(function ($get, $record) {
+                            $pName = $get('../../selected_product_name');
+                            $orderId = $get('../../order_id');
+                            if (!$orderId && $record) {
+                                if ($record instanceof \App\Models\Order) {
+                                    $orderId = $record->id;
+                                } elseif (isset($record->order_id)) {
+                                    $orderId = $record->order_id;
+                                }
+                            }
+                            if (!$orderId) {
+                                $routeRecord = request()->route()?->parameter('record');
+                                if ($routeRecord instanceof \App\Models\Order) {
+                                    $orderId = $routeRecord->id;
+                                } elseif (is_numeric($routeRecord)) {
+                                    $orderId = (int) $routeRecord;
+                                }
+                            }
+                            if (!$orderId || !$pName) return [];
+
+                            $items = OrderItem::where('order_id', $orderId)
+                                ->where('product_name', $pName)
+                                ->get();
+
+                            $options = [];
+                            foreach ($items as $item) {
+                                $sz = $item->size ? "Ukuran {$item->size}" : "Tanpa Ukuran";
+                                $qty = " ({$item->quantity} pcs)";
+                                $options[$item->id] = "{$sz}{$qty}" . ($item->recipient_name ? " — {$item->recipient_name}" : "");
+                            }
+                            return $options;
+                        })
+                        ->required()
+                        ->searchable(),
+
+                    TextInput::make('return_qty')
+                        ->label('Jumlah Pcs Diretur')
+                        ->numeric()
+                        ->default(1)
+                        ->minValue(1)
+                        ->required(),
+                ])
+                ->columns(2)
+                ->defaultItems(1)
+                ->itemLabel(fn (array $state): ?string => isset($state['return_qty']) ? "{$state['return_qty']} pcs diretur" : null)
+                ->helperText('Tambahkan setiap ukuran yang bermasalah pada tahapan ini.'),
 
             // 4. Tindakan Retur (Perbaikan / Buat Baru)
             Select::make('action_type')
