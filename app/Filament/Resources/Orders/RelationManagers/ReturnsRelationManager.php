@@ -174,6 +174,7 @@ class ReturnsRelationManager extends RelationManager
                             if (!empty($record->size_breakdown) && is_array($record->size_breakdown)) {
                                 $lines = [];
                                 foreach ($record->size_breakdown as $sz => $q) {
+                                    if ($sz === '_raw') continue;
                                     $lines[] = "• {$sz} ➔ {$q} pcs";
                                 }
                                 $breakdownText = implode("\n", $lines);
@@ -237,20 +238,32 @@ class ReturnsRelationManager extends RelationManager
 
                             return false;
                         })
-                        ->fillForm(fn (OrderReturn $record): array => [
-                            'shop_id' => $record->shop_id,
-                            'order_id' => $record->order_id,
-                            'selected_product_name' => $record->orderItem?->product_name,
-                            'order_item_id' => $record->order_item_id,
-                            'quantity' => $record->quantity,
-                            'action_type' => $record->action_type,
-                            'target_stages' => explode(',', (string)$record->target_stage),
-                            'responsibility_type' => $record->responsibility_type,
-                            'additional_fee' => $record->additional_fee,
-                            'return_date' => $record->return_date,
-                            'expected_pickup_date' => $record->expected_pickup_date,
-                            'items_description' => $record->items_description ?: $record->reason,
-                        ])
+                        ->fillForm(function (OrderReturn $record): array {
+                            $multiItems = [];
+                            if (!empty($record->size_breakdown['_raw']) && is_array($record->size_breakdown['_raw'])) {
+                                $multiItems = $record->size_breakdown['_raw'];
+                            } elseif ($record->order_item_id) {
+                                $multiItems = [
+                                    ['order_item_id' => $record->order_item_id, 'return_qty' => $record->quantity ?: 1],
+                                ];
+                            }
+
+                            return [
+                                'shop_id' => $record->shop_id,
+                                'order_id' => $record->order_id,
+                                'selected_product_name' => $record->orderItem?->product_name,
+                                'multi_size_items' => $multiItems,
+                                'order_item_id' => $record->order_item_id,
+                                'quantity' => $record->quantity,
+                                'action_type' => $record->action_type,
+                                'target_stages' => explode(',', (string)$record->target_stage),
+                                'responsibility_type' => $record->responsibility_type,
+                                'additional_fee' => $record->additional_fee,
+                                'return_date' => $record->return_date,
+                                'expected_pickup_date' => $record->expected_pickup_date,
+                                'items_description' => $record->items_description ?: $record->reason,
+                            ];
+                        })
                         ->form(OrderReturnForm::getComponents(true))
                         ->action(function (OrderReturn $record, array $data): void {
                             if (isset($data['target_stages'])) {

@@ -70,7 +70,7 @@ class OrderReturn extends Model
 
     protected static function booted(): void
     {
-        static::creating(function ($return) {
+        static::saving(function ($return) {
             if (empty($return->status)) {
                 $return->status = 'pending';
             }
@@ -87,7 +87,7 @@ class OrderReturn extends Model
                 $return->items_description = $return->reason;
             }
             if (!empty($return->multi_size_items) && is_array($return->multi_size_items)) {
-                $breakdown = [];
+                $breakdown = ['_raw' => $return->multi_size_items];
                 $totQty = 0;
                 $firstItemId = null;
 
@@ -98,7 +98,14 @@ class OrderReturn extends Model
                         if (!$firstItemId) $firstItemId = $itemId;
                         $itemObj = \App\Models\OrderItem::find($itemId);
                         if ($itemObj) {
-                            $label = ($itemObj->size ? "Size {$itemObj->size}" : "Tanpa Ukuran") . ($itemObj->recipient_name ? " ({$itemObj->recipient_name})" : "");
+                            $reqDetails = $itemObj->size_and_request_details ?? [];
+                            $vLabel = !empty($reqDetails['group_label']) ? $reqDetails['group_label'] : "Varian Utama";
+                            $gender = !empty($reqDetails['gender']) ? " (" . ($reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan') . ")" : "";
+                            $batch = $itemObj->is_addition ? " ➕ Penambahan" : "";
+                            $sz = $itemObj->size ? "Ukuran {$itemObj->size}" : "Tanpa Ukuran";
+                            $rec = !empty($itemObj->recipient_name) ? " — 👤 Penerima: {$itemObj->recipient_name}" : "";
+
+                            $label = "📦 {$vLabel}{$gender}{$batch} — {$sz}{$rec}";
                             $breakdown[$label] = ($breakdown[$label] ?? 0) + $rQty;
                             $totQty += $rQty;
                         }
@@ -115,10 +122,14 @@ class OrderReturn extends Model
             if (empty($return->size_breakdown) && $return->order_item_id) {
                 $item = \App\Models\OrderItem::find($return->order_item_id);
                 if ($item) {
-                    $szKey = $item->size ? "Size {$item->size}" : "Tanpa Ukuran";
-                    if (!empty($item->recipient_name)) {
-                        $szKey .= " (Nama: {$item->recipient_name})";
-                    }
+                    $reqDetails = $item->size_and_request_details ?? [];
+                    $vLabel = !empty($reqDetails['group_label']) ? $reqDetails['group_label'] : "Varian Utama";
+                    $gender = !empty($reqDetails['gender']) ? " (" . ($reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan') . ")" : "";
+                    $batch = $item->is_addition ? " ➕ Penambahan" : "";
+                    $sz = $item->size ? "Ukuran {$item->size}" : "Tanpa Ukuran";
+                    $rec = !empty($item->recipient_name) ? " — 👤 Penerima: {$item->recipient_name}" : "";
+
+                    $szKey = "📦 {$vLabel}{$gender}{$batch} — {$sz}{$rec}";
                     $return->size_breakdown = [$szKey => $return->quantity ?: 1];
                 }
             }
