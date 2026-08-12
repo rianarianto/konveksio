@@ -143,15 +143,10 @@ class OrderReturnForm
                                     $details[] = "👤 Penerima: {$item->recipient_name}";
                                 }
 
-                                $specs = [];
-                                if (!empty($reqDetails['sleeve_model'])) {
-                                    $specs[] = "Lengan " . ucfirst(str_replace('_', ' ', (string)$reqDetails['sleeve_model']));
-                                }
-                                if (!empty($reqDetails['collar_model'])) {
-                                    $specs[] = "Kerah " . ucfirst(str_replace('_', ' ', (string)$reqDetails['collar_model']));
-                                }
-                                if (count($specs) > 0) {
-                                    $details[] = implode(', ', $specs);
+                                if (!empty($reqDetails['person_notes'])) {
+                                    $details[] = "📝 {$reqDetails['person_notes']}";
+                                } elseif (!empty($reqDetails['spec_notes']) && strtolower((string)$reqDetails['spec_notes']) !== strtolower((string)($reqDetails['group_label'] ?? ''))) {
+                                    $details[] = "📝 {$reqDetails['spec_notes']}";
                                 }
 
                                 $extra = count($details) > 0 ? " — " . implode(' | ', $details) : "";
