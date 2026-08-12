@@ -120,20 +120,12 @@ class OrderReturnForm
 
                             foreach ($items as $item) {
                                 $reqDetails = $item->size_and_request_details ?? [];
-                                $groupName = !empty($reqDetails['group_label']) 
-                                    ? "📦 Varian: " . $reqDetails['group_label']
-                                    : "📦 Varian Utama";
+                                
+                                $prefix = $item->is_addition ? "➕ Batch Penambahan" : "📦 Batch Utama";
+                                $vLabel = !empty($reqDetails['group_label']) ? $reqDetails['group_label'] : "Varian Standard";
+                                $gender = !empty($reqDetails['gender']) ? " (" . ($reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan') . ")" : "";
 
-                                if (!empty($reqDetails['gender'])) {
-                                    $groupName .= " (" . ($reqDetails['gender'] === 'L' ? 'Laki-laki' : 'Perempuan') . ")";
-                                }
-
-                                if ($item->is_addition) {
-                                    $groupName = "➕ Batch Penambahan Baru";
-                                    if (!empty($reqDetails['group_label'])) {
-                                        $groupName .= " — " . $reqDetails['group_label'];
-                                    }
-                                }
+                                $groupName = "{$prefix} — Varian: {$vLabel}{$gender}";
 
                                 $sz = $item->size ? "Ukuran {$item->size}" : "Tanpa Ukuran";
                                 $qty = " ({$item->quantity} pcs)";
