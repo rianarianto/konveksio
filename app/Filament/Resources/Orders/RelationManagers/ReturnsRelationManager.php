@@ -161,7 +161,7 @@ class ReturnsRelationManager extends RelationManager
                     }),
             ])
             ->actions([
-                \Filament\Tables\Actions\ActionGroup::make([
+                ActionGroup::make([
                     \Filament\Actions\Action::make('view_detail')
                         ->label('Detail Retur')
                         ->icon('heroicon-o-eye')
