@@ -82,13 +82,22 @@ class OrderReturnForm
                 ->searchable()
                 ->required()
                 ->reactive()
-                ->afterStateUpdated(fn (callable $set) => $set('order_item_id', null))
+                ->afterStateUpdated(function (callable $set) {
+                    $set('multi_size_items', [
+                        ['order_item_id' => null, 'return_qty' => 1],
+                    ]);
+                })
                 ->helperText('Pilih nama produk dari pesanan ini yang mengalami komplain/cacat.'),
 
             // 2. Grid Rincian Item / Ukuran yang Diretur
             Repeater::make('multi_size_items')
                 ->label('2. Pilih Ukuran & Input Jumlah Pcs Diretur')
                 ->visible(fn ($get) => !empty($get('selected_product_name')))
+                ->default([
+                    ['order_item_id' => null, 'return_qty' => 1],
+                ])
+                ->defaultItems(1)
+                ->minItems(1)
                 ->schema([
                     Select::make('order_item_id')
                         ->label('Ukuran / Varian Item')
