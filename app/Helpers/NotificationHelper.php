@@ -334,7 +334,7 @@ class NotificationHelper
                         ->icon('heroicon-o-check-badge')
                         ->iconColor('success')
                         ->actions([
-                            \Filament\Notifications\Actions\Action::make('view')
+                            \Filament\Actions\Action::make('view')
                                 ->label('Lihat Pesanan')
                                 ->url("/app/{$shopId}/orders/{$orderId}?relation=2"),
                         ])
@@ -366,7 +366,7 @@ class NotificationHelper
                         ->icon('heroicon-o-arrow-right-circle')
                         ->iconColor('info')
                         ->actions([
-                            \Filament\Notifications\Actions\Action::make('view')
+                            \Filament\Actions\Action::make('view')
                                 ->label('Control Produksi')
                                 ->url("/app/{$shopId}/control-produksis"),
                         ])
