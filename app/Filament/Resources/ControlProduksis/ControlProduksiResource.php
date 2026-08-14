@@ -420,7 +420,41 @@ class ControlProduksiResource extends Resource
                 ActionGroup::make([
                     Action::make('update_progress')
                     ->visible(function (OrderItem $record): bool {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+
+                        if ($retur) {
+                            $unassignedReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->where('status', '!=', 'done')
+                                ->whereNull('assigned_to')
+                                ->exists();
+
+                            if ($unassignedReturTasks) {
+                                return false; // Must assign worker first!
+                            }
+
+                            $hasReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->exists();
+
+                            return $hasReturTasks;
+                        }
+
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
+
+                        $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('status', '!=', 'done')
+                            ->whereNull('assigned_to')
+                            ->exists();
+
+                        if ($unassignedTasks) {
+                            return false; // Must assign worker first!
+                        }
+
                         $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
                             ->exists();
@@ -820,7 +854,33 @@ class ControlProduksiResource extends Resource
 
                 Action::make('atur_tugas')
                     ->hidden(function (OrderItem $record): bool {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+
+                        if ($retur) {
+                            $unassignedReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->where('status', '!=', 'done')
+                                ->whereNull('assigned_to')
+                                ->exists();
+
+                            if ($unassignedReturTasks) {
+                                return false; // Show Atur Tugas because workers must be assigned!
+                            }
+                        }
+
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('status', '!=', 'done')
+                            ->whereNull('assigned_to')
+                            ->exists();
+
+                        if ($unassignedTasks) {
+                            return false; // Show Atur Tugas because workers must be assigned!
+                        }
+
                         $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
                             ->exists();
@@ -835,7 +895,34 @@ class ControlProduksiResource extends Resource
                         return !$hasUnfinishedTasks;
                     })
                     ->label(function (OrderItem $record): string {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+
+                        if ($retur) {
+                            $unassignedReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->where('status', '!=', 'done')
+                                ->whereNull('assigned_to')
+                                ->exists();
+
+                            if ($unassignedReturTasks) {
+                                return '⚙️ Atur Retur (Belum Ditunjuk)';
+                            }
+                            return '⚙️ Edit Tugas Retur';
+                        }
+
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('status', '!=', 'done')
+                            ->whereNull('assigned_to')
+                            ->exists();
+
+                        if ($unassignedTasks) {
+                            return '⚙️ Atur Tugas (Belum Ditunjuk)';
+                        }
+
                         $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
                             ->exists();
@@ -843,7 +930,12 @@ class ControlProduksiResource extends Resource
                     })
                     ->icon('heroicon-o-clipboard-document-list')
                     ->color('primary')
-                    ->url(fn (OrderItem $record): string => AturTugasProduksi::getUrl(['record' => $record])),
+                    ->url(function (OrderItem $record): string {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+                        $targetId = $retur ? $retur->order_item_id : $record->id;
+                        return AturTugasProduksi::getUrl(['record' => $targetId]);
+                    }),
                 ])
                     ->icon('heroicon-m-ellipsis-vertical')
                     ->tooltip('Aksi')
