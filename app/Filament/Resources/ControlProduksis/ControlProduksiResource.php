@@ -249,16 +249,7 @@ class ControlProduksiResource extends Resource
                             return $record->getItemsInGroup()->sum('quantity');
                         }
                     )
-                    ->description(function (OrderItem $record) {
-                        $returMap = static::getReturMapping();
-                        $retur = $returMap[$record->id] ?? null;
-
-                        if ($retur) {
-                            $origTotal = $retur->orderItem ? $retur->orderItem->quantity : $record->getItemsInGroup()->sum('quantity');
-                            return "dari total {$origTotal} pcs";
-                        }
-                        return null;
-                    })
+                    ->description(fn (OrderItem $record) => null)
                     ->formatStateUsing(fn ($state) => $state . ' pcs')
                     ->sortable(['quantity']),
 
