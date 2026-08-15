@@ -903,9 +903,9 @@ class ControlProduksiResource extends Resource
                                 ->exists();
 
                             if ($unassignedReturTasks) {
-                                return '⚙️ Atur Retur (Belum Ditunjuk)';
+                                return 'Atur Tugas Retur';
                             }
-                            return '⚙️ Edit Tugas Retur';
+                            return 'Edit Tugas Retur';
                         }
 
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
@@ -916,7 +916,7 @@ class ControlProduksiResource extends Resource
                             ->exists();
 
                         if ($unassignedTasks) {
-                            return '⚙️ Atur Tugas (Belum Ditunjuk)';
+                            return 'Atur Tugas';
                         }
 
                         $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
