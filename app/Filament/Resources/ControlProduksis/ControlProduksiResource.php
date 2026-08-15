@@ -322,10 +322,8 @@ class ControlProduksiResource extends Resource
                                 ->first();
 
                             $workerName = $revTask?->assignedTo?->name ?: 'Belum ditunjuk';
-                            $fullNote = $activeReturn->items_description ?: '-';
-                            $displayNote = \Illuminate\Support\Str::limit($fullNote, 60);
 
-                            return new \Illuminate\Support\HtmlString('<span title="' . e($fullNote) . '">👷 Tukang: ' . e($workerName) . ' | 📝 ' . e($displayNote) . '</span>');
+                            return "👷 Tukang: {$workerName}";
                         }
                         
                         $groupItemIds = OrderItem::where('order_id', $record->order_id)
