@@ -324,13 +324,12 @@ class ControlProduksiResource extends Resource
                             $activeTask = $returTasks->firstWhere('status', 'in_progress')
                                 ?? $returTasks->where('status', 'pending')->sortBy('id')->first();
 
-                            if ($activeTask) {
+                            if ($activeTask && $activeTask->assignedTo) {
                                 $stageLabel = str_replace('_', ' ', $activeTask->stage_name);
-                                $workerName = $activeTask->assignedTo?->name ?: 'Belum ditunjuk';
-                                return "👷 {$stageLabel}: {$workerName}";
+                                return "👷 {$stageLabel}: {$activeTask->assignedTo->name}";
                             }
 
-                            return "👷 Tukang: Belum ditunjuk";
+                            return null;
                         }
                         
                         $groupItemIds = OrderItem::where('order_id', $record->order_id)
