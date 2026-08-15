@@ -47,17 +47,39 @@ class AturTugasProduksi extends Page
         // Aggregate max quantities for the whole group to determine _fill_all state
         $allGroupItems = $item->getItemsInGroup();
             
-        $maxSizes = [];
-        foreach ($allGroupItems as $gi) {
-            $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-            $maxSizes[$sz] = ($maxSizes[$sz] ?? 0) + $gi->quantity;
-        }
+        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $item->id)
+            ->whereIn('status', ['pending', 'diproses'])
+            ->latest('id')
+            ->first();
 
-        if ($item->production_category === 'custom') {
-            $details = $item->size_and_request_details ?? [];
-            $count = count($details['detail_custom'] ?? []);
-            if ($count > 0) {
-                $maxSizes['CUSTOM'] = ($maxSizes['CUSTOM'] ?? 0) + $count;
+        $maxSizes = [];
+        if ($activeReturn && !empty($activeReturn->size_breakdown)) {
+            $raw = $activeReturn->size_breakdown['_raw'] ?? [];
+            if (!empty($raw)) {
+                foreach ($raw as $rItem) {
+                    $oi = \App\Models\OrderItem::find($rItem['order_item_id'] ?? null);
+                    if ($oi) {
+                        $sz = strtoupper($oi->size ?? 'CUSTOM');
+                        $rQty = (int) ($rItem['return_qty'] ?? $activeReturn->quantity);
+                        $maxSizes[$sz] = ($maxSizes[$sz] ?? 0) + $rQty;
+                    }
+                }
+            }
+            if (empty($maxSizes)) {
+                $maxSizes['TOTAL_RETUR'] = $activeReturn->quantity;
+            }
+        } else {
+            foreach ($allGroupItems as $gi) {
+                $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                $maxSizes[$sz] = ($maxSizes[$sz] ?? 0) + $gi->quantity;
+            }
+
+            if ($item->production_category === 'custom') {
+                $details = $item->size_and_request_details ?? [];
+                $count = count($details['detail_custom'] ?? []);
+                if ($count > 0) {
+                    $maxSizes['CUSTOM'] = ($maxSizes['CUSTOM'] ?? 0) + $count;
+                }
             }
         }
 
@@ -428,35 +450,57 @@ class AturTugasProduksi extends Page
                                                         ->required(),
 
                                                     Fieldset::make('Distribusi Qty Per Ukuran')
-                                                        ->schema(function (Get $get, Set $set) use ($item) {
-                                                            $allGroupItems = $item->getItemsInGroup();
+                                                         ->schema(function (Get $get, Set $set) use ($item) {
+                                                             $activeReturn = \App\Models\OrderReturn::where('order_item_id', $item->id)
+                                                                 ->whereIn('status', ['pending', 'diproses'])
+                                                                 ->latest('id')
+                                                                 ->first();
 
-                                                            $standardSizes = [];
-                                                            $requestPerSize = [];
-                                                            foreach ($allGroupItems as $gi) {
-                                                                $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-                                                                $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
-                                                                $dtl = $gi->size_and_request_details ?? [];
-                                                                if (!empty($dtl['request_tambahan'])) {
-                                                                    foreach ($dtl['request_tambahan'] as $rt) {
-                                                                        $reqText = ($rt['jenis'] ?? '') . ': ' . ($rt['keterangan'] ?? '');
-                                                                        $requestPerSize[$sz][] = $reqText;
-                                                                    }
-                                                                }
-                                                            }
+                                                             $standardSizes = [];
+                                                             $requestPerSize = [];
 
-                                                            if ($item->production_category === 'custom') {
-                                                                $details = $item->size_and_request_details ?? [];
-                                                                $count = count($details['detail_custom'] ?? []);
-                                                                if ($count > 0) $standardSizes['CUSTOM'] = ($standardSizes['CUSTOM'] ?? 0) + $count;
-                                                            }
+                                                             if ($activeReturn && !empty($activeReturn->size_breakdown)) {
+                                                                 $raw = $activeReturn->size_breakdown['_raw'] ?? [];
+                                                                 if (!empty($raw)) {
+                                                                     foreach ($raw as $rItem) {
+                                                                         $oi = \App\Models\OrderItem::find($rItem['order_item_id'] ?? null);
+                                                                         if ($oi) {
+                                                                             $sz = strtoupper($oi->size ?? 'CUSTOM');
+                                                                             $rQty = (int) ($rItem['return_qty'] ?? $activeReturn->quantity);
+                                                                             $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $rQty;
+                                                                         }
+                                                                     }
+                                                                 }
+                                                                 if (empty($standardSizes)) {
+                                                                     $standardSizes['TOTAL_RETUR'] = $activeReturn->quantity;
+                                                                 }
+                                                             } else {
+                                                                 $allGroupItems = $item->getItemsInGroup();
+                                                                 foreach ($allGroupItems as $gi) {
+                                                                     $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                                                                     $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
+                                                                     $dtl = $gi->size_and_request_details ?? [];
+                                                                     if (!empty($dtl['request_tambahan'])) {
+                                                                         foreach ($dtl['request_tambahan'] as $rt) {
+                                                                             $reqText = ($rt['jenis'] ?? '') . ': ' . ($rt['keterangan'] ?? '');
+                                                                             $requestPerSize[$sz][] = $reqText;
+                                                                         }
+                                                                     }
+                                                                 }
 
-                                                            // Move 'CUSTOM' to the end of the array if it exists
-                                                            if (array_key_exists('CUSTOM', $standardSizes)) {
-                                                                $customVal = $standardSizes['CUSTOM'];
-                                                                unset($standardSizes['CUSTOM']);
-                                                                $standardSizes['CUSTOM'] = $customVal;
-                                                            }
+                                                                 if ($item->production_category === 'custom') {
+                                                                     $details = $item->size_and_request_details ?? [];
+                                                                     $count = count($details['detail_custom'] ?? []);
+                                                                     if ($count > 0) $standardSizes['CUSTOM'] = ($standardSizes['CUSTOM'] ?? 0) + $count;
+                                                                 }
+                                                             }
+
+                                                             // Move 'CUSTOM' to the end of the array if it exists
+                                                             if (array_key_exists('CUSTOM', $standardSizes)) {
+                                                                 $customVal = $standardSizes['CUSTOM'];
+                                                                 unset($standardSizes['CUSTOM']);
+                                                                 $standardSizes['CUSTOM'] = $customVal;
+                                                             }
 
                                                             $recalcQty = function (Get $get, Set $set) use ($standardSizes) {
                                                                 $total = 0;
