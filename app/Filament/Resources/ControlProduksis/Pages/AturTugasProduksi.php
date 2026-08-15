@@ -146,18 +146,40 @@ class AturTugasProduksi extends Page
                 ];
 
                 if (is_array($task->size_quantities)) {
-                    foreach ($task->size_quantities as $sz => $qty) {
-                        $upperSz = trim(str_replace(['SIZE ', 'SIZE'], '', strtoupper($sz)));
-                        if (str_starts_with($sz, '_')) {
-                            if ($sz === '_custom_recipients') {
-                                $workerRow['_custom_recipients'] = $qty;
+                    if (!empty($task->size_quantities['_raw'])) {
+                        foreach ($task->size_quantities['_raw'] as $rItem) {
+                            $oi = \App\Models\OrderItem::find($rItem['order_item_id'] ?? null);
+                            if ($oi) {
+                                $szKey = strtoupper($oi->size ?? 'CUSTOM');
+                                $rQty = (int) ($rItem['return_qty'] ?? $task->quantity);
+                                $workerRow[$szKey] = ($workerRow[$szKey] ?? 0) + $rQty;
                             }
-                            continue;
                         }
-                        if ((str_starts_with($upperSz, 'PERSON_') || !isset($maxSizes[$upperSz])) && isset($maxSizes['CUSTOM'])) {
-                            $workerRow['CUSTOM'] = ($workerRow['CUSTOM'] ?? 0) + $qty;
-                        } else {
-                            $workerRow[$upperSz] = $qty ?: null;
+                    } else {
+                        foreach ($task->size_quantities as $sz => $qty) {
+                            if (str_starts_with($sz, '_')) {
+                                if ($sz === '_custom_recipients') {
+                                    $workerRow['_custom_recipients'] = $qty;
+                                }
+                                continue;
+                            }
+                            $upperSz = trim(str_replace(['SIZE ', 'SIZE'], '', strtoupper($sz)));
+
+                            $matchedKey = null;
+                            foreach (array_keys($maxSizes) as $mKey) {
+                                if ($upperSz === $mKey || str_contains($upperSz, 'UKURAN ' . $mKey) || str_ends_with($upperSz, ' ' . $mKey)) {
+                                    $matchedKey = $mKey;
+                                    break;
+                                }
+                            }
+
+                            if ($matchedKey) {
+                                $workerRow[$matchedKey] = ($workerRow[$matchedKey] ?? 0) + $qty;
+                            } elseif ((str_starts_with($upperSz, 'PERSON_') || !isset($maxSizes[$upperSz])) && isset($maxSizes['CUSTOM'])) {
+                                $workerRow['CUSTOM'] = ($workerRow['CUSTOM'] ?? 0) + $qty;
+                            } else {
+                                $workerRow[$upperSz] = $qty ?: null;
+                            }
                         }
                     }
                 }
