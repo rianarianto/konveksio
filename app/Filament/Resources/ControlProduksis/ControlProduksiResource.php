@@ -722,10 +722,39 @@ class ControlProduksiResource extends Resource
                     ->label('Cetak SPK')
                     ->icon('heroicon-o-printer')
                     ->color('success')
-                    ->visible(fn (\App\Models\OrderItem $record) => $record->productionTasks()->exists())
+                    ->visible(function (OrderItem $record): bool {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+
+                        if ($retur) {
+                            return \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->exists();
+                        }
+
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        return \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->exists();
+                    })
                     ->url(function (OrderItem $record) {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+
+                        if ($retur) {
+                            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('wo_number', 'like', '%-R%')
+                                ->latest('id')
+                                ->first();
+                            return $wo ? route('work.task.spk', $wo->id) : '#';
+                        }
+
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $record->getItemsInGroup()->pluck('id'))
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('wo_number', 'not like', '%-R%')
                             ->first();
                         return $wo ? route('work.task.spk', $wo->id) : '#';
                     })
@@ -737,35 +766,90 @@ class ControlProduksiResource extends Resource
                     ->label('Kirim Tugas')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('success')
-                    ->visible(fn(OrderItem $record) => $record->productionTasks()->where('status', 'pending')->exists())
-                    ->requiresConfirmation()
-                    ->modalHeading(fn(OrderItem $record) => $record->productionTasks()->where('is_revision', true)->where('status', '!=', 'done')->exists() ? 'Kirim WhatsApp Retur?' : 'Kirim Notifikasi ke Pekerja?')
-                    ->modalDescription(fn(OrderItem $record) => $record->productionTasks()->where('is_revision', true)->where('status', '!=', 'done')->exists() ? 'Sistem akan mengirim pesan WhatsApp perbaikan retur khusus ke 1 tukang yang ditugaskan.' : 'Sistem akan mengirim pesan WhatsApp ke pekerja yang ditugaskan pada item ini.')
-                    ->modalSubmitActionLabel('Ya, Kirim Sekarang')
-                    ->action(function (OrderItem $record) {
-                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                        $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->where('status', '!=', 'done')
-                            ->whereNull('assigned_to')
-                            ->get();
+                    ->visible(function (OrderItem $record): bool {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
 
-                        if ($unassignedTasks->isNotEmpty()) {
-                            $stages = $unassignedTasks->pluck('stage_name')->unique()->implode(', ');
-                            \Filament\Notifications\Notification::make()
-                                ->title('❌ Gagal Mengirim Tugas!')
-                                ->body("Tugas tidak dapat dikirim karena ada pekerja yang belum ditunjuk pada tahap: <strong>{$stages}</strong>. Silakan atur tukangnya terlebih dahulu melalui menu Edit Tugas.")
-                                ->danger()
-                                ->persistent()
-                                ->send();
-                            return;
+                        if ($retur) {
+                            return \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->where('status', 'pending')
+                                ->exists();
                         }
 
-                        \App\Helpers\NotificationHelper::notifyAllWorkers($record);
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        return \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('status', 'pending')
+                            ->exists();
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading(function (OrderItem $record): string {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+                        return $retur ? 'Kirim WhatsApp Retur?' : 'Kirim Notifikasi ke Pekerja?';
+                    })
+                    ->modalDescription(function (OrderItem $record): string {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+                        return $retur
+                            ? 'Sistem akan mengirim pesan WhatsApp perbaikan retur khusus ke tukang yang ditugaskan.'
+                            : 'Sistem akan mengirim pesan WhatsApp ke pekerja yang ditugaskan pada item ini.';
+                    })
+                    ->modalSubmitActionLabel('Ya, Kirim Sekarang')
+                    ->action(function (OrderItem $record) {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+
+                        if ($retur) {
+                            $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->where('status', '!=', 'done')
+                                ->whereNull('assigned_to')
+                                ->get();
+
+                            if ($unassignedTasks->isNotEmpty()) {
+                                $stages = $unassignedTasks->pluck('stage_name')->unique()->implode(', ');
+                                \Filament\Notifications\Notification::make()
+                                    ->title('❌ Gagal Mengirim Tugas!')
+                                    ->body("Tugas retur tidak dapat dikirim karena ada pekerja yang belum ditunjuk pada tahap: <strong>{$stages}</strong>. Silakan atur tukangnya terlebih dahulu.")
+                                    ->danger()
+                                    ->persistent()
+                                    ->send();
+                                return;
+                            }
+
+                            $targetItem = \App\Models\OrderItem::find($retur->order_item_id);
+                            if ($targetItem) {
+                                \App\Helpers\NotificationHelper::notifyAllWorkers($targetItem);
+                            }
+                        } else {
+                            $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                            $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->where('status', '!=', 'done')
+                                ->whereNull('assigned_to')
+                                ->get();
+
+                            if ($unassignedTasks->isNotEmpty()) {
+                                $stages = $unassignedTasks->pluck('stage_name')->unique()->implode(', ');
+                                \Filament\Notifications\Notification::make()
+                                    ->title('❌ Gagal Mengirim Tugas!')
+                                    ->body("Tugas tidak dapat dikirim karena ada pekerja yang belum ditunjuk pada tahap: <strong>{$stages}</strong>. Silakan atur tukangnya terlebih dahulu.")
+                                    ->danger()
+                                    ->persistent()
+                                    ->send();
+                                return;
+                            }
+
+                            \App\Helpers\NotificationHelper::notifyAllWorkers($record);
+                        }
 
                         \Filament\Notifications\Notification::make()
                             ->title('Notifikasi terkirim!')
-                            ->body('Pesan WhatsApp perbaikan telah dikirim ke tukang yang bersangkutan.')
+                            ->body('Pesan WhatsApp penugasan telah dikirim ke tukang yang bersangkutan.')
                             ->success()
                             ->send();
                     }),
