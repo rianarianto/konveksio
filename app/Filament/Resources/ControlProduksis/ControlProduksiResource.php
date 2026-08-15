@@ -315,15 +315,22 @@ class ControlProduksiResource extends Resource
                             ->first();
 
                         if ($activeReturn) {
-                            $revTask = \App\Models\ProductionTask::withoutGlobalScopes()
-                                ->where('order_item_id', $record->id)
+                            $targetItemId = $activeReturn->order_item_id;
+                            $returTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $targetItemId)
                                 ->where('is_revision', true)
-                                ->latest('id')
-                                ->first();
+                                ->get();
 
-                            $workerName = $revTask?->assignedTo?->name ?: 'Belum ditunjuk';
+                            $activeTask = $returTasks->firstWhere('status', 'in_progress')
+                                ?? $returTasks->where('status', 'pending')->sortBy('id')->first();
 
-                            return "👷 Tukang: {$workerName}";
+                            if ($activeTask) {
+                                $stageLabel = str_replace('_', ' ', $activeTask->stage_name);
+                                $workerName = $activeTask->assignedTo?->name ?: 'Belum ditunjuk';
+                                return "👷 {$stageLabel}: {$workerName}";
+                            }
+
+                            return "👷 Tukang: Belum ditunjuk";
                         }
                         
                         $groupItemIds = OrderItem::where('order_id', $record->order_id)
