@@ -775,16 +775,35 @@ class ControlProduksiResource extends Resource
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->visible(function (OrderItem $record): bool {
-                        if (!in_array(auth()->user()->role, ['owner', 'admin', 'designer']) || !$record->productionTasks()->exists()) {
+                        if (!in_array(auth()->user()->role, ['owner', 'admin', 'designer'])) {
                             return false;
                         }
-                        $wo = $record->workOrder;
-                        if (!$wo) {
-                            $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
-                                ->whereIn('order_item_id', $groupItemIds)
-                                ->first();
+
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+
+                        if ($retur) {
+                            $hasReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->exists();
+                            return $hasReturTasks;
                         }
+
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->exists();
+
+                        if (!$hasTasks) {
+                            return false;
+                        }
+
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('wo_number', 'not like', '%-R%')
+                            ->first();
+
                         if ($wo && $wo->isCompleted()) {
                             return false;
                         }
@@ -794,10 +813,29 @@ class ControlProduksiResource extends Resource
                         if (auth()->user()->role === 'owner') {
                             return false;
                         }
-                        $hasTasksStarted = $record->productionTasks()->whereIn('status', ['in_progress', 'done'])->exists();
+
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+
+                        if ($retur) {
+                            $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->whereIn('status', ['in_progress', 'done'])
+                                ->exists();
+
+                            return $hasTasksStarted;
+                        }
+
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->whereIn('status', ['in_progress', 'done'])
+                            ->exists();
+
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
+                            ->where('wo_number', 'not like', '%-R%')
                             ->first();
                         $woStarted = $wo && !in_array($wo->status, [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO']);
 
@@ -805,10 +843,31 @@ class ControlProduksiResource extends Resource
                     })
                     ->tooltip(function (OrderItem $record): ?string {
                         if (auth()->user()->role !== 'owner') {
-                            $hasTasksStarted = $record->productionTasks()->whereIn('status', ['in_progress', 'done'])->exists();
+                            $returMap = static::getReturMapping();
+                            $retur = $returMap[$record->id] ?? null;
+
+                            if ($retur) {
+                                $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
+                                    ->where('order_item_id', $retur->order_item_id)
+                                    ->where('is_revision', true)
+                                    ->whereIn('status', ['in_progress', 'done'])
+                                    ->exists();
+
+                                if ($hasTasksStarted) {
+                                    return 'Perbaikan retur sudah dimulai. Pembatalan tugas hanya dapat dilakukan oleh Owner.';
+                                }
+                                return null;
+                            }
+
                             $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                            $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->whereIn('status', ['in_progress', 'done'])
+                                ->exists();
+
                             $wo = \App\Models\WorkOrder::withoutGlobalScopes()
                                 ->whereIn('order_item_id', $groupItemIds)
+                                ->where('wo_number', 'not like', '%-R%')
                                 ->first();
                             $woStarted = $wo && !in_array($wo->status, [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO']);
 
@@ -823,20 +882,34 @@ class ControlProduksiResource extends Resource
                     ->modalDescription('Tindakan ini akan menghapus seluruh penugasan kerja untuk item ini secara permanen. Status pengerjaan item akan kembali ke Belum Diatur.')
                     ->modalSubmitActionLabel('Ya, Batalkan Tugas')
                     ->action(function (OrderItem $record) {
-                        // Hapus task produksi
-                        $record->productionTasks()->delete();
-                        
-                        // Hapus WorkOrder terkait agar statusnya bersih
-                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                        \App\Models\WorkOrder::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->delete();
-                        
-                        $record->refresh();
-                        if ($order = $record->order) {
-                            $totalTasks = $order->orderItems()->withCount('productionTasks')->get()->sum('production_tasks_count');
-                            if ($totalTasks === 0 && $order->status === 'antrian') {
-                                $order->update(['status' => 'diterima']);
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+
+                        if ($retur) {
+                            \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->delete();
+
+                            \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('wo_number', 'like', '%-R%')
+                                ->delete();
+                        } else {
+                            $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                            $record->productionTasks()->delete();
+
+                            \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->where('wo_number', 'not like', '%-R%')
+                                ->delete();
+
+                            $record->refresh();
+                            if ($order = $record->order) {
+                                $totalTasks = $order->orderItems()->withCount('productionTasks')->get()->sum('production_tasks_count');
+                                if ($totalTasks === 0 && $order->status === 'antrian') {
+                                    $order->update(['status' => 'diterima']);
+                                }
                             }
                         }
 
