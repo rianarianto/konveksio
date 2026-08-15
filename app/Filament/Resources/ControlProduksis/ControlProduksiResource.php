@@ -481,19 +481,34 @@ class ControlProduksiResource extends Resource
                         return ['item_id' => $record->id];
                     })
                     ->form(function (OrderItem $record) {
-                        // Load WorkOrder untuk item ini
-                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                        $workOrder = \App\Models\WorkOrder::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->first();
+                        // Load WorkOrder dan tasks untuk item/retur ini
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
 
-                        $woStatus = $workOrder?->status ?? 'NO_WO';
-                        $woStatusLabel = $workOrder?->status_label ?? 'Belum ada WO';
+                        if ($retur) {
+                            $targetItemId = $retur->order_item_id;
+                            $workOrder = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->where('order_item_id', $targetItemId)
+                                ->where('wo_number', 'like', '%-R%')
+                                ->latest('id')
+                                ->first();
 
-                        // Load tugas dan group berdasarkan urutan stage
-                        $tasks = $record->productionTasks()
-                            ->with(['assignedTo'])
-                            ->get();
+                            $tasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $targetItemId)
+                                ->where('is_revision', true)
+                                ->with(['assignedTo'])
+                                ->get();
+                        } else {
+                            $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                            $workOrder = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->where('wo_number', 'not like', '%-R%')
+                                ->first();
+
+                            $tasks = $record->productionTasks()
+                                ->with(['assignedTo'])
+                                ->get();
+                        }
 
                         // Ambil semua stage yang ada beserta order_sequence-nya
                         $stageOrder = \App\Models\ProductionStage::pluck('order_sequence', 'name');
@@ -689,7 +704,40 @@ class ControlProduksiResource extends Resource
                                 </div>';
                         }
 
-                        $html = $woBannerHtml . $designHtml . '
+                        $returBannerHtml = '';
+                        if ($retur) {
+                            $woNumText = $workOrder ? " ({$workOrder->wo_number})" : '';
+                            $garansiText = $retur->responsibility_type === 'customer_paid' ? '💳 Retur Berbayar' : '🛡️ Retur Garansi Toko';
+                            $defectNote = htmlspecialchars($retur->items_description ?: '-');
+
+                            $breakdownLines = [];
+                            if (!empty($retur->size_breakdown) && is_array($retur->size_breakdown)) {
+                                foreach ($retur->size_breakdown as $label => $q) {
+                                    if ($label === '_raw' || is_array($q)) continue;
+                                    $breakdownLines[] = '• ' . htmlspecialchars($label) . ' ➔ <strong>' . ((int)$q) . ' pcs</strong>';
+                                }
+                            }
+                            $breakdownStr = !empty($breakdownLines)
+                                ? '<div style="margin-top:8px; padding:8px 10px; background:#fff; border-radius:6px; border:1px solid #fca5a5; font-size:12px; color:#991b1b; line-height:1.5;">'
+                                    . '<div style="font-weight:800; margin-bottom:2px;">🎯 UKURAN / VARIAN CACAT DIREVISI:</div>'
+                                    . implode('<br>', $breakdownLines)
+                                    . '</div>'
+                                : '';
+
+                            $returBannerHtml = '<div style="margin-bottom:16px; padding:14px; background:#fef2f2; border:1.5px solid #fca5a5; border-radius:10px;">'
+                                . '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">'
+                                . '<span style="font-size:13px; font-weight:800; color:#991b1b;">🔄 REVISI RETUR REPAIR' . $woNumText . '</span>'
+                                . '<span style="font-size:11px; font-weight:800; color:#b91c1c; background:#fee2e2; padding:2px 8px; border-radius:12px; border:1px solid #fca5a5;">Total Retur: ' . $retur->quantity . ' pcs</span>'
+                                . '</div>'
+                                . '<div style="font-size:12px; font-weight:700; color:#7f1d1d; margin-bottom:6px;">' . $garansiText . '</div>'
+                                . '<div style="font-size:12px; background:#fff; padding:8px 10px; border-radius:6px; border:1px solid #fecaca; color:#991b1b; font-weight:600; line-height:1.4;">'
+                                . '📝 <strong>Catatan Perbaikan / Defect:</strong><br>' . $defectNote
+                                . '</div>'
+                                . $breakdownStr
+                                . '</div>';
+                        }
+
+                        $html = $returBannerHtml . $woBannerHtml . $designHtml . '
                             <div style="border-radius:10px;overflow-x:auto;border:1px solid #e5e7eb;-webkit-overflow-scrolling:touch;">
                                 <table style="width:100%;min-width:600px;border-collapse:collapse;">
                                     <thead>

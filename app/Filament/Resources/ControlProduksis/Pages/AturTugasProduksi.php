@@ -801,6 +801,49 @@ class AturTugasProduksi extends Page
                                                 $bahanLabel = $bahan ? (($bahan->material->name ?? 'Bahan') . ' - ' . ($bahan->color_name ?? 'Tanpa Warna')) : ($details['bahan'] ?? '-');
                                             }
 
+                                            $activeReturn = \App\Models\OrderReturn::where('order_item_id', $item->id)
+                                                ->whereIn('status', ['pending', 'diproses'])
+                                                ->latest('id')
+                                                ->first();
+
+                                            if ($activeReturn) {
+                                                $returWo = \App\Models\WorkOrder::withoutGlobalScopes()
+                                                    ->where('order_item_id', $item->id)
+                                                    ->where('wo_number', 'like', '%-R%')
+                                                    ->latest('id')
+                                                    ->first();
+                                                $woNumText = $returWo ? " ({$returWo->wo_number})" : '';
+                                                $garansiText = $activeReturn->responsibility_type === 'customer_paid' ? '💳 Retur Berbayar' : '🛡️ Retur Garansi Toko';
+                                                $defectNote = htmlspecialchars($activeReturn->items_description ?: '-');
+
+                                                $breakdownHtml = '';
+                                                if (!empty($activeReturn->size_breakdown) && is_array($activeReturn->size_breakdown)) {
+                                                    $lines = [];
+                                                    foreach ($activeReturn->size_breakdown as $label => $qty) {
+                                                        if ($label === '_raw' || is_array($qty)) continue;
+                                                        $lines[] = '• ' . htmlspecialchars($label) . ' ➔ <strong>' . ((int)$qty) . ' pcs</strong>';
+                                                    }
+                                                    if (!empty($lines)) {
+                                                        $breakdownHtml = '<div style="margin-top:10px; padding:10px; background:#fff; border-radius:6px; border:1px solid #fca5a5; font-size:12px; color:#991b1b; line-height:1.6;">'
+                                                            . '<div style="font-weight:800; margin-bottom:4px;">🎯 RINCIAN UKURAN / VARIAN CACAT DIREVISI:</div>'
+                                                            . implode('<br>', $lines)
+                                                            . '</div>';
+                                                    }
+                                                }
+
+                                                $html .= '<div style="margin-bottom:16px; padding:14px; background:#fef2f2; border:1.5px solid #fca5a5; border-radius:10px;">'
+                                                    . '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">'
+                                                    . '<span style="font-size:13px; font-weight:800; color:#991b1b;">🔄 REVISI RETUR REPAIR' . $woNumText . '</span>'
+                                                    . '<span style="font-size:11px; font-weight:800; color:#b91c1c; background:#fee2e2; padding:2px 8px; border-radius:12px; border:1px solid #fca5a5;">Total Retur: ' . $activeReturn->quantity . ' pcs</span>'
+                                                    . '</div>'
+                                                    . '<div style="font-size:12px; font-weight:700; color:#7f1d1d; margin-bottom:6px;">' . $garansiText . '</div>'
+                                                    . '<div style="font-size:12px; background:#fff; padding:8px 10px; border-radius:6px; border:1px solid #fecaca; color:#991b1b; font-weight:600; line-height:1.4;">'
+                                                    . '📝 <strong>Catatan Perbaikan / Defect:</strong><br>' . $defectNote
+                                                    . '</div>'
+                                                    . $breakdownHtml
+                                                    . '</div>';
+                                            }
+
                                             $html .= '<div style="margin-bottom:20px;">';
                                             $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . ($cat === 'non_produksi' ? 'INFORMASI NON-PRODUKSI' : 'INFORMASI BAHAN') . '</div>';
                                             
