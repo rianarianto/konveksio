@@ -1185,18 +1185,28 @@ class AturTugasProduksi extends Page
         // ══════════════════════════════════════════════════════════════
         // PERSIAPAN DATA KAPASITAS ASLI
         // ══════════════════════════════════════════════════════════════
-        $activeReturTask = $item->productionTasks()->where('is_revision', true)->where('status', '!=', 'done')->latest('id')->first();
-        
-        if ($activeReturTask) {
+        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $item->id)
+            ->whereIn('status', ['pending', 'diproses'])
+            ->latest('id')
+            ->first();
+
+        if ($activeReturn && !empty($activeReturn->size_breakdown)) {
             $originalSizes = [];
-            if (is_array($activeReturTask->size_quantities)) {
-                foreach ($activeReturTask->size_quantities as $rSz => $rQty) {
-                    if (str_starts_with($rSz, '_')) continue;
-                    $cleanSz = trim(str_replace(['SIZE ', 'SIZE'], '', strtoupper($rSz)));
-                    $originalSizes[$cleanSz] = (int) $rQty;
+            $raw = $activeReturn->size_breakdown['_raw'] ?? [];
+            if (!empty($raw)) {
+                foreach ($raw as $rItem) {
+                    $oi = \App\Models\OrderItem::find($rItem['order_item_id'] ?? null);
+                    if ($oi) {
+                        $szKey = strtoupper($oi->size ?? 'CUSTOM');
+                        $rQty = (int) ($rItem['return_qty'] ?? $activeReturn->quantity);
+                        $originalSizes[$szKey] = ($originalSizes[$szKey] ?? 0) + $rQty;
+                    }
                 }
             }
-            $totalOrderQty = (int) $activeReturTask->quantity;
+            if (empty($originalSizes)) {
+                $originalSizes['TOTAL_RETUR'] = $activeReturn->quantity;
+            }
+            $totalOrderQty = (int) $activeReturn->quantity;
         } else {
             $allGroupItems = $item->getItemsInGroup();
 
@@ -1358,8 +1368,8 @@ class AturTugasProduksi extends Page
             $sizeGenders[$sz] = $sortedList;
         }
 
-        // Delete existing non-revision tasks for this item (preserve retur tasks)
-        $item->productionTasks()->where('is_revision', false)->delete();
+        // Delete existing tasks for this item/retur (diferensiasi retur vs item biasa)
+        $item->productionTasks()->where('is_revision', $activeReturn ? true : false)->delete();
 
         // Keep local pools of custom names and genders per stage
         $stageCustomPools = [];
@@ -1478,8 +1488,8 @@ class AturTugasProduksi extends Page
                     'assigned_by' => $oldTask?->assigned_by ?? auth()->id(),
                     'status' => $oldTask?->status ?? 'pending',
                     'is_paid' => $oldTask?->is_paid ?? false,
-                    'is_revision' => false,
-                    'revision_source' => null,
+                    'is_revision' => $activeReturn ? true : false,
+                    'revision_source' => $activeReturn ? 'shop_warranty' : null,
                     'wajib_qc' => $wajibQc,
                     'worker_payroll_id' => $oldTask?->worker_payroll_id ?? null,
                     'completed_at' => $oldTask?->completed_at ?? null,
