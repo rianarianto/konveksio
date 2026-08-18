@@ -683,24 +683,57 @@ class AturTugasProduksi extends Page
                                                             return;
                                                         }
 
-                                                        // 1. Kumpulkan ukuran dari semua item di grup
-                                                        $allGroupItems = $item->getItemsInGroup();
+                                                        // 1. Kumpulkan ukuran (diferensiasi retur vs item biasa)
+                                                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $item->id)
+                                                            ->whereIn('status', ['pending', 'diproses'])
+                                                            ->latest('id')
+                                                            ->first();
 
                                                         $standardSizes = [];
-                                                        foreach ($allGroupItems as $gi) {
-                                                            $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-                                                            $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
-                                                        }
-
-                                                        // Hitung CUSTOM (ukuran perorangan)
                                                         $customQtyTotal = 0;
                                                         $customNames = [];
-                                                        if ($item->production_category === 'custom') {
-                                                            $details = $item->size_and_request_details ?? [];
-                                                            $customNames = array_values(array_filter(
-                                                                array_map(fn($u) => $u['nama'] ?? null, $details['detail_custom'] ?? [])
-                                                            ));
-                                                            $customQtyTotal = count($customNames);
+
+                                                        if ($activeReturn && !empty($activeReturn->size_breakdown)) {
+                                                            $raw = $activeReturn->size_breakdown['_raw'] ?? [];
+                                                            if (!empty($raw)) {
+                                                                foreach ($raw as $rItem) {
+                                                                    $oi = \App\Models\OrderItem::find($rItem['order_item_id'] ?? null);
+                                                                    if ($oi) {
+                                                                        $rQty = (int) ($rItem['return_qty'] ?? $activeReturn->quantity);
+                                                                        if ($oi->size === 'Custom' || $item->production_category === 'custom') {
+                                                                            $customQtyTotal += $rQty;
+                                                                            if ($oi->recipient_name) {
+                                                                                $customNames[] = $oi->recipient_name;
+                                                                            } else {
+                                                                                $details = $oi->size_and_request_details ?? [];
+                                                                                foreach ($details['detail_custom'] ?? [] as $u) {
+                                                                                    if (!empty($u['nama'])) $customNames[] = $u['nama'];
+                                                                                }
+                                                                            }
+                                                                        } else {
+                                                                            $sz = strtoupper($oi->size ?? 'TANPA_UKURAN');
+                                                                            $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $rQty;
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                            if (empty($standardSizes) && $customQtyTotal === 0) {
+                                                                $standardSizes['TOTAL_RETUR'] = $activeReturn->quantity;
+                                                            }
+                                                        } else {
+                                                            $allGroupItems = $item->getItemsInGroup();
+                                                            foreach ($allGroupItems as $gi) {
+                                                                $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                                                                $standardSizes[$sz] = ($standardSizes[$sz] ?? 0) + $gi->quantity;
+                                                            }
+
+                                                            if ($item->production_category === 'custom') {
+                                                                $details = $item->size_and_request_details ?? [];
+                                                                $customNames = array_values(array_filter(
+                                                                    array_map(fn($u) => $u['nama'] ?? null, $details['detail_custom'] ?? [])
+                                                                ));
+                                                                $customQtyTotal = count($customNames);
+                                                            }
                                                         }
 
                                                         $totalQty = array_sum($standardSizes) + $customQtyTotal;
