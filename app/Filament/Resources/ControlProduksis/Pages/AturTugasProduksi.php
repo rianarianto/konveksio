@@ -874,6 +874,22 @@ class AturTugasProduksi extends Page
                                             $bahan = $item->bahan;
                                             $allOrderItems = $item->getItemsInGroup();
 
+                                            $activeReturn = \App\Models\OrderReturn::where('order_item_id', $item->id)
+                                                ->whereIn('status', ['pending', 'diproses'])
+                                                ->latest('id')
+                                                ->first();
+
+                                            if ($activeReturn && !empty($activeReturn->size_breakdown['_raw'])) {
+                                                $returItemIds = collect($activeReturn->size_breakdown['_raw'])->pluck('order_item_id')->toArray();
+                                                $returQtyMap = collect($activeReturn->size_breakdown['_raw'])->pluck('return_qty', 'order_item_id')->toArray();
+
+                                                $allOrderItems = $allOrderItems->filter(fn($ai) => in_array($ai->id, $returItemIds))->map(function($ai) use ($returQtyMap) {
+                                                    $clone = clone $ai;
+                                                    $clone->quantity = $returQtyMap[$ai->id] ?? $ai->quantity;
+                                                    return $clone;
+                                                });
+                                            }
+
                                             $catLabel = match ($cat) {
                                                 'non_produksi' => 'NON-PRODUKSI',
                                                 'jasa' => 'JASA',
@@ -1062,8 +1078,9 @@ class AturTugasProduksi extends Page
                                                  }
                                             }
 
+                                            $rincianHeading = $activeReturn ? "RINCIAN PRODUKSI REVISI RETUR ({$activeReturn->quantity} PCS)" : "RINCIAN PRODUKSI";
                                             $html .= '<div>';
-                                            $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">RINCIAN PRODUKSI</div>';
+                                            $html .= '<div style="font-size:11px; font-weight:800; color:#6b7280; letter-spacing:0.05em; margin-bottom:8px;">' . $rincianHeading . '</div>';
                                             $html .= '<div style="display:flex; flex-direction:column; gap:10px;">';
 
                                             $hasItemsToShow = count($genders) > 0;
