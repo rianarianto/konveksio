@@ -215,9 +215,29 @@ const apiSendHandler = async (req, res) => {
     }
 };
 
+// Middleware Proteksi API Key (Anti-Spam / Open Proxy)
+const verifyApiKey = (req, res, next) => {
+    const secretKey = process.env.BOT_SECRET_KEY;
+    if (!secretKey) {
+        return next(); // Jika tidak di-set di env, izinkan request (lokal dev)
+    }
+
+    const clientKey = req.headers['x-bot-key'] || req.query.bot_key || req.body.bot_key;
+    if (!clientKey || clientKey !== secretKey) {
+        console.warn('⚠️ Unauthorized API access attempt from:', req.ip);
+        return res.status(401).json({
+            status: 'error',
+            pesan: 'Unauthorized: Header x-bot-key atau BOT_SECRET_KEY tidak valid.'
+        });
+    }
+    next();
+};
+
 // API Routes
-app.post('/api', apiSendHandler);
-app.get('/api', apiSendHandler);
+app.post('/api', verifyApiKey, apiSendHandler);
+app.get('/api', verifyApiKey, apiSendHandler);
+app.post('/send-message', verifyApiKey, apiSendHandler);
+app.get('/send-message', verifyApiKey, apiSendHandler);
 
 // GET /qr endpoint - Render QR Code directly in browser
 app.get('/qr', async (req, res) => {

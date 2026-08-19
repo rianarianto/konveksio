@@ -299,14 +299,7 @@ class WorkOrderService
                         . "📋 *Alasan:* {$reason}\n\n"
                         . "Silakan perbaiki dan selesaikan kembali.\n"
                         . "🔗 {$link}";
-                    try {
-                        \Illuminate\Support\Facades\Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                            'nohp'  => $worker->phone,
-                            'pesan' => $pesan,
-                        ]);
-                    } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error('[WA-Bot] Gagal kirim notif revisi: ' . $e->getMessage());
-                    }
+                    \App\Helpers\NotificationHelper::sendWaMessage($worker->phone, $pesan);
                 }
             }
 
@@ -604,14 +597,7 @@ class WorkOrderService
                         . "📋 *Alasan:* {$reason}\n\n"
                         . "Silakan perbaiki dan selesaikan kembali.\n"
                         . "🔗 {$link}";
-                    try {
-                        \Illuminate\Support\Facades\Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                            'nohp'  => $worker->phone,
-                            'pesan' => $pesan,
-                        ]);
-                    } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error('[WA-Bot] Gagal kirim notif revisi QC akhir: ' . $e->getMessage());
-                    }
+                    \App\Helpers\NotificationHelper::sendWaMessage($worker->phone, $pesan);
                 }
             }
 

@@ -1,0 +1,30 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Force HTTPS (Opsional untuk cPanel Production)
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Forward Requests To Public Directory...
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Block Public Access to Sensitive Files & Folders
+<FilesMatch "^(\.env|\.git|\.editorconfig|composer\.(json|lock)|package\.(json|lock)|phpunit\.xml|README\.md)">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Security Headers (Hardening Anti-Hacking)
+<IfModule mod_headers.c>
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

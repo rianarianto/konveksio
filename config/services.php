@@ -37,6 +37,7 @@ return [
 
     'wa_bot' => [
         'url' => env('WA_BOT_URL', 'http://localhost:5001'),
+        'secret_key' => env('BOT_SECRET_KEY', null),
     ],
 
 ];

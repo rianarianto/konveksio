@@ -604,13 +604,32 @@ class NotificationHelper
             . "Silakan buka portal untuk melakukan review ulang:\n"
             . "🔗 {$qcLink}";
 
+        self::sendWaMessage($qcWorker->phone, $pesan);
+    }
+
+    /**
+     * Helper terpusat mengirim pesan WA via wa-bot service (dengan proteksi x-bot-key jika ada)
+     */
+    public static function sendWaMessage(string $phone, string $pesan): bool
+    {
         try {
-            Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                'nohp'  => $qcWorker->phone,
+            $url = config('services.wa_bot.url', 'http://localhost:5001') . '/api';
+            $secretKey = config('services.wa_bot.secret_key');
+
+            $request = Http::timeout(10);
+            if (!empty($secretKey)) {
+                $request = $request->withHeaders(['x-bot-key' => $secretKey]);
+            }
+
+            $response = $request->post($url, [
+                'nohp'  => $phone,
                 'pesan' => $pesan,
             ]);
+
+            return $response->successful();
         } catch (\Exception $e) {
-            Log::error('[WA-Bot] Gagal kirim notif re-review QC: ' . $e->getMessage());
+            Log::error('[WA-Bot] Gagal mengirim pesan WA: ' . $e->getMessage());
+            return false;
         }
     }
 }
