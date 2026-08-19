@@ -1,5 +1,13 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    DisconnectReason,
+    fetchLatestBaileysVersion,
+    makeCacheableSignalKeyStore
+} = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const qrcode = require('qrcode');
+const qrcodeTerminal = require('qrcode-terminal');
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
@@ -17,39 +25,18 @@ const io = socketIO(server, {
 
 let clientStatus = 'not ready';
 let lastQRUrl = '';
-let client = null; // Pastikan initialized
+let rawQR = '';
+let sock = null;
 
-// Fungsi untuk rename & delete directory dengan retry
-const renameAndDeleteDirectory = async (directoryPath, retries = 10, delay = 2000) => {
-    const tempDirPath = directoryPath + '_temp';
-    
-    for (let i = 0; i < retries; i++) {
-        try {
-            if (fs.existsSync(directoryPath)) {
-                await fs.rename(directoryPath, tempDirPath);
-            }
-            if (fs.existsSync(tempDirPath)) {
-                await fs.remove(tempDirPath);
-            }
-            return;
-        } catch (err) {
-            if (err.code === 'EBUSY' && i < retries - 1) {
-                console.warn(`🔄 File is busy, retrying (${i + 1}/${retries})...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-                console.error(`❌ Failed to delete directory after ${i + 1} attempts:`, err);
-                throw err;
-            }
-        }
-    }
-};
+// Path auth folder Baileys
+const AUTH_DIR = path.join(__dirname, 'auth_info_baileys');
 
-// Fungsi untuk broadcast status ke semua socket
+// Broadcast status function
 const broadcastStatus = (status, message) => {
     clientStatus = status;
     console.log(`📢 Broadcasting status: ${status} - ${message}`);
     io.emit('status', { status, message });
-    
+
     if (status === 'ready') {
         io.emit('ready', message);
     } else if (status === 'qr') {
@@ -59,146 +46,122 @@ const broadcastStatus = (status, message) => {
     }
 };
 
-
-
-// Fungsi membuat client WhatsApp
-const createClient = () => {
-    console.log('🔄 Creating new WhatsApp client...');
+// Format phone number to JID format for Baileys
+const formatToJid = (numberStr) => {
+    if (!numberStr) return null;
+    let cleaned = String(numberStr).trim().replace(/\D/g, '');
     
-    const newClient = new Client({
-        authStrategy: new LocalAuth({
-            clientId: "YOUR_CLIENT_ID", // Ganti dengan ID unik Anda
-            dataPath: "./.wwebjs_auth"
-        }),
-        puppeteer: {
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu'
-            ]
-        },
-        qrMaxRetries: 5,
-        restartOnAuthFail: true
-    });
+    if (cleaned.startsWith('0')) {
+        cleaned = '62' + cleaned.slice(1);
+    } else if (cleaned.startsWith('8')) {
+        cleaned = '62' + cleaned;
+    }
 
-    // Event: QR Code
-    newClient.on('qr', (qr) => {
-        console.log('📱 QR Code received, generating data URL...');
-        qrcode.toDataURL(qr, (err, url) => {
-            if (err) {
-                console.error('❌ Failed to generate QR code:', err);
-                return;
-            }
-            lastQRUrl = url;
-            console.log('✅ QR Code generated, broadcasting...');
-            broadcastStatus('qr', 'Silakan scan QR code');
-        });
-    });
+    if (!cleaned.endsWith('@s.whatsapp.net')) {
+        cleaned = cleaned + '@s.whatsapp.net';
+    }
 
-    // Event: Loading
-    newClient.on('loading_screen', (percent, message) => {
-        console.log(`⏳ Loading: ${percent}% - ${message}`);
-        broadcastStatus('loading', `Loading: ${percent}%`);
-    });
-
-    // Event: Authenticated
-    newClient.on('authenticated', () => {
-        console.log('✅ Client authenticated!');
-    });
-
-    // Event: Auth Failure
-    newClient.on('auth_failure', (msg) => {
-        console.error('❌ Authentication failure:', msg);
-        broadcastStatus('not ready', 'Authentication failed. Please scan QR again.');
-    });
-
-    // Event: Ready - GUNAKAN 'on' BUKAN 'once'
-    newClient.on('ready', () => {
-        console.log('✅✅✅ CLIENT IS READY! ✅✅✅');
-        broadcastStatus('ready', 'WhatsApp terhubung dan siap digunakan!');
-        lastQRUrl = '';
-        
-        // Verifikasi bahwa client benar-benar ready
-        setTimeout(async () => {
-            try {
-                const info = await newClient.info;
-                console.log('📱 WhatsApp Info:', info);
-            } catch (err) {
-                console.error('⚠️ Could not get client info:', err);
-            }
-        }, 1000);
-    });
-
-    // Event: Disconnected
-    newClient.on('disconnected', async (reason) => {
-        console.log('🔌 Client disconnected:', reason);
-        broadcastStatus('not ready', 'Client was logged out');
-
-        try {
-            await newClient.destroy();
-            const sessionPath = path.join(__dirname, '.wwebjs_auth', 'session-YOUR_CLIENT_ID');
-            
-            if (fs.existsSync(sessionPath)) {
-                console.log('🗑️ Cleaning up session...');
-                await renameAndDeleteDirectory(sessionPath);
-            }
-        } catch (error) {
-            console.error('❌ Error during cleanup:', error);
-        }
-
-        // Reinitialize setelah delay
-        setTimeout(() => {
-            console.log('🔄 Reinitializing client...');
-            client = createClient();
-            client.initialize();
-        }, 10000);
-    });
-
-    // Event: Change State - TAMBAHKAN INI
-    newClient.on('change_state', (state) => {
-        console.log('📊 WhatsApp state changed to:', state);
-        if (state === 'CONNECTED' || state === 'BREAKPOINT') {
-            // Double check - jika ready event tidak firing
-            if (clientStatus !== 'ready') {
-                console.log('⚠️ State is CONNECTED but ready event did not fire. Forcing status update...');
-                broadcastStatus('ready', 'WhatsApp terhubung dan siap digunakan!');
-            }
-        }
-    });
-
-    // Event: Change Battery
-    newClient.on('change_battery', (batteryInfo) => {
-        const { battery, plugged } = batteryInfo;
-        console.log(`🔋 Battery: ${battery}% | Charging: ${plugged}`);
-    });
-
-    // Event: Message
-    newClient.on('message', (message) => {
-        console.log('💬 Message received:', message.body);
-    });
-
-    console.log('📱 Initializing client...');
-    newClient.initialize();
-    
-    return newClient;
+    return cleaned;
 };
 
+// Clean directory helper
+const cleanAuthDir = async () => {
+    try {
+        if (await fs.pathExists(AUTH_DIR)) {
+            await fs.remove(AUTH_DIR);
+            console.log('🗑️ Auth directory cleaned up successfully.');
+        }
+    } catch (err) {
+        console.error('❌ Failed to clean auth directory:', err);
+    }
+};
 
+// Initialize WhatsApp Socket (Baileys)
+const connectToWhatsApp = async () => {
+    console.log('🔄 Initializing WhatsApp connection via Baileys...');
+    broadcastStatus('loading', 'Menyiapkan modul WhatsApp...');
 
-// Inisialisasi client pertama kali
-client = createClient();
+    try {
+        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+        const { version, isLatest } = await fetchLatestBaileysVersion();
+        console.log(`ℹ️ Baileys version: ${version.join('.')}, isLatest: ${isLatest}`);
 
-// Middleware
+        sock = makeWASocket({
+            version,
+            logger: pino({ level: 'silent' }),
+            printQRInTerminal: false,
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+            },
+            browser: ['Konveksio Bot', 'Chrome', '1.0.0'],
+            generateHighQualityLinkPreview: true,
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000,
+            keepAliveIntervalMs: 25000
+        });
+
+        // Bind credentials save event
+        sock.ev.on('creds.update', saveCreds);
+
+        // Connection Update Handler
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                console.log('📱 QR Code received from Baileys!');
+                rawQR = qr;
+                try {
+                    // Terminal display
+                    qrcodeTerminal.generate(qr, { small: true });
+                    // Data URL generation
+                    lastQRUrl = await qrcode.toDataURL(qr);
+                    broadcastStatus('qr', 'Silakan scan QR code');
+                } catch (err) {
+                    console.error('❌ Failed to process QR Code:', err);
+                }
+            }
+
+            if (connection === 'open') {
+                console.log('✅✅✅ WHATSAPP IS CONNECTED & READY! ✅✅✅');
+                rawQR = '';
+                lastQRUrl = '';
+                broadcastStatus('ready', 'WhatsApp terhubung dan siap digunakan!');
+            }
+
+            if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                console.log(`🔌 Connection closed. Reason: ${lastDisconnect?.error?.message || statusCode}, Should Reconnect: ${shouldReconnect}`);
+
+                if (statusCode === DisconnectReason.loggedOut) {
+                    console.log('🔒 Client logged out. Clearing auth directory...');
+                    broadcastStatus('not ready', 'WhatsApp logged out. Please scan QR again.');
+                    await cleanAuthDir();
+                    setTimeout(connectToWhatsApp, 3000);
+                } else if (shouldReconnect) {
+                    broadcastStatus('not ready', 'Koneksi terputus. Menghubungkan ulang...');
+                    setTimeout(connectToWhatsApp, 5000);
+                } else {
+                    console.log('⚠️ Connection ended. Restarting connection...');
+                    setTimeout(connectToWhatsApp, 5000);
+                }
+            }
+        });
+
+    } catch (err) {
+        console.error('❌ Failed to initialize Baileys connection:', err);
+        broadcastStatus('not ready', 'Gagal inisialisasi modul WhatsApp');
+        setTimeout(connectToWhatsApp, 10000);
+    }
+};
+
+// Express Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Endpoint
-const api = async (req, res) => {
+// Main Send API Handler (Compatible with Laravel NotificationHelper & WorkOrderService)
+const apiSendHandler = async (req, res) => {
     console.log('📩 API Request received:', req.method, req.query, req.body);
 
     let nohp = req.query.nohp || req.query.number || req.body.nohp || req.body.number;
@@ -211,24 +174,13 @@ const api = async (req, res) => {
         return res.status(400).json({ status: "error", pesan: "Parameter 'pesan' atau 'message' wajib diisi" });
     }
 
-    nohp = String(nohp).trim();
+    const jid = formatToJid(nohp);
     const messageText = String(pesan).trim();
 
-    // Format nomor WhatsApp
-    let formattedNumber = nohp;
-    if (nohp.startsWith('0')) {
-        formattedNumber = '62' + nohp.slice(1);
-    } else if (nohp.startsWith('+')) {
-        formattedNumber = nohp.slice(1);
-    }
-    if (!formattedNumber.includes('@c.us')) {
-        formattedNumber = formattedNumber + '@c.us';
-    }
+    console.log('📱 Formatted JID for Baileys:', jid);
 
-    console.log('📱 Formatted number:', formattedNumber);
-
-    if (!client || clientStatus !== 'ready') {
-        console.error('❌ Client not ready. Status:', clientStatus);
+    if (!sock || clientStatus !== 'ready') {
+        console.error('❌ WhatsApp client not ready. Current Status:', clientStatus);
         return res.status(503).json({
             status: "error",
             pesan: "WhatsApp client belum siap. Buka http://localhost:5001 untuk scan QR.",
@@ -237,47 +189,76 @@ const api = async (req, res) => {
     }
 
     try {
-        console.log('📤 Sending message...');
-        const sendPromise = client.sendMessage(formattedNumber, messageText);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('WhatsApp sendMessage timeout (12s)')), 12000));
-        await Promise.race([sendPromise, timeoutPromise]);
-        console.log('✅ Message sent successfully!');
-        res.json({ status: "berhasil terkirim", pesan: messageText, to: formattedNumber });
+        console.log(`📤 Sending WhatsApp message via Baileys to ${jid}...`);
+        
+        // Timeout 12s safety race
+        const sendPromise = sock.sendMessage(jid, { text: messageText });
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('WhatsApp sendMessage timeout (12s)')), 12000)
+        );
+
+        const result = await Promise.race([sendPromise, timeoutPromise]);
+        console.log('✅ Message sent successfully!', result?.key?.id);
+
+        return res.json({ 
+            status: "berhasil terkirim", 
+            pesan: messageText, 
+            to: jid,
+            id: result?.key?.id || null 
+        });
     } catch (error) {
-        console.error('❌ Send Error:', error.message);
-
-        // Jika frame detached → auto reconnect
-        if (error.message && error.message.includes('detached Frame')) {
-            console.log('⚠️ Detached Frame! Reconnecting in 5s...');
-            broadcastStatus('not ready', 'Frame detached, reconnecting...');
-            setTimeout(() => {
-                if (client) client.destroy().catch(() => {});
-                client = createClient();
-            }, 5000);
-            return res.status(503).json({
-                status: "error",
-                pesan: "WhatsApp terputus, sedang reconnect. Coba lagi dalam 30 detik."
-            });
-        }
-
-        res.status(500).json({ status: "error", pesan: "Gagal kirim: " + error.message });
+        console.error('❌ Send Message Error:', error.message);
+        return res.status(500).json({ 
+            status: "error", 
+            pesan: "Gagal kirim: " + error.message 
+        });
     }
 };
 
-// Route API
-app.post('/api', api);
-app.get('/api', api);
+// API Routes
+app.post('/api', apiSendHandler);
+app.get('/api', apiSendHandler);
 
-// Route halaman utama
+// GET /qr endpoint - Render QR Code directly in browser
+app.get('/qr', async (req, res) => {
+    if (clientStatus === 'ready') {
+        return res.send(`
+            <div style="font-family:sans-serif; text-align:center; padding:50px;">
+                <h2 style="color:#16a34a;">✅ WhatsApp Client Sudah Terhubung!</h2>
+                <p>Status: Ready. Tidak perlu scan QR lagi.</p>
+                <a href="/">Kembali ke Dashboard</a>
+            </div>
+        `);
+    }
+
+    if (!lastQRUrl && !rawQR) {
+        return res.send(`
+            <div style="font-family:sans-serif; text-align:center; padding:50px;">
+                <h3 style="color:#ca8a04;">⏳ Memuat QR Code...</h3>
+                <p>Silakan refresh halaman ini dalam beberapa detik.</p>
+                <script>setTimeout(() => location.reload(), 3000);</script>
+            </div>
+        `);
+    }
+
+    try {
+        const qrBuffer = await qrcode.toBuffer(rawQR || lastQRUrl);
+        res.type('png');
+        return res.send(qrBuffer);
+    } catch (err) {
+        return res.status(500).send('Gagal merender QR Code: ' + err.message);
+    }
+});
+
+// Serve index.html Dashboard
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Socket.IO Connection Handler
 io.on('connection', (socket) => {
-    console.log('🔗 Socket connected:', socket.id);
+    console.log('🔗 Socket client connected:', socket.id);
 
-    // Kirim status saat koneksi baru
     if (clientStatus === 'ready') {
         socket.emit('ready', 'Client is ready!');
         socket.emit('status', { status: 'ready', message: 'WhatsApp terhubung!' });
@@ -286,10 +267,9 @@ io.on('connection', (socket) => {
         socket.emit('status', { status: 'qr', message: 'Silakan scan QR code' });
     } else {
         socket.emit('disconnected', 'Client was logged out');
-        socket.emit('status', { status: 'not ready', message: 'Client was logged out' });
+        socket.emit('status', { status: 'not ready', message: 'Client not ready' });
     }
 
-    // Handler untuk request status dari frontend
     socket.on('checkStatus', () => {
         console.log('📋 checkStatus requested by:', socket.id);
         if (clientStatus === 'ready') {
@@ -300,7 +280,7 @@ io.on('connection', (socket) => {
             socket.emit('status', { status: 'qr', message: 'Silakan scan QR code' });
         } else {
             socket.emit('disconnected', 'Client was logged out');
-            socket.emit('status', { status: 'not ready', message: 'Client was logged out' });
+            socket.emit('status', { status: 'not ready', message: 'Client not ready' });
         }
     });
 
@@ -313,16 +293,16 @@ io.on('connection', (socket) => {
 app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
+        engine: 'Baileys',
         whatsapp: {
             status: clientStatus,
-            hasClient: !!client,
-            hasInfo: client ? !!client.info : false,
+            hasSocket: !!sock,
             timestamp: new Date().toISOString()
         }
     });
 });
 
-// Error handling global
+// Global Error Handling
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
 });
@@ -331,10 +311,14 @@ process.on('uncaughtException', (err) => {
     console.error('❌ Uncaught Exception:', err);
 });
 
-// Start Server
+// Start Baileys Connection
+connectToWhatsApp();
+
+// Start Express Server
 const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);
-    console.log(`🌐 Open http://localhost:${PORT} to scan QR code`);
+    console.log(`🌐 Dashboard: http://localhost:${PORT}`);
+    console.log(`📷 Direct QR: http://localhost:${PORT}/qr`);
     console.log(`🔍 Health check: http://localhost:${PORT}/health`);
 });
