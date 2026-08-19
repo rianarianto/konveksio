@@ -26,3 +26,4 @@ Thumbs.db
 /wa-bot/node_modules
 /wa-bot/.wwebjs_auth
 /wa-bot/.wwebjs_cache
+/wa-bot/auth_info_baileys
