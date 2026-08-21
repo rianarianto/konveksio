@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Bot - QR Login</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="socket.io/socket.io.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -229,7 +229,8 @@
     </div>
 
     <script>
-        const socket = io();
+        const socketPath = window.location.pathname.endsWith('/') ? window.location.pathname + 'socket.io' : window.location.pathname + '/socket.io';
+        const socket = io({ path: socketPath });
         const qrImage = document.getElementById('qr-image');
         const statusEl = document.getElementById('status');
         const loader = document.getElementById('loader');
