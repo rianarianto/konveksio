@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Create Owner
-        User::factory()->create([
+        User::create([
             'name' => 'Owner',
             'email' => 'owner@duniabordirkomputer.com',
             'password' => bcrypt('@ownerdbk26'),
