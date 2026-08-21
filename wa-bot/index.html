@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Bot - QR Login</title>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <title>WhatsApp Bot - Dashboard</title>
     <style>
         * {
             box-sizing: border-box;
@@ -223,14 +222,12 @@
         </div>
         
         <div class="footer">
-            <p>Server: <strong id="serverStatus">Connecting...</strong></p>
-            <p style="margin-top:5px">Port: 5000 | <a href="/api?nohp=628123456789&pesan=Halo" target="_blank">Docs API</a></p>
+            <p>Server Status: <strong id="serverStatus">Checking...</strong></p>
+            <p style="margin-top:5px"><a href="https://sim.duniabordirkomputer.com" style="color:#128C7E; text-decoration:none; font-weight:600;">← Kembali ke SIM Konveksio</a></p>
         </div>
     </div>
 
     <script>
-        const socketPath = window.location.pathname.endsWith('/') ? window.location.pathname + 'socket.io' : window.location.pathname + '/socket.io';
-        const socket = io({ path: socketPath });
         const qrImage = document.getElementById('qr-image');
         const statusEl = document.getElementById('status');
         const loader = document.getElementById('loader');
@@ -239,86 +236,58 @@
         const sendBtn = document.getElementById('sendBtn');
         const apiResponse = document.getElementById('apiResponse');
 
-        // Update status UI
         function updateStatus(message, type = 'loading') {
             statusEl.textContent = message;
             statusEl.className = type;
         }
 
-        // Socket event handlers
-        socket.on('connect', () => {
-            console.log('✅ Socket connected');
-            serverStatus.textContent = 'Connected';
-            serverStatus.style.color = '#388E3C';
-            socket.emit('checkStatus');
-        });
+        // Get relative endpoint URL helper
+        function getEndpoint(path) {
+            const basePath = window.location.pathname.endsWith('/') 
+                ? window.location.pathname 
+                : window.location.pathname + '/';
+            return basePath + path.replace(/^\//, '');
+        }
 
-        socket.on('connect_error', (err) => {
-            console.error('❌ Socket connection note:', err.message);
-            serverStatus.textContent = 'HTTP Mode';
-            serverStatus.style.color = '#388E3C';
-            if (statusEl.className !== 'success') {
-                updateStatus('🔌 Menghubungkan ke WA Bot...', 'loading');
+        // Clean HTTP Status Polling (No WebSockets, zero console errors on shared hosting)
+        async function checkHealthStatus() {
+            try {
+                const response = await fetch(getEndpoint('health'));
+                if (!response.ok) throw new Error('Healthcheck HTTP ' + response.status);
+                
+                const data = await response.json();
+                serverStatus.textContent = 'Active (HTTP)';
+                serverStatus.style.color = '#388E3C';
+
+                const waStatus = data?.whatsapp?.status;
+
+                if (waStatus === 'ready') {
+                    loader.style.display = 'none';
+                    qrImage.style.display = 'none';
+                    updateStatus('✅ WhatsApp siap digunakan! Anda bisa kirim pesan via API.', 'success');
+                } else if (waStatus === 'qr') {
+                    loader.style.display = 'none';
+                    qrImage.src = getEndpoint('qr') + '?t=' + new Date().getTime();
+                    qrImage.style.display = 'block';
+                    qrImage.classList.add('loaded');
+                    updateStatus('📱 Silakan scan QR code dengan WhatsApp Anda:\n1. Buka WhatsApp di HP\n2. Menu → Perangkat Tertaut\n3. Tap "Tautkan Perangkat"\n4. Arahkan kamera ke QR code', 'warning');
+                } else {
+                    loader.style.display = 'block';
+                    qrImage.style.display = 'none';
+                    updateStatus('🔌 Menghubungkan ke WhatsApp...', 'loading');
+                }
+            } catch (err) {
+                console.warn('Status check note:', err.message);
+                serverStatus.textContent = 'Checking...';
+                serverStatus.style.color = '#ca8a04';
             }
-        });
+        }
 
-        socket.on('qr', (qr) => {
-            console.log('📱 QR Code received');
-            loader.style.display = 'none';
-            qrImage.src = qr;
-            qrImage.classList.add('loaded');
-            qrImage.style.display = 'block';
-            updateStatus('📱 Silakan scan QR code dengan WhatsApp Anda:\n1. Buka WhatsApp di HP\n2. Menu → Perangkat Tertaut\n3. Tap "Tautkan Perangkat"\n4. Arahkan kamera ke QR code', 'warning');
-        });
+        // Poll status every 2.5 seconds
+        checkHealthStatus();
+        setInterval(checkHealthStatus, 2500);
 
-        socket.on('ready', (message) => {
-            console.log('✅ Client ready:', message);
-            loader.style.display = 'none';
-            qrImage.style.display = 'none';
-            qrImage.classList.remove('loaded');
-            updateStatus(message || '✅ WhatsApp siap digunakan! Anda bisa kirim pesan via API.', 'success');
-        });
-
-        socket.on('disconnected', (message) => {
-            console.log('🔌 Disconnected:', message);
-            loader.style.display = 'block';
-            qrImage.style.display = 'none';
-            qrImage.classList.remove('loaded');
-            updateStatus(message || '❌ Terputus. Memuat ulang QR code...', 'error');
-        });
-
-        socket.on('status', (data) => {
-            console.log('📊 Status update:', data);
-            if (data.status === 'ready') {
-                updateStatus(data.message, 'success');
-                loader.style.display = 'none';
-                qrImage.style.display = 'none';
-            }
-        });
-
-        // Request status saat halaman load via HTTP & Socket
-        window.addEventListener('load', () => {
-            console.log('🔄 Page loaded, checking status via HTTP & Socket...');
-            socket.emit('checkStatus');
-
-            // HTTP Fallback Check (Tahan Banting di Shared Hosting tanpa WebSocket)
-            const healthUrl = window.location.pathname.endsWith('/') 
-                ? window.location.pathname + 'health' 
-                : window.location.pathname + '/health';
-
-            fetch(healthUrl)
-                .then(res => res.json())
-                .then(data => {
-                    if (data && data.whatsapp && data.whatsapp.status === 'ready') {
-                        updateStatus('✅ WhatsApp siap digunakan! Anda bisa kirim pesan via API.', 'success');
-                        loader.style.display = 'none';
-                        qrImage.style.display = 'none';
-                    }
-                })
-                .catch(err => console.log('HTTP Healthcheck note:', err.message));
-        });
-
-        // Handle form submission untuk test API
+        // Handle Test API Form Submit
         testForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -335,11 +304,7 @@
             apiResponse.classList.remove('show');
 
             try {
-                const apiUrl = window.location.pathname.endsWith('/') 
-                    ? window.location.pathname + 'api' 
-                    : window.location.pathname + '/api';
-
-                const response = await fetch(apiUrl, {
+                const response = await fetch(getEndpoint('api'), {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -355,7 +320,7 @@
                 if (result.status === 'berhasil terkirim') {
                     updateStatus('✅ Pesan berhasil dikirim!', 'success');
                 } else {
-                    updateStatus(`⚠️ ${result.pesan}`, 'warning');
+                    updateStatus(`⚠️ ${result.pesan || 'Gagal mengirim pesan'}`, 'warning');
                 }
             } catch (error) {
                 console.error('❌ API Error:', error);
@@ -366,13 +331,6 @@
                 sendBtn.disabled = false;
                 sendBtn.textContent = 'Kirim Pesan';
             }
-        });
-
-        // Auto-hide API response after 10 seconds
-        let responseTimeout;
-        apiResponse.addEventListener('click', () => {
-            clearTimeout(responseTimeout);
-            apiResponse.classList.remove('show');
         });
     </script>
 </body>
