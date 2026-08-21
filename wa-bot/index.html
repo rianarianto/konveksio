@@ -294,10 +294,26 @@
             }
         });
 
-        // Request status saat halaman load
+        // Request status saat halaman load via HTTP & Socket
         window.addEventListener('load', () => {
-            console.log('🔄 Page loaded, requesting status...');
+            console.log('🔄 Page loaded, checking status via HTTP & Socket...');
             socket.emit('checkStatus');
+
+            // HTTP Fallback Check (Tahan Banting di Shared Hosting tanpa WebSocket)
+            const healthUrl = window.location.pathname.endsWith('/') 
+                ? window.location.pathname + 'health' 
+                : window.location.pathname + '/health';
+
+            fetch(healthUrl)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.whatsapp && data.whatsapp.status === 'ready') {
+                        updateStatus('✅ WhatsApp siap digunakan! Anda bisa kirim pesan via API.', 'success');
+                        loader.style.display = 'none';
+                        qrImage.style.display = 'none';
+                    }
+                })
+                .catch(err => console.log('HTTP Healthcheck note:', err.message));
         });
 
         // Handle form submission untuk test API
