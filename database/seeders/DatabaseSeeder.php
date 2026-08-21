@@ -24,12 +24,12 @@ class DatabaseSeeder extends Seeder
             'shop_id' => null,
         ]);
 
-        // // Create Shop
-        // $shop = \App\Models\Shop::create([
-        //     'name' => 'Konveksi Cabang Jakarta',
-        //     'address' => 'Jl. Jendral Sudirman No. 1',
-        //     'phone' => '081234567890',
-        // ]);
+        // Create Default Shop (Required for Filament Tenancy)
+        $shop = \App\Models\Shop::create([
+            'name' => 'Dunia Bordir Komputer Utama',
+            'address' => 'Pusat',
+            'phone' => '081234567890',
+        ]);
 
         // // Create Admin for Shop
         // User::factory()->create([
