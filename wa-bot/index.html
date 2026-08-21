@@ -254,10 +254,12 @@
         });
 
         socket.on('connect_error', (err) => {
-            console.error('❌ Socket connection error:', err.message);
-            serverStatus.textContent = 'Disconnected';
-            serverStatus.style.color = '#C62828';
-            updateStatus('⚠️ Gagal terhubung ke server. Refresh halaman untuk mencoba lagi.', 'error');
+            console.error('❌ Socket connection note:', err.message);
+            serverStatus.textContent = 'HTTP Mode';
+            serverStatus.style.color = '#388E3C';
+            if (statusEl.className !== 'success') {
+                updateStatus('🔌 Menghubungkan ke WA Bot...', 'loading');
+            }
         });
 
         socket.on('qr', (qr) => {
@@ -333,9 +335,16 @@
             apiResponse.classList.remove('show');
 
             try {
-                const response = await fetch('/api', {
+                const apiUrl = window.location.pathname.endsWith('/') 
+                    ? window.location.pathname + 'api' 
+                    : window.location.pathname + '/api';
+
+                const response = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-bot-key': 'DuniaBordirSecretKey998877!@#'
+                    },
                     body: JSON.stringify({ number, message })
                 });
                 
