@@ -254,7 +254,7 @@ app.get('/qr', async (req, res) => {
             <div style="font-family:sans-serif; text-align:center; padding:50px;">
                 <h2 style="color:#16a34a;">✅ WhatsApp Client Sudah Terhubung!</h2>
                 <p>Status: Ready. Tidak perlu scan QR lagi.</p>
-                <a href="/">Kembali ke Dashboard</a>
+                <a href="https://sim.duniabordirkomputer.com" style="display:inline-block; margin-top:15px; padding:10px 20px; background:#6366f1; color:white; border-radius:8px; text-decoration:none; font-weight:600;">Kembali ke SIM Konveksio</a>
             </div>
         `);
     }
@@ -278,9 +278,9 @@ app.get('/qr', async (req, res) => {
     }
 });
 
-// Serve index.html Dashboard -> Redirect directly to /qr
+// Serve index.html Dashboard
 app.get('/', (req, res) => {
-    res.redirect('qr');
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Socket.IO Connection Handler
