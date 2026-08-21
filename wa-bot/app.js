@@ -160,6 +160,14 @@ const connectToWhatsApp = async () => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Handle cPanel Passenger base path prefix (e.g. /bot or /bot/)
+app.use((req, res, next) => {
+    if (req.url.startsWith('/bot')) {
+        req.url = req.url.replace(/^\/bot/, '') || '/';
+    }
+    next();
+});
+
 // Main Send API Handler (Compatible with Laravel NotificationHelper & WorkOrderService)
 const apiSendHandler = async (req, res) => {
     console.log('📩 API Request received:', req.method, req.query, req.body);
