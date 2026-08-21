@@ -278,9 +278,9 @@ app.get('/qr', async (req, res) => {
     }
 });
 
-// Serve index.html Dashboard
+// Serve index.html Dashboard -> Redirect directly to /qr
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.redirect('qr');
 });
 
 // Socket.IO Connection Handler
