@@ -261,7 +261,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->selectRaw('MAX(recipient_name) as recipient_name')
                     ->selectRaw('MAX(size) as size')
                     ->selectRaw('MIN(price) as price')
-                    ->selectRaw('ANY_VALUE(size_and_request_details) as size_and_request_details')
+                    ->selectRaw('MAX(size_and_request_details) as size_and_request_details')
                     ->selectRaw('MAX(created_at) as created_at')
                     ->selectRaw('MAX(updated_at) as updated_at')
                     ->selectRaw('SUM(quantity) as quantity')
