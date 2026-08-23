@@ -19,11 +19,13 @@ class EditOrder extends EditRecord
     {
         return $schema
             ->components([
-                \Filament\Schemas\Components\Form::make([\Filament\Schemas\Components\EmbeddedSchema::make('form')])
-                    ->id('form')
-                    ->livewireSubmitHandler($this->getSubmitFormLivewireMethodName()),
-                $this->getFormActionsContentComponent()
-                    ->extraAttributes(['class' => 'mb-10 pb-6 border-b border-gray-200 dark:border-gray-800']),
+                \Filament\Schemas\Components\Form::make([
+                    \Filament\Schemas\Components\EmbeddedSchema::make('form'),
+                    $this->getFormActionsContentComponent()
+                        ->extraAttributes(['class' => 'mt-6 mb-10 pb-6 border-b border-gray-200 dark:border-gray-800']),
+                ])
+                ->id('form')
+                ->livewireSubmitHandler($this->getSubmitFormLivewireMethodName()),
                 $this->getRelationManagersContentComponent(),
             ]);
     }
