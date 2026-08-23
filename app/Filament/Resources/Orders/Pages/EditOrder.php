@@ -22,8 +22,9 @@ class EditOrder extends EditRecord
                 \Filament\Schemas\Components\Form::make([\Filament\Schemas\Components\EmbeddedSchema::make('form')])
                     ->id('form')
                     ->livewireSubmitHandler($this->getSubmitFormLivewireMethodName()),
+                $this->getFormActionsContentComponent()
+                    ->extraAttributes(['class' => 'mb-10 pb-6 border-b border-gray-200 dark:border-gray-800']),
                 $this->getRelationManagersContentComponent(),
-                $this->getFormActionsContentComponent(),
             ]);
     }
 
