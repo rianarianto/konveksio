@@ -181,9 +181,9 @@ class PaymentsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with('recorder'))
             ->recordTitleAttribute('note')
             ->columns([
-
                 TextColumn::make('payment_date')
                     ->label('Tanggal')
                     ->date('d M Y')
@@ -238,9 +238,9 @@ class PaymentsRelationManager extends RelationManager
                 CreateAction::make()
                     ->label('Tambah Pembayaran')
                     ->icon('heroicon-o-plus')
-                    ->mutateFormDataUsing(function (array $data): array {
+                    ->using(function (array $data, RelationManager $livewire): \App\Models\Payment {
                         $data['recorded_by'] = auth()->id();
-                        return $data;
+                        return $livewire->getOwnerRecord()->payments()->create($data);
                     })
                     ->after(function () {
                         $this->dispatch('refreshOrderSummary');
