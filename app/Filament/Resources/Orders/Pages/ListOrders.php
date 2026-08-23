@@ -85,6 +85,7 @@ class ListOrders extends ListRecords
                 ])
                 ->mutateFormDataUsing(function (array $data): array {
                     $data['shop_id'] = Filament::getTenant()->id;
+                    $data['created_by'] = Filament::auth()->id() ?? auth()->id();
                     $data['status'] = 'draft'; 
                     return $data;
                 })

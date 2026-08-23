@@ -239,7 +239,7 @@ class PaymentsRelationManager extends RelationManager
                     ->label('Tambah Pembayaran')
                     ->icon('heroicon-o-plus')
                     ->using(function (array $data, RelationManager $livewire): \App\Models\Payment {
-                        $data['recorded_by'] = auth()->id();
+                        $data['recorded_by'] = \Filament\Facades\Filament::auth()->id() ?? auth()->id();
                         return $livewire->getOwnerRecord()->payments()->create($data);
                     })
                     ->after(function () {
