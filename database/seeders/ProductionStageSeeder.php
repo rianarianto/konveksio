@@ -56,14 +56,6 @@ class ProductionStageSeeder extends Seeder
                 'for_non_produksi' => true,
                 'for_jasa' => true,
             ],
-            [
-                'name' => 'QC',
-                'base_wage' => 500,
-                'order_sequence' => 6,
-                'for_produksi_custom' => true,
-                'for_non_produksi' => true,
-                'for_jasa' => true,
-            ],
         ];
 
         $shops = \App\Models\Shop::all();

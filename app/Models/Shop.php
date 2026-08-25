@@ -34,7 +34,6 @@ class Shop extends Model
                 ['name' => 'Bordir/Sablon', 'base_wage' => 2000, 'order_sequence' => 3, 'for_produksi_custom' => true, 'for_non_produksi' => true, 'for_jasa' => true],
                 ['name' => 'Kancing', 'base_wage' => 500, 'order_sequence' => 4, 'for_produksi_custom' => true, 'for_non_produksi' => false, 'for_jasa' => true],
                 ['name' => 'Finishing', 'base_wage' => 500, 'order_sequence' => 5, 'for_produksi_custom' => true, 'for_non_produksi' => true, 'for_jasa' => true],
-                ['name' => 'QC', 'base_wage' => 500, 'order_sequence' => 6, 'for_produksi_custom' => true, 'for_non_produksi' => true, 'for_jasa' => true],
             ];
 
             foreach ($defaultStages as $stage) {
