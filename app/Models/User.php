@@ -30,6 +30,7 @@ class User extends Authenticatable implements HasTenants, FilamentUser
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
         'role',

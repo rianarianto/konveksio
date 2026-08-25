@@ -14,7 +14,15 @@ class UserForm
         return $schema
             ->components([
                 TextInput::make('name')
+                    ->label('Nama Lengkap')
                     ->required()
+                    ->maxLength(255),
+
+                TextInput::make('username')
+                    ->label('Username')
+                    ->placeholder('Contoh: admin_andalas1 (opsional, untuk login tanpa email)')
+                    ->unique(ignoreRecord: true)
+                    ->alphaDash()
                     ->maxLength(255),
 
                 TextInput::make('email')

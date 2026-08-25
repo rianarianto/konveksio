@@ -16,9 +16,8 @@ class CustomLogin extends Login
         return $schema
             ->components([
                 TextInput::make('email')
-                    ->label('Email/Username')
-                    ->placeholder('Johndoe@mail.comm')
-                    ->email()
+                    ->label('Username atau Email')
+                    ->placeholder('Ketik username atau email...')
                     ->required()
                     ->autocomplete()
                     ->autofocus()
@@ -35,6 +34,16 @@ class CustomLogin extends Login
                 Checkbox::make('remember')
                     ->label('Remember Me'),
             ]);
+    }
+
+    protected function getCredentialsFromFormData(array $data): array
+    {
+        $loginType = filter_var($data['email'], FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        return [
+            $loginType => $data['email'],
+            'password' => $data['password'],
+        ];
     }
 
     public function getHeading(): string|Htmlable|null
