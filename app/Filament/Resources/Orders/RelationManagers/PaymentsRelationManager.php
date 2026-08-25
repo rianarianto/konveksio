@@ -227,9 +227,13 @@ class PaymentsRelationManager extends RelationManager
                     ->verticallyAlignCenter()
                     ->defaultImageUrl(null),
 
-                TextColumn::make('recorder.name')
+                TextColumn::make('recorder_display_name')
                     ->label('Dicatat Oleh')
-                    ->placeholder('—')
+                    ->state(function ($record) {
+                        return $record->recorder?->name 
+                            ?? ($record->recorded_by ? \App\Models\User::find($record->recorded_by)?->name : null)
+                            ?? '—';
+                    })
                     ->verticallyAlignCenter()
                     ->color('gray'),
 
