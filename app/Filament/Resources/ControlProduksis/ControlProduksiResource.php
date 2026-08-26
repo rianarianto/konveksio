@@ -510,6 +510,8 @@ class ControlProduksiResource extends Resource
                                 ->get();
                         }
 
+                        $woStatus = $workOrder?->status ?? 'NO_WO';
+
                         // Ambil semua stage yang ada beserta order_sequence-nya
                         $stageOrder = \App\Models\ProductionStage::pluck('order_sequence', 'name');
                         // QC_PERSIAPAN always first (before any production stage)
