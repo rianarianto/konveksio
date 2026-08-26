@@ -182,14 +182,7 @@ class NotificationHelper
                         . "🔗 {$link}";
                 }
 
-                try {
-                    Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                        'nohp'  => $phone,
-                        'pesan' => $pesan,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('[WA-Bot] Gagal mengirim pesan: ' . $e->getMessage());
-                }
+                self::sendWaMessage($phone, $pesan);
             }
         }
 
@@ -214,14 +207,7 @@ class NotificationHelper
                     . "Silakan buka portal untuk melakukan verifikasi:\n"
                     . "🔗 {$qcLink}";
 
-                try {
-                    Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                        'nohp'  => $qcWorker->phone,
-                        'pesan' => $qcPesan,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('[WA-Bot] Gagal kirim notif QC review: ' . $e->getMessage());
-                }
+                self::sendWaMessage($qcWorker->phone, $qcPesan);
             } else {
                 Log::info("[WA-Bot] QC Review: tidak ada QC worker atau nomor HP untuk WO {$wo->wo_number}");
             }
@@ -247,15 +233,7 @@ class NotificationHelper
                     . "Buka portal QC Akhir:\n"
                     . "🔗 {$qcLink}";
 
-                try {
-                    Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                        'nohp'  => $qcWorker->phone,
-                        'pesan' => $qcPesan,
-                    ]);
-                    Log::info("[WA-Bot] Notifikasi QC Akhir berhasil dikirim ke {$qcWorker->name} ({$qcWorker->phone})");
-                } catch (\Exception $e) {
-                    Log::error('[WA-Bot] Gagal kirim notif QC Akhir: ' . $e->getMessage());
-                }
+                self::sendWaMessage($qcWorker->phone, $qcPesan);
             } else {
                 Log::info("[WA-Bot] QC Akhir: tidak ada QC worker atau nomor HP untuk WO {$wo->wo_number}");
             }
@@ -281,14 +259,7 @@ class NotificationHelper
                     . "• Deadline: {$deadline}\n\n"
                     . "Silakan cek di dashboard admin.";
 
-                try {
-                    Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                        'nohp'  => $adminWorker->phone,
-                        'pesan' => $pesanAdmin,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('[WA-Bot] Gagal kirim notif WO Selesai ke Admin WA: ' . $e->getMessage());
-                }
+                self::sendWaMessage($adminWorker->phone, $pesanAdmin);
             }
 
             // 2. WhatsApp notification to Owner (from Shop settings)
@@ -304,14 +275,7 @@ class NotificationHelper
                     . "• Deadline: {$deadline}\n\n"
                     . "Silakan pantau perkembangan order di sistem.";
 
-                try {
-                    Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                        'nohp'  => $shop->phone,
-                        'pesan' => $pesanOwner,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('[WA-Bot] Gagal kirim notif WO Selesai ke Owner WA: ' . $e->getMessage());
-                }
+                self::sendWaMessage($shop->phone, $pesanOwner);
             }
 
             // 3. Database/System notification to admin & owner users in this shop
@@ -493,14 +457,7 @@ class NotificationHelper
                     . "🔗 {$link}";
             }
 
-            try {
-                Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                    'nohp'  => $worker->phone,
-                    'pesan' => $pesan,
-                ]);
-            } catch (\Exception $e) {
-                Log::error('[WA-Bot] Gagal kirim tugas ke ' . $worker->name . ': ' . $e->getMessage());
-            }
+            self::sendWaMessage($worker->phone, $pesan);
         }
     }
 
@@ -613,8 +570,13 @@ class NotificationHelper
     public static function sendWaMessage(string $phone, string $pesan): bool
     {
         try {
-            $url = config('services.wa_bot.url', 'http://localhost:5001') . '/api';
-            $secretKey = config('services.wa_bot.secret_key');
+            $rawUrl = config('services.wa_bot.url', 'http://localhost:5001');
+            $baseUrl = rtrim($rawUrl, '/');
+            $url = str_ends_with($baseUrl, '/api') || str_ends_with($baseUrl, '/send-message')
+                ? $baseUrl
+                : $baseUrl . '/send-message';
+
+            $secretKey = config('services.wa_bot.secret_key') ?: env('BOT_SECRET_KEY');
 
             $request = Http::timeout(10);
             if (!empty($secretKey)) {
@@ -622,9 +584,16 @@ class NotificationHelper
             }
 
             $response = $request->post($url, [
-                'nohp'  => $phone,
-                'pesan' => $pesan,
+                'nohp'    => $phone,
+                'pesan'   => $pesan,
+                'bot_key' => $secretKey,
             ]);
+
+            if (!$response->successful()) {
+                Log::error("[WA-Bot] HTTP Request ke {$url} gagal: HTTP {$response->status()} — " . $response->body());
+            } else {
+                Log::info("[WA-Bot] Berhasil kirim pesan WA ke {$phone} via {$url}");
+            }
 
             return $response->successful();
         } catch (\Exception $e) {

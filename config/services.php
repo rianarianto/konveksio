@@ -36,8 +36,8 @@ return [
     ],
 
     'wa_bot' => [
-        'url' => env('WA_BOT_URL', 'http://localhost:5001'),
-        'secret_key' => env('BOT_SECRET_KEY', null),
+        'url' => env('WA_BOT_URL', 'https://duniabordirkomputer.com/bot'),
+        'secret_key' => env('BOT_SECRET_KEY', 'DuniaBordirSecretKey998877!@#'),
     ],
 
 ];
