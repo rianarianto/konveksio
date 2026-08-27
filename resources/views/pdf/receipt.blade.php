@@ -448,9 +448,14 @@
                     'product_name' => $pName,
                     'production_category' => $item->production_category,
                     'bahan' => $item->bahan ? ($item->bahan->material->name . ' - ' . $item->bahan->color_name) : null,
+                    'design_image' => $item->design_image,
                     'total_qty' => 0,
                     'spec_groups' => [],
                 ];
+            }
+
+            if (empty($receiptProducts[$pName]['design_image']) && !empty($item->design_image)) {
+                $receiptProducts[$pName]['design_image'] = $item->design_image;
             }
             
             $receiptProducts[$pName]['total_qty'] += $item->quantity;
@@ -706,6 +711,26 @@
                         @endif
                     </div>
                 @endforeach
+
+                {{-- Gambar Desain ACC / Proposal --}}
+                @if(!empty($product['design_image']))
+                    @php
+                        $imgPath = storage_path('app/public/' . $product['design_image']);
+                        if (!file_exists($imgPath)) {
+                            $imgPath = public_path('storage/' . $product['design_image']);
+                        }
+                        $imgData = file_exists($imgPath) ? 'data:image/' . pathinfo($imgPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($imgPath)) : null;
+                    @endphp
+
+                    @if($imgData)
+                    <div style="margin-top: 14px; padding: 12px; border: 1.5px dashed #7F00FF; border-radius: 8px; background: #FAF5FF; text-align: center; page-break-inside: avoid;">
+                        <div style="font-size: 11px; font-weight: bold; color: #7F00FF; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+                            🖼️ GAMBAR DESAIN ACC / PROPOSAL: {{ strtoupper($product['product_name']) }}
+                        </div>
+                        <img src="{{ $imgData }}" style="max-height: 380px; max-width: 100%; object-fit: contain; border-radius: 6px; border: 1px solid #E9D5FF; box-shadow: 0 2px 4px rgba(127,0,255,0.1);" alt="Gambar Desain">
+                    </div>
+                    @endif
+                @endif
             </div>
         @endforeach
     </div>
