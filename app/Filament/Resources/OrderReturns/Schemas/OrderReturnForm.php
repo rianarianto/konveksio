@@ -265,6 +265,8 @@ class OrderReturnForm
             FileUpload::make('photo_path')
                 ->label('Foto Bukti Cacat / Kerusakan (Opsional)')
                 ->image()
+                ->disk('public')
+                ->visibility('public')
                 ->directory('order-returns')
                 ->maxSize(5120)
                 ->columnSpanFull(),

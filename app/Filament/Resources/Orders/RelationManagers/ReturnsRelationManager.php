@@ -265,6 +265,7 @@ class ReturnsRelationManager extends RelationManager
                                 'return_date' => $record->return_date,
                                 'expected_pickup_date' => $record->expected_pickup_date,
                                 'items_description' => $record->items_description ?: $record->reason,
+                                'photo_path' => $record->photo_path,
                             ];
                         })
                         ->form(OrderReturnForm::getComponents(true))
