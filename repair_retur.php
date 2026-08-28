@@ -13,12 +13,17 @@ if ($retur) {
             $retur->order_item_id = $item->id;
         }
     }
-    
-    // Trigger saved event listener to create/sync all multi-stage tasks and WO
+
     $retur->touch();
     $retur->save();
 
-    echo "REPAIR RETUR #1 COMPLETED! MULTI-STAGE TASKS & WO SYNCED.\n";
+    // Reset revision tasks to pending status for retur #1
+    \App\Models\ProductionTask::withoutGlobalScopes()
+        ->where('order_item_id', $retur->order_item_id)
+        ->where('is_revision', true)
+        ->update(['status' => 'pending']);
+
+    echo "REPAIR RETUR #1 COMPLETED! REVISION TASKS RESET TO PENDING.\n";
 } else {
     echo "Retur #1 not found.\n";
 }

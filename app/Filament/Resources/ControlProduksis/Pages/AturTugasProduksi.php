@@ -1495,7 +1495,7 @@ class AturTugasProduksi extends Page
                     'description' => !empty($baseDesc) ? $baseDesc : null,
                     'shop_id' => \Filament\Facades\Filament::getTenant()->id,
                     'assigned_by' => $oldTask?->assigned_by ?? auth()->id(),
-                    'status' => $oldTask?->status ?? 'pending',
+                    'status' => $activeReturn ? 'pending' : ($oldTask?->status ?? 'pending'),
                     'is_paid' => $oldTask?->is_paid ?? false,
                     'is_revision' => $activeReturn ? true : false,
                     'revision_source' => $activeReturn ? 'shop_warranty' : null,
