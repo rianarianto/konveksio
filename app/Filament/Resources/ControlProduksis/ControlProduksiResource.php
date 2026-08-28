@@ -98,11 +98,33 @@ class ControlProduksiResource extends Resource
         if ($map !== null) return $map;
 
         $returns = \App\Models\OrderReturn::whereIn('status', ['pending', 'diproses'])->get();
+        $normalIds = \DB::table('order_items')
+            ->selectRaw('MIN(id) as id')
+            ->groupBy([
+                'order_id',
+                'product_name',
+                'production_category',
+                'bahan_id',
+                'is_addition',
+            ])
+            ->pluck('id')
+            ->toArray();
+
         $map = [];
+        $usedIds = $normalIds;
 
         foreach ($returns as $retur) {
-            if ($retur->order_item_id) {
-                $map[$retur->order_item_id] = $retur;
+            $cId = $retur->order_item_id;
+            if (!$cId || in_array($cId, $usedIds)) {
+                $alt = \DB::table('order_items')
+                    ->where('order_id', $retur->order_id)
+                    ->whereNotIn('id', $usedIds)
+                    ->value('id');
+                if ($alt) $cId = $alt;
+            }
+            if ($cId) {
+                $map[$cId] = $retur;
+                $usedIds[] = $cId;
             }
         }
 
@@ -385,6 +407,8 @@ class ControlProduksiResource extends Resource
                     ->select('order_items.*')
                     ->orderByRaw('orders.is_express DESC')
                     ->orderBy('orders.deadline', 'asc')
+                    ->orderByRaw('CASE WHEN order_items.id IN (SELECT order_item_id FROM order_returns WHERE status IN ("pending", "diproses")) THEN 0 ELSE 1 END ASC')
+                    ->orderBy('order_items.id', 'desc')
             )
             ->filters([
                 // Filters handled by Tabs in Manage page
