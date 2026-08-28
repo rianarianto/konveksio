@@ -98,33 +98,12 @@ class ControlProduksiResource extends Resource
         if ($map !== null) return $map;
 
         $returns = \App\Models\OrderReturn::whereIn('status', ['pending', 'diproses'])->get();
-        $normalIds = \DB::table('order_items')
-            ->selectRaw('MIN(id) as id')
-            ->where('design_status', 'approved')
-            ->groupBy([
-                'order_id',
-                'product_name',
-                'production_category',
-                'bahan_id',
-                'is_addition',
-            ])
-            ->pluck('id')
-            ->toArray();
-
         $map = [];
-        $usedIds = $normalIds;
 
         foreach ($returns as $retur) {
-            $cId = $retur->order_item_id;
-            if (in_array($cId, $usedIds)) {
-                $alt = \DB::table('order_items')
-                    ->where('order_id', $retur->order_id)
-                    ->whereNotIn('id', $usedIds)
-                    ->value('id');
-                if ($alt) $cId = $alt;
+            if ($retur->order_item_id) {
+                $map[$retur->order_item_id] = $retur;
             }
-            $map[$cId] = $retur;
-            $usedIds[] = $cId;
         }
 
         return $map;
@@ -134,7 +113,6 @@ class ControlProduksiResource extends Resource
     {
         $normalIds = \DB::table('order_items')
             ->selectRaw('MIN(id) as id')
-            ->where('design_status', 'approved')
             ->groupBy([
                 'order_id',
                 'product_name',
@@ -149,7 +127,6 @@ class ControlProduksiResource extends Resource
         $allIds = array_unique(array_merge($normalIds, array_keys($returMap)));
 
         return parent::getEloquentQuery()
-            ->where('order_items.design_status', 'approved')
             ->with(['order.customer', 'productionTasks'])
             ->whereIn('order_items.id', empty($allIds) ? [0] : $allIds);
     }
