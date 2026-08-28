@@ -83,7 +83,9 @@ class OrderReturnsTable
 
                 ImageColumn::make('photo_path')
                     ->label('Foto Bukti')
-                    ->circular(),
+                    ->disk('public')
+                    ->square()
+                    ->size(50),
 
                 TextColumn::make('status')
                     ->label('Status')

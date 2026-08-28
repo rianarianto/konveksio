@@ -100,7 +100,9 @@ class ReturnsRelationManager extends RelationManager
 
                 ImageColumn::make('photo_path')
                     ->label('Foto Bukti')
-                    ->circular(),
+                    ->disk('public')
+                    ->square()
+                    ->size(50),
 
                 TextColumn::make('status')
                     ->label('Status Antrian')
@@ -136,23 +138,23 @@ class ReturnsRelationManager extends RelationManager
                             $data['order_id'] = $order->id;
                         }
 
+                        $targetStages = $data['target_stages'] ?? [];
+                        $multiItems = $data['multi_size_items'] ?? [];
+
+                        unset($data['target_stages'], $data['multi_size_items'], $data['selected_product_name'], $data['selection_mode']);
+
                         $retur = new OrderReturn();
-                        if (isset($data['target_stages'])) {
-                            $retur->target_stages = $data['target_stages'];
-                            unset($data['target_stages']);
-                        }
-                        if (isset($data['multi_size_items'])) {
-                            $retur->multi_size_items = $data['multi_size_items'];
-                            unset($data['multi_size_items']);
-                        }
-                        if (isset($data['selected_product_name'])) {
-                            unset($data['selected_product_name']);
-                        }
-                        if (isset($data['selection_mode'])) {
-                            unset($data['selection_mode']);
+                        $retur->fill($data);
+                        $retur->target_stages = $targetStages;
+                        $retur->multi_size_items = $multiItems;
+
+                        if (empty($retur->order_item_id) && !empty($multiItems)) {
+                            $firstItemId = $multiItems[0]['order_item_id'] ?? null;
+                            if ($firstItemId) {
+                                $retur->order_item_id = $firstItemId;
+                            }
                         }
 
-                        $retur->fill($data);
                         $retur->save();
 
                         \Filament\Notifications\Notification::make()
@@ -267,22 +269,22 @@ class ReturnsRelationManager extends RelationManager
                         })
                         ->form(OrderReturnForm::getComponents(true))
                         ->action(function (OrderReturn $record, array $data): void {
-                            if (isset($data['target_stages'])) {
-                                $record->target_stages = $data['target_stages'];
-                                unset($data['target_stages']);
-                            }
-                            if (isset($data['multi_size_items'])) {
-                                $record->multi_size_items = $data['multi_size_items'];
-                                unset($data['multi_size_items']);
-                            }
-                            if (isset($data['selected_product_name'])) {
-                                unset($data['selected_product_name']);
-                            }
-                            if (isset($data['selection_mode'])) {
-                                unset($data['selection_mode']);
-                            }
+                            $targetStages = $data['target_stages'] ?? [];
+                            $multiItems = $data['multi_size_items'] ?? [];
+
+                            unset($data['target_stages'], $data['multi_size_items'], $data['selected_product_name'], $data['selection_mode']);
 
                             $record->fill($data);
+                            $record->target_stages = $targetStages;
+                            $record->multi_size_items = $multiItems;
+
+                            if (empty($record->order_item_id) && !empty($multiItems)) {
+                                $firstItemId = $multiItems[0]['order_item_id'] ?? null;
+                                if ($firstItemId) {
+                                    $record->order_item_id = $firstItemId;
+                                }
+                            }
+
                             $record->save();
 
                             \Filament\Notifications\Notification::make()
