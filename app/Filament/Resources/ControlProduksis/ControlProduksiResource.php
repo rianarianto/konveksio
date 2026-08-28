@@ -427,40 +427,17 @@ class ControlProduksiResource extends Resource
                         $retur = $returMap[$record->id] ?? null;
 
                         if ($retur) {
-                            $unassignedReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-                                ->where('order_item_id', $retur->order_item_id)
-                                ->where('is_revision', true)
-                                ->where('status', '!=', 'done')
-                                ->whereNull('assigned_to')
-                                ->exists();
-
-                            if ($unassignedReturTasks) {
-                                return false; // Must assign worker first!
-                            }
-
-                            $hasReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            return \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->where('order_item_id', $retur->order_item_id)
                                 ->where('is_revision', true)
                                 ->exists();
-
-                            return $hasReturTasks;
                         }
 
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
-
-                        $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->where('status', '!=', 'done')
-                            ->whereNull('assigned_to')
-                            ->exists();
-
-                        if ($unassignedTasks) {
-                            return false; // Must assign worker first!
-                        }
-
                         $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
                             ->exists();
+
                         if (!$hasTasks) {
                             return false;
                         }
@@ -1063,47 +1040,9 @@ class ControlProduksiResource extends Resource
 
 
                 Action::make('atur_tugas')
-                    ->hidden(function (OrderItem $record): bool {
-                        $returMap = static::getReturMapping();
-                        $retur = $returMap[$record->id] ?? null;
-
-                        if ($retur) {
-                            $unassignedReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-                                ->where('order_item_id', $retur->order_item_id)
-                                ->where('is_revision', true)
-                                ->where('status', '!=', 'done')
-                                ->whereNull('assigned_to')
-                                ->exists();
-
-                            if ($unassignedReturTasks) {
-                                return false; // Show Atur Tugas because workers must be assigned!
-                            }
-                        }
-
-                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                        $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->where('status', '!=', 'done')
-                            ->whereNull('assigned_to')
-                            ->exists();
-
-                        if ($unassignedTasks) {
-                            return false; // Show Atur Tugas because workers must be assigned!
-                        }
-
-                        $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->exists();
-                        if (!$hasTasks) {
-                            return false;
-                        }
-                        $hasUnfinishedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->where('status', '!=', 'done')
-                            ->exists();
-
-                        return !$hasUnfinishedTasks;
-                    })
+                    ->label('Atur / Edit Tukang')
+                    ->icon('heroicon-o-user-plus')
+                    ->color('primary')
                     ->label(function (OrderItem $record): string {
                         $returMap = static::getReturMapping();
                         $retur = $returMap[$record->id] ?? null;
