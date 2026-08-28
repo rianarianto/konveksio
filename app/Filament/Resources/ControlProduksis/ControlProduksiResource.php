@@ -402,13 +402,19 @@ class ControlProduksiResource extends Resource
             ])
             ->defaultGroup('order.order_number')
             ->modifyQueryUsing(
-                fn($query) => $query
-                    ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                    ->select('order_items.*')
-                    ->orderByRaw('orders.is_express DESC')
-                    ->orderBy('orders.deadline', 'asc')
-                    ->orderByRaw('CASE WHEN order_items.id IN (SELECT order_item_id FROM order_returns WHERE status IN ("pending", "diproses")) THEN 0 ELSE 1 END ASC')
-                    ->orderBy('order_items.id', 'desc')
+                function($query) {
+                    $returMap = static::getReturMapping();
+                    $activeReturItemIds = array_keys($returMap);
+                    $returSqlIds = !empty($activeReturItemIds) ? implode(',', $activeReturItemIds) : '0';
+
+                    return $query
+                        ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                        ->select('order_items.*')
+                        ->orderByRaw('orders.is_express DESC')
+                        ->orderBy('orders.deadline', 'asc')
+                        ->orderByRaw("CASE WHEN order_items.id IN ({$returSqlIds}) THEN 0 ELSE 1 END ASC")
+                        ->orderBy('order_items.id', 'desc');
+                }
             )
             ->filters([
                 // Filters handled by Tabs in Manage page
