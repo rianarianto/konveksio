@@ -427,6 +427,17 @@ class ControlProduksiResource extends Resource
                         $retur = $returMap[$record->id] ?? null;
 
                         if ($retur) {
+                            $unassignedReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('is_revision', true)
+                                ->where('status', '!=', 'done')
+                                ->whereNull('assigned_to')
+                                ->exists();
+
+                            if ($unassignedReturTasks) {
+                                return false; // Must assign worker first!
+                            }
+
                             return \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->where('order_item_id', $retur->order_item_id)
                                 ->where('is_revision', true)
@@ -434,6 +445,17 @@ class ControlProduksiResource extends Resource
                         }
 
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
+
+                        $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('status', '!=', 'done')
+                            ->whereNull('assigned_to')
+                            ->exists();
+
+                        if ($unassignedTasks) {
+                            return false; // Must assign worker first!
+                        }
+
                         $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
                             ->exists();
@@ -443,6 +465,7 @@ class ControlProduksiResource extends Resource
                         }
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
+                            ->where('wo_number', 'not like', '%-R%')
                             ->first();
 
                         $hasUnfinishedTasks = \App\Models\ProductionTask::withoutGlobalScopes()

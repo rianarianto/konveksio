@@ -90,13 +90,22 @@ class AturTugasProduksi extends Page
             $maxSizes['CUSTOM'] = $customVal;
         }
 
-        $tasksForRepeater = [];
-        $groupedTasks = $item->productionTasks->groupBy('stage_name');
-
-        // If this item has active retur revision tasks & active OrderReturn, show active retur target stages!
         $hasActiveReturn = \App\Models\OrderReturn::where('order_item_id', $item->id)
             ->whereIn('status', ['pending', 'diproses'])
             ->exists();
+
+        if ($hasActiveReturn) {
+            $groupedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->where('order_item_id', $item->id)
+                ->where('is_revision', true)
+                ->get()
+                ->groupBy('stage_name');
+        } else {
+            $groupedTasks = $item->productionTasks()
+                ->where('is_revision', false)
+                ->get()
+                ->groupBy('stage_name');
+        }
 
         $activeReturStages = [];
         if ($hasActiveReturn) {
