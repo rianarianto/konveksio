@@ -213,11 +213,42 @@ class NotificationHelper
             }
         }
 
+        // Jika ini WO Retur atau ada active retur, sesuaikan totalQty menjadi qty retur
+        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+            ->where('status', '!=', 'selesai')
+            ->latest('id')
+            ->first();
+        if ($activeReturn) {
+            $totalQty = $activeReturn->quantity;
+        }
+
         // Notifikasi khusus ke QC Worker saat WO masuk QC_AKHIR
         if ($newStatus === WorkOrder::STATUS_QC_AKHIR && !$isReject) {
-            $qcWorker = $wo->qc_worker_id 
-                ? Worker::find($wo->qc_worker_id) 
-                : Worker::where('shop_id', $wo->shop_id)->where('is_active', true)->first();
+            $qcWorker = null;
+            if ($wo->qc_worker_id) {
+                $qcWorker = Worker::find($wo->qc_worker_id);
+            }
+            if (!$qcWorker) {
+                // Cari worker yang ditugaskan di QC_AKHIR atau QC_PERSIAPAN
+                $qcTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItemIds)
+                    ->whereIn('stage_name', ['QC_AKHIR', 'QC_PERSIAPAN'])
+                    ->whereNotNull('assigned_to')
+                    ->first();
+                if ($qcTask) {
+                    $qcWorker = Worker::find($qcTask->assigned_to);
+                }
+            }
+            if (!$qcWorker) {
+                // Cari worker yang memang bertugas sebagai QC (berdasarkan nama atau role)
+                $qcWorker = Worker::where('shop_id', $wo->shop_id)
+                    ->where('is_active', true)
+                    ->where(function($q) {
+                        $q->where('name', 'like', '%qc%')
+                          ->orWhere('name', 'like', '%quality%');
+                    })
+                    ->first();
+            }
 
             if ($qcWorker && $qcWorker->phone) {
                 $qcLink = url("/worker/{$qcWorker->portal_token}");
