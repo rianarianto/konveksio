@@ -191,7 +191,7 @@ const apiSendHandler = async (req, res) => {
         console.error('❌ WhatsApp client not ready. Current Status:', clientStatus);
         return res.status(503).json({
             status: "error",
-            pesan: "WhatsApp client belum siap. Buka http://localhost:5001 untuk scan QR.",
+            pesan: "WhatsApp client belum siap. Buka dashboard bot (/bot) untuk scan QR.",
             clientStatus
         });
     }
