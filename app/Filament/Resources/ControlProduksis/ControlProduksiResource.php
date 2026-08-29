@@ -448,6 +448,7 @@ class ControlProduksiResource extends Resource
 
                         $unassignedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
+                            ->where('is_revision', false)
                             ->where('status', '!=', 'done')
                             ->whereNull('assigned_to')
                             ->exists();
@@ -458,6 +459,7 @@ class ControlProduksiResource extends Resource
 
                         $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
+                            ->where('is_revision', false)
                             ->exists();
 
                         if (!$hasTasks) {
@@ -470,6 +472,7 @@ class ControlProduksiResource extends Resource
 
                         $hasUnfinishedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
+                            ->where('is_revision', false)
                             ->where('status', '!=', 'done')
                             ->exists();
 
@@ -1066,6 +1069,28 @@ class ControlProduksiResource extends Resource
                     ->label('Atur / Edit Tukang')
                     ->icon('heroicon-o-user-plus')
                     ->color('primary')
+                    ->visible(function (OrderItem $record): bool {
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
+                        if ($retur) return true;
+
+                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('wo_number', 'not like', '%-R%')
+                            ->first();
+
+                        $hasUnfinishedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('is_revision', false)
+                            ->where('status', '!=', 'done')
+                            ->exists();
+
+                        if ($wo && $wo->isCompleted() && !$hasUnfinishedTasks) {
+                            return false;
+                        }
+                        return true;
+                    })
                     ->label(function (OrderItem $record): string {
                         $returMap = static::getReturMapping();
                         $retur = $returMap[$record->id] ?? null;
