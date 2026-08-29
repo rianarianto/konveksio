@@ -1084,9 +1084,22 @@ class ControlProduksiResource extends Resource
                     ->icon('heroicon-o-user-plus')
                     ->color('primary')
                     ->visible(function (OrderItem $record): bool {
+                        // Aturan Ketat: Jika BUKAN Owner, dan produksi sudah dimulai (ada task in_progress/done), form tidak boleh dibuka sama sekali
+                        $isOwner = (auth()->user()->role === 'owner');
+
                         $returMap = static::getReturMapping();
                         $retur = $returMap[$record->id] ?? null;
-                        if ($retur) return true;
+                        if ($retur) {
+                            if (!$isOwner) {
+                                $hasStarted = \App\Models\ProductionTask::withoutGlobalScopes()
+                                    ->where('order_item_id', $retur->order_item_id)
+                                    ->where('is_revision', true)
+                                    ->whereIn('status', ['in_progress', 'done'])
+                                    ->exists();
+                                if ($hasStarted) return false;
+                            }
+                            return true;
+                        }
 
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
                         $wo = \App\Models\WorkOrder::withoutGlobalScopes()
@@ -1094,15 +1107,22 @@ class ControlProduksiResource extends Resource
                             ->where('wo_number', 'not like', '%-R%')
                             ->first();
 
-                        $hasUnfinishedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->where('is_revision', false)
-                            ->where('status', '!=', 'done')
-                            ->exists();
-
-                        if ($wo && $wo->isCompleted() && !$hasUnfinishedTasks) {
+                        if ($wo && $wo->isCompleted()) {
                             return false;
                         }
+
+                        if (!$isOwner) {
+                            $hasStarted = \App\Models\ProductionTask::withoutGlobalScopes()
+                                ->whereIn('order_item_id', $groupItemIds)
+                                ->whereIn('status', ['in_progress', 'done'])
+                                ->exists();
+                            $woStarted = $wo && !in_array($wo->status, [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO']);
+
+                            if ($hasStarted || $woStarted) {
+                                return false; // Sembunyikan untuk Admin/Designer jika sudah dimulai
+                            }
+                        }
+
                         return true;
                     })
                     ->label(function (OrderItem $record): string {
