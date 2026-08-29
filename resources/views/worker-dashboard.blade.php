@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Tugas — Dunia Bordir Komputer</title>
+    @php
+        $workerShop = \App\Models\Worker::where('portal_token', $token ?? '')->with('shop')->first()?->shop?->name ?? 'Konveksio';
+    @endphp
+    <title>Dashboard Tugas — {{ $workerShop }}</title>
     @vite(['resources/css/app.css'])
     @livewireStyles
     <style>

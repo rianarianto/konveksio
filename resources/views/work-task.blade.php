@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tugas Produksi — Dunia Bordir Komputer</title>
+    @php
+        $woRecord = \App\Models\WorkOrder::where('id', request()->route('wo'))->with('shop')->first();
+        $shopTitle = $woRecord?->shop?->name ?? 'Konveksio';
+    @endphp
+    <title>Tugas Produksi — {{ $shopTitle }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @livewireStyles
