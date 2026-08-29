@@ -205,7 +205,7 @@
                 <td style="text-align: right;">
                     <div style="font-size: 12pt; font-weight: bold; color:#111827;">{{ strtoupper($record->product_name) }}</div>
                     <div class="badge {{ !empty($activeReturn) ? 'badge-danger' : 'badge-primary' }}" style="margin-top:2px; {{ !empty($activeReturn) ? 'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;' : '' }}">
-                        {{ !empty($activeReturn) ? '🔄 REVISI RETUR' : 'KATEGORI: ' . match($record->production_category) {
+                        {{ !empty($activeReturn) ? '[REVISI RETUR]' : 'KATEGORI: ' . match($record->production_category) {
                             'custom' => 'PRODUKSI',
                             'non_produksi' => 'NON-PRODUKSI',
                             'jasa' => 'JASA',
@@ -219,9 +219,9 @@
 
     @if(!empty($activeReturn))
     <div style="margin-bottom: 10px; padding: 8px 12px; background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 6px; color: #991b1b;">
-        <div style="font-weight: bold; font-size: 10pt;">🔄 SPK PERBAIKAN RETUR — {{ $activeReturn->responsibility_type === 'customer_paid' ? 'RETUR BERBAYAR' : 'GARANSI TOKO' }}</div>
+        <div style="font-weight: bold; font-size: 10pt;">[SPK PERBAIKAN RETUR] — {{ $activeReturn->responsibility_type === 'customer_paid' ? 'RETUR BERBAYAR' : 'GARANSI TOKO' }}</div>
         <div style="font-size: 8.5pt; margin-top: 3px;">
-            📌 <strong>Jumlah yang Perlu Diperbaiki:</strong> {{ $activeReturn->quantity }} pcs 
+            <strong>Jumlah yang Perlu Diperbaiki:</strong> {{ $activeReturn->quantity }} pcs 
             @if(!empty($activeReturn->size_breakdown) && is_array($activeReturn->size_breakdown))
                 @php
                     $sbLines = [];
@@ -234,10 +234,10 @@
                     ({{ implode(', ', $sbLines) }})
                 @endif
             @endif
-            | 🎯 <strong>Tahap Pengerjaan:</strong> {{ $activeReturn->target_stage ?: 'Bordir/Sablon' }} ➔ Direct ke QC Akhir
+            | <strong>Tahap Pengerjaan:</strong> {{ $activeReturn->target_stage ?: 'Bordir/Sablon' }} &rarr; Direct ke QC Akhir
         </div>
         <div style="font-size: 8.5pt; margin-top: 2px;">
-            📝 <strong>Alasan Komplain Pelanggan:</strong> {{ $activeReturn->reason ?: $activeReturn->items_description }}
+            <strong>Alasan Komplain Pelanggan:</strong> {{ $activeReturn->reason ?: $activeReturn->items_description }}
         </div>
     </div>
     @endif
@@ -355,11 +355,24 @@
                         @endif
                     </td>
                     <td>
-                        @foreach($group['sizes'] as $sz => $q)
-                            <div class="size-badge">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}:<strong>{{ $q }}</strong></div>
+                        @php
+                            $renderSizes = $group['sizes'];
+                            if (!empty($activeReturn) && !empty($sizes)) {
+                                $renderSizes = array_intersect_key($group['sizes'], $sizes);
+                                foreach ($renderSizes as $rSz => $rQ) {
+                                    if (isset($sizes[$rSz])) {
+                                        $renderSizes[$rSz] = $sizes[$rSz];
+                                    }
+                                }
+                            }
+                        @endphp
+                        @foreach($renderSizes as $sz => $q)
+                            @if($q > 0)
+                                <div class="size-badge">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}:<strong>{{ $q }}</strong></div>
+                            @endif
                         @endforeach
                     </td>
-                    <td style="text-align: center; font-weight: bold; font-size: 9.5pt;">{{ $group['total_qty'] }}</td>
+                    <td style="text-align: center; font-weight: bold; font-size: 9.5pt;">{{ !empty($activeReturn) ? array_sum($renderSizes) : $group['total_qty'] }}</td>
                 </tr>
                 @endforeach
             </tbody>
