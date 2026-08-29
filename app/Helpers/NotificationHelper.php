@@ -425,13 +425,15 @@ class NotificationHelper
                 }
             }
 
+            $shopName = $item->order?->shop?->name ?? 'Dunia Bordir Komputer';
+
             if ($isReturMsg || $activeReturn) {
                 $garansiText = ($activeReturn?->responsibility_type === 'customer_paid') ? 'Retur Berbayar' : 'Garansi Toko';
                 $reasonText = $activeReturn?->reason ?: $activeReturn?->items_description ?: 'Perbaikan barang komplain';
 
                 $pesan = "🔄 *PENUGASAN PERBAIKAN RETUR — {$produk}*\n\n"
                     . "Halo {$worker->name},\n"
-                    . "Anda mendapat penugasan *PERBAIKAN RETUR* di Konveksio.\n\n"
+                    . "Anda mendapat penugasan *PERBAIKAN RETUR* di {$shopName}.\n\n"
                     . "🧾 *Detail Pesanan:*\n"
                     . "• Produk: {$produk}\n"
                     . "• Pelanggan: {$customer}\n"
@@ -446,7 +448,7 @@ class NotificationHelper
             } else {
                 $pesan = "📋 *PENUGASAN PRODUKSI — {$produk}*\n\n"
                     . "Halo {$worker->name},\n"
-                    . "Anda mendapat penugasan baru di Konveksio.\n\n"
+                    . "Anda mendapat penugasan baru di {$shopName}.\n\n"
                     . "🧾 *Detail Pesanan:*\n"
                     . "• Produk: {$produk}\n"
                     . "• Pelanggan: {$customer}\n"
