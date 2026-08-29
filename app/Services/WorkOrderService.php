@@ -40,15 +40,11 @@ class WorkOrderService
                     return $wo;
                 }
 
-                // Jika ini adalah task perbaikan retur customer ATAU revisi dari QC_AKHIR,
-                // setelah selesai baru LANGSUNG kembali ke QC_AKHIR.
-                // Jika ini revisi reguler dari QC_REVIEW biasa, kembalikan ke QC_REVIEW stage tersebut atau tahap berikutnya.
-                $hasQcAkhirRevision = $allTasksForStage->contains(fn($t) => $t->revision_source === 'qc_akhir')
-                    || \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
-                        ->whereIn('status', ['pending', 'diproses'])
-                        ->exists();
+                // Jika ini adalah revisi dari QC_AKHIR (single task reject) dan tidak ada tahapan berikutnya
+                $hasQcAkhirRevision = $allTasksForStage->contains(fn($t) => $t->revision_source === 'qc_akhir');
+                $nextStatus = $wo->getNextStatus();
 
-                if ($hasQcAkhirRevision) {
+                if ($hasQcAkhirRevision && (!$nextStatus || $nextStatus === WorkOrder::STATUS_COMPLETED)) {
                     // Reset revision_source tasks
                     \App\Models\ProductionTask::withoutGlobalScopes()
                         ->whereIn('order_item_id', $groupItemIds)

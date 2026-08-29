@@ -1169,12 +1169,14 @@
                     @php
                         $nextStatus = $wo->getNextStatus();
                         $isActiveTaskQcPrep = in_array(strtoupper($myActiveTask->stage_name ?? ''), ['QC_PREP', 'QC_PERSIAPAN']);
-                        $isQcAkhirRevision = ($myActiveTask?->revision_source === 'qc_akhir') || $hasReturnItem;
+                        $isQcAkhirRevision = ($myActiveTask?->revision_source === 'qc_akhir');
 
-                        if ($isQcAkhirRevision) {
+                        if ($nextStatus && $nextStatus !== \App\Models\WorkOrder::STATUS_COMPLETED && $nextStatus !== \App\Models\WorkOrder::STATUS_QC_REVIEW) {
+                            $btnLabel = '✅ Selesai Perbaikan & Lanjut ke ' . str_replace('_', ' ', $nextStatus);
+                        } elseif ($isQcAkhirRevision) {
                             $btnLabel = '✅ Selesai Perbaikan & Lanjut ke QC Akhir';
                         } elseif ($myActiveTask?->is_revision) {
-                            $btnLabel = '✅ Selesai Perbaikan & Kirim ke QC';
+                            $btnLabel = '✅ Selesai Perbaikan & Selesai';
                         } elseif ($isActiveTaskQcPrep) {
                             $btnLabel = '✅ Selesai & Lanjutkan';
                         } elseif ($nextStatus === \App\Models\WorkOrder::STATUS_QC_REVIEW) {
