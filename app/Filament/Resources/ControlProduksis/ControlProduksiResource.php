@@ -97,7 +97,7 @@ class ControlProduksiResource extends Resource
         static $map = null;
         if ($map !== null) return $map;
 
-        $returns = \App\Models\OrderReturn::whereIn('status', ['pending', 'diproses'])->get();
+        $returns = \App\Models\OrderReturn::all();
         $normalIds = \DB::table('order_items')
             ->selectRaw('MIN(id) as id')
             ->groupBy([
