@@ -267,6 +267,9 @@ class ControlProduksiResource extends Resource
 
                         if ($retur) {
                             $target = $retur->target_stage ?: 'Jahit';
+                            if ($retur->status === 'selesai') {
+                                return '✅ Retur Selesai';
+                            }
                             return '🔄 Retur (' . ucfirst($target) . ')';
                         }
 

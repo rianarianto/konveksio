@@ -527,6 +527,11 @@ class WorkOrderService
                 ]);
                 $wo->refresh();
 
+                // Update OrderReturn status menjadi 'selesai'
+                \App\Models\OrderReturn::whereIn('order_item_id', $groupItemIds)
+                    ->whereIn('status', ['pending', 'diproses'])
+                    ->update(['status' => 'selesai']);
+
                 $woId2 = $wo->id;
                 dispatch(function () use ($woId2) {
                     $wo = WorkOrder::withoutGlobalScopes()->find($woId2);
