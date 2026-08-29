@@ -52,6 +52,7 @@ class ControlProduksiResource extends Resource
         }
 
         $count = static::getEloquentQuery()
+            ->whereNotIn('production_category', ['non_produksi', 'jasa'])
             ->whereDoesntHave('productionTasks')
             ->count();
 
