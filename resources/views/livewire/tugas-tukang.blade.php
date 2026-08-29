@@ -64,85 +64,172 @@
             }
         }
 
-        // Build specGroups (sama persis dengan PDFController)
-        $specGroups = [];
-        foreach ($groupItems as $gi) {
-            $d = $gi->size_and_request_details ?? [];
-            $isProduksi = in_array($gi->production_category ?? 'produksi', ['produksi', 'custom']);
-            if (!$isProduksi) {
-                $gen = 'UMUM'; $slv = '-'; $pck = '-'; $btn = '-'; $tun = '-'; $clr = '-';
-            } else {
-                $gen = $d['gender'] ?? 'L';
-                $slv = strtoupper($d['sleeve_model'] ?? 'PENDEK');
-                $pck = strtoupper(str_replace('_', ' ', $d['pocket_model'] ?? 'TANPA SAKU'));
-                $btn = strtoupper($d['button_model'] ?? 'BIASA');
-                $tun = !empty($d['is_tunic']) ? 'TUNIK' : 'STANDAR';
-                $clr = strtoupper($d['collar_model'] ?? 'BIASA');
+        // Cek apakah WO ini adalah WO Retur
+        $isWoRetur = str_contains($wo->wo_number ?? '', '-R') || $wo->is_revision;
+        $activeReturn = \App\Models\OrderReturn::whereIn('order_item_id', $groupItems->pluck('id'))
+            ->where('status', '!=', 'selesai')
+            ->latest('id')
+            ->first();
+
+        if ($isWoRetur && $activeReturn) {
+            $totalQty = $activeReturn->quantity;
+
+            // Rebuild specGroups from retur raw data only
+            $rawEntries = [];
+            $breakdown = $activeReturn->size_breakdown ?? [];
+            if (is_array($breakdown) && !empty($breakdown['_raw'])) {
+                $rawEntries = $breakdown['_raw'];
             }
-            $sbList = [];
-            if (!empty($d['sablon_bordir'])) {
-                foreach ($d['sablon_bordir'] as $sb) {
-                    $ket = !empty($sb['keterangan']) ? ' - ' . $sb['keterangan'] : '';
-                    $sbList[] = ($sb['jenis'] ?? '') . ' (' . ($sb['lokasi'] ?? '') . $ket . ')';
+            $returItemQtyMap = [];
+            foreach ($rawEntries as $entry) {
+                $oid = $entry['order_item_id'] ?? null;
+                $qty = $entry['return_qty'] ?? 0;
+                if ($oid) $returItemQtyMap[$oid] = (int) $qty;
+            }
+
+            $specGroups = [];
+            $returItems = \App\Models\OrderItem::withoutGlobalScopes()
+                ->whereIn('id', array_keys($returItemQtyMap))
+                ->get();
+
+            foreach ($returItems as $gi) {
+                $d = $gi->size_and_request_details ?? [];
+                $returQty = $returItemQtyMap[$gi->id] ?? 0;
+                $isProduksi = in_array($gi->production_category ?? 'produksi', ['produksi', 'custom']);
+                if (!$isProduksi) {
+                    $gen = 'UMUM'; $slv = '-'; $pck = '-'; $btn = '-'; $tun = '-'; $clr = '-';
+                } else {
+                    $gen = $d['gender'] ?? 'L';
+                    $slv = strtoupper($d['sleeve_model'] ?? 'PENDEK');
+                    $pck = strtoupper(str_replace('_', ' ', $d['pocket_model'] ?? 'TANPA SAKU'));
+                    $btn = strtoupper($d['button_model'] ?? 'BIASA');
+                    $tun = !empty($d['is_tunic']) ? 'TUNIK' : 'STANDAR';
+                    $clr = strtoupper($d['collar_model'] ?? 'BIASA');
                 }
-            } elseif (!empty($d['sablon_jenis'])) {
-                $ket = !empty($d['sablon_keterangan']) ? ' - ' . $d['sablon_keterangan'] : '';
-                $sbList[] = ($d['sablon_jenis'] ?? '') . ' (' . ($d['sablon_lokasi'] ?? '-') . $ket . ')';
-            }
-            $reqList = [];
-            if (!empty($d['request_tambahan']) && is_array($d['request_tambahan'])) {
-                foreach ($d['request_tambahan'] as $rt) {
-                    $reqList[] = ($rt['jenis'] ?? '') . ': ' . ($rt['keterangan'] ?? '');
+                $sbList = [];
+                if (!empty($d['sablon_bordir'])) {
+                    foreach ($d['sablon_bordir'] as $sb) {
+                        $ket = !empty($sb['keterangan']) ? ' - ' . $sb['keterangan'] : '';
+                        $sbList[] = ($sb['jenis'] ?? '') . ' (' . ($sb['lokasi'] ?? '') . $ket . ')';
+                    }
+                } elseif (!empty($d['sablon_jenis'])) {
+                    $ket = !empty($d['sablon_keterangan']) ? ' - ' . $d['sablon_keterangan'] : '';
+                    $sbList[] = ($d['sablon_jenis'] ?? '') . ' (' . ($d['sablon_lokasi'] ?? '-') . $ket . ')';
                 }
-            }
-            $groupLabel = trim($d['group_label'] ?? '');
-            $groupKey = "{$groupLabel}|{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|" . implode('|', $sbList);
-            if (!isset($specGroups[$groupKey])) {
-                $specGroups[$groupKey] = [
-                    'group_label'  => $groupLabel,
-                    'gender'       => $gen === 'UMUM' ? 'UMUM' : ($gen === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN'),
-                    'is_produksi'  => $isProduksi,
-                    'sleeve'       => $slv,
-                    'pocket'       => $pck,
-                    'button'       => $btn,
-                    'tunic'        => $tun,
-                    'collar'       => $clr,
-                    'sablon_bordir'=> $sbList,
-                    'requests'     => $reqList,
-                    'spec_notes'   => [],
-                    'total_qty'    => 0,
-                    'sizes'        => [],
-                    'recipients'   => ['standard' => [], 'custom' => []],
-                ];
-            }
-            if (!empty($d['spec_notes'])) {
-                if (!in_array($d['spec_notes'], $specGroups[$groupKey]['spec_notes'])) {
-                    $specGroups[$groupKey]['spec_notes'][] = $d['spec_notes'];
+                $reqList = [];
+                if (!empty($d['request_tambahan']) && is_array($d['request_tambahan'])) {
+                    foreach ($d['request_tambahan'] as $rt) {
+                        $reqList[] = is_array($rt) ? (($rt['jenis'] ?? '') . ': ' . ($rt['keterangan'] ?? '')) : $rt;
+                    }
                 }
-            }
-            $specGroups[$groupKey]['total_qty'] += $gi->quantity;
-            $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
-            $specGroups[$groupKey]['sizes'][$sz] = ($specGroups[$groupKey]['sizes'][$sz] ?? 0) + $gi->quantity;
-            if (!empty($d['detail_custom'])) {
-                foreach ($d['detail_custom'] as $u) {
-                    $specGroups[$groupKey]['recipients']['custom'][] = [
-                        'nama' => $u['nama'] ?? '-',
-                        'size' => $u['ukuran'] ?? 'Custom',
-                        'ukuran_badan' => !empty($u['LD']) ? "LD:{$u['LD']} PB:{$u['PB']} LP:{$u['LP']}" : '',
+                $grpLabel = trim($d['group_label'] ?? '');
+                $groupKey = "{$grpLabel}|{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|" . implode('|', $sbList);
+                if (!isset($specGroups[$groupKey])) {
+                    $specGroups[$groupKey] = [
+                        'group_label'  => $grpLabel,
+                        'gender'       => $gen === 'UMUM' ? 'UMUM' : ($gen === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN'),
+                        'is_produksi'  => $isProduksi,
+                        'sleeve'       => $slv,
+                        'pocket'       => $pck,
+                        'button'       => $btn,
+                        'tunic'        => $tun,
+                        'collar'       => $clr,
+                        'sablon_bordir'=> $sbList,
+                        'requests'     => $reqList,
+                        'spec_notes'   => [],
+                        'total_qty'    => 0,
+                        'sizes'        => [],
+                        'recipients'   => ['standard' => [], 'custom' => []],
                     ];
                 }
-            } elseif ($sz === 'CUSTOM') {
-                $mArr = [];
-                foreach (['LD','PB','PL','LB','LP','LPh'] as $mk) {
-                    if (!empty($d[$mk])) $mArr[] = "$mk:{$d[$mk]}";
+                if (!empty($d['spec_notes']) && !in_array($d['spec_notes'], $specGroups[$groupKey]['spec_notes'])) {
+                    $specGroups[$groupKey]['spec_notes'][] = $d['spec_notes'];
                 }
-                $specGroups[$groupKey]['recipients']['custom'][] = [
-                    'nama' => $gi->recipient_name ?? '-',
-                    'size' => 'Custom',
-                    'ukuran_badan' => implode(' ', $mArr),
-                ];
-            } elseif (!empty($gi->recipient_name)) {
-                $specGroups[$groupKey]['recipients']['standard'][$sz][] = $gi->recipient_name;
+                $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                $specGroups[$groupKey]['total_qty'] += $returQty;
+                $specGroups[$groupKey]['sizes'][$sz] = ($specGroups[$groupKey]['sizes'][$sz] ?? 0) + $returQty;
+            }
+        } else {
+            // Build specGroups normal
+            $specGroups = [];
+            foreach ($groupItems as $gi) {
+                $d = $gi->size_and_request_details ?? [];
+                $isProduksi = in_array($gi->production_category ?? 'produksi', ['produksi', 'custom']);
+                if (!$isProduksi) {
+                    $gen = 'UMUM'; $slv = '-'; $pck = '-'; $btn = '-'; $tun = '-'; $clr = '-';
+                } else {
+                    $gen = $d['gender'] ?? 'L';
+                    $slv = strtoupper($d['sleeve_model'] ?? 'PENDEK');
+                    $pck = strtoupper(str_replace('_', ' ', $d['pocket_model'] ?? 'TANPA SAKU'));
+                    $btn = strtoupper($d['button_model'] ?? 'BIASA');
+                    $tun = !empty($d['is_tunic']) ? 'TUNIK' : 'STANDAR';
+                    $clr = strtoupper($d['collar_model'] ?? 'BIASA');
+                }
+                $sbList = [];
+                if (!empty($d['sablon_bordir'])) {
+                    foreach ($d['sablon_bordir'] as $sb) {
+                        $ket = !empty($sb['keterangan']) ? ' - ' . $sb['keterangan'] : '';
+                        $sbList[] = ($sb['jenis'] ?? '') . ' (' . ($sb['lokasi'] ?? '') . $ket . ')';
+                    }
+                } elseif (!empty($d['sablon_jenis'])) {
+                    $ket = !empty($d['sablon_keterangan']) ? ' - ' . $d['sablon_keterangan'] : '';
+                    $sbList[] = ($d['sablon_jenis'] ?? '') . ' (' . ($d['sablon_lokasi'] ?? '-') . $ket . ')';
+                }
+                $reqList = [];
+                if (!empty($d['request_tambahan']) && is_array($d['request_tambahan'])) {
+                    foreach ($d['request_tambahan'] as $rt) {
+                        $reqList[] = is_array($rt) ? (($rt['jenis'] ?? '') . ': ' . ($rt['keterangan'] ?? '')) : $rt;
+                    }
+                }
+                $groupLabel = trim($d['group_label'] ?? '');
+                $groupKey = "{$groupLabel}|{$gen}|{$slv}|{$pck}|{$btn}|{$tun}|{$clr}|" . implode('|', $sbList);
+                if (!isset($specGroups[$groupKey])) {
+                    $specGroups[$groupKey] = [
+                        'group_label'  => $groupLabel,
+                        'gender'       => $gen === 'UMUM' ? 'UMUM' : ($gen === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN'),
+                        'is_produksi'  => $isProduksi,
+                        'sleeve'       => $slv,
+                        'pocket'       => $pck,
+                        'button'       => $btn,
+                        'tunic'        => $tun,
+                        'collar'       => $clr,
+                        'sablon_bordir'=> $sbList,
+                        'requests'     => $reqList,
+                        'spec_notes'   => [],
+                        'total_qty'    => 0,
+                        'sizes'        => [],
+                        'recipients'   => ['standard' => [], 'custom' => []],
+                    ];
+                }
+                if (!empty($d['spec_notes'])) {
+                    if (!in_array($d['spec_notes'], $specGroups[$groupKey]['spec_notes'])) {
+                        $specGroups[$groupKey]['spec_notes'][] = $d['spec_notes'];
+                    }
+                }
+                $specGroups[$groupKey]['total_qty'] += $gi->quantity;
+                $sz = strtoupper($gi->size ?? 'TANPA_UKURAN');
+                $specGroups[$groupKey]['sizes'][$sz] = ($specGroups[$groupKey]['sizes'][$sz] ?? 0) + $gi->quantity;
+                if (!empty($d['detail_custom'])) {
+                    foreach ($d['detail_custom'] as $u) {
+                        $specGroups[$groupKey]['recipients']['custom'][] = [
+                            'nama' => $u['nama'] ?? '-',
+                            'size' => $u['ukuran'] ?? 'Custom',
+                            'ukuran_badan' => !empty($u['LD']) ? "LD:{$u['LD']} PB:{$u['PB']} LP:{$u['LP']}" : '',
+                        ];
+                    }
+                } elseif ($sz === 'CUSTOM') {
+                    $mArr = [];
+                    foreach (['LD','PB','PL','LB','LP','LPh'] as $mk) {
+                        if (!empty($d[$mk])) $mArr[] = "$mk:{$d[$mk]}";
+                    }
+                    $specGroups[$groupKey]['recipients']['custom'][] = [
+                        'nama' => $gi->recipient_name ?? '-',
+                        'size' => 'Custom',
+                        'ukuran_badan' => implode(' ', $mArr),
+                    ];
+                } elseif (!empty($gi->recipient_name)) {
+                    $specGroups[$groupKey]['recipients']['standard'][$sz][] = $gi->recipient_name;
+                }
             }
         }
 
@@ -156,12 +243,33 @@
 
         $myActiveTask = null;
         if ($worker) {
-            // 1. Cari task yang sesuai dengan stage aktif WO saat ini
-            $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
-                ->whereIn('order_item_id', $groupItems->pluck('id'))
-                ->where('stage_name', $expectedStage)
-                ->where('assigned_to', $worker->id)
-                ->first();
+            // JIKA INI WO RETUR: Prioritaskan task revisi retur
+            if ($isWoRetur) {
+                $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItems->pluck('id'))
+                    ->where('assigned_to', $worker->id)
+                    ->where('is_revision', true)
+                    ->where('stage_name', $expectedStage)
+                    ->first();
+
+                if (!$myActiveTask) {
+                    $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                        ->whereIn('order_item_id', $groupItems->pluck('id'))
+                        ->where('assigned_to', $worker->id)
+                        ->where('is_revision', true)
+                        ->first();
+                }
+            }
+
+            // 1. Cari task yang sesuai dengan stage aktif WO saat ini (hanya non-revisi jika bukan WO retur)
+            if (!$myActiveTask) {
+                $myActiveTask = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->whereIn('order_item_id', $groupItems->pluck('id'))
+                    ->where('stage_name', $expectedStage)
+                    ->where('assigned_to', $worker->id)
+                    ->where('is_revision', $isWoRetur)
+                    ->first();
+            }
 
             // 2. Jika tidak ada, cari apakah ada task revisi yang aktif untuk worker ini
             if (!$myActiveTask) {
@@ -284,8 +392,8 @@
     {{-- ── HERO PERBAIKAN / RETUR CARD (Tampil Utama Jika Task Adalah Revisi atau Retur) ── --}}
     @if($myTask && ($myTask->is_revision || $myTask->revision_source))
     @php
-        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $orderItem?->id)
-            ->whereIn('status', ['pending', 'diproses'])
+        $activeReturn = $activeReturn ?? \App\Models\OrderReturn::whereIn('order_item_id', $groupItems->pluck('id'))
+            ->where('status', '!=', 'selesai')
             ->latest('id')
             ->first();
         $isCustomerReturn = !empty($activeReturn);
