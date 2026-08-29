@@ -400,6 +400,33 @@ class NotificationHelper
                 ->get();
         }
 
+        // Jika semua task pengerjaan tukang sudah done, tapi status WO sedang di QC_AKHIR atau QC_REVIEW, kirim notifikasi ke Petugas QC
+        if ($tasks->isEmpty()) {
+            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->first();
+
+            if ($wo && in_array($wo->status, [\App\Models\WorkOrder::STATUS_QC_AKHIR, \App\Models\WorkOrder::STATUS_QC_REVIEW])) {
+                $qcWorker = $wo->qc_worker_id ? \App\Models\Worker::find($wo->qc_worker_id) : null;
+                if ($qcWorker && $qcWorker->phone) {
+                    $qcLink = url("/worker/{$qcWorker->portal_token}");
+                    $qcPesan = "🏁 *PENGINGAT VERIFIKASI QC AKHIR — {$wo->wo_number}*\n\n"
+                        . "Halo {$qcWorker->name},\n"
+                        . "Tugas perbaikan retur telah selesai dikerjakan tukang dan sedang *Menunggu Verifikasi Final QC Akhir* Anda.\n\n"
+                        . "📋 *Detail Pesanan:*\n"
+                        . "• Produk: {$produk}\n"
+                        . "• Pelanggan: {$customer}\n"
+                        . "• Total Qty: " . ($activeReturn ? $activeReturn->quantity : $totalGroupQty) . " pcs\n"
+                        . "• Deadline: {$deadline}\n\n"
+                        . "Silakan buka portal QC Akhir:\n"
+                        . "🔗 {$qcLink}";
+
+                    self::sendWaMessage($qcWorker->phone, $qcPesan);
+                    return;
+                }
+            }
+        }
+
         // Grup per pekerja (satu pekerja bisa punya lebih dari 1 tahap)
         $workerTasks = $tasks->groupBy('assigned_to');
 
