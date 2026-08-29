@@ -402,9 +402,13 @@ class NotificationHelper
 
         // Jika semua task pengerjaan tukang sudah done, tapi status WO sedang di QC_AKHIR atau QC_REVIEW, kirim notifikasi ke Petugas QC
         if ($tasks->isEmpty()) {
-            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
-                ->whereIn('order_item_id', $groupItemIds)
-                ->first();
+            $woQuery = \App\Models\WorkOrder::withoutGlobalScopes()->whereIn('order_item_id', $groupItemIds);
+            if ($activeReturn) {
+                $wo = (clone $woQuery)->where('wo_number', 'like', '%-R%')->latest('id')->first()
+                    ?: $woQuery->first();
+            } else {
+                $wo = $woQuery->first();
+            }
 
             if ($wo && in_array($wo->status, [\App\Models\WorkOrder::STATUS_QC_AKHIR, \App\Models\WorkOrder::STATUS_QC_REVIEW])) {
                 $qcWorker = $wo->qc_worker_id ? \App\Models\Worker::find($wo->qc_worker_id) : null;
