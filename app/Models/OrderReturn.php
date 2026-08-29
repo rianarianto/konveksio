@@ -252,10 +252,12 @@ class OrderReturn extends Model
                         'is_express' => (bool) ($origWo?->is_express ?? false),
                         'has_qc_prep' => false,
                         'has_qc_selesai' => true,
+                        'qc_worker_id' => $origWo?->qc_worker_id,
                     ]);
                 } else {
                     $returWo->update([
                         'stage_sequence' => $mappedStages,
+                        'qc_worker_id' => $returWo->qc_worker_id ?: $origWo?->qc_worker_id,
                     ]);
                 }
 
