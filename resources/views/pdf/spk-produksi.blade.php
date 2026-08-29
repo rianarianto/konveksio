@@ -222,8 +222,17 @@
         <div style="font-weight: bold; font-size: 10pt;">🔄 SPK PERBAIKAN RETUR — {{ $activeReturn->responsibility_type === 'customer_paid' ? 'RETUR BERBAYAR' : 'GARANSI TOKO' }}</div>
         <div style="font-size: 8.5pt; margin-top: 3px;">
             📌 <strong>Jumlah yang Perlu Diperbaiki:</strong> {{ $activeReturn->quantity }} pcs 
-            @if(!empty($activeReturn->size_breakdown))
-                ({{ implode(', ', array_map(fn($k,$v) => "$k: $v pcs", array_keys($activeReturn->size_breakdown), $activeReturn->size_breakdown)) }})
+            @if(!empty($activeReturn->size_breakdown) && is_array($activeReturn->size_breakdown))
+                @php
+                    $sbLines = [];
+                    foreach($activeReturn->size_breakdown as $sbKey => $sbVal) {
+                        if ($sbKey === '_raw' || is_array($sbVal)) continue;
+                        $sbLines[] = "{$sbKey}: {$sbVal} pcs";
+                    }
+                @endphp
+                @if(!empty($sbLines))
+                    ({{ implode(', ', $sbLines) }})
+                @endif
             @endif
             | 🎯 <strong>Tahap Pengerjaan:</strong> {{ $activeReturn->target_stage ?: 'Bordir/Sablon' }} ➔ Direct ke QC Akhir
         </div>
