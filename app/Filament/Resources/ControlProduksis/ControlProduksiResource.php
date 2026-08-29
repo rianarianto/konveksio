@@ -933,10 +933,12 @@ class ControlProduksiResource extends Resource
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->visible(function (OrderItem $record): bool {
-                        if (!in_array(auth()->user()->role, ['owner', 'admin', 'designer'])) {
+                        $userRole = auth()->user()->role;
+                        if (!in_array($userRole, ['owner', 'admin', 'designer'])) {
                             return false;
                         }
 
+                        $isOwner = ($userRole === 'owner');
                         $returMap = static::getReturMapping();
                         $retur = $returMap[$record->id] ?? null;
 
@@ -945,7 +947,21 @@ class ControlProduksiResource extends Resource
                                 ->where('order_item_id', $retur->order_item_id)
                                 ->where('is_revision', true)
                                 ->exists();
-                            return $hasReturTasks;
+
+                            if (!$hasReturTasks) return false;
+
+                            // Jika BUKAN owner, dan tugas retur sudah dimulai (ada in_progress / done), SEMBUNYIKAN TOTAL
+                            if (!$isOwner) {
+                                $hasStarted = \App\Models\ProductionTask::withoutGlobalScopes()
+                                    ->where('order_item_id', $retur->order_item_id)
+                                    ->where('is_revision', true)
+                                    ->whereIn('status', ['in_progress', 'done'])
+                                    ->exists();
+
+                                if ($hasStarted) return false;
+                            }
+
+                            return true;
                         }
 
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
@@ -965,75 +981,21 @@ class ControlProduksiResource extends Resource
                         if ($wo && $wo->isCompleted()) {
                             return false;
                         }
-                        return true;
-                    })
-                    ->disabled(function (OrderItem $record): bool {
-                        if (auth()->user()->role === 'owner') {
-                            return false;
-                        }
 
-                        $returMap = static::getReturMapping();
-                        $retur = $returMap[$record->id] ?? null;
-
-                        if ($retur) {
-                            $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
-                                ->where('order_item_id', $retur->order_item_id)
-                                ->where('is_revision', true)
-                                ->whereIn('status', ['in_progress', 'done'])
-                                ->exists();
-
-                            return $hasTasksStarted;
-                        }
-
-                        $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                        $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->whereIn('status', ['in_progress', 'done'])
-                            ->exists();
-
-                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
-                            ->whereIn('order_item_id', $groupItemIds)
-                            ->where('wo_number', 'not like', '%-R%')
-                            ->first();
-                        $woStarted = $wo && !in_array($wo->status, [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO']);
-
-                        return $hasTasksStarted || $woStarted;
-                    })
-                    ->tooltip(function (OrderItem $record): ?string {
-                        if (auth()->user()->role !== 'owner') {
-                            $returMap = static::getReturMapping();
-                            $retur = $returMap[$record->id] ?? null;
-
-                            if ($retur) {
-                                $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
-                                    ->where('order_item_id', $retur->order_item_id)
-                                    ->where('is_revision', true)
-                                    ->whereIn('status', ['in_progress', 'done'])
-                                    ->exists();
-
-                                if ($hasTasksStarted) {
-                                    return 'Perbaikan retur sudah dimulai. Pembatalan tugas hanya dapat dilakukan oleh Owner.';
-                                }
-                                return null;
-                            }
-
-                            $groupItemIds = $record->getItemsInGroup()->pluck('id');
-                            $hasTasksStarted = \App\Models\ProductionTask::withoutGlobalScopes()
+                        // Jika BUKAN owner, dan produksi sudah dimulai (ada task in_progress/done atau WO status jalan), SEMBUNYIKAN TOTAL
+                        if (!$isOwner) {
+                            $hasStarted = \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->whereIn('order_item_id', $groupItemIds)
                                 ->whereIn('status', ['in_progress', 'done'])
                                 ->exists();
-
-                            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
-                                ->whereIn('order_item_id', $groupItemIds)
-                                ->where('wo_number', 'not like', '%-R%')
-                                ->first();
                             $woStarted = $wo && !in_array($wo->status, [\App\Models\WorkOrder::STATUS_CREATED, 'NO_WO']);
 
-                            if ($hasTasksStarted || $woStarted) {
-                                return 'Produksi sudah dimulai. Pembatalan tugas hanya dapat dilakukan oleh Owner.';
+                            if ($hasStarted || $woStarted) {
+                                return false;
                             }
                         }
-                        return null;
+
+                        return true;
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Batalkan Tugas?')
