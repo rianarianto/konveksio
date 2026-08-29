@@ -51,12 +51,50 @@ class ControlProduksiResource extends Resource
             return null;
         }
 
-        $count = static::getEloquentQuery()
+        $records = static::getEloquentQuery()
             ->whereNotIn('production_category', ['non_produksi', 'jasa'])
-            ->whereDoesntHave('productionTasks')
-            ->count();
+            ->get();
 
-        return $count > 0 ? (string) $count : null;
+        $returMap = static::getReturMapping();
+        $unassignedCount = 0;
+
+        foreach ($records as $record) {
+            $retur = $returMap[$record->id] ?? null;
+            if ($retur) {
+                $hasReturTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                    ->where('order_item_id', $retur->order_item_id)
+                    ->where('is_revision', true)
+                    ->whereNotNull('assigned_to')
+                    ->exists();
+
+                if (!$hasReturTasks) {
+                    $unassignedCount++;
+                }
+                continue;
+            }
+
+            $groupItemIds = $record->getItemsInGroup()->pluck('id');
+            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('wo_number', 'not like', '%-R%')
+                ->first();
+
+            if ($wo && $wo->isCompleted()) {
+                continue;
+            }
+
+            $hasTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('is_revision', false)
+                ->whereNotNull('assigned_to')
+                ->exists();
+
+            if (!$hasTasks) {
+                $unassignedCount++;
+            }
+        }
+
+        return $unassignedCount > 0 ? (string) $unassignedCount : null;
     }
 
     public static function getNavigationBadgeColor(): ?string
