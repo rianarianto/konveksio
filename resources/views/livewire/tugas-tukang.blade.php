@@ -1373,7 +1373,8 @@
                         $hasQcAkhir   = $wo->has_qc_selesai ?? true;
                         
                         $qaApproved   = $qaTask->qc_approved ?? false;
-                        $qaHasOwnQc   = ($qaTask->wajib_qc ?? false) && !($isLastStage && $hasQcAkhir); // Bypass "Sudah QC" jika tahap terakhir
+                        // Jika ini WO Retur, semua tahap direview di QC Akhir (tidak ada bypass "Sudah QC" palsu)
+                        $qaHasOwnQc   = !$isWoRetur && ($qaTask->wajib_qc ?? false) && !($isLastStage && $hasQcAkhir);
                         $qaDone       = $qaTask->status === 'done';
                         $qaRevision   = $qaTask->is_revision ?? false;
                     @endphp
