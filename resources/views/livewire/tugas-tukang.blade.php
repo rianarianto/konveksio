@@ -1331,9 +1331,14 @@
     @if($wo->status === \App\Models\WorkOrder::STATUS_QC_AKHIR && $worker && $wo->qc_worker_id === $worker->id)
     @php
         $qaGroupItemIds = $orderItem ? $orderItem->getItemsInGroup()->pluck('id') : collect([$wo->order_item_id]);
+        $isWoRetur = str_contains($wo->wo_number ?? '', '-R') || $wo->is_revision;
+        $woStages = $wo->stage_sequence ?? [];
+
         $qaAllTasks = \App\Models\ProductionTask::withoutGlobalScopes()
             ->whereIn('order_item_id', $qaGroupItemIds)
             ->where('stage_name', '!=', 'QC_PERSIAPAN')
+            ->where('is_revision', $isWoRetur)
+            ->when(!empty($woStages), fn($q) => $q->whereIn('stage_name', $woStages))
             ->with('assignedTo')
             ->get()
             ->groupBy('stage_name');
