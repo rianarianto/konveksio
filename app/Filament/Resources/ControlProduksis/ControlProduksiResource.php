@@ -308,13 +308,11 @@ class ControlProduksiResource extends Resource
                         default => 'gray',
                     })
                     ->description(function (OrderItem $record) {
-                        $activeReturn = \App\Models\OrderReturn::where('order_item_id', $record->id)
-                            ->whereIn('status', ['pending', 'diproses'])
-                            ->latest('id')
-                            ->first();
+                        $returMap = static::getReturMapping();
+                        $retur = $returMap[$record->id] ?? null;
 
-                        if ($activeReturn) {
-                            $targetItemId = $activeReturn->order_item_id;
+                        if ($retur) {
+                            $targetItemId = $retur->order_item_id;
                             $returTasks = \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->where('order_item_id', $targetItemId)
                                 ->where('is_revision', true)
@@ -839,8 +837,24 @@ class ControlProduksiResource extends Resource
                         }
 
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
+                        $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('wo_number', 'not like', '%-R%')
+                            ->first();
+
+                        $hasUnfinishedTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                            ->whereIn('order_item_id', $groupItemIds)
+                            ->where('is_revision', false)
+                            ->where('status', '!=', 'done')
+                            ->exists();
+
+                        if ($wo && $wo->isCompleted() && !$hasUnfinishedTasks) {
+                            return false;
+                        }
+
                         return \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
+                            ->where('is_revision', false)
                             ->whereNotNull('assigned_to')
                             ->exists();
                     })
