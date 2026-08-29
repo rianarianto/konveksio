@@ -219,25 +219,30 @@
 
     @if(!empty($activeReturn))
     <div style="margin-bottom: 10px; padding: 8px 12px; background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 6px; color: #991b1b;">
-        <div style="font-weight: bold; font-size: 10pt;">[SPK PERBAIKAN RETUR] — {{ $activeReturn->responsibility_type === 'customer_paid' ? 'RETUR BERBAYAR' : 'GARANSI TOKO' }}</div>
-        <div style="font-size: 8.5pt; margin-top: 3px;">
-            <strong>Jumlah yang Perlu Diperbaiki:</strong> {{ $activeReturn->quantity }} pcs 
+        <div style="font-weight: bold; font-size: 10pt; margin-bottom: 5px;">[SPK PERBAIKAN RETUR] &mdash; {{ $activeReturn->responsibility_type === 'customer_paid' ? 'RETUR BERBAYAR' : 'GARANSI TOKO' }}</div>
+        <div style="font-size: 8.5pt; margin-bottom: 3px;">
+            <strong>Jumlah Diperbaiki:</strong> {{ $activeReturn->quantity }} pcs
             @if(!empty($activeReturn->size_breakdown) && is_array($activeReturn->size_breakdown))
                 @php
                     $sbLines = [];
                     foreach($activeReturn->size_breakdown as $sbKey => $sbVal) {
                         if ($sbKey === '_raw' || is_array($sbVal)) continue;
-                        $sbLines[] = "{$sbKey}: {$sbVal} pcs";
+                        // Strip emoji (non-ASCII) prefix from key
+                        $cleanKey = trim(preg_replace('/[^\x20-\x7E]/u', '', $sbKey));
+                        $cleanKey = ltrim($cleanKey, ' -');
+                        $sbLines[] = $cleanKey . ': ' . $sbVal . ' pcs';
                     }
                 @endphp
                 @if(!empty($sbLines))
-                    ({{ implode(', ', $sbLines) }})
+                    &mdash; {{ implode(', ', $sbLines) }}
                 @endif
             @endif
-            | <strong>Tahap Pengerjaan:</strong> {{ $activeReturn->target_stage ?: 'Bordir/Sablon' }} &rarr; Direct ke QC Akhir
         </div>
-        <div style="font-size: 8.5pt; margin-top: 2px;">
-            <strong>Alasan Komplain Pelanggan:</strong> {{ $activeReturn->reason ?: $activeReturn->items_description }}
+        <div style="font-size: 8.5pt; margin-bottom: 3px;">
+            <strong>Tahap Pengerjaan:</strong> {{ $activeReturn->target_stage ?: 'Bordir/Sablon' }} &rarr; Direct ke QC Akhir
+        </div>
+        <div style="font-size: 8.5pt;">
+            <strong>Alasan Komplain:</strong> {{ $activeReturn->reason ?: $activeReturn->items_description }}
         </div>
     </div>
     @endif
@@ -624,7 +629,14 @@
                                     <div style="font-size: 7.5pt; color: #444; margin-top: 2px;">
                                         @if(!empty($task->size_quantities))
                                             @foreach($task->size_quantities as $sz => $q)
-                                                @if(!str_starts_with($sz, '_') && $q > 0) {{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}:{{ $q }}{{ !$loop->last ? ',' : '' }} @endif
+                                                @if(!str_starts_with($sz, '_') && $q > 0)
+                                                    @php
+                                                        $cleanSz = trim(preg_replace('/[^\x20-\x7E]/u', '', $sz));
+                                                        $cleanSz = ltrim($cleanSz, ' -');
+                                                        $cleanSz = $cleanSz ?: $sz;
+                                                    @endphp
+                                                    {{ $cleanSz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $cleanSz }}: {{ $q }} pcs{{ !$loop->last ? ',' : '' }}
+                                                @endif
                                             @endforeach
                                         @else - @endif
                                     </div>
