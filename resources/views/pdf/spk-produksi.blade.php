@@ -434,7 +434,13 @@
             </thead>
             <tbody>
                 @php
-                    $groupedTasks = $record->productionTasks->groupBy(function($task) {
+                    $allTasks = $record->productionTasks;
+                    if (!empty($activeReturn)) {
+                        $allTasks = $allTasks->where('is_revision', true);
+                    } else {
+                        $allTasks = $allTasks->where('is_revision', false);
+                    }
+                    $groupedTasks = $allTasks->groupBy(function($task) {
                         return strtoupper($task->stage_name);
                     });
                 @endphp
