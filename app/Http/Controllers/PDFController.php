@@ -218,6 +218,18 @@ class PDFController extends Controller
             ->latest('id')
             ->first();
 
+        if ($activeReturn) {
+            $totalQuantity = $activeReturn->quantity;
+            if (!empty($activeReturn->size_breakdown) && is_array($activeReturn->size_breakdown)) {
+                $sizes = [];
+                foreach ($activeReturn->size_breakdown as $szKey => $szQty) {
+                    if ($szKey === '_raw' || is_array($szQty)) continue;
+                    $cleanSz = strtoupper(str_replace(['SIZE ', 'SIZE'], '', $szKey));
+                    $sizes[$cleanSz] = (int) $szQty;
+                }
+            }
+        }
+
         return [
             'record' => $record->load(['order.customer', 'productionTasks.assignedTo', 'bahan.material']),
             'totalQuantity' => $totalQuantity,

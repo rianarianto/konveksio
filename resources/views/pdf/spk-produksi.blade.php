@@ -434,12 +434,13 @@
             </thead>
             <tbody>
                 @php
-                    $allTasks = $record->productionTasks;
-                    if (!empty($activeReturn)) {
-                        $allTasks = $allTasks->where('is_revision', true);
-                    } else {
-                        $allTasks = $allTasks->where('is_revision', false);
-                    }
+                    $targetItemId = !empty($activeReturn) ? $activeReturn->order_item_id : $record->id;
+                    $allTasks = \App\Models\ProductionTask::withoutGlobalScopes()
+                        ->where('order_item_id', $targetItemId)
+                        ->where('is_revision', !empty($activeReturn))
+                        ->with(['assignedTo'])
+                        ->get();
+
                     $groupedTasks = $allTasks->groupBy(function($task) {
                         return strtoupper($task->stage_name);
                     });
