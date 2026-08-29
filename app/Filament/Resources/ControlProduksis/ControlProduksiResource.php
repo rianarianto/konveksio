@@ -831,14 +831,14 @@ class ControlProduksiResource extends Resource
                             return \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->where('order_item_id', $retur->order_item_id)
                                 ->where('is_revision', true)
-                                ->where('status', 'pending')
+                                ->whereNotNull('assigned_to')
                                 ->exists();
                         }
 
                         $groupItemIds = $record->getItemsInGroup()->pluck('id');
                         return \App\Models\ProductionTask::withoutGlobalScopes()
                             ->whereIn('order_item_id', $groupItemIds)
-                            ->where('status', 'pending')
+                            ->whereNotNull('assigned_to')
                             ->exists();
                     })
                     ->requiresConfirmation()
