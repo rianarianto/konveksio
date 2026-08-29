@@ -428,11 +428,18 @@
                 | Penerima: <b>{{ $orderItem->recipient_name }}</b>
                 @endif
             </div>
-            @if(!empty($activeReturn?->size_breakdown))
+            @if(!empty($activeReturn?->size_breakdown) && is_array($activeReturn->size_breakdown))
             <div style="margin-top: 8px; font-size: 12px; color: #b91c1c; font-weight: 600;">
                 Rincian Ukuran Retur: 
                 @foreach($activeReturn->size_breakdown as $sz => $q)
-                    <span style="background: #fee2e2; padding: 3px 8px; border-radius: 6px; margin-right: 4px; display: inline-block; margin-top: 4px;">{{ $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz }}: {{ $q }} pcs</span>
+                    @if($sz !== '_raw' && !is_array($q))
+                        @php
+                            $cleanSz = trim(preg_replace('/[^\x20-\x7E]/u', '', $sz));
+                            $cleanSz = ltrim($cleanSz, ' -');
+                            $cleanSz = $cleanSz ?: $sz;
+                        @endphp
+                        <span style="background: #fee2e2; padding: 3px 8px; border-radius: 6px; margin-right: 4px; display: inline-block; margin-top: 4px;">{{ $cleanSz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $cleanSz }}: {{ $q }} pcs</span>
+                    @endif
                 @endforeach
             </div>
             @endif
