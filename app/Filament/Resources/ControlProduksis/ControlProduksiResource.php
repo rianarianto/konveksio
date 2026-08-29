@@ -832,6 +832,20 @@ class ControlProduksiResource extends Resource
                         $retur = $returMap[$record->id] ?? null;
 
                         if ($retur) {
+                            if ($retur->status === 'selesai') {
+                                return false;
+                            }
+
+                            $returWo = \App\Models\WorkOrder::withoutGlobalScopes()
+                                ->where('order_item_id', $retur->order_item_id)
+                                ->where('wo_number', 'like', '%-R%')
+                                ->latest('id')
+                                ->first();
+
+                            if ($returWo && $returWo->isCompleted()) {
+                                return false;
+                            }
+
                             return \App\Models\ProductionTask::withoutGlobalScopes()
                                 ->where('order_item_id', $retur->order_item_id)
                                 ->where('is_revision', true)
