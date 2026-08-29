@@ -243,14 +243,9 @@
     @endif
 
     @php
-        $totalStockUsed = collect($allGroupItems)->sum(function($i) {
-            return (float) ($i->size_and_request_details['stock_qty_used'] ?? 0);
-        });
-        $stockUnit = 'pcs';
-        if (in_array($record->production_category, ['produksi', 'custom'])) {
-            $stockUnit = $record->bahan?->material?->unit ?? 'm';
-        }
-        $fmtStock = $totalStockUsed == (int)$totalStockUsed ? (int)$totalStockUsed : number_format($totalStockUsed, 1, ',', '.');
+        $totalStockUsed = $totalStockUsed ?? 0;
+        $stockUnit = $stockUnit ?? 'm';
+        $fmtStock = $fmtStock ?? '0';
     @endphp
 
     {{-- SECTION 1 --}}
