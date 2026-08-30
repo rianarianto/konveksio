@@ -484,33 +484,51 @@ class OrderResource extends Resource
                                         $html .= "</div>";
                                     }
 
-                                    // 2. Penyerahan Setiap Retur
-                                    $retIndex = 1;
-                                    foreach ($returns as $ret) {
-                                        $isDelivered = !empty($ret->delivered_at);
-                                        $badgeBg = $isDelivered ? '#dcfce7' : '#fef3c7';
-                                        $badgeColor = $isDelivered ? '#15803d' : '#b45309';
-                                        $badgeText = $isDelivered ? '✅ SUDAH DISERAHKAN' : '⏳ SIAP DIAMBIL (BELUM DISERAHKAN)';
-                                        $borderLeftColor = $isDelivered ? '#10b981' : '#f59e0b';
+                                    // 2. Penyerahan Hasil Retur (Dikelompokkan berdasarkan Sesi Penyerahan / Batch Handover)
+                                    $deliveredBatches = [];
+                                    $undeliveredReturns = [];
 
-                                        $retTime = $ret->delivered_at ? $ret->delivered_at->format('d M Y, H:i') . ' WIB' : 'Menunggu diambil oleh customer';
-                                        $retProof = $ret->delivery_proof ? asset('storage/' . $ret->delivery_proof) : null;
-                                        $retNote = $ret->delivery_note;
+                                    foreach ($returns as $ret) {
+                                        if (!empty($ret->delivered_at)) {
+                                            $batchKey = $ret->delivered_at->format('Y-m-d H:i') . '_' . ($ret->delivery_proof ?: 'no_proof');
+                                            $deliveredBatches[$batchKey]['time'] = $ret->delivered_at->format('d M Y, H:i') . ' WIB';
+                                            $deliveredBatches[$batchKey]['proof'] = $ret->delivery_proof ? asset('storage/' . $ret->delivery_proof) : null;
+                                            $deliveredBatches[$batchKey]['note'] = $ret->delivery_note;
+                                            $deliveredBatches[$batchKey]['items'][] = [
+                                                'product' => $ret->orderItem?->product_name ?: 'Produk',
+                                                'qty' => $ret->quantity,
+                                                'type' => $ret->action_type === 'remake' ? 'Buat Baru' : 'Perbaikan',
+                                            ];
+                                        } else {
+                                            $undeliveredReturns[] = $ret;
+                                        }
+                                    }
+
+                                    // Tampilkan Batch Retur yang SUDAH DISERAHKAN (1 Kotak per Sesi Pengambilan)
+                                    $batchIndex = 1;
+                                    foreach ($deliveredBatches as $batch) {
+                                        $totalPcs = array_sum(array_column($batch['items'], 'qty'));
+                                        $itemCount = count($batch['items']);
+                                        $retProof = $batch['proof'];
+                                        $retNote = $batch['note'] ?: 'Semua barang retur telah diserahkan ke customer';
+
+                                        $itemsBadges = '';
+                                        foreach ($batch['items'] as $it) {
+                                            $itemsBadges .= "<span style='background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;display:inline-block;margin-right:6px;margin-bottom:4px;'>📦 {$it['product']} ({$it['qty']} pcs - {$it['type']})</span>";
+                                        }
 
                                         $html .= "
-                                        <div style='background:#ffffff;border:1px solid #e2e8f0;border-left:4px solid {$borderLeftColor};border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);'>
-                                            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px;'>
+                                        <div style='background:#ffffff;border:1px solid #e2e8f0;border-left:4px solid #10b981;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);'>
+                                            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;'>
                                                 <div style='display:flex;align-items:center;gap:8px;'>
-                                                    <span style='background:{$badgeBg};color:{$badgeColor};font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;'>{$badgeText}</span>
-                                                    <strong style='color:#0f172a;font-size:14px;'>🔄 Hasil Retur #{$retIndex} ({$ret->quantity} pcs)</strong>
+                                                    <span style='background:#dcfce7;color:#15803d;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;'>✅ SUDAH DISERAHKAN</span>
+                                                    <strong style='color:#0f172a;font-size:14px;'>🔄 Penyerahan Hasil Retur " . (count($deliveredBatches) > 1 ? "#{$batchIndex} " : "") . "({$totalPcs} pcs • {$itemCount} Produk)</strong>
                                                 </div>
-                                                <span style='font-size:12px;color:#64748b;font-weight:600;'>📅 {$retTime}</span>
+                                                <span style='font-size:12px;color:#64748b;font-weight:600;'>📅 {$batch['time']}</span>
                                             </div>
+                                            <div style='margin:6px 0 8px 0;'>{$itemsBadges}</div>
+                                            <p style='font-size:13px;color:#334155;margin:4px 0;'><strong>Catatan Penyerahan:</strong> {$retNote}</p>
                                         ";
-
-                                        if ($isDelivered && $retNote) {
-                                            $html .= "<p style='font-size:13px;color:#334155;margin:6px 0;'><strong>Catatan Penyerahan:</strong> {$retNote}</p>";
-                                        }
 
                                         if ($retProof) {
                                             $html .= "
@@ -524,7 +542,31 @@ class OrderResource extends Resource
                                         }
 
                                         $html .= "</div>";
-                                        $retIndex++;
+                                        $batchIndex++;
+                                    }
+
+                                    // Tampilkan jika ADA Retur yang MASIH BELUM DIAMBIL (1 Kotak Ringkas)
+                                    if (!empty($undeliveredReturns)) {
+                                        $totalPendingPcs = array_sum(array_map(fn($r) => $r->quantity, $undeliveredReturns));
+                                        $pendingBadges = '';
+                                        foreach ($undeliveredReturns as $uRet) {
+                                            $pName = $uRet->orderItem?->product_name ?: 'Produk';
+                                            $pendingBadges .= "<span style='background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;display:inline-block;margin-right:6px;margin-bottom:4px;'>⏳ {$pName} ({$uRet->quantity} pcs)</span>";
+                                        }
+
+                                        $html .= "
+                                        <div style='background:#fffbeb;border:1px solid #fef3c7;border-left:4px solid #f59e0b;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);'>
+                                            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;'>
+                                                <div style='display:flex;align-items:center;gap:8px;'>
+                                                    <span style='background:#fef3c7;color:#b45309;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;'>⏳ SIAP DIAMBIL (BELUM DISERAHKAN)</span>
+                                                    <strong style='color:#78350f;font-size:14px;'>🔄 Hasil Retur Selesai ({$totalPendingPcs} pcs)</strong>
+                                                </div>
+                                                <span style='font-size:12px;color:#92400e;font-weight:600;'>📅 Menunggu diambil customer</span>
+                                            </div>
+                                            <div style='margin:6px 0;'>{$pendingBadges}</div>
+                                            <p style='font-size:12px;color:#92400e;margin:0;'>Klik tombol hijau <strong>\"Serahkan Pesanan\"</strong> di atas untuk menyerahkan semua barang retur ini sekaligus.</p>
+                                        </div>
+                                        ";
                                     }
 
                                     $html .= '</div>';
