@@ -46,7 +46,7 @@ class ProductionTasksRelationManager extends RelationManager
                     ->alignLeft()
                     ->html()
                     ->getStateUsing(function (ProductionTask $record): string {
-                        $qtyBadge = '<span style="display:inline-block; font-weight:800; font-size:13px; color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px;">' . $record->quantity . ' pcs</span>';
+                        $qtyBadge = '<span style="display:inline-flex; align-items:center; font-weight:600; font-size:12px; line-height:1; color:#2563eb; background:#eff6ff; border:1px solid #bfdbfe; border-radius:9999px; padding:3px 8px;">' . $record->quantity . ' pcs</span>';
                         
                         $sq = $record->size_quantities;
                         $sizeDetails = [];
