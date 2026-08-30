@@ -23,6 +23,9 @@ class OrderReturn extends Model
         'additional_fee',
         'size_breakdown',
         'photo_path',
+        'delivered_at',
+        'delivery_proof',
+        'delivery_note',
     ];
 
     public $multi_size_items = [];
@@ -51,6 +54,7 @@ class OrderReturn extends Model
         'quantity' => 'integer',
         'additional_fee' => 'decimal:2',
         'size_breakdown' => 'array',
+        'delivered_at' => 'datetime',
     ];
 
     public function order(): BelongsTo

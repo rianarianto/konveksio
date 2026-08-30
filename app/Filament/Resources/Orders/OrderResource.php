@@ -430,39 +430,108 @@ class OrderResource extends Resource
                                 ->columnSpanFull(),
                         ]),
 
-                    // Section 5: Bukti Penyerahan
-                    Section::make('Bukti Penyerahan / Pengambilan')
+                    // Section 5: Bukti Penyerahan / Pengambilan (Multi-Handover History)
+                    Section::make('Riwayat Penyerahan / Pengambilan Barang')
                         ->schema([
-                            Group::make([
-                                Placeholder::make('pickup_at_display')
-                                    ->label('Tanggal & Waktu Pengambilan')
-                                    ->content(fn (?Order $record) => $record?->pickup_at ? $record->pickup_at->format('d M Y, H:i') . ' WIB' : '-'),
-                                
-                                Placeholder::make('pickup_note_display')
-                                    ->label('Catatan Penyerahan / Penerima')
-                                    ->content(fn (?Order $record) => $record?->pickup_note ?: '-'),
-                            ])->columns(2),
-
-                            Placeholder::make('pickup_proof_display')
-                                ->label('Foto Bukti Penyerahan Barang')
+                            Placeholder::make('handover_timeline_display')
+                                ->label('')
                                 ->content(function (?Order $record) {
-                                    if (!$record || empty($record->pickup_proof)) {
-                                        return new HtmlString('<div style="padding:12px;background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px;color:#9ca3af;font-size:13px;">Belum ada foto bukti penyerahan</div>');
+                                    if (!$record) return '-';
+
+                                    $returns = \App\Models\OrderReturn::withoutGlobalScopes()
+                                        ->where('order_id', $record->id)
+                                        ->orderBy('id', 'asc')
+                                        ->get();
+
+                                    $hasMainPickup = !empty($record->pickup_at) || !empty($record->pickup_proof);
+                                    $hasReturns = $returns->isNotEmpty();
+
+                                    if (!$hasMainPickup && !$hasReturns) {
+                                        return new HtmlString('<div style="padding:16px;background:#f9fafb;border:1px dashed #d1d5db;border-radius:10px;color:#9ca3af;font-size:13px;text-align:center;">Belum ada riwayat penyerahan barang untuk pesanan ini.</div>');
                                     }
 
-                                    $url = asset('storage/' . $record->pickup_proof);
-                                    return new HtmlString("
-                                        <div style='margin-top:6px;'>
-                                            <a href='{$url}' target='_blank' style='display:inline-block;'>
-                                                <img src='{$url}' style='max-height:280px;width:auto;border-radius:10px;border:1px solid #e5e7eb;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);object-fit:cover;' alt='Bukti Penyerahan' />
-                                                <div style='margin-top:6px;font-size:12px;color:#2563eb;font-weight:600;'>🔍 Klik foto untuk membuka ukuran penuh di tab baru</div>
-                                            </a>
-                                        </div>
-                                    ");
+                                    $html = '<div style="display:flex;flex-direction:column;gap:14px;">';
+
+                                    // 1. Penyerahan Utama
+                                    if ($hasMainPickup) {
+                                        $mainTime = $record->pickup_at ? $record->pickup_at->format('d M Y, H:i') . ' WIB' : 'Waktu tidak tercatat';
+                                        $mainNote = $record->pickup_note ?: 'Penyerahan pesanan utama';
+                                        $mainProof = $record->pickup_proof ? asset('storage/' . $record->pickup_proof) : null;
+
+                                        $html .= "
+                                        <div style='background:#ffffff;border:1px solid #e2e8f0;border-left:4px solid #16a34a;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);'>
+                                            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;'>
+                                                <div style='display:flex;align-items:center;gap:8px;'>
+                                                    <span style='background:#dcfce7;color:#15803d;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;text-transform:uppercase;'>Penyerahan Utama</span>
+                                                    <strong style='color:#0f172a;font-size:14px;'>📦 Pesanan Selesai Pertama</strong>
+                                                </div>
+                                                <span style='font-size:12px;color:#64748b;font-weight:600;'>📅 {$mainTime}</span>
+                                            </div>
+                                            <p style='font-size:13px;color:#334155;margin:4px 0 10px 0;'><strong>Catatan / Penerima:</strong> {$mainNote}</p>
+                                        ";
+
+                                        if ($mainProof) {
+                                            $html .= "
+                                            <div style='margin-top:10px;'>
+                                                <a href='{$mainProof}' target='_blank' style='display:inline-block;'>
+                                                    <img src='{$mainProof}' style='max-height:220px;width:auto;border-radius:8px;border:1px solid #e2e8f0;box-shadow:0 2px 4px rgba(0,0,0,0.08);object-fit:cover;' alt='Bukti Penyerahan Utama' />
+                                                    <div style='margin-top:4px;font-size:11px;color:#2563eb;font-weight:600;'>🔍 Klik foto untuk memperbesar</div>
+                                                </a>
+                                            </div>
+                                            ";
+                                        }
+
+                                        $html .= "</div>";
+                                    }
+
+                                    // 2. Penyerahan Setiap Retur
+                                    $retIndex = 1;
+                                    foreach ($returns as $ret) {
+                                        $isDelivered = !empty($ret->delivered_at);
+                                        $badgeBg = $isDelivered ? '#dcfce7' : '#fef3c7';
+                                        $badgeColor = $isDelivered ? '#15803d' : '#b45309';
+                                        $badgeText = $isDelivered ? '✅ SUDAH DISERAHKAN' : '⏳ BELUM DISERAHKAN (SIAP DIAMBIL)';
+                                        $borderLeftColor = $isDelivered ? '#10b981' : '#f59e0b';
+
+                                        $retTime = $ret->delivered_at ? $ret->delivered_at->format('d M Y, H:i') . ' WIB' : 'Menunggu diambil oleh customer';
+                                        $retNote = $ret->delivery_note ?: ($ret->reason ?: 'Perbaikan retur barang');
+                                        $retProof = $ret->delivery_proof ? asset('storage/' . $ret->delivery_proof) : null;
+                                        $itemDesc = $ret->items_description ?: $ret->reason;
+
+                                        $html .= "
+                                        <div style='background:#ffffff;border:1px solid #e2e8f0;border-left:4px solid {$borderLeftColor};border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);'>
+                                            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;'>
+                                                <div style='display:flex;align-items:center;gap:8px;'>
+                                                    <span style='background:{$badgeBg};color:{$badgeColor};font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;'>{$badgeText}</span>
+                                                    <strong style='color:#0f172a;font-size:14px;'>🔄 Penyerahan Hasil Retur #{$retIndex} ({$ret->quantity} pcs)</strong>
+                                                </div>
+                                                <span style='font-size:12px;color:#64748b;font-weight:600;'>📅 {$retTime}</span>
+                                            </div>
+                                            <p style='font-size:12px;color:#64748b;margin:0 0 6px 0;'><strong>Detail Retur:</strong> {$itemDesc}</p>
+                                            <p style='font-size:13px;color:#334155;margin:4px 0 10px 0;'><strong>Catatan Penyerahan:</strong> {$retNote}</p>
+                                        ";
+
+                                        if ($retProof) {
+                                            $html .= "
+                                            <div style='margin-top:10px;'>
+                                                <a href='{$retProof}' target='_blank' style='display:inline-block;'>
+                                                    <img src='{$retProof}' style='max-height:220px;width:auto;border-radius:8px;border:1px solid #e2e8f0;box-shadow:0 2px 4px rgba(0,0,0,0.08);object-fit:cover;' alt='Bukti Penyerahan Retur' />
+                                                    <div style='margin-top:4px;font-size:11px;color:#2563eb;font-weight:600;'>🔍 Klik foto untuk memperbesar</div>
+                                                </a>
+                                            </div>
+                                            ";
+                                        }
+
+                                        $html .= "</div>";
+                                        $retIndex++;
+                                    }
+
+                                    $html .= '</div>';
+                                    return new HtmlString($html);
                                 })
                                 ->columnSpanFull(),
                         ])
-                        ->visible(fn (?Order $record) => $record?->status === 'selesai' || !empty($record?->pickup_proof))
+                        ->visible(fn (?Order $record) => $record?->status === 'selesai' || $record?->status === 'siap_diambil' || !empty($record?->pickup_proof) || $record?->returns()->exists())
                         ->collapsible(),
 
                 ])

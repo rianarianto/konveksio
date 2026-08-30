@@ -160,7 +160,21 @@ class OrderDeliveryForm
             ->whereIn('order_item_id', $itemIds)
             ->update(['delivered_at' => now()]);
 
-        // 3. Update Order status to 'selesai'
+        // 3. Mark undelivered OrderReturns as delivered
+        $pendingReturns = \App\Models\OrderReturn::withoutGlobalScopes()
+            ->where('order_id', $record->id)
+            ->whereNull('delivered_at')
+            ->get();
+
+        foreach ($pendingReturns as $ret) {
+            $ret->update([
+                'delivered_at'   => now(),
+                'delivery_proof' => $data['pickup_proof'],
+                'delivery_note'  => $data['pickup_note'] ?? 'Barang retur diserahkan ke customer',
+            ]);
+        }
+
+        // 4. Update Order status to 'selesai'
         $record->update([
             'status'       => 'selesai',
             'pickup_proof' => $data['pickup_proof'],
@@ -168,12 +182,15 @@ class OrderDeliveryForm
             'pickup_at'    => now(),
         ]);
 
-        $bodyText = $settlementAmount > 0
-            ? "Pesanan #{$record->order_number} telah lunas (Rp " . number_format($settlementAmount, 0, ',', '.') . ") dan diserahkan ke customer."
-            : "Pesanan #{$record->order_number} telah selesai dan seluruh barang diserahkan ke customer.";
+        $isReturnHandover = $pendingReturns->isNotEmpty();
+        $bodyText = $isReturnHandover
+            ? "Hasil perbaikan retur pesanan #{$record->order_number} telah selesai dan diserahkan ke customer."
+            : ($settlementAmount > 0
+                ? "Pesanan #{$record->order_number} telah lunas (Rp " . number_format($settlementAmount, 0, ',', '.') . ") dan diserahkan ke customer."
+                : "Pesanan #{$record->order_number} telah selesai dan seluruh barang diserahkan ke customer.");
 
         Notification::make()
-            ->title('Pesanan Telah Diserahkan!')
+            ->title($isReturnHandover ? 'Hasil Retur Telah Diserahkan!' : 'Pesanan Telah Diserahkan!')
             ->body($bodyText)
             ->success()
             ->send();
