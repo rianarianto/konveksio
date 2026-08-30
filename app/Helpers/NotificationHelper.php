@@ -556,10 +556,7 @@ class NotificationHelper
             . "🔗 {$link}";
 
         try {
-            Http::timeout(10)->post(config('services.wa_bot.url', 'http://localhost:5001') . '/api', [
-                'nohp'  => $worker->phone,
-                'pesan' => $pesan,
-            ]);
+            self::sendWaMessage($worker->phone, $pesan);
         } catch (\Exception $e) {
             Log::error('[WA-Bot] Gagal kirim notif revisi QC: ' . $e->getMessage());
         }
