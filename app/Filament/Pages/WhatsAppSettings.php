@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 class WhatsAppSettings extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-chat-bubble-left-right';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chat-bubble-left-right';
 
     protected static ?string $navigationLabel = 'WhatsApp';
 
