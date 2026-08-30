@@ -204,37 +204,37 @@
                 {{-- Right: Actions --}}
                 <div class="flex items-center gap-2.5 flex-wrap">
                     <button
-                        x-on:click="refreshStatus(true)"
+                        wire:click="actionRefresh"
                         class="wa-btn wa-btn-secondary"
                         title="Perbarui data status"
                     >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4" wire:loading.class="animate-spin" wire:target="actionRefresh" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                         Refresh
                     </button>
 
                     <button
-                        x-on:click="reconnect()"
-                        :disabled="isReconnecting"
+                        wire:click="actionReconnect"
+                        wire:loading.attr="disabled"
                         class="wa-btn wa-btn-warning"
                     >
-                        <svg class="w-4 h-4" :class="{ 'animate-spin': isReconnecting }" fill="currentColor" viewBox="0 0 20 20">
+                        <svg class="w-4 h-4" wire:loading.class="animate-spin" wire:target="actionReconnect" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.75a.75.75 0 00-.75.75v4.482a.75.75 0 001.5 0v-2.186l.488.488a7 7 0 0011.824-3.189.75.75 0 00-1.5-.01zM4.688 8.576a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h4.482a.75.75 0 00.75-.75V2.689a.75.75 0 00-1.5 0v2.186l-.488-.488a7 7 0 00-11.824 3.189.75.75 0 001.5.01z" clip-rule="evenodd" />
                         </svg>
-                        <span x-text="isReconnecting ? 'Menyambung...' : 'Reconnect'"></span>
+                        <span wire:loading.remove wire:target="actionReconnect">Reconnect</span>
+                        <span wire:loading wire:target="actionReconnect">Menyambung...</span>
                     </button>
 
                     @if($isOwner)
                     <button
-                        x-on:click="confirmLogout()"
-                        :disabled="isLoggingOut"
+                        x-on:click="if(confirm('⚠️ PERINGATAN:\n\nApakah Anda yakin ingin logout nomor WhatsApp saat ini?\nNomor akan diputuskan dan sistem butuh scan QR ulang dengan nomor baru.')) { $wire.actionLogout() }"
                         class="wa-btn wa-btn-danger"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                         </svg>
-                        <span x-text="isLoggingOut ? 'Logging out...' : 'Ganti Nomor'"></span>
+                        <span>Ganti Nomor</span>
                     </button>
                     @endif
                 </div>
@@ -520,10 +520,39 @@
             pollInterval: null,
 
             startPolling() {
-                this.pollInterval = setInterval(() => this.refreshStatus(), 5000);
+                this.pollInterval = setInterval(() => this.refreshStatus(false), 5000);
+
+                window.addEventListener('wa-status-updated', (e) => {
+                    if (e.detail && e.detail.status) {
+                        this.applyStatusData(e.detail.status);
+                    }
+                    if (e.detail && e.detail.logs) {
+                        this.logs = e.detail.logs.logs || [];
+                    }
+                });
+
+                window.addEventListener('wa-reconnecting', () => {
+                    setTimeout(() => {
+                        this.$wire.actionRefresh();
+                    }, 4000);
+                });
             },
 
-            async refreshStatus() {
+            applyStatusData(data) {
+                this.status = data.status;
+                this.connectedPhone = data.connectedPhone;
+                this.uptimeHuman = data.uptime_human;
+                this.qrUrl = data.connection?.qr_url || null;
+                this.stats = {
+                    sentToday: data.stats?.sent_today ?? 0,
+                    deliveredToday: data.stats?.delivered_today ?? 0,
+                    failedToday: data.stats?.failed_today ?? 0,
+                    consecutiveFailures: data.stats?.consecutive_failures ?? 0,
+                    ghostThreshold: data.stats?.ghost_threshold ?? 3,
+                };
+            },
+
+            async refreshStatus(isManual = false) {
                 try {
                     const botUrl = {!! json_encode($botUrl) !!};
                     const secretKey = {!! json_encode($secretKey) !!};
@@ -533,35 +562,10 @@
                     const res = await fetch(botUrl + '/api/status', { headers });
                     if (res.ok) {
                         const data = await res.json();
-                        this.status = data.status;
-                        this.connectedPhone = data.connectedPhone;
-                        this.uptimeHuman = data.uptime_human;
-                        this.qrUrl = data.connection?.qr_url || null;
-                        this.stats = {
-                            sentToday: data.stats?.sent_today ?? 0,
-                            deliveredToday: data.stats?.delivered_today ?? 0,
-                            failedToday: data.stats?.failed_today ?? 0,
-                            consecutiveFailures: data.stats?.consecutive_failures ?? 0,
-                            ghostThreshold: data.stats?.ghost_threshold ?? 3,
-                        };
-                        
-                        if (isManual) {
-                            new FilamentNotification()
-                                .title('Data Diperbarui')
-                                .body('Status koneksi & metrik WhatsApp berhasil disinkronkan.')
-                                .success()
-                                .send();
-                        }
+                        this.applyStatusData(data);
                     }
                 } catch (e) {
-                    console.warn('Status poll error:', e);
-                    if (isManual) {
-                        new FilamentNotification()
-                            .title('Gagal Refresh')
-                            .body('Tidak dapat menghubungi server WhatsApp Bot: ' + e.message)
-                            .danger()
-                            .send();
-                    }
+                    console.warn('Status poll note:', e.message);
                 }
             },
 
@@ -576,11 +580,6 @@
                     if (res.ok) {
                         const data = await res.json();
                         this.logs = data.logs || [];
-                        new FilamentNotification()
-                            .title('Log Diperbarui')
-                            .body('Riwayat pesan WhatsApp berhasil disinkronkan.')
-                            .success()
-                            .send();
                     }
                 } catch (e) {
                     console.warn('Logs fetch error:', e);
@@ -590,11 +589,6 @@
             async sendTestMessage() {
                 if (!this.testNumber || !this.testMessage) {
                     this.sendResult = { success: false, detail: 'Nomor WhatsApp dan isi pesan wajib diisi!' };
-                    new FilamentNotification()
-                        .title('Form Belum Lengkap')
-                        .body('Silakan masukkan nomor tujuan dan isi pesan uji coba.')
-                        .warning()
-                        .send();
                     return;
                 }
 
@@ -602,125 +596,12 @@
                 this.sendResult = null;
 
                 try {
-                    const botUrl = {!! json_encode($botUrl) !!};
-                    const secretKey = {!! json_encode($secretKey) !!};
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (secretKey) headers['x-bot-key'] = secretKey;
-
-                    const res = await fetch(botUrl + '/api', {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify({
-                            number: this.testNumber,
-                            message: this.testMessage,
-                        }),
-                    });
-
-                    const data = await res.json();
-                    const isSuccess = res.ok && data.status === 'berhasil terkirim';
-                    this.sendResult = {
-                        success: isSuccess,
-                        detail: res.ok
-                            ? `Pesan dikirim ke ID: ${data.id || '-'} (${data.delivery || 'terkirim'})`
-                            : (data.pesan || 'Gagal mengirim pesan'),
-                    };
-
-                    if (isSuccess) {
-                        new FilamentNotification()
-                            .title('Pesan Terkirim!')
-                            .body('Pesan uji coba berhasil diserahkan ke server WhatsApp.')
-                            .success()
-                            .send();
-                    } else {
-                        new FilamentNotification()
-                            .title('Gagal Kirim Pesan')
-                            .body(data.pesan || 'Terjadi kesalahan saat pengiriman pesan.')
-                            .danger()
-                            .send();
-                    }
-
-                    // Refresh logs after send
-                    setTimeout(() => {
-                        this.refreshLogs();
-                        this.refreshStatus();
-                    }, 1000);
+                    await this.$wire.actionSendTest(this.testNumber, this.testMessage);
+                    this.testMessage = '';
                 } catch (e) {
-                    this.sendResult = { success: false, detail: 'Network error: ' + e.message };
-                    new FilamentNotification()
-                        .title('Koneksi Error')
-                        .body('Gagal menghubungi bot WhatsApp: ' + e.message)
-                        .danger()
-                        .send();
+                    console.error('Send test error:', e);
                 } finally {
                     this.isSending = false;
-                }
-            },
-
-            async reconnect() {
-                if (this.isReconnecting) return;
-                this.isReconnecting = true;
-
-                new FilamentNotification()
-                    .title('Memulai Reconnect')
-                    .body('Memutuskan socket lama dan menyambung ulang session WhatsApp...')
-                    .info()
-                    .send();
-
-                try {
-                    const botUrl = {!! json_encode($botUrl) !!};
-                    const secretKey = {!! json_encode($secretKey) !!};
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (secretKey) headers['x-bot-key'] = secretKey;
-
-                    await fetch(botUrl + '/api/reconnect', { method: 'POST', headers });
-
-                    // Wait and refresh
-                    setTimeout(async () => {
-                        await this.refreshStatus();
-                        this.isReconnecting = false;
-
-                        new FilamentNotification()
-                            .title('Reconnect Berhasil')
-                            .body('Koneksi WhatsApp telah berhasil disambungkan ulang.')
-                            .success()
-                            .send();
-                    }, 4000);
-                } catch (e) {
-                    console.error('Reconnect error:', e);
-                    this.isReconnecting = false;
-                    new FilamentNotification()
-                        .title('Gagal Reconnect')
-                        .body('Terjadi kesalahan saat reconnect: ' + e.message)
-                        .danger()
-                        .send();
-                }
-            },
-
-            async confirmLogout() {
-                if (!confirm('⚠️ PERINGATAN:\n\nApakah Anda yakin ingin logout nomor WhatsApp saat ini?\nNomor akan diputuskan dan sistem butuh scan QR ulang dengan nomor baru.')) {
-                    return;
-                }
-
-                this.isLoggingOut = true;
-                try {
-                    const botUrl = {!! json_encode($botUrl) !!};
-                    const secretKey = {!! json_encode($secretKey) !!};
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (secretKey) headers['x-bot-key'] = secretKey;
-
-                    await fetch(botUrl + '/api/logout', { method: 'POST', headers });
-
-                    this.connectedPhone = null;
-                    this.status = 'not ready';
-
-                    // Wait for new QR
-                    setTimeout(() => {
-                        this.refreshStatus();
-                        this.isLoggingOut = false;
-                    }, 4000);
-                } catch (e) {
-                    console.error('Logout error:', e);
-                    this.isLoggingOut = false;
                 }
             },
 
