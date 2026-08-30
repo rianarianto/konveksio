@@ -1,309 +1,506 @@
 <x-filament-panels::page>
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        .wa-card {
+            background: #ffffff;
+            border-radius: 18px;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+            padding: 24px;
+            transition: all 0.2s ease;
+        }
+
+        .wa-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #f8fafc;
+        }
+
+        .wa-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .wa-stat-card {
+            background: #ffffff;
+            border-radius: 16px;
+            border: 1px solid #f1f5f9;
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 10px -2px rgba(0,0,0,0.03);
+        }
+
+        .wa-stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .wa-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: none;
+        }
+        
+        .wa-btn:active {
+            transform: scale(0.98);
+        }
+
+        .wa-btn-primary {
+            background: #8000FF;
+            color: #ffffff;
+        }
+        .wa-btn-primary:hover {
+            background: #6b00d6;
+        }
+
+        .wa-btn-warning {
+            background: #f59e0b;
+            color: #ffffff;
+        }
+        .wa-btn-warning:hover {
+            background: #d97706;
+        }
+
+        .wa-btn-danger {
+            background: #ef4444;
+            color: #ffffff;
+        }
+        .wa-btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .wa-btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+        }
+        .wa-btn-secondary:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .wa-input, .wa-textarea {
+            width: 100%;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            color: #1e293b;
+            outline: none;
+            transition: all 0.15s ease;
+        }
+        .wa-input:focus, .wa-textarea:focus {
+            background: #ffffff;
+            border-color: #8000FF;
+            box-shadow: 0 0 0 3px rgba(128, 0, 255, 0.1);
+        }
+
+        .wa-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 9999px;
+        }
+    </style>
+
     <div
         x-data="whatsappSettings()"
         x-init="startPolling()"
         class="space-y-6"
     >
-        {{-- CONNECTION STATUS CARD --}}
-        <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 overflow-hidden">
-            <div class="fi-section-content p-6">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div class="flex items-center gap-4">
-                        {{-- Status Indicator --}}
-                        <div class="relative">
-                            <div
-                                x-show="status === 'ready'"
-                                class="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center"
-                            >
-                                <div class="w-5 h-5 rounded-full bg-emerald-500 animate-pulse"></div>
+        {{-- 1. TOP HEADER STATUS BANNER --}}
+        <div class="wa-card">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                
+                {{-- Left: Status & Info --}}
+                <div class="flex items-center gap-5">
+                    {{-- Big Pulse Indicator --}}
+                    <div class="relative flex-shrink-0">
+                        <template x-if="status === 'ready'">
+                            <div class="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+                                <span class="relative flex h-5 w-5">
+                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span class="relative inline-flex rounded-full h-5 w-5 bg-emerald-500"></span>
+                                </span>
                             </div>
-                            <div
-                                x-show="status === 'qr'"
-                                class="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center"
-                            >
-                                <div class="w-5 h-5 rounded-full bg-amber-500 animate-pulse"></div>
+                        </template>
+                        <template x-if="status === 'qr'">
+                            <div class="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+                                <span class="relative flex h-5 w-5">
+                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                  <span class="relative inline-flex rounded-full h-5 w-5 bg-amber-500"></span>
+                                </span>
                             </div>
-                            <div
-                                x-show="status !== 'ready' && status !== 'qr'"
-                                class="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center"
-                            >
+                        </template>
+                        <template x-if="status !== 'ready' && status !== 'qr'">
+                            <div class="w-16 h-16 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
                                 <div class="w-5 h-5 rounded-full bg-red-500"></div>
                             </div>
-                        </div>
-
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-950 dark:text-white">
-                                Status WhatsApp Bot
-                            </h3>
-                            <p class="text-sm mt-0.5" :class="{
-                                'text-emerald-600 dark:text-emerald-400': status === 'ready',
-                                'text-amber-600 dark:text-amber-400': status === 'qr',
-                                'text-red-600 dark:text-red-400': status !== 'ready' && status !== 'qr',
-                            }">
-                                <span x-show="status === 'ready'">✅ Terhubung & Siap Kirim Pesan</span>
-                                <span x-show="status === 'qr'">📱 Perlu Scan QR Code</span>
-                                <span x-show="status === 'loading'">⏳ Menyiapkan koneksi...</span>
-                                <span x-show="status === 'not ready' || status === 'error'">❌ Tidak Terhubung</span>
-                                <span x-show="!status">⏳ Memuat status...</span>
-                            </p>
-                            <p x-show="connectedPhone" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                📱 Nomor: <span class="font-mono font-semibold" x-text="'+' + connectedPhone"></span>
-                            </p>
-                            <p x-show="uptimeHuman" class="text-xs text-gray-500 dark:text-gray-400">
-                                ⏱️ Uptime: <span x-text="uptimeHuman"></span>
-                            </p>
-                        </div>
+                        </template>
                     </div>
 
-                    {{-- Action Buttons --}}
-                    <div class="flex flex-wrap gap-2">
-                        <button
-                            x-show="status !== 'ready'"
-                            x-on:click="refreshStatus()"
-                            class="fi-btn fi-btn-size-sm inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold shadow-sm bg-primary-600 text-white hover:bg-primary-500 transition"
-                        >
-                            <x-heroicon-s-arrow-path class="w-4 h-4" />
-                            Refresh
-                        </button>
+                    {{-- Text Info --}}
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <h2 class="text-xl font-extrabold text-slate-800 tracking-tight">WhatsApp Gateway</h2>
+                            <template x-if="status === 'ready'">
+                                <span class="wa-badge bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    ● ONLINE & SIAP
+                                </span>
+                            </template>
+                            <template x-if="status === 'qr'">
+                                <span class="wa-badge bg-amber-50 text-amber-700 border border-amber-200">
+                                    ● BUTUH SCAN QR
+                                </span>
+                            </template>
+                            <template x-if="status !== 'ready' && status !== 'qr'">
+                                <span class="wa-badge bg-red-50 text-red-700 border border-red-200">
+                                    ● TERPUTUS
+                                </span>
+                            </template>
+                        </div>
 
-                        <button
-                            x-on:click="reconnect()"
-                            :disabled="isReconnecting"
-                            class="fi-btn fi-btn-size-sm inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold shadow-sm bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                        >
-                            <svg class="w-4 h-4" :class="{ 'animate-spin': isReconnecting }" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.75a.75.75 0 00-.75.75v4.482a.75.75 0 001.5 0v-2.186l.488.488a7 7 0 0011.824-3.189.75.75 0 00-1.5-.01zM4.688 8.576a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h4.482a.75.75 0 00.75-.75V2.689a.75.75 0 00-1.5 0v2.186l-.488-.488a7 7 0 00-11.824 3.189.75.75 0 001.5.01z" clip-rule="evenodd" />
-                            </svg>
-                            <span x-text="isReconnecting ? 'Reconnecting...' : 'Reconnect'"></span>
-                        </button>
+                        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2 text-xs text-slate-500">
+                            <div class="flex items-center gap-1.5 font-medium">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                </svg>
+                                <span>Nomor: </span>
+                                <span class="font-bold text-slate-700" x-text="connectedPhone ? ('+' + connectedPhone) : '-'"></span>
+                            </div>
 
-                        @if($isOwner)
-                        <button
-                            x-on:click="confirmLogout()"
-                            :disabled="isLoggingOut"
-                            class="fi-btn fi-btn-size-sm inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold shadow-sm bg-red-600 text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                        >
-                            <x-heroicon-s-arrow-right-on-rectangle class="w-4 h-4" />
-                            <span x-text="isLoggingOut ? 'Logging out...' : 'Logout & Ganti Nomor'"></span>
-                        </button>
-                        @endif
+                            <div class="flex items-center gap-1.5 font-medium">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Uptime: </span>
+                                <span class="font-bold text-slate-700" x-text="uptimeHuman || '-'"></span>
+                            </div>
+
+                            <div class="flex items-center gap-1.5 font-medium">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                <span>Engine: </span>
+                                <span class="font-bold text-slate-700">Baileys Socket (v6.7)</span>
+                            </div>
+                        </div>
                     </div>
+                </div>
+
+                {{-- Right: Actions --}}
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <button
+                        x-on:click="refreshStatus()"
+                        class="wa-btn wa-btn-secondary"
+                        title="Perbarui data status"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
+
+                    <button
+                        x-on:click="reconnect()"
+                        :disabled="isReconnecting"
+                        class="wa-btn wa-btn-warning"
+                    >
+                        <svg class="w-4 h-4" :class="{ 'animate-spin': isReconnecting }" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.75a.75.75 0 00-.75.75v4.482a.75.75 0 001.5 0v-2.186l.488.488a7 7 0 0011.824-3.189.75.75 0 00-1.5-.01zM4.688 8.576a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h4.482a.75.75 0 00.75-.75V2.689a.75.75 0 00-1.5 0v2.186l-.488-.488a7 7 0 00-11.824 3.189.75.75 0 001.5.01z" clip-rule="evenodd" />
+                        </svg>
+                        <span x-text="isReconnecting ? 'Menyambung...' : 'Reconnect'"></span>
+                    </button>
+
+                    @if($isOwner)
+                    <button
+                        x-on:click="confirmLogout()"
+                        :disabled="isLoggingOut"
+                        class="wa-btn wa-btn-danger"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        <span x-text="isLoggingOut ? 'Logging out...' : 'Ganti Nomor'"></span>
+                    </button>
+                    @endif
+                </div>
+
+            </div>
+        </div>
+
+        {{-- 2. QR CODE SCANNER MODAL / INLINE (Hanya Tampil Jika Perlu Scan QR) --}}
+        <div x-show="status === 'qr' && qrUrl" x-transition class="wa-card bg-amber-50/50 border-amber-200">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="space-y-2">
+                    <h3 class="text-lg font-bold text-amber-900 flex items-center gap-2">
+                        📷 Scan QR Code untuk Menghubungkan WhatsApp
+                    </h3>
+                    <ol class="text-xs text-amber-800 list-decimal list-inside space-y-1 font-medium">
+                        <li>Buka aplikasi WhatsApp di HP Anda</li>
+                        <li>Tekan menu titik tiga (Android) atau Pengaturan (iOS) lalu pilih <strong>Perangkat Tertaut</strong></li>
+                        <li>Tekan tombol <strong>Tautkan Perangkat</strong></li>
+                        <li>Arahkan kamera HP Anda ke QR code di samping</li>
+                    </ol>
+                    <p class="text-[11px] text-amber-600 mt-2">QR Code ini otomatis me-refresh diri setiap beberapa detik.</p>
+                </div>
+
+                <div class="bg-white p-3 rounded-2xl shadow-sm border border-amber-200 flex-shrink-0">
+                    <img :src="qrUrl" alt="QR Code WhatsApp" class="w-48 h-48 rounded-lg" />
                 </div>
             </div>
         </div>
 
-        {{-- QR CODE CARD (shown only when QR needed) --}}
-        <div x-show="status === 'qr' && qrUrl" x-transition class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 overflow-hidden">
-            <div class="fi-section-content p-6 text-center">
-                <h3 class="text-lg font-bold text-gray-950 dark:text-white mb-2">📷 Scan QR Code</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    Buka WhatsApp di HP → Menu → Perangkat Tertaut → Tautkan Perangkat → Arahkan kamera ke QR
-                </p>
-                <div class="inline-block bg-white p-3 rounded-xl shadow-lg">
-                    <img :src="qrUrl" alt="QR Code WhatsApp" class="w-64 h-64 rounded-lg" />
-                </div>
-                <p class="text-xs text-gray-400 mt-3">QR code akan refresh otomatis setiap 5 detik</p>
-            </div>
-        </div>
-
-        {{-- STATS CARDS --}}
+        {{-- 3. STATS METRICS (4 COLUMNS EQUAL) --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {{-- Sent Today --}}
-            <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 p-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                        <x-heroicon-o-paper-airplane class="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Terkirim Hari Ini</p>
-                        <p class="text-xl font-bold text-gray-950 dark:text-white" x-text="stats.sentToday ?? '-'"></p>
-                    </div>
+            
+            {{-- Stat 1: Terkirim --}}
+            <div class="wa-stat-card">
+                <div class="wa-stat-icon bg-blue-50 text-blue-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold tracking-wider uppercase text-slate-400">Total Terkirim</div>
+                    <div class="text-2xl font-black text-slate-800 mt-0.5" x-text="stats.sentToday ?? 0"></div>
+                    <div class="text-[11px] text-slate-400">Hari ini</div>
                 </div>
             </div>
-            {{-- Delivered --}}
-            <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 p-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                        <x-heroicon-o-check-badge class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Terkonfirmasi</p>
-                        <p class="text-xl font-bold text-gray-950 dark:text-white" x-text="stats.deliveredToday ?? '-'"></p>
-                    </div>
+
+            {{-- Stat 2: Terkonfirmasi --}}
+            <div class="wa-stat-card">
+                <div class="wa-stat-icon bg-emerald-50 text-emerald-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold tracking-wider uppercase text-slate-400">Sampai di HP</div>
+                    <div class="text-2xl font-black text-emerald-600 mt-0.5" x-text="stats.deliveredToday ?? 0"></div>
+                    <div class="text-[11px] text-slate-400">Ack diterima</div>
                 </div>
             </div>
-            {{-- Failed --}}
-            <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 p-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                        <x-heroicon-o-x-circle class="w-5 h-5 text-red-600 dark:text-red-400" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Gagal</p>
-                        <p class="text-xl font-bold text-gray-950 dark:text-white" x-text="stats.failedToday ?? '-'"></p>
-                    </div>
+
+            {{-- Stat 3: Gagal --}}
+            <div class="wa-stat-card">
+                <div class="wa-stat-icon bg-rose-50 text-rose-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold tracking-wider uppercase text-slate-400">Gagal Kirim</div>
+                    <div class="text-2xl font-black text-rose-600 mt-0.5" x-text="stats.failedToday ?? 0"></div>
+                    <div class="text-[11px] text-slate-400">Error response</div>
                 </div>
             </div>
-            {{-- Ghost Failures --}}
-            <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 p-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                        <x-heroicon-o-exclamation-triangle class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+
+            {{-- Stat 4: Ghost Failure Tracker --}}
+            <div class="wa-stat-card">
+                <div class="wa-stat-icon bg-amber-50 text-amber-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold tracking-wider uppercase text-slate-400">Ghost Check</div>
+                    <div class="text-2xl font-black text-amber-600 mt-0.5">
+                        <span x-text="stats.consecutiveFailures ?? 0"></span>
+                        <span class="text-xs font-normal text-slate-400">/ <span x-text="stats.ghostThreshold ?? 3"></span></span>
                     </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Ghost Failures</p>
-                        <p class="text-xl font-bold text-gray-950 dark:text-white">
-                            <span x-text="stats.consecutiveFailures ?? '0'"></span>
-                            <span class="text-xs font-normal text-gray-400">/ <span x-text="stats.ghostThreshold ?? '3'"></span></span>
-                        </p>
-                    </div>
+                    <div class="text-[11px] text-slate-400">Auto reconnect jika limit</div>
                 </div>
             </div>
+
         </div>
 
-        {{-- TEST SEND MESSAGE & LOG --}}
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {{-- Test Send --}}
-            <div class="lg:col-span-2 fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 overflow-hidden">
-                <div class="fi-section-header flex items-center gap-3 px-6 py-4 border-b border-gray-200 dark:border-white/10">
-                    <x-heroicon-o-chat-bubble-bottom-center-text class="w-5 h-5 text-gray-400" />
-                    <h3 class="text-base font-semibold text-gray-950 dark:text-white">Test Kirim Pesan</h3>
+        {{-- 4. TWO COLUMN: TEST FORM (LEFT) & RECENT LOGS (RIGHT) --}}
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {{-- LEFT: TEST KIRIM FORM (5 Cols) --}}
+            <div class="lg:col-span-5 wa-card">
+                <div class="wa-card-header">
+                    <div class="wa-title">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <span>Uji Coba Kirim Pesan</span>
+                    </div>
+                    <span class="text-[11px] text-slate-400 font-medium">Test Delivery API</span>
                 </div>
-                <div class="fi-section-content p-6 space-y-4">
+
+                <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nomor WhatsApp</label>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nomor WhatsApp Tujuan</label>
                         <input
                             type="text"
                             x-model="testNumber"
-                            placeholder="628xxxxxxxxxx"
-                            class="fi-input block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm py-2 px-3"
+                            placeholder="Contoh: 08123456789 atau 628123456789"
+                            class="wa-input"
                         />
+                        <p class="text-[11px] text-slate-400 mt-1">Bisa format 08xx atau 628xx</p>
                     </div>
+
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pesan</label>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Isi Pesan Uji Coba</label>
                         <textarea
                             x-model="testMessage"
                             rows="3"
-                            placeholder="Tulis pesan test..."
-                            class="fi-input block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm py-2 px-3"
+                            placeholder="Tulis pesan test Anda disini..."
+                            class="wa-textarea"
                         ></textarea>
                     </div>
+
                     <button
                         x-on:click="sendTestMessage()"
                         :disabled="isSending || status !== 'ready'"
-                        class="w-full fi-btn inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-sm bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        class="w-full wa-btn wa-btn-primary"
                     >
-                        <x-heroicon-s-paper-airplane class="w-4 h-4" />
-                        <span x-text="isSending ? 'Mengirim...' : 'Kirim Pesan Test'"></span>
+                        <svg class="w-4 h-4" :class="{ 'animate-spin': isSending }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                        <span x-text="isSending ? 'Mengirim pesan...' : 'Kirim Pesan Sekarang'"></span>
                     </button>
 
-                    {{-- Send Result --}}
-                    <div x-show="sendResult" x-transition class="rounded-lg p-3 text-sm" :class="{
-                        'bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300': sendResult?.success,
-                        'bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-300': sendResult && !sendResult.success,
+                    {{-- Result Feedback --}}
+                    <div x-show="sendResult" x-transition class="p-3.5 rounded-xl text-xs font-medium" :class="{
+                        'bg-emerald-50 text-emerald-800 border border-emerald-200': sendResult?.success,
+                        'bg-rose-50 text-rose-800 border border-rose-200': sendResult && !sendResult.success,
                     }">
-                        <p class="font-semibold" x-text="sendResult?.success ? '✅ Pesan terkirim!' : '❌ Gagal kirim'"></p>
-                        <p class="text-xs mt-1 font-mono opacity-75" x-text="sendResult?.detail"></p>
+                        <div class="flex items-center gap-2 font-bold" x-text="sendResult?.success ? '✅ Pesan Berhasil Dikirim!' : '❌ Gagal Mengirim Pesan'"></div>
+                        <div class="mt-1 opacity-80 text-[11px] font-mono" x-text="sendResult?.detail"></div>
                     </div>
                 </div>
             </div>
 
-            {{-- Message Log --}}
-            <div class="lg:col-span-3 fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 overflow-hidden">
-                <div class="fi-section-header flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-white/10">
-                    <div class="flex items-center gap-3">
-                        <x-heroicon-o-document-text class="w-5 h-5 text-gray-400" />
-                        <h3 class="text-base font-semibold text-gray-950 dark:text-white">Log Aktivitas</h3>
+            {{-- RIGHT: ACTIVITY LOGS (7 Cols) --}}
+            <div class="lg:col-span-7 wa-card">
+                <div class="wa-card-header">
+                    <div class="wa-title">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                        <span>Riwayat Pengiriman Pesan</span>
                     </div>
-                    <button x-on:click="refreshLogs()" class="text-xs text-primary-600 hover:text-primary-500 font-semibold">
-                        Refresh
+                    <button x-on:click="refreshLogs()" class="text-xs text-purple-600 hover:text-purple-700 font-bold flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh Log
                     </button>
                 </div>
-                <div class="fi-section-content divide-y divide-gray-100 dark:divide-white/5 max-h-96 overflow-y-auto">
+
+                <div class="divide-y divide-slate-100 max-h-[340px] overflow-y-auto pr-1">
                     <template x-if="!logs || logs.length === 0">
-                        <div class="p-6 text-center text-sm text-gray-400">
-                            Belum ada log aktivitas
+                        <div class="py-12 text-center">
+                            <svg class="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                            </svg>
+                            <p class="text-xs text-slate-400 font-medium">Belum ada riwayat pengiriman pesan hari ini.</p>
                         </div>
                     </template>
+
                     <template x-for="(log, index) in (logs || [])" :key="index">
-                        <div class="px-6 py-3 flex items-start gap-3">
-                            {{-- Status icon --}}
-                            <div class="mt-0.5">
-                                <span x-show="log.deliveryStatus === 'delivered'" class="text-emerald-500">✅</span>
-                                <span x-show="log.deliveryStatus === 'sent'" class="text-blue-500">📤</span>
-                                <span x-show="log.deliveryStatus === 'unconfirmed'" class="text-amber-500">⚠️</span>
-                                <span x-show="log.deliveryStatus === 'error'" class="text-red-500">❌</span>
-                                <span x-show="log.type === 'system'" class="text-gray-400">⚙️</span>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <span x-show="log.to" class="text-xs font-mono text-gray-600 dark:text-gray-400" x-text="log.to"></span>
-                                    <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="{
-                                        'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400': log.deliveryStatus === 'delivered',
-                                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400': log.deliveryStatus === 'sent',
-                                        'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400': log.deliveryStatus === 'unconfirmed',
-                                        'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': log.deliveryStatus === 'error',
-                                        'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400': log.type === 'system',
-                                    }" x-text="log.deliveryStatus || log.type"></span>
+                        <div class="py-3 flex items-start justify-between gap-4">
+                            <div class="flex items-start gap-3 min-w-0">
+                                <div class="mt-0.5 flex-shrink-0">
+                                    <template x-if="log.deliveryStatus === 'delivered'">
+                                        <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold">✓</span>
+                                    </template>
+                                    <template x-if="log.deliveryStatus === 'sent'">
+                                        <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">↑</span>
+                                    </template>
+                                    <template x-if="log.deliveryStatus === 'unconfirmed'">
+                                        <span class="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs font-bold">!</span>
+                                    </template>
+                                    <template x-if="log.deliveryStatus === 'error'">
+                                        <span class="w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-xs font-bold">✕</span>
+                                    </template>
                                 </div>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate" x-text="log.preview || log.message"></p>
-                                <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5" x-text="formatTimestamp(log.timestamp)"></p>
+
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-bold text-slate-800 font-mono" x-text="log.to || 'System'"></span>
+                                        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full" :class="{
+                                            'bg-emerald-50 text-emerald-700': log.deliveryStatus === 'delivered',
+                                            'bg-blue-50 text-blue-700': log.deliveryStatus === 'sent',
+                                            'bg-amber-50 text-amber-700': log.deliveryStatus === 'unconfirmed',
+                                            'bg-rose-50 text-rose-700': log.deliveryStatus === 'error',
+                                            'bg-slate-100 text-slate-600': log.type === 'system'
+                                        }" x-text="log.deliveryStatus || log.type"></span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 truncate mt-0.5" x-text="log.preview || log.message"></p>
+                                </div>
                             </div>
+
+                            <span class="text-[10px] font-medium text-slate-400 whitespace-nowrap" x-text="formatTimestamp(log.timestamp)"></span>
                         </div>
                     </template>
                 </div>
             </div>
+
         </div>
 
-        {{-- BOT CONFIGURATION (Owner only) --}}
+        {{-- 5. OWNER ONLY: CONFIG & URL INFO --}}
         @if($isOwner)
-        <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 overflow-hidden">
-            <div class="fi-section-header flex items-center gap-3 px-6 py-4 border-b border-gray-200 dark:border-white/10">
-                <x-heroicon-o-cog-6-tooth class="w-5 h-5 text-gray-400" />
-                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Konfigurasi Bot</h3>
-            </div>
-            <div class="fi-section-content p-6 space-y-3">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Bot URL</label>
-                        <div class="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 ring-1 ring-gray-200 dark:ring-gray-700">
-                            <x-heroicon-o-link class="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <code class="text-xs text-gray-700 dark:text-gray-300 break-all">{{ $botUrl }}</code>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Secret Key</label>
-                        <div x-data="{ showKey: false }" class="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 ring-1 ring-gray-200 dark:ring-gray-700">
-                            <x-heroicon-o-key class="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <code class="text-xs text-gray-700 dark:text-gray-300 flex-1 break-all" x-show="showKey">{{ $secretKey }}</code>
-                            <code class="text-xs text-gray-400 flex-1" x-show="!showKey">••••••••••••••••</code>
-                            <button x-on:click="showKey = !showKey" class="text-xs text-primary-600 hover:text-primary-500 font-semibold flex-shrink-0" x-text="showKey ? 'Sembunyikan' : 'Tampilkan'"></button>
-                        </div>
-                    </div>
+        <div class="wa-card">
+            <div class="wa-card-header">
+                <div class="wa-title">
+                    <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>Konfigurasi Endpoint & Keamanan Gateway</span>
                 </div>
-                <p class="text-xs text-gray-400 dark:text-gray-500">
-                    Konfigurasi ini diatur melalui file <code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">.env</code> di server.
-                    Ubah <code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">WA_BOT_URL</code> dan <code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">BOT_SECRET_KEY</code> di file tersebut.
-                </p>
+                <span class="text-[11px] text-slate-400 font-medium">Pengaturan Khusus Owner</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Bot Service Endpoint URL</div>
+                    <div class="text-xs font-mono font-bold text-slate-800 break-all">{{ $botUrl }}</div>
+                    <p class="text-[11px] text-slate-400 mt-1">Dikonfigurasi via <code>WA_BOT_URL</code> di file .env</p>
+                </div>
+
+                <div x-data="{ showKey: false }" class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Secret Key API Authorization</div>
+                        <div class="text-xs font-mono font-bold text-slate-800" x-show="showKey">{{ $secretKey }}</div>
+                        <div class="text-xs text-slate-400 tracking-widest" x-show="!showKey">••••••••••••••••••••••••</div>
+                    </div>
+                    <button x-on:click="showKey = !showKey" class="text-xs text-purple-600 font-bold hover:underline" x-text="showKey ? 'Sembunyikan' : 'Lihat Key'"></button>
+                </div>
             </div>
         </div>
         @endif
 
-        {{-- TIPS / INFO --}}
-        <div class="fi-section rounded-xl bg-blue-50/50 dark:bg-blue-900/10 ring-1 ring-blue-200/50 dark:ring-blue-500/20 overflow-hidden">
-            <div class="p-6">
-                <h4 class="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">💡 Tips</h4>
-                <ul class="text-xs text-blue-700 dark:text-blue-400 space-y-1.5">
-                    <li>• Jika status <strong>Tidak Terhubung</strong>, coba tekan <strong>Reconnect</strong> terlebih dahulu.</li>
-                    <li>• Jika pesan sering gagal terkirim (Ghost Failures > 0), bot akan otomatis reconnect.</li>
-                    <li>• Gunakan <strong>Test Kirim Pesan</strong> untuk memastikan bot benar-benar bisa mengirim pesan.</li>
-                    <li>• <strong>Ghost Failures</strong> menunjukkan jumlah pesan berturut-turut yang dikirim tapi tidak terkonfirmasi sampai. Jika mencapai batas (default: 3), bot otomatis reconnect.</li>
-                    @if($isOwner)
-                    <li>• Untuk <strong>ganti nomor WhatsApp</strong>, tekan "Logout & Ganti Nomor" lalu scan QR dengan nomor baru.</li>
-                    @endif
-                </ul>
-            </div>
-        </div>
     </div>
 
     @push('scripts')
@@ -385,7 +582,7 @@
 
             async sendTestMessage() {
                 if (!this.testNumber || !this.testMessage) {
-                    this.sendResult = { success: false, detail: 'Nomor dan pesan wajib diisi' };
+                    this.sendResult = { success: false, detail: 'Nomor WhatsApp dan isi pesan wajib diisi!' };
                     return;
                 }
 
@@ -411,12 +608,15 @@
                     this.sendResult = {
                         success: res.ok && data.status === 'berhasil terkirim',
                         detail: res.ok
-                            ? `ID: ${data.id || '-'} | Delivery: ${data.delivery || '-'}`
-                            : (data.pesan || 'Unknown error'),
+                            ? `Pesan dikirim ke ID: ${data.id || '-'} (${data.delivery || 'terkirim'})`
+                            : (data.pesan || 'Gagal mengirim pesan'),
                     };
 
                     // Refresh logs after send
-                    setTimeout(() => this.refreshLogs(), 1000);
+                    setTimeout(() => {
+                        this.refreshLogs();
+                        this.refreshStatus();
+                    }, 1000);
                 } catch (e) {
                     this.sendResult = { success: false, detail: 'Network error: ' + e.message };
                 } finally {
@@ -440,7 +640,7 @@
                     setTimeout(() => {
                         this.refreshStatus();
                         this.isReconnecting = false;
-                    }, 5000);
+                    }, 4000);
                 } catch (e) {
                     console.error('Reconnect error:', e);
                     this.isReconnecting = false;
@@ -448,7 +648,7 @@
             },
 
             async confirmLogout() {
-                if (!confirm('⚠️ Yakin ingin logout WhatsApp?\n\nNomor yang terhubung akan di-putuskan dan Anda perlu scan QR lagi dengan nomor baru.')) {
+                if (!confirm('⚠️ PERINGATAN:\n\nApakah Anda yakin ingin logout nomor WhatsApp saat ini?\nNomor akan diputuskan dan sistem butuh scan QR ulang dengan nomor baru.')) {
                     return;
                 }
 
@@ -468,7 +668,7 @@
                     setTimeout(() => {
                         this.refreshStatus();
                         this.isLoggingOut = false;
-                    }, 5000);
+                    }, 4000);
                 } catch (e) {
                     console.error('Logout error:', e);
                     this.isLoggingOut = false;
