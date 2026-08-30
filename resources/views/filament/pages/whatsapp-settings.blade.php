@@ -269,56 +269,56 @@
             
             {{-- Stat 1: Terkirim --}}
             <div class="wa-stat-card">
-                <div class="wa-stat-icon bg-blue-50 text-blue-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="wa-stat-icon" style="background-color: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe;">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>
                 </div>
                 <div>
                     <div class="text-[11px] font-bold tracking-wider uppercase text-slate-400">Total Terkirim</div>
-                    <div class="text-2xl font-black text-slate-800 mt-0.5" x-text="stats.sentToday ?? 0"></div>
+                    <div class="text-2xl font-bold text-slate-800 mt-0.5" x-text="stats.sentToday ?? 0"></div>
                     <div class="text-[11px] text-slate-400">Hari ini</div>
                 </div>
             </div>
 
             {{-- Stat 2: Terkonfirmasi --}}
             <div class="wa-stat-card">
-                <div class="wa-stat-icon bg-emerald-50 text-emerald-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="wa-stat-icon" style="background-color: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0;">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
                 <div>
                     <div class="text-[11px] font-bold tracking-wider uppercase text-slate-400">Sampai di HP</div>
-                    <div class="text-2xl font-black text-emerald-600 mt-0.5" x-text="stats.deliveredToday ?? 0"></div>
+                    <div class="text-2xl font-bold text-emerald-600 mt-0.5" x-text="stats.deliveredToday ?? 0"></div>
                     <div class="text-[11px] text-slate-400">Ack diterima</div>
                 </div>
             </div>
 
             {{-- Stat 3: Gagal --}}
             <div class="wa-stat-card">
-                <div class="wa-stat-icon bg-rose-50 text-rose-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="wa-stat-icon" style="background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca;">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
                 <div>
                     <div class="text-[11px] font-bold tracking-wider uppercase text-slate-400">Gagal Kirim</div>
-                    <div class="text-2xl font-black text-rose-600 mt-0.5" x-text="stats.failedToday ?? 0"></div>
+                    <div class="text-2xl font-bold text-rose-600 mt-0.5" x-text="stats.failedToday ?? 0"></div>
                     <div class="text-[11px] text-slate-400">Error response</div>
                 </div>
             </div>
 
             {{-- Stat 4: Ghost Failure Tracker --}}
             <div class="wa-stat-card">
-                <div class="wa-stat-icon bg-amber-50 text-amber-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="wa-stat-icon" style="background-color: #fefce8; color: #ca8a04; border: 1px solid #fef08a;">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                 </div>
                 <div>
                     <div class="text-[11px] font-bold tracking-wider uppercase text-slate-400">Ghost Check</div>
-                    <div class="text-2xl font-black text-amber-600 mt-0.5">
+                    <div class="text-2xl font-bold text-amber-600 mt-0.5">
                         <span x-text="stats.consecutiveFailures ?? 0"></span>
                         <span class="text-xs font-normal text-slate-400">/ <span x-text="stats.ghostThreshold ?? 3"></span></span>
                     </div>
