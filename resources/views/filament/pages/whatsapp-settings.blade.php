@@ -5,10 +5,9 @@
         .wa-card {
             background: #ffffff;
             border-radius: 18px;
-            border: 1px solid #f1f5f9;
-            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+            border: 1.5px solid #f1f5f9;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
             padding: 24px;
-            transition: all 0.2s ease;
         }
 
         .wa-card-header {
@@ -17,33 +16,33 @@
             justify-content: space-between;
             margin-bottom: 20px;
             padding-bottom: 14px;
-            border-bottom: 1px solid #f8fafc;
+            border-bottom: 1px solid #f3f4f6;
         }
 
         .wa-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #0f172a;
+            font-size: 15px;
+            font-weight: 600;
+            color: #1f2937;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .wa-stat-card {
             background: #ffffff;
             border-radius: 16px;
-            border: 1px solid #f1f5f9;
+            border: 1.5px solid #f1f5f9;
             padding: 18px 20px;
             display: flex;
             align-items: center;
             gap: 16px;
-            box-shadow: 0 2px 10px -2px rgba(0,0,0,0.03);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
         .wa-stat-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 14px;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -54,14 +53,15 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 6px;
             font-size: 13px;
             font-weight: 600;
-            padding: 10px 18px;
-            border-radius: 10px;
+            padding: 8px 16px;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.15s ease;
             border: none;
+            line-height: 1.25;
         }
         
         .wa-btn:active {
@@ -93,22 +93,23 @@
         }
 
         .wa-btn-secondary {
-            background: #f1f5f9;
-            color: #475569;
+            background: #f3f4f6;
+            color: #4b5563;
+            border: 1px solid #e5e7eb;
         }
         .wa-btn-secondary:hover {
-            background: #e2e8f0;
-            color: #1e293b;
+            background: #e5e7eb;
+            color: #1f2937;
         }
 
         .wa-input, .wa-textarea {
             width: 100%;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 10px 14px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 9px 12px;
             font-size: 13px;
-            color: #1e293b;
+            color: #374151;
             outline: none;
             transition: all 0.15s ease;
         }
@@ -121,11 +122,12 @@
         .wa-badge {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
             font-size: 11px;
             font-weight: 600;
             padding: 3px 10px;
             border-radius: 9999px;
+            line-height: 1;
         }
     </style>
 
@@ -139,82 +141,69 @@
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 
                 {{-- Left: Status & Info --}}
-                <div class="flex items-center gap-5">
+                <div class="flex items-center gap-4">
                     {{-- WhatsApp Official Icon + Status Overlay --}}
                     <div class="relative flex-shrink-0">
-                        <div class="w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm" :class="{
-                            'bg-[#25D366]/10 border border-[#25D366]/20': status === 'ready',
-                            'bg-amber-50 border border-amber-200': status === 'qr',
-                            'bg-rose-50 border border-rose-200': status !== 'ready' && status !== 'qr'
+                        <div class="w-14 h-14 rounded-2xl flex items-center justify-center border" :class="{
+                            'bg-[#dcfce7] border-[#bbf7d0]': status === 'ready',
+                            'bg-[#fef9c3] border-[#fef08a]': status === 'qr',
+                            'bg-[#fef2f2] border-[#fecaca]': status !== 'ready' && status !== 'qr'
                         }">
                             {{-- Official WhatsApp SVG Logo --}}
-                            <svg class="w-9 h-9" :class="{
-                                'text-[#25D366]': status === 'ready',
-                                'text-amber-500': status === 'qr',
-                                'text-rose-500': status !== 'ready' && status !== 'qr'
+                            <svg class="w-7 h-7" :class="{
+                                'text-[#16a34a]': status === 'ready',
+                                'text-[#ca8a04]': status === 'qr',
+                                'text-[#dc2626]': status !== 'ready' && status !== 'qr'
                             }" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.698c.97.581 1.777.818 2.796.818 3.18 0 5.767-2.587 5.768-5.766.001-3.18-2.586-5.766-5.768-5.766zm9.969 5.766c-.002 5.519-4.49 9.998-10 9.998-1.745 0-3.411-.459-4.877-1.284l-5.623 1.473 1.503-5.485c-.911-1.523-1.391-3.267-1.39-5.061.002-5.52 4.491-10 10-10 2.666.001 5.171 1.04 7.054 2.926 1.884 1.886 2.931 4.393 2.933 7.058z"/>
                             </svg>
                         </div>
-                        {{-- Live Status Badge Dot in Corner --}}
-                        <span class="absolute -top-1 -right-1 flex h-4 w-4">
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" :class="{
-                                'bg-emerald-400': status === 'ready',
-                                'bg-amber-400': status === 'qr',
-                                'bg-rose-400': status !== 'ready' && status !== 'qr'
-                            }"></span>
-                            <span class="relative inline-flex rounded-full h-4 w-4 border-2 border-white" :class="{
-                                'bg-emerald-500': status === 'ready',
-                                'bg-amber-500': status === 'qr',
-                                'bg-rose-500': status !== 'ready' && status !== 'qr'
-                            }"></span>
-                        </span>
                     </div>
 
                     {{-- Text Info --}}
                     <div>
-                        <div class="flex items-center gap-3">
-                            <h2 class="text-xl font-extrabold text-slate-800 tracking-tight">WhatsApp Gateway</h2>
+                        <div class="flex items-center gap-2.5">
+                            <h2 class="text-lg font-semibold text-[#1f2937] tracking-tight">WhatsApp Gateway</h2>
                             <template x-if="status === 'ready'">
-                                <span class="wa-badge bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span class="wa-badge bg-[#dcfce7] text-[#16a34a] border border-[#bbf7d0]">
                                     ● ONLINE & SIAP
                                 </span>
                             </template>
                             <template x-if="status === 'qr'">
-                                <span class="wa-badge bg-amber-50 text-amber-700 border border-amber-200">
+                                <span class="wa-badge bg-[#fef9c3] text-[#ca8a04] border border-[#fef08a]">
                                     ● BUTUH SCAN QR
                                 </span>
                             </template>
                             <template x-if="status !== 'ready' && status !== 'qr'">
-                                <span class="wa-badge bg-red-50 text-red-700 border border-red-200">
+                                <span class="wa-badge bg-[#fef2f2] text-[#dc2626] border border-[#fecaca]">
                                     ● TERPUTUS
                                 </span>
                             </template>
                         </div>
 
-                        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2 text-xs text-slate-500">
-                            <div class="flex items-center gap-1.5 font-medium">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="flex flex-wrap items-center gap-x-5 gap-y-1 mt-1.5 text-xs text-[#6b7280]">
+                            <div class="flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-[#9ca3af]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                 </svg>
                                 <span>Nomor: </span>
-                                <span class="font-bold text-slate-700" x-text="connectedPhone ? ('+' + connectedPhone) : '-'"></span>
+                                <span class="font-semibold text-[#374151]" x-text="connectedPhone ? ('+' + connectedPhone) : '-'"></span>
                             </div>
 
-                            <div class="flex items-center gap-1.5 font-medium">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-[#9ca3af]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <span>Uptime: </span>
-                                <span class="font-bold text-slate-700" x-text="uptimeHuman || '-'"></span>
+                                <span class="font-semibold text-[#374151]" x-text="uptimeHuman || '-'"></span>
                             </div>
 
-                            <div class="flex items-center gap-1.5 font-medium">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-[#9ca3af]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
                                 <span>Engine: </span>
-                                <span class="font-bold text-slate-700">Baileys Socket (v6.7)</span>
+                                <span class="font-semibold text-[#374151]">Baileys Socket (v6.7)</span>
                             </div>
                         </div>
                     </div>
