@@ -140,29 +140,35 @@
                 
                 {{-- Left: Status & Info --}}
                 <div class="flex items-center gap-5">
-                    {{-- Big Pulse Indicator --}}
+                    {{-- WhatsApp Official Icon + Status Overlay --}}
                     <div class="relative flex-shrink-0">
-                        <template x-if="status === 'ready'">
-                            <div class="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center">
-                                <span class="relative flex h-5 w-5">
-                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                  <span class="relative inline-flex rounded-full h-5 w-5 bg-emerald-500"></span>
-                                </span>
-                            </div>
-                        </template>
-                        <template x-if="status === 'qr'">
-                            <div class="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center">
-                                <span class="relative flex h-5 w-5">
-                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                  <span class="relative inline-flex rounded-full h-5 w-5 bg-amber-500"></span>
-                                </span>
-                            </div>
-                        </template>
-                        <template x-if="status !== 'ready' && status !== 'qr'">
-                            <div class="w-16 h-16 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
-                                <div class="w-5 h-5 rounded-full bg-red-500"></div>
-                            </div>
-                        </template>
+                        <div class="w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm" :class="{
+                            'bg-[#25D366]/10 border border-[#25D366]/20': status === 'ready',
+                            'bg-amber-50 border border-amber-200': status === 'qr',
+                            'bg-rose-50 border border-rose-200': status !== 'ready' && status !== 'qr'
+                        }">
+                            {{-- Official WhatsApp SVG Logo --}}
+                            <svg class="w-9 h-9" :class="{
+                                'text-[#25D366]': status === 'ready',
+                                'text-amber-500': status === 'qr',
+                                'text-rose-500': status !== 'ready' && status !== 'qr'
+                            }" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.698c.97.581 1.777.818 2.796.818 3.18 0 5.767-2.587 5.768-5.766.001-3.18-2.586-5.766-5.768-5.766zm9.969 5.766c-.002 5.519-4.49 9.998-10 9.998-1.745 0-3.411-.459-4.877-1.284l-5.623 1.473 1.503-5.485c-.911-1.523-1.391-3.267-1.39-5.061.002-5.52 4.491-10 10-10 2.666.001 5.171 1.04 7.054 2.926 1.884 1.886 2.931 4.393 2.933 7.058z"/>
+                            </svg>
+                        </div>
+                        {{-- Live Status Badge Dot in Corner --}}
+                        <span class="absolute -top-1 -right-1 flex h-4 w-4">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" :class="{
+                                'bg-emerald-400': status === 'ready',
+                                'bg-amber-400': status === 'qr',
+                                'bg-rose-400': status !== 'ready' && status !== 'qr'
+                            }"></span>
+                            <span class="relative inline-flex rounded-full h-4 w-4 border-2 border-white" :class="{
+                                'bg-emerald-500': status === 'ready',
+                                'bg-amber-500': status === 'qr',
+                                'bg-rose-500': status !== 'ready' && status !== 'qr'
+                            }"></span>
+                        </span>
                     </div>
 
                     {{-- Text Info --}}
