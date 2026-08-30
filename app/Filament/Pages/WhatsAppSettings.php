@@ -20,7 +20,7 @@ class WhatsAppSettings extends Page
 
     protected static ?int $navigationSort = 1;
 
-    protected static string $view = 'filament.pages.whatsapp-settings';
+    protected string $view = 'filament.pages.whatsapp-settings';
 
     /**
      * Only Admin and Owner can access this page.
