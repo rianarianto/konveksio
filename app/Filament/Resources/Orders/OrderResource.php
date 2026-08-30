@@ -490,26 +490,27 @@ class OrderResource extends Resource
                                         $isDelivered = !empty($ret->delivered_at);
                                         $badgeBg = $isDelivered ? '#dcfce7' : '#fef3c7';
                                         $badgeColor = $isDelivered ? '#15803d' : '#b45309';
-                                        $badgeText = $isDelivered ? '✅ SUDAH DISERAHKAN' : '⏳ BELUM DISERAHKAN (SIAP DIAMBIL)';
+                                        $badgeText = $isDelivered ? '✅ SUDAH DISERAHKAN' : '⏳ SIAP DIAMBIL (BELUM DISERAHKAN)';
                                         $borderLeftColor = $isDelivered ? '#10b981' : '#f59e0b';
 
                                         $retTime = $ret->delivered_at ? $ret->delivered_at->format('d M Y, H:i') . ' WIB' : 'Menunggu diambil oleh customer';
-                                        $retNote = $ret->delivery_note ?: ($ret->reason ?: 'Perbaikan retur barang');
                                         $retProof = $ret->delivery_proof ? asset('storage/' . $ret->delivery_proof) : null;
-                                        $itemDesc = $ret->items_description ?: $ret->reason;
+                                        $retNote = $ret->delivery_note;
 
                                         $html .= "
                                         <div style='background:#ffffff;border:1px solid #e2e8f0;border-left:4px solid {$borderLeftColor};border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);'>
-                                            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;'>
+                                            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px;'>
                                                 <div style='display:flex;align-items:center;gap:8px;'>
                                                     <span style='background:{$badgeBg};color:{$badgeColor};font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;'>{$badgeText}</span>
-                                                    <strong style='color:#0f172a;font-size:14px;'>🔄 Penyerahan Hasil Retur #{$retIndex} ({$ret->quantity} pcs)</strong>
+                                                    <strong style='color:#0f172a;font-size:14px;'>🔄 Hasil Retur #{$retIndex} ({$ret->quantity} pcs)</strong>
                                                 </div>
                                                 <span style='font-size:12px;color:#64748b;font-weight:600;'>📅 {$retTime}</span>
                                             </div>
-                                            <p style='font-size:12px;color:#64748b;margin:0 0 6px 0;'><strong>Detail Retur:</strong> {$itemDesc}</p>
-                                            <p style='font-size:13px;color:#334155;margin:4px 0 10px 0;'><strong>Catatan Penyerahan:</strong> {$retNote}</p>
                                         ";
+
+                                        if ($isDelivered && $retNote) {
+                                            $html .= "<p style='font-size:13px;color:#334155;margin:6px 0;'><strong>Catatan Penyerahan:</strong> {$retNote}</p>";
+                                        }
 
                                         if ($retProof) {
                                             $html .= "
