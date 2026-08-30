@@ -10,6 +10,7 @@ class OrderReturn extends Model
     protected $fillable = [
         'shop_id',
         'order_id',
+        'batch_number',
         'order_item_id',
         'return_date',
         'expected_pickup_date',
@@ -49,6 +50,7 @@ class OrderReturn extends Model
     }
 
     protected $casts = [
+        'batch_number' => 'integer',
         'return_date' => 'date',
         'expected_pickup_date' => 'date',
         'quantity' => 'integer',

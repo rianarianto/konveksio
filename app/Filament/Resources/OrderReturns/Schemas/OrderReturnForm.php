@@ -41,6 +41,94 @@ class OrderReturnForm
         }
 
         return array_merge($components, [
+            // Batch Retur Grouping
+            Select::make('batch_number')
+                ->label('📦 Batch Retur')
+                ->options(function ($get, $record) {
+                    $orderId = $get('order_id');
+                    if (!$orderId && $record) {
+                        if ($record instanceof \App\Models\Order) {
+                            $orderId = $record->id;
+                        } elseif (isset($record->order_id)) {
+                            $orderId = $record->order_id;
+                        }
+                    }
+                    if (!$orderId) {
+                        $routeRecord = request()->route()?->parameter('record');
+                        if ($routeRecord instanceof \App\Models\Order) {
+                            $orderId = $routeRecord->id;
+                        } elseif (is_numeric($routeRecord)) {
+                            $orderId = (int) $routeRecord;
+                        }
+                    }
+                    if (!$orderId) return [1 => 'Batch #1 (Retur Pertama)'];
+
+                    $existingBatches = \App\Models\OrderReturn::withoutGlobalScopes()
+                        ->where('order_id', $orderId)
+                        ->distinct()
+                        ->pluck('batch_number')
+                        ->filter()
+                        ->sort()
+                        ->values()
+                        ->toArray();
+
+                    $options = [];
+                    foreach ($existingBatches as $bNum) {
+                        $undeliveredCount = \App\Models\OrderReturn::withoutGlobalScopes()
+                            ->where('order_id', $orderId)
+                            ->where('batch_number', $bNum)
+                            ->whereNull('delivered_at')
+                            ->count();
+                        $statusLabel = $undeliveredCount > 0 ? ' [Sedang Berjalan]' : ' [Sudah Diserahkan]';
+                        $options[$bNum] = "Batch #{$bNum}{$statusLabel}";
+                    }
+
+                    $nextBatch = (!empty($existingBatches) ? max($existingBatches) : 0) + 1;
+                    if (!isset($options[$nextBatch])) {
+                        $options[$nextBatch] = "➕ Buat Batch #{$nextBatch} Baru (Retur Susulan)";
+                    }
+
+                    return $options;
+                })
+                ->default(function ($get, $record) {
+                    $orderId = $get('order_id');
+                    if (!$orderId && $record) {
+                        if ($record instanceof \App\Models\Order) {
+                            $orderId = $record->id;
+                        } elseif (isset($record->order_id)) {
+                            $orderId = $record->order_id;
+                        }
+                    }
+                    if (!$orderId) {
+                        $routeRecord = request()->route()?->parameter('record');
+                        if ($routeRecord instanceof \App\Models\Order) {
+                            $orderId = $routeRecord->id;
+                        } elseif (is_numeric($routeRecord)) {
+                            $orderId = (int) $routeRecord;
+                        }
+                    }
+                    if (!$orderId) return 1;
+
+                    // Default to latest active (undelivered) batch, or new batch if all delivered
+                    $activeBatch = \App\Models\OrderReturn::withoutGlobalScopes()
+                        ->where('order_id', $orderId)
+                        ->whereNull('delivered_at')
+                        ->orderBy('batch_number', 'desc')
+                        ->value('batch_number');
+
+                    if ($activeBatch) {
+                        return (int) $activeBatch;
+                    }
+
+                    $maxBatch = \App\Models\OrderReturn::withoutGlobalScopes()
+                        ->where('order_id', $orderId)
+                        ->max('batch_number');
+
+                    return $maxBatch ? ((int)$maxBatch + 1) : 1;
+                })
+                ->required()
+                ->helperText('Pilih Batch aktif untuk menggabungkan retur ini, atau pilih "Buat Batch Baru" jika ini komplain susulan.'),
+
             // 1. Pilih Produk Utama Pesanan
             Select::make('selected_product_name')
                 ->label('1. Pilih Produk Pesanan')
