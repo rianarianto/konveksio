@@ -42,10 +42,50 @@ class ProductionTasksRelationManager extends RelationManager
                     ->label('Tahap'),
 
                 TextColumn::make('quantity')
-                    ->label('Qty')
-                    ->suffix(' pcs')
-                    ->badge()
-                    ->color('info'),
+                    ->label('Qty & Ukuran')
+                    ->html()
+                    ->getStateUsing(function (ProductionTask $record): string {
+                        $qtyBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">' . $record->quantity . ' pcs</span>';
+                        
+                        $sq = $record->size_quantities;
+                        $sizeDetails = [];
+
+                        if (!empty($sq) && is_array($sq)) {
+                            $cleanSizes = array_filter($sq, fn($k) => !str_starts_with($k, '_'), ARRAY_FILTER_USE_KEY);
+                            $genders = $sq['_genders'] ?? [];
+                            $customRecipients = $sq['_custom_recipients'] ?? [];
+
+                            foreach ($cleanSizes as $sz => $cnt) {
+                                if ($cnt <= 0) continue;
+                                $displaySz = $sz === 'TANPA_UKURAN' ? 'Tanpa Ukuran' : $sz;
+                                
+                                if (!empty($genders[$sz])) {
+                                    $gStrs = [];
+                                    foreach ($genders[$sz] as $gLabel => $gQty) {
+                                        $gStrs[] = ($gLabel === 'P' ? 'P' : 'L') . ':' . $gQty;
+                                    }
+                                    $sizeDetails[] = "<strong>{$displaySz}</strong> (" . implode(', ', $gStrs) . ')';
+                                } else {
+                                    $sizeDetails[] = "<strong>{$displaySz}</strong>: {$cnt}";
+                                }
+                            }
+
+                            if (!empty($customRecipients)) {
+                                $sizeDetails[] = '<span class="text-amber-600 dark:text-amber-400 font-medium">📏 Ukur Badan: ' . implode(', ', array_slice($customRecipients, 0, 3)) . (count($customRecipients) > 3 ? '...' : '') . '</span>';
+                            }
+                        }
+
+                        if (!empty($sizeDetails)) {
+                            return $qtyBadge . '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">' . implode(' • ', $sizeDetails) . '</div>';
+                        }
+
+                        if (!empty($record->description)) {
+                            $firstLine = explode("\n", $record->description)[0];
+                            return $qtyBadge . '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">' . e($firstLine) . '</div>';
+                        }
+
+                        return $qtyBadge;
+                    }),
 
                 TextColumn::make('wage_amount')
                     ->label('Total Upah')
