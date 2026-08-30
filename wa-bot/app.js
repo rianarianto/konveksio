@@ -298,8 +298,18 @@ const connectToWhatsApp = async () => {
 const forceReconnect = async (reason = 'manual') => {
     console.log(`🔄 Force reconnecting... Reason: ${reason}`);
     
+    if (isReconnecting) {
+        console.log('⏳ Already in the middle of reconnecting, skipping redundant call');
+        return;
+    }
+
+    isReconnecting = true;
+    clientStatus = 'loading';
+    broadcastStatus('loading', 'Menyambung ulang session WhatsApp...');
+
     if (sock) {
         try {
+            sock.ev.removeAllListeners();
             sock.end(undefined);
         } catch (e) {
             console.log('⚠️ Error closing socket:', e.message);
@@ -307,12 +317,11 @@ const forceReconnect = async (reason = 'manual') => {
         sock = null;
     }
 
-    clientStatus = 'not ready';
-    isReconnecting = false;
     consecutiveFailures = 0;
     
     // Small delay before reconnecting
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    isReconnecting = false;
     await connectToWhatsApp();
 };
 
@@ -456,29 +465,26 @@ const apiSendHandler = async (req, res) => {
         totalSentToday++;
         lastMessageSentAt = new Date();
 
-        // Add to log
-        const logEntry = {
+        addToLog({
             type: 'outgoing',
             messageId: msgId,
             to: jid.replace(/@s\.whatsapp\.net$/, ''),
             preview: messageText.substring(0, 80) + (messageText.length > 80 ? '...' : ''),
             deliveryStatus: 'sent',
             ack: 1,
-        };
-        addToLog(logEntry);
+        });
 
         return res.json({ 
             status: "berhasil terkirim", 
             pesan: messageText, 
             to: jid,
             id: msgId,
-            delivery: 'pending_confirmation',
-            note: 'Pesan dikirim ke server WhatsApp. Delivery confirmation akan di-track otomatis.'
+            delivery: 'sent',
+            note: 'Pesan berhasil diserahkan ke jaringan WhatsApp.'
         });
     } catch (error) {
         console.error('❌ Send Message Error:', error.message);
         totalFailedToday++;
-        consecutiveFailures++;
 
         addToLog({
             type: 'outgoing',
@@ -488,14 +494,6 @@ const apiSendHandler = async (req, res) => {
             deliveryStatus: 'error',
             error: error.message,
         });
-
-        // Auto-reconnect if error indicates stale connection
-        if (error.message.includes('timeout') || error.message.includes('not open')) {
-            if (!isReconnecting) {
-                console.log('🚨 Send error indicates stale connection. Scheduling reconnect...');
-                setTimeout(() => forceReconnect('send_error'), 1000);
-            }
-        }
 
         return res.status(500).json({ 
             status: "error", 
