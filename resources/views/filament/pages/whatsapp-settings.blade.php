@@ -71,7 +71,9 @@
                             :disabled="isReconnecting"
                             class="fi-btn fi-btn-size-sm inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold shadow-sm bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
                         >
-                            <x-heroicon-s-arrow-path class="w-4 h-4" :class="{ 'animate-spin': isReconnecting }" />
+                            <svg class="w-4 h-4" :class="{ 'animate-spin': isReconnecting }" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.75a.75.75 0 00-.75.75v4.482a.75.75 0 001.5 0v-2.186l.488.488a7 7 0 0011.824-3.189.75.75 0 00-1.5-.01zM4.688 8.576a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h4.482a.75.75 0 00.75-.75V2.689a.75.75 0 00-1.5 0v2.186l-.488-.488a7 7 0 00-11.824 3.189.75.75 0 001.5.01z" clip-rule="evenodd" />
+                            </svg>
                             <span x-text="isReconnecting ? 'Reconnecting...' : 'Reconnect'"></span>
                         </button>
 
