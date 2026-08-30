@@ -16,7 +16,7 @@ class WhatsAppSettings extends Page
 
     protected static ?string $slug = 'whatsapp-settings';
 
-    protected static string|array|\UnitEnum|null $navigationGroup = 'PENGATURAN';
+    protected static string|\UnitEnum|null $navigationGroup = 'PENGATURAN';
 
     protected static ?int $navigationSort = 1;
 
