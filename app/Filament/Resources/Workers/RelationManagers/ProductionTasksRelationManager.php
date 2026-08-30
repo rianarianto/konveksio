@@ -46,7 +46,7 @@ class ProductionTasksRelationManager extends RelationManager
                     ->alignLeft()
                     ->html()
                     ->getStateUsing(function (ProductionTask $record): string {
-                        $qtyBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">' . $record->quantity . ' pcs</span>';
+                        $qtyBadge = '<span style="display:inline-block; font-weight:800; font-size:13px; color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px;">' . $record->quantity . ' pcs</span>';
                         
                         $sq = $record->size_quantities;
                         $sizeDetails = [];
@@ -72,20 +72,20 @@ class ProductionTasksRelationManager extends RelationManager
                             }
 
                             if (!empty($customRecipients)) {
-                                $sizeDetails[] = '<span class="text-amber-600 dark:text-amber-400 font-medium">📏 Ukur Badan: ' . implode(', ', array_slice($customRecipients, 0, 3)) . (count($customRecipients) > 3 ? '...' : '') . '</span>';
+                                $sizeDetails[] = '<span style="color:#d97706; font-weight:600;">📏 Ukur Badan: ' . implode(', ', array_slice($customRecipients, 0, 3)) . (count($customRecipients) > 3 ? '...' : '') . '</span>';
                             }
                         }
 
                         if (!empty($sizeDetails)) {
-                            return '<div class="text-left">' . $qtyBadge . '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed text-left">' . implode(' • ', $sizeDetails) . '</div></div>';
+                            return '<div style="text-align:left;">' . $qtyBadge . '<div style="font-size:12px; color:#64748b; margin-top:4px; line-height:1.4; text-align:left;">' . implode(' • ', $sizeDetails) . '</div></div>';
                         }
 
                         if (!empty($record->description)) {
                             $firstLine = explode("\n", $record->description)[0];
-                            return '<div class="text-left">' . $qtyBadge . '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-left">' . e($firstLine) . '</div></div>';
+                            return '<div style="text-align:left;">' . $qtyBadge . '<div style="font-size:12px; color:#64748b; margin-top:4px; text-align:left;">' . e($firstLine) . '</div></div>';
                         }
 
-                        return '<div class="text-left">' . $qtyBadge . '</div>';
+                        return '<div style="text-align:left;">' . $qtyBadge . '</div>';
                     }),
 
                 TextColumn::make('wage_amount')
