@@ -157,18 +157,18 @@
                         <div class="flex items-center gap-2.5">
                             <h2 class="text-lg font-semibold text-[#1f2937] tracking-tight">WhatsApp Gateway</h2>
                             <template x-if="status === 'ready'">
-                                <span class="wa-badge bg-[#dcfce7] text-[#16a34a] border border-[#bbf7d0]">
-                                    ● ONLINE & SIAP
+                                <span class="wa-badge" style="background-color: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0;">
+                                    <span style="font-size: 8px;">●</span> ONLINE & SIAP
                                 </span>
                             </template>
                             <template x-if="status === 'qr'">
-                                <span class="wa-badge bg-[#fef9c3] text-[#ca8a04] border border-[#fef08a]">
-                                    ● BUTUH SCAN QR
+                                <span class="wa-badge" style="background-color: #fef9c3; color: #ca8a04; border: 1px solid #fef08a;">
+                                    <span style="font-size: 8px;">●</span> BUTUH SCAN QR
                                 </span>
                             </template>
                             <template x-if="status !== 'ready' && status !== 'qr'">
-                                <span class="wa-badge bg-[#fef2f2] text-[#dc2626] border border-[#fecaca]">
-                                    ● TERPUTUS
+                                <span class="wa-badge" style="background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca;">
+                                    <span style="font-size: 8px;">●</span> TERPUTUS
                                 </span>
                             </template>
                         </div>
