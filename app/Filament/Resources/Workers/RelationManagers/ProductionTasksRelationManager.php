@@ -43,6 +43,7 @@ class ProductionTasksRelationManager extends RelationManager
 
                 TextColumn::make('quantity')
                     ->label('Qty & Ukuran')
+                    ->alignLeft()
                     ->html()
                     ->getStateUsing(function (ProductionTask $record): string {
                         $qtyBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">' . $record->quantity . ' pcs</span>';
@@ -76,15 +77,15 @@ class ProductionTasksRelationManager extends RelationManager
                         }
 
                         if (!empty($sizeDetails)) {
-                            return $qtyBadge . '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">' . implode(' • ', $sizeDetails) . '</div>';
+                            return '<div class="text-left">' . $qtyBadge . '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed text-left">' . implode(' • ', $sizeDetails) . '</div></div>';
                         }
 
                         if (!empty($record->description)) {
                             $firstLine = explode("\n", $record->description)[0];
-                            return $qtyBadge . '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">' . e($firstLine) . '</div>';
+                            return '<div class="text-left">' . $qtyBadge . '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-left">' . e($firstLine) . '</div></div>';
                         }
 
-                        return $qtyBadge;
+                        return '<div class="text-left">' . $qtyBadge . '</div>';
                     }),
 
                 TextColumn::make('wage_amount')
@@ -110,7 +111,7 @@ class ProductionTasksRelationManager extends RelationManager
                     }),
 
                 TextColumn::make('completed_at')
-                    ->label('Selesai Pada')
+                    ->label('Selesai')
                     ->dateTime('d M Y, H:i')
                     ->sortable()
                     ->toggleable(),
