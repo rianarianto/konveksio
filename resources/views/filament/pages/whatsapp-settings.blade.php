@@ -204,7 +204,7 @@
                 {{-- Right: Actions --}}
                 <div class="flex items-center gap-2.5 flex-wrap">
                     <button
-                        x-on:click="refreshStatus()"
+                        x-on:click="refreshStatus(true)"
                         class="wa-btn wa-btn-secondary"
                         title="Perbarui data status"
                     >
@@ -544,9 +544,24 @@
                             consecutiveFailures: data.stats?.consecutive_failures ?? 0,
                             ghostThreshold: data.stats?.ghost_threshold ?? 3,
                         };
+                        
+                        if (isManual) {
+                            new FilamentNotification()
+                                .title('Data Diperbarui')
+                                .body('Status koneksi & metrik WhatsApp berhasil disinkronkan.')
+                                .success()
+                                .send();
+                        }
                     }
                 } catch (e) {
                     console.warn('Status poll error:', e);
+                    if (isManual) {
+                        new FilamentNotification()
+                            .title('Gagal Refresh')
+                            .body('Tidak dapat menghubungi server WhatsApp Bot: ' + e.message)
+                            .danger()
+                            .send();
+                    }
                 }
             },
 
@@ -561,6 +576,11 @@
                     if (res.ok) {
                         const data = await res.json();
                         this.logs = data.logs || [];
+                        new FilamentNotification()
+                            .title('Log Diperbarui')
+                            .body('Riwayat pesan WhatsApp berhasil disinkronkan.')
+                            .success()
+                            .send();
                     }
                 } catch (e) {
                     console.warn('Logs fetch error:', e);
@@ -570,6 +590,11 @@
             async sendTestMessage() {
                 if (!this.testNumber || !this.testMessage) {
                     this.sendResult = { success: false, detail: 'Nomor WhatsApp dan isi pesan wajib diisi!' };
+                    new FilamentNotification()
+                        .title('Form Belum Lengkap')
+                        .body('Silakan masukkan nomor tujuan dan isi pesan uji coba.')
+                        .warning()
+                        .send();
                     return;
                 }
 
@@ -592,12 +617,27 @@
                     });
 
                     const data = await res.json();
+                    const isSuccess = res.ok && data.status === 'berhasil terkirim';
                     this.sendResult = {
-                        success: res.ok && data.status === 'berhasil terkirim',
+                        success: isSuccess,
                         detail: res.ok
                             ? `Pesan dikirim ke ID: ${data.id || '-'} (${data.delivery || 'terkirim'})`
                             : (data.pesan || 'Gagal mengirim pesan'),
                     };
+
+                    if (isSuccess) {
+                        new FilamentNotification()
+                            .title('Pesan Terkirim!')
+                            .body('Pesan uji coba berhasil diserahkan ke server WhatsApp.')
+                            .success()
+                            .send();
+                    } else {
+                        new FilamentNotification()
+                            .title('Gagal Kirim Pesan')
+                            .body(data.pesan || 'Terjadi kesalahan saat pengiriman pesan.')
+                            .danger()
+                            .send();
+                    }
 
                     // Refresh logs after send
                     setTimeout(() => {
@@ -606,6 +646,11 @@
                     }, 1000);
                 } catch (e) {
                     this.sendResult = { success: false, detail: 'Network error: ' + e.message };
+                    new FilamentNotification()
+                        .title('Koneksi Error')
+                        .body('Gagal menghubungi bot WhatsApp: ' + e.message)
+                        .danger()
+                        .send();
                 } finally {
                     this.isSending = false;
                 }
@@ -614,6 +659,12 @@
             async reconnect() {
                 if (this.isReconnecting) return;
                 this.isReconnecting = true;
+
+                new FilamentNotification()
+                    .title('Memulai Reconnect')
+                    .body('Memutuskan socket lama dan menyambung ulang session WhatsApp...')
+                    .info()
+                    .send();
 
                 try {
                     const botUrl = {!! json_encode($botUrl) !!};
@@ -624,13 +675,24 @@
                     await fetch(botUrl + '/api/reconnect', { method: 'POST', headers });
 
                     // Wait and refresh
-                    setTimeout(() => {
-                        this.refreshStatus();
+                    setTimeout(async () => {
+                        await this.refreshStatus();
                         this.isReconnecting = false;
+
+                        new FilamentNotification()
+                            .title('Reconnect Berhasil')
+                            .body('Koneksi WhatsApp telah berhasil disambungkan ulang.')
+                            .success()
+                            .send();
                     }, 4000);
                 } catch (e) {
                     console.error('Reconnect error:', e);
                     this.isReconnecting = false;
+                    new FilamentNotification()
+                        .title('Gagal Reconnect')
+                        .body('Terjadi kesalahan saat reconnect: ' + e.message)
+                        .danger()
+                        .send();
                 }
             },
 
