@@ -138,10 +138,10 @@
     >
         {{-- 1. TOP HEADER STATUS BANNER --}}
         <div class="wa-card">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
                 
                 {{-- Left: Status & Info --}}
-                <div class="flex items-center gap-4">
+                <div class="flex items-start sm:items-center gap-4 min-w-0">
                     {{-- WhatsApp Official Icon + Status Overlay --}}
                     <div class="flex-shrink-0" style="width: 52px; height: 52px;">
                         <div style="width: 52px; height: 52px; border-radius: 14px; background: #f0fdf4; border: 1.5px solid #bbf7d0; display: flex; align-items: center; justify-content: center;">
@@ -153,8 +153,8 @@
                     </div>
 
                     {{-- Text Info --}}
-                    <div>
-                        <div class="flex items-center gap-2.5">
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2.5">
                             <h2 class="text-lg font-semibold text-[#1f2937] tracking-tight">WhatsApp Gateway</h2>
                             <template x-if="status === 'ready'">
                                 <span class="wa-badge" style="background-color: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0;">
@@ -202,10 +202,10 @@
                 </div>
 
                 {{-- Right: Actions --}}
-                <div class="flex items-center gap-2.5 flex-wrap">
+                <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full xl:w-auto justify-start xl:justify-end pt-2 xl:pt-0 border-t border-slate-100 xl:border-t-0">
                     <button
                         wire:click="actionRefresh"
-                        class="wa-btn wa-btn-secondary"
+                        class="wa-btn wa-btn-secondary flex-1 sm:flex-initial whitespace-nowrap"
                         title="Perbarui data status"
                     >
                         <svg class="w-4 h-4" wire:loading.class="animate-spin" wire:target="actionRefresh" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,7 +217,7 @@
                     <button
                         wire:click="actionReconnect"
                         wire:loading.attr="disabled"
-                        class="wa-btn wa-btn-warning"
+                        class="wa-btn wa-btn-warning flex-1 sm:flex-initial whitespace-nowrap"
                     >
                         <svg class="w-4 h-4" wire:loading.class="animate-spin" wire:target="actionReconnect" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.75a.75.75 0 00-.75.75v4.482a.75.75 0 001.5 0v-2.186l.488.488a7 7 0 0011.824-3.189.75.75 0 00-1.5-.01zM4.688 8.576a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h4.482a.75.75 0 00.75-.75V2.689a.75.75 0 00-1.5 0v2.186l-.488-.488a7 7 0 00-11.824 3.189.75.75 0 001.5.01z" clip-rule="evenodd" />
@@ -229,7 +229,7 @@
                     @if($isOwner)
                     <button
                         x-on:click="if(confirm('⚠️ PERINGATAN:\n\nApakah Anda yakin ingin logout nomor WhatsApp saat ini?\nNomor akan diputuskan dan sistem butuh scan QR ulang dengan nomor baru.')) { $wire.actionLogout() }"
-                        class="wa-btn wa-btn-danger"
+                        class="wa-btn wa-btn-danger flex-1 sm:flex-initial whitespace-nowrap"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
