@@ -24,6 +24,54 @@ const io = socketIO(server, {
 });
 
 // ============================================================
+// SINGLE INSTANCE ENFORCER (Mencegah Zombie / Duplikasi Proses)
+// ============================================================
+const PID_FILE = path.join(__dirname, 'bot.pid');
+const currentPid = process.pid;
+
+function enforceSingleInstance() {
+    try {
+        if (fs.existsSync(PID_FILE)) {
+            const oldPid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
+            if (oldPid && oldPid !== currentPid) {
+                try {
+                    // Cek apakah PID lama masih hidup di OS
+                    process.kill(oldPid, 0);
+                    console.log(`⚠️ Terdeteksi proses bot lama (PID: ${oldPid}). Mematikan proses zombie...`);
+                    process.kill(oldPid, 'SIGTERM');
+                    setTimeout(() => {
+                        try { process.kill(oldPid, 'SIGKILL'); } catch (e) {}
+                    }, 1000);
+                } catch (e) {
+                    // Proses lama sudah mati, aman
+                }
+            }
+        }
+        fs.writeFileSync(PID_FILE, String(currentPid), 'utf8');
+        console.log(`🔒 Bot Single-Instance Lock aktif untuk PID: ${currentPid}`);
+    } catch (err) {
+        console.error('⚠️ Gagal memproses PID file:', err.message);
+    }
+}
+
+function cleanupPidFile() {
+    try {
+        if (fs.existsSync(PID_FILE)) {
+            const savedPid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
+            if (savedPid === currentPid) {
+                fs.unlinkSync(PID_FILE);
+            }
+        }
+    } catch (e) {}
+}
+
+enforceSingleInstance();
+
+process.on('exit', cleanupPidFile);
+process.on('SIGINT', () => { cleanupPidFile(); process.exit(0); });
+process.on('SIGTERM', () => { cleanupPidFile(); process.exit(0); });
+
+// ============================================================
 // STATE MANAGEMENT
 // ============================================================
 let clientStatus = 'not ready';
