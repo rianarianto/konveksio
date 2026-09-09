@@ -454,6 +454,14 @@ function initStartupSessions() {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Handle cPanel Passenger base path prefix (e.g. /bot or /bot/)
+app.use((req, res, next) => {
+    if (req.url.startsWith('/bot')) {
+        req.url = req.url.replace(/^\/bot/, '') || '/';
+    }
+    next();
+});
+
 // CORS
 app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
