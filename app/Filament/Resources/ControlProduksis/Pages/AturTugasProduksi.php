@@ -125,6 +125,8 @@ class AturTugasProduksi extends Page
 
 
 
+        $tasksForRepeater = [];
+
         foreach ($groupedTasks as $stageName => $tasks) {
             // Skip QC stages - dikontrol oleh toggle di atas, bukan row repeater
             if (str_starts_with($stageName, 'QC_')) {
