@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ShopScope;
 use Illuminate\Database\Eloquent\Model;
 
 class Supplier extends Model
@@ -14,6 +15,11 @@ class Supplier extends Model
         'address',
         'bank_info',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ShopScope());
+    }
 
     public function shop()
     {

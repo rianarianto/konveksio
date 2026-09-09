@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ShopScope;
 use Illuminate\Database\Eloquent\Model;
 
 class Material extends Model
@@ -14,6 +15,11 @@ class Material extends Model
         'unit',
         'supplier_id',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ShopScope());
+    }
 
     public function variants()
     {

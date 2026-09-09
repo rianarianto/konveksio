@@ -28,6 +28,8 @@ class OrderReturnResource extends Resource
     protected static ?string $pluralLabel = 'Retur Pesanan';
     protected static ?string $modelLabel = 'Retur Pesanan';
 
+    protected static bool $isScopedToTenant = true;
+
     protected static ?string $recordTitleAttribute = 'items_description';
 
     public static function form(Schema $schema): Schema

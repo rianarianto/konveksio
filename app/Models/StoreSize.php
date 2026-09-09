@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ShopScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -16,6 +17,11 @@ class StoreSize extends Model
         'sort_order',
         'is_active',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ShopScope());
+    }
 
     protected function casts(): array
     {

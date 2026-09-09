@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ShopScope;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
@@ -14,6 +15,11 @@ class Product extends Model
         'color_code',
         'supplier_id',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ShopScope());
+    }
 
     public function shop()
     {

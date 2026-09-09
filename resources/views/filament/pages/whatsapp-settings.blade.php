@@ -155,7 +155,7 @@
                     {{-- Text Info --}}
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2.5">
-                            <h2 class="text-lg font-semibold text-[#1f2937] tracking-tight">WhatsApp Gateway</h2>
+                            <h2 class="text-lg font-semibold text-[#1f2937] tracking-tight">WhatsApp Gateway <span class="text-sm font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">🏪 {{ $shopName }}</span></h2>
                             <template x-if="status === 'ready'">
                                 <span class="wa-badge" style="background-color: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0;">
                                     <span style="font-size: 8px;">●</span> ONLINE & SIAP
@@ -494,6 +494,7 @@
     <script>
     function whatsappSettings() {
         return {
+            shopId: {{ $shopId }},
             status: {!! json_encode($botStatus['status'] ?? null) !!},
             connectedPhone: {!! json_encode($botStatus['connectedPhone'] ?? null) !!},
             uptimeHuman: {!! json_encode($botStatus['uptime_human'] ?? null) !!},
@@ -558,8 +559,9 @@
                     const secretKey = {!! json_encode($secretKey) !!};
                     const headers = {};
                     if (secretKey) headers['x-bot-key'] = secretKey;
+                    headers['x-shop-id'] = String(this.shopId);
 
-                    const res = await fetch(botUrl + '/api/status', { headers });
+                    const res = await fetch(botUrl + '/api/status?shop_id=' + this.shopId, { headers });
                     if (res.ok) {
                         const data = await res.json();
                         this.applyStatusData(data);
@@ -575,8 +577,9 @@
                     const secretKey = {!! json_encode($secretKey) !!};
                     const headers = {};
                     if (secretKey) headers['x-bot-key'] = secretKey;
+                    headers['x-shop-id'] = String(this.shopId);
 
-                    const res = await fetch(botUrl + '/api/logs?limit=20', { headers });
+                    const res = await fetch(botUrl + '/api/logs?shop_id=' + this.shopId + '&limit=20', { headers });
                     if (res.ok) {
                         const data = await res.json();
                         this.logs = data.logs || [];

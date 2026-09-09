@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ShopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -76,6 +77,8 @@ class OrderReturn extends Model
 
     protected static function booted(): void
     {
+        static::addGlobalScope(new ShopScope());
+
         static::saving(function ($return) {
             if (empty($return->status)) {
                 $return->status = 'pending';

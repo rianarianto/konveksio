@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -35,12 +36,34 @@ class WhatsAppSettings extends Page
         return auth()->check() && in_array(auth()->user()->role, ['admin', 'owner']);
     }
 
+    public function getTitle(): string
+    {
+        $shopName = Filament::getTenant()?->name;
+        return $shopName ? "Pengaturan WhatsApp — {$shopName}" : 'Pengaturan WhatsApp';
+    }
+
     /**
      * Check if the current user is an Owner (for privileged actions like logout).
      */
     public function isOwner(): bool
     {
         return auth()->user()->role === 'owner';
+    }
+
+    /**
+     * Get the active Shop ID.
+     */
+    public function getShopId(): int
+    {
+        return (int) (Filament::getTenant()?->id ?? 1);
+    }
+
+    /**
+     * Get the active Shop Name.
+     */
+    public function getShopName(): string
+    {
+        return Filament::getTenant()?->name ?? 'Toko';
     }
 
     /**
@@ -68,43 +91,48 @@ class WhatsAppSettings extends Page
         $client = Http::timeout(10);
         $secretKey = $this->getSecretKey();
         if ($secretKey) {
-            $client = $client->withHeaders(['x-bot-key' => $secretKey]);
+            $client = $client->withHeaders([
+                'x-bot-key' => $secretKey,
+                'x-shop-id' => (string) $this->getShopId(),
+            ]);
         }
         return $client;
     }
 
     /**
-     * Fetch bot status from the /api/status endpoint.
-     * Returns null on failure.
+     * Fetch bot status from the /api/status endpoint for active shop.
      */
     public function fetchBotStatus(): ?array
     {
         try {
-            $response = $this->botClient()->get($this->getBotUrl() . '/api/status');
+            $response = $this->botClient()->get($this->getBotUrl() . '/api/status', [
+                'shop_id' => $this->getShopId(),
+            ]);
             if ($response->successful()) {
                 return $response->json();
             }
-            Log::warning('[WA Settings] Bot status fetch failed: HTTP ' . $response->status());
+            Log::warning("[WA Settings] Bot status fetch failed for shop {$this->getShopId()}: HTTP " . $response->status());
         } catch (\Exception $e) {
-            Log::warning('[WA Settings] Bot status fetch error: ' . $e->getMessage());
+            Log::warning("[WA Settings] Bot status fetch error for shop {$this->getShopId()}: " . $e->getMessage());
         }
         return null;
     }
 
     /**
-     * Fetch message logs from the bot.
+     * Fetch message logs from the bot for active shop.
      */
     public function fetchLogs(int $limit = 20): ?array
     {
         try {
             $response = $this->botClient()->get($this->getBotUrl() . '/api/logs', [
+                'shop_id' => $this->getShopId(),
                 'limit' => $limit,
             ]);
             if ($response->successful()) {
                 return $response->json();
             }
         } catch (\Exception $e) {
-            Log::warning('[WA Settings] Bot logs fetch error: ' . $e->getMessage());
+            Log::warning("[WA Settings] Bot logs fetch error for shop {$this->getShopId()}: " . $e->getMessage());
         }
         return null;
     }
@@ -118,7 +146,7 @@ class WhatsAppSettings extends Page
             $this->dispatch('wa-status-updated', status: $status, logs: $logs);
             \Filament\Notifications\Notification::make()
                 ->title('Data Diperbarui')
-                ->body('Status koneksi & metrik WhatsApp berhasil disinkronkan.')
+                ->body("Status koneksi WhatsApp ({$this->getShopName()}) berhasil disinkronkan.")
                 ->success()
                 ->send();
         } else {
@@ -133,11 +161,13 @@ class WhatsAppSettings extends Page
     public function actionReconnect(): void
     {
         try {
-            $response = $this->botClient()->post($this->getBotUrl() . '/api/reconnect');
+            $response = $this->botClient()->post($this->getBotUrl() . '/api/reconnect', [
+                'shop_id' => $this->getShopId(),
+            ]);
             
             \Filament\Notifications\Notification::make()
                 ->title('Proses Reconnect Dimulai')
-                ->body('Menyambung ulang session WhatsApp. Tunggu beberapa detik...')
+                ->body("Menyambung ulang session WhatsApp {$this->getShopName()}. Tunggu beberapa detik...")
                 ->info()
                 ->send();
 
@@ -166,6 +196,7 @@ class WhatsAppSettings extends Page
             $response = $this->botClient()->post($this->getBotUrl() . '/api', [
                 'nohp' => $number,
                 'pesan' => $message,
+                'shop_id' => $this->getShopId(),
             ]);
 
             $data = $response->json();
@@ -174,7 +205,7 @@ class WhatsAppSettings extends Page
             if ($isSuccess) {
                 \Filament\Notifications\Notification::make()
                     ->title('Pesan Terkirim!')
-                    ->body("Pesan berhasil diserahkan ke WhatsApp (ID: " . ($data['id'] ?? '-') . ").")
+                    ->body("Pesan berhasil diserahkan ke WhatsApp via {$this->getShopName()} (ID: " . ($data['id'] ?? '-') . ").")
                     ->success()
                     ->send();
             } else {
@@ -202,11 +233,13 @@ class WhatsAppSettings extends Page
         }
 
         try {
-            $this->botClient()->post($this->getBotUrl() . '/api/logout');
+            $this->botClient()->post($this->getBotUrl() . '/api/logout', [
+                'shop_id' => $this->getShopId(),
+            ]);
             
             \Filament\Notifications\Notification::make()
                 ->title('WhatsApp Logout')
-                ->body('Session lama telah dihapus. Silakan scan QR code baru.')
+                ->body("Session WhatsApp {$this->getShopName()} telah dihapus. Silakan scan QR code baru.")
                 ->warning()
                 ->send();
 
@@ -234,6 +267,8 @@ class WhatsAppSettings extends Page
             'isOwner' => $this->isOwner(),
             'botUrl' => $this->getBotUrl(),
             'secretKey' => $this->getSecretKey(),
+            'shopId' => $this->getShopId(),
+            'shopName' => $this->getShopName(),
         ];
     }
 }

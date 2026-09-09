@@ -37,6 +37,8 @@ class WorkerResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    protected static bool $isScopedToTenant = true;
+
     public static function canAccess(): bool
     {
         return in_array(auth()->user()->role, ['admin', 'owner']);

@@ -182,7 +182,7 @@ class NotificationHelper
                         . "🔗 {$link}";
                 }
 
-                self::sendWaMessage($phone, $pesan);
+                self::sendWaMessage($phone, $pesan, $wo->shop_id);
             }
         }
 
@@ -207,7 +207,7 @@ class NotificationHelper
                     . "Silakan buka portal untuk melakukan verifikasi:\n"
                     . "🔗 {$qcLink}";
 
-                self::sendWaMessage($qcWorker->phone, $qcPesan);
+                self::sendWaMessage($qcWorker->phone, $qcPesan, $wo->shop_id);
             } else {
                 Log::info("[WA-Bot] QC Review: tidak ada QC worker atau nomor HP untuk WO {$wo->wo_number}");
             }
@@ -241,7 +241,7 @@ class NotificationHelper
                     . "Buka portal QC Akhir:\n"
                     . "🔗 {$qcLink}";
 
-                self::sendWaMessage($qcWorker->phone, $qcPesan);
+                self::sendWaMessage($qcWorker->phone, $qcPesan, $wo->shop_id);
             } else {
                 Log::info("[WA-Bot] QC Akhir: tidak ada QC worker atau nomor HP untuk WO {$wo->wo_number}");
             }
@@ -267,7 +267,7 @@ class NotificationHelper
                     . "• Deadline: {$deadline}\n\n"
                     . "Silakan cek di dashboard admin.";
 
-                self::sendWaMessage($adminWorker->phone, $pesanAdmin);
+                self::sendWaMessage($adminWorker->phone, $pesanAdmin, $wo->shop_id);
             }
 
             // 2. WhatsApp notification to Owner (from Shop settings)
@@ -283,7 +283,7 @@ class NotificationHelper
                     . "• Deadline: {$deadline}\n\n"
                     . "Silakan pantau perkembangan order di sistem.";
 
-                self::sendWaMessage($shop->phone, $pesanOwner);
+                self::sendWaMessage($shop->phone, $pesanOwner, $wo->shop_id);
             }
 
             // 3. Database/System notification to admin & owner users in this shop
@@ -425,7 +425,7 @@ class NotificationHelper
                         . "Silakan buka portal QC Akhir:\n"
                         . "🔗 {$qcLink}";
 
-                    self::sendWaMessage($qcWorker->phone, $qcPesan);
+                    self::sendWaMessage($qcWorker->phone, $qcPesan, $wo->shop_id ?? $item->order?->shop_id);
                     return;
                 }
             }
@@ -433,6 +433,7 @@ class NotificationHelper
 
         // Grup per pekerja (satu pekerja bisa punya lebih dari 1 tahap)
         $workerTasks = $tasks->groupBy('assigned_to');
+        $itemShopId = $item->order?->shop_id;
 
         foreach ($workerTasks as $workerId => $workerTaskList) {
             $worker = $workerTaskList->first()?->assignedTo;
@@ -498,7 +499,7 @@ class NotificationHelper
                     . "🔗 {$link}";
             }
 
-            self::sendWaMessage($worker->phone, $pesan);
+            self::sendWaMessage($worker->phone, $pesan, $itemShopId);
         }
     }
 
@@ -556,7 +557,7 @@ class NotificationHelper
             . "🔗 {$link}";
 
         try {
-            self::sendWaMessage($worker->phone, $pesan);
+            self::sendWaMessage($worker->phone, $pesan, $wo->shop_id);
         } catch (\Exception $e) {
             Log::error('[WA-Bot] Gagal kirim notif revisi QC: ' . $e->getMessage());
         }
@@ -599,13 +600,13 @@ class NotificationHelper
             . "Silakan buka portal untuk melakukan review ulang:\n"
             . "🔗 {$qcLink}";
 
-        self::sendWaMessage($qcWorker->phone, $pesan);
+        self::sendWaMessage($qcWorker->phone, $pesan, $wo->shop_id);
     }
 
     /**
      * Helper terpusat mengirim pesan WA via wa-bot service (dengan proteksi x-bot-key jika ada)
      */
-    public static function sendWaMessage(string $phone, string $pesan): bool
+    public static function sendWaMessage(string $phone, string $pesan, ?int $shopId = null): bool
     {
         try {
             $rawUrl = config('services.wa_bot.url', 'http://localhost:5001');
@@ -621,16 +622,22 @@ class NotificationHelper
                 $request = $request->withHeaders(['x-bot-key' => $secretKey]);
             }
 
-            $response = $request->post($url, [
+            $payload = [
                 'nohp'    => $phone,
                 'pesan'   => $pesan,
                 'bot_key' => $secretKey,
-            ]);
+            ];
+
+            if ($shopId) {
+                $payload['shop_id'] = (string) $shopId;
+            }
+
+            $response = $request->post($url, $payload);
 
             if (!$response->successful()) {
-                Log::error("[WA-Bot] HTTP Request ke {$url} gagal: HTTP {$response->status()} — " . $response->body());
+                Log::error("[WA-Bot] HTTP Request ke {$url} gagal (Shop {$shopId}): HTTP {$response->status()} — " . $response->body());
             } else {
-                Log::info("[WA-Bot] Berhasil kirim pesan WA ke {$phone} via {$url}");
+                Log::info("[WA-Bot] Berhasil kirim pesan WA ke {$phone} via {$url} (Shop {$shopId})");
             }
 
             return $response->successful();
