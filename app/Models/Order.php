@@ -99,9 +99,8 @@ class Order extends Model
         $yearMonth = now()->format('Ym');
         $prefix = "#ORD-{$yearMonth}-";
 
-        // Get the last order for this shop in this month
-        $lastOrder = static::withoutGlobalScope(ShopScope::class)
-            ->where('shop_id', $shopId)
+        // Query globally across all shops to prevent database unique constraint violations
+        $lastOrder = static::withoutGlobalScopes()
             ->where('order_number', 'like', "{$prefix}%")
             ->orderBy('id', 'desc')
             ->first();
@@ -114,7 +113,16 @@ class Order extends Model
             $newNumber = 1;
         }
 
-        return $prefix . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
+        // Loop guarantee uniqueness in case of concurrency or gaps
+        do {
+            $candidate = $prefix . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
+            $exists = static::withoutGlobalScopes()->where('order_number', $candidate)->exists();
+            if ($exists) {
+                $newNumber++;
+            }
+        } while ($exists);
+
+        return $candidate;
     }
 
     public function shop(): BelongsTo

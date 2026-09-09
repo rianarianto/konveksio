@@ -154,15 +154,23 @@ class WorkOrder extends Model
         $yearMonth = now()->format('Ym');
         $prefix = "#WO-{$yearMonth}-";
 
-        $last = static::withoutGlobalScope(ShopScope::class)
-            ->where('shop_id', $shopId)
+        // Query globally across all shops to prevent database unique constraint violations
+        $last = static::withoutGlobalScopes()
             ->where('wo_number', 'like', "{$prefix}%")
             ->orderBy('id', 'desc')
             ->first();
 
         $next = $last ? ((int) str_replace($prefix, '', $last->wo_number)) + 1 : 1;
 
-        return $prefix . str_pad($next, 3, '0', STR_PAD_LEFT);
+        do {
+            $candidate = $prefix . str_pad($next, 3, '0', STR_PAD_LEFT);
+            $exists = static::withoutGlobalScopes()->where('wo_number', $candidate)->exists();
+            if ($exists) {
+                $next++;
+            }
+        } while ($exists);
+
+        return $candidate;
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
