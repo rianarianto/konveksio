@@ -784,7 +784,15 @@ class OrderResource extends Resource
                 // KOLOM 1: Pesanan & Pelanggan
                 TextColumn::make('order_number')
                     ->label('Pesanan & Pelanggan')
-                    ->searchable(['order_number', 'customer.name', 'customer.phone'])
+                    ->searchable(query: function ($query, string $search) {
+                        $query->where(function ($q) use ($search) {
+                            $q->where('order_number', 'like', "%{$search}%")
+                              ->orWhereHas('customer', function ($cq) use ($search) {
+                                  $cq->where('name', 'like', "%{$search}%")
+                                     ->orWhere('phone', 'like', "%{$search}%");
+                              });
+                        });
+                    })
                     ->sortable()
                     ->html()
                     ->extraCellAttributes(['style' => 'vertical-align:top;'])
