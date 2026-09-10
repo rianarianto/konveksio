@@ -438,8 +438,7 @@ class ControlProduksiResource extends Resource
                             : '';
                         return new HtmlString($prefix . $order->order_number . ' — ' . ($order->customer->name ?? 'Tanpa Nama'));
                     })
-                    ->collapsible()
-                    ->collapsedByDefault(true),
+                    ->collapsible(),
 
                 TableGroup::make('production_category')
                     ->label('Kategori Pesanan')
@@ -449,11 +448,11 @@ class ControlProduksiResource extends Resource
                         'jasa' => '🔧 Jasa',
                         default => '🏭 Produksi',
                     })
-                    ->collapsible()
-                    ->collapsedByDefault(true),
+                    ->collapsible(),
 
             ])
             ->defaultGroup('order.order_number')
+            ->collapsedGroupsByDefault()
             ->modifyQueryUsing(
                 function($query) {
                     $returMap = static::getReturMapping();
