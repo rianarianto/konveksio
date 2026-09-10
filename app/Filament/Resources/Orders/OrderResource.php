@@ -575,7 +575,8 @@ class OrderResource extends Resource
                                 ->columnSpanFull(),
                         ])
                         ->visible(fn (?Order $record) => $record?->status === 'selesai' || $record?->status === 'siap_diambil' || !empty($record?->pickup_proof) || $record?->returns()->exists())
-                        ->collapsible(),
+                        ->collapsible()
+                        ->collapsed(),
 
                 ])
                 ->columnSpanFull(),
@@ -783,7 +784,7 @@ class OrderResource extends Resource
                 // KOLOM 1: Pesanan & Pelanggan
                 TextColumn::make('order_number')
                     ->label('Pesanan & Pelanggan')
-                    ->searchable()
+                    ->searchable(['order_number', 'customer.name', 'customer.phone'])
                     ->sortable()
                     ->html()
                     ->extraCellAttributes(['style' => 'vertical-align:top;'])
@@ -1232,8 +1233,8 @@ class OrderResource extends Resource
                         ->visible(fn() => auth()->user()->role === 'owner'),
                 ]),
             ])
-            ->defaultSort('is_express', 'desc')
-            ->modifyQueryUsing(fn($query) => $query->orderBy('is_express', 'desc')->orderBy('order_date', 'desc'))
+            ->defaultSort('id', 'desc')
+            ->modifyQueryUsing(fn($query) => $query->orderBy('is_express', 'desc')->orderBy('id', 'desc'))
             ->extraAttributes([
                 'class' => 'orders-main-table-container',
             ]);

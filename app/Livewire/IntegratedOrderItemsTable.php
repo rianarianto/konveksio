@@ -2069,7 +2069,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                         return new \Illuminate\Support\HtmlString($html);
                     })
-                    ->collapsible(),
+                    ->collapsible()
+                    ->collapsedByDefault(true),
             ])
             ->defaultGroup('item_group_identity')
             ->groupingSettingsHidden()

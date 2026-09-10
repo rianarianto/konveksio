@@ -139,6 +139,11 @@ class ControlProduksiResource extends Resource
         $returns = \App\Models\OrderReturn::all();
         $normalIds = \DB::table('order_items')
             ->selectRaw('MIN(id) as id')
+            ->where(function ($q) {
+                $q->whereNotNull('design_image')
+                  ->orWhere('design_status', 'approved')
+                  ->orWhereIn('production_category', ['non_produksi', 'jasa']);
+            })
             ->groupBy([
                 'order_id',
                 'product_name',
@@ -174,6 +179,11 @@ class ControlProduksiResource extends Resource
     {
         $normalIds = \DB::table('order_items')
             ->selectRaw('MIN(id) as id')
+            ->where(function ($q) {
+                $q->whereNotNull('design_image')
+                  ->orWhere('design_status', 'approved')
+                  ->orWhereIn('production_category', ['non_produksi', 'jasa']);
+            })
             ->groupBy([
                 'order_id',
                 'product_name',
@@ -189,7 +199,8 @@ class ControlProduksiResource extends Resource
 
         return parent::getEloquentQuery()
             ->with(['order.customer', 'productionTasks'])
-            ->whereIn('order_items.id', empty($allIds) ? [0] : $allIds);
+            ->whereIn('order_items.id', empty($allIds) ? [0] : $allIds)
+            ->orderBy('order_items.id', 'desc');
     }
 
 
@@ -427,7 +438,8 @@ class ControlProduksiResource extends Resource
                             : '';
                         return new HtmlString($prefix . $order->order_number . ' — ' . ($order->customer->name ?? 'Tanpa Nama'));
                     })
-                    ->collapsible(),
+                    ->collapsible()
+                    ->collapsedByDefault(true),
 
                 TableGroup::make('production_category')
                     ->label('Kategori Pesanan')
@@ -437,7 +449,8 @@ class ControlProduksiResource extends Resource
                         'jasa' => '🔧 Jasa',
                         default => '🏭 Produksi',
                     })
-                    ->collapsible(),
+                    ->collapsible()
+                    ->collapsedByDefault(true),
 
             ])
             ->defaultGroup('order.order_number')

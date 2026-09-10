@@ -3,7 +3,9 @@ const {
     useMultiFileAuthState,
     DisconnectReason,
     fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore
+    makeCacheableSignalKeyStore,
+    Browsers,
+    proto
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const qrcode = require('qrcode');
@@ -257,17 +259,18 @@ const connectToWhatsApp = async (session) => {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
             },
-            browser: [`Konveksio Shop ${session.shopId}`, 'Chrome', '1.0.0'],
+            browser: Browsers.ubuntu('Chrome'),
+            syncFullHistory: false,
             generateHighQualityLinkPreview: true,
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 25000,
             getMessage: async (key) => {
-                const msg = session.messageStore.get(key.id);
-                if (msg) {
-                    return msg;
+                if (session.messageStore.has(key.id)) {
+                    const msg = session.messageStore.get(key.id);
+                    return msg?.message || msg || proto.Message.fromObject({});
                 }
-                return { conversation: '' };
+                return proto.Message.fromObject({});
             }
         });
 

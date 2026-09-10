@@ -417,6 +417,7 @@ class DesignTaskResource extends Resource
                     ->label('Pesanan')
                     ->getTitleFromRecordUsing(fn(Model $record): string => $record->order->order_number . ' - ' . ($record->order->customer->name ?? 'Tanpa Nama'))
                     ->collapsible()
+                    ->collapsedByDefault(true)
                     ->orderQueryUsing(fn ($query) => $query->orderBy('order_id', 'desc'))
             )
             ->defaultSort('order_id', 'desc')
