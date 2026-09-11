@@ -778,8 +778,6 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                         
                                                         $set('bulk_bahan', $existing->bahan_id);
                                                         $set('bulk_material_variant_id', $details['material_variant_id'] ?? null);
-                                                        $set('specification_groups', []);
-                                                        
                                                         $sablonItem = OrderItem::where('order_id', $this->order->id)
                                                              ->where('product_name', $state)
                                                              ->get()
@@ -789,9 +787,81 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                          $set('bulk_sablon_teknik', $sDetails['sablon_jenis'] ?? null);
                                                          $set('bulk_sablon_lokasi', $sDetails['sablon_lokasi'] ?? null);
                                                          $set('bulk_sablon_keterangan', $sDetails['sablon_keterangan'] ?? null);
+
+                                                         // Populate existing specification groups along with sizes & custom people
+                                                         $existingItems = OrderItem::where('order_id', $this->order->id)
+                                                             ->where('product_name', $state)
+                                                             ->get();
+
+                                                         $grouped = $existingItems->groupBy(function($item) {
+                                                             $d = $item->size_and_request_details ?? [];
+                                                             return implode('|', [
+                                                                 $d['group_label'] ?? '',
+                                                                 $d['gender'] ?? 'L',
+                                                                 $d['model'] ?? 'biasa',
+                                                                 $d['sleeve_model'] ?? 'pendek',
+                                                                 $d['pocket_model'] ?? 'tanpa_saku',
+                                                                 $d['button_model'] ?? 'biasa',
+                                                                 $d['collar_model'] ?? 'biasa',
+                                                                 $d['spec_notes'] ?? '',
+                                                             ]);
+                                                         });
+
+                                                         $specGroups = [];
+                                                         foreach ($grouped as $groupItems) {
+                                                             $first = $groupItems->first();
+                                                             $d = $first->size_and_request_details ?? [];
+                                                             
+                                                             $groupData = [
+                                                                 'group_label' => $d['group_label'] ?? null,
+                                                                 'bulk_gender' => $d['gender'] ?? 'L',
+                                                                 'bulk_model' => $d['model'] ?? 'biasa',
+                                                                 'bulk_sleeve' => $d['sleeve_model'] ?? 'pendek',
+                                                                 'bulk_pocket' => $d['pocket_model'] ?? 'tanpa_saku',
+                                                                 'bulk_button' => $d['button_model'] ?? 'biasa',
+                                                                 'bulk_collar' => $d['collar_model'] ?? 'biasa',
+                                                                 'spec_notes' => $d['spec_notes'] ?? null,
+                                                                 'price_custom' => $groupItems->where('size', 'Custom')->first()?->price ?? null,
+                                                             ];
+
+                                                             // Standard sizes
+                                                             foreach ($sizeOptions as $key => $label) {
+                                                                 $sItems = $groupItems->where('size', $key);
+                                                                 if ($sItems->isNotEmpty()) {
+                                                                     $groupData["qty_{$key}"] = $sItems->sum('quantity');
+                                                                     $groupData["price_{$key}"] = $sItems->first()->price;
+                                                                 } else {
+                                                                     $groupData["qty_{$key}"] = 0;
+                                                                     $groupData["price_{$key}"] = 0;
+                                                                 }
+                                                             }
+
+                                                             // Custom people
+                                                             $customList = [];
+                                                             foreach ($groupItems->where('size', 'Custom') as $cItem) {
+                                                                 $cD = $cItem->size_and_request_details ?? [];
+                                                                 $meas = $cD['custom_measurements'] ?? $cD['measurements'] ?? [];
+                                                                 $customList[] = [
+                                                                     'item_id' => $cItem->id,
+                                                                     'name' => $cItem->recipient_name,
+                                                                     'notes' => $cD['person_notes'] ?? $cD['note'] ?? null,
+                                                                     'ld' => $meas['ld'] ?? $cD['LD'] ?? null,
+                                                                     'pb' => $meas['pb'] ?? $cD['PB'] ?? null,
+                                                                     'pl' => $meas['pl'] ?? $cD['PL'] ?? null,
+                                                                     'lb' => $meas['lb'] ?? $cD['LB'] ?? null,
+                                                                     'lp' => $meas['lp'] ?? $cD['LP'] ?? null,
+                                                                     'lph' => $meas['lph'] ?? $cD['LPh'] ?? null,
+                                                                 ];
+                                                             }
+                                                             $groupData['custom_people'] = $customList;
+
+                                                             $specGroups[] = $groupData;
+                                                         }
+
+                                                         $set('specification_groups', $specGroups);
                                                     }
 
-                                                    Notification::make()->title("Spesifikasi '{$state}' disalin!")->success()->send();
+                                                    Notification::make()->title("Spesifikasi & Varian '{$state}' dimuat!")->success()->send();
                                                 }
                                             })
                                             ->columnSpan(2),
@@ -1247,6 +1317,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 ->collapsible()
                                                 ->compact()
                                                 ->schema([
+                                                    \Filament\Forms\Components\Hidden::make('item_id'),
                                                     Grid::make(12)->schema([
                                                         TextInput::make('name')
                                                             ->label('Nama Pemesan / Label')
@@ -1375,50 +1446,83 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                 $remainingStockToStore = $useStock ? $sanitizeInt($data['bulk_stock_qty']) : 0;
                             }
 
+                            $existingItems = OrderItem::where('order_id', $this->order->id)
+                                ->where('product_name', $productName)
+                                ->get();
+                            $existingItemIdsToKeep = [];
+
                             foreach ($specGroups as $group) {
                                 $groupCreated = false;
+                                
+                                // Standard sizes sync
                                 foreach ($sizeOptions as $key => $label) {
                                     $qty = $sanitizeInt($group["qty_{$key}"] ?? 0);
                                     if ($qty <= 0) continue;
 
                                     $groupCreated = true;
-                                    if ($category === 'produksi') {
-                                        $itemStockUsed = ($isFirstItem && $useStock) ? $remainingStockToStore : 0;
-                                        $isFirstItem = false;
-                                        $remainingStockToStore = 0;
+                                    $itemStockUsed = ($isFirstItem && $useStock) ? $remainingStockToStore : 0;
+                                    $isFirstItem = false;
+                                    $remainingStockToStore = 0;
 
-                                        $rawPrice = $group["price_{$key}"] ?? $data['bulk_price'] ?? 0;
-                                        $this->order->orderItems()->create([
+                                    $rawPrice = $group["price_{$key}"] ?? $data['bulk_price'] ?? 0;
+                                    $itemPrice = $sanitizeInt($rawPrice);
+
+                                    $itemDetails = [
+                                        'gender' => $group['bulk_gender'] ?? 'L',
+                                        'sleeve_model' => $group['bulk_sleeve'] ?? 'pendek',
+                                        'pocket_model' => $group['bulk_pocket'] ?? 'tanpa_saku',
+                                        'button_model' => $group['bulk_button'] ?? 'biasa',
+                                        'collar_model' => $group['bulk_collar'] ?? 'biasa',
+                                        'is_tunic' => ($group['bulk_model'] ?? 'biasa') === 'tunic',
+                                        'model' => $group['bulk_model'] ?? 'biasa',
+                                        'group_label' => $group['group_label'] ?? null,
+                                        'spec_notes' => $group['spec_notes'] ?? null,
+                                        'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
+                                        'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
+                                        'sablon_keterangan' => $data['bulk_sablon_keterangan'] ?? null,
+                                        'material_variant_id' => $variantId,
+                                        'product_variant_id' => null,
+                                        'supplier_product' => null,
+                                        'use_stock' => $useStock,
+                                        'stock_qty_used' => $itemStockUsed,
+                                    ];
+
+                                    // Match existing standard size item
+                                    $matchedItem = $existingItems->first(function($item) use ($key, $group, $data) {
+                                        if ($item->size !== $key) return false;
+                                        $d = $item->size_and_request_details ?? [];
+                                        return ($d['group_label'] ?? null) === ($group['group_label'] ?? null)
+                                            && ($d['gender'] ?? 'L') === ($group['bulk_gender'] ?? 'L')
+                                            && ($d['sleeve_model'] ?? 'pendek') === ($group['bulk_sleeve'] ?? 'pendek')
+                                            && ($d['collar_model'] ?? 'biasa') === ($group['bulk_collar'] ?? 'biasa')
+                                            && ($d['model'] ?? 'biasa') === ($group['bulk_model'] ?? 'biasa');
+                                    });
+
+                                    if ($matchedItem) {
+                                        $matchedItem->update([
+                                            'production_category' => $category,
+                                            'bahan_id' => $data['bulk_bahan'] ?? null,
+                                            'price' => $itemPrice,
+                                            'quantity' => $qty,
+                                            'size_and_request_details' => $itemDetails,
+                                        ]);
+                                        $existingItemIdsToKeep[] = $matchedItem->id;
+                                    } else {
+                                        $newItem = $this->order->orderItems()->create([
                                             'product_name' => $productName,
                                             'production_category' => $category,
                                             'bahan_id' => $data['bulk_bahan'] ?? null,
                                             'size' => $key,
-                                            'price' => $sanitizeInt($rawPrice),
+                                            'price' => $itemPrice,
                                             'quantity' => $qty,
                                             'design_status' => $this->getNewItemDesignStatus($productName),
-                                            'size_and_request_details' => [
-                                                'gender' => $group['bulk_gender'] ?? 'L',
-                                                'sleeve_model' => $group['bulk_sleeve'] ?? 'pendek',
-                                                'pocket_model' => $group['bulk_pocket'] ?? 'tanpa_saku',
-                                                'button_model' => $group['bulk_button'] ?? 'biasa',
-                                                'collar_model' => $group['bulk_collar'] ?? 'biasa',
-                                                'is_tunic' => ($group['bulk_model'] ?? 'biasa') === 'tunic',
-                                                'model' => $group['bulk_model'] ?? 'biasa',
-                                                'group_label' => $group['group_label'] ?? null,
-                                                'spec_notes' => $group['spec_notes'] ?? null,
-                                                'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
-                                                'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
-                                                'sablon_keterangan' => $data['bulk_sablon_keterangan'] ?? null,
-                                                'material_variant_id' => $variantId,
-                                                'product_variant_id' => null,
-                                                'supplier_product' => null,
-                                                'use_stock' => $useStock,
-                                                'stock_qty_used' => $itemStockUsed,
-                                            ],
+                                            'size_and_request_details' => $itemDetails,
                                         ]);
+                                        $existingItemIdsToKeep[] = $newItem->id;
                                     }
                                 }
                                 
+                                // Custom people sync
                                 $customPeople = $group['custom_people'] ?? [];
                                 $cQty = count($customPeople);
                                 if ($cQty > 0) {
@@ -1436,74 +1540,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         $personPrice = $sanitizeInt($rawPersonPrice);
                                         $personName = !empty($personData['name']) ? $personData['name'] : null;
 
-                                        $this->order->orderItems()->create([
-                                            'product_name' => $productName,
-                                            'production_category' => $category,
-                                            'bahan_id' => ($category === 'produksi') ? ($data['bulk_bahan'] ?? null) : null,
-                                            'size' => 'Custom',
-                                            'quantity' => 1,
-                                            'price' => $personPrice,
-                                            'recipient_name' => $personName,
-                                            'design_status' => $this->getNewItemDesignStatus($productName),
-                                            'size_and_request_details' => [
-                                                'gender' => $group['bulk_gender'] ?? 'L',
-                                                'sleeve_model' => $group['bulk_sleeve'] ?? 'pendek',
-                                                'pocket_model' => $group['bulk_pocket'] ?? 'tanpa_saku',
-                                                'button_model' => $group['bulk_button'] ?? 'biasa',
-                                                'collar_model' => $group['bulk_collar'] ?? 'biasa',
-                                                'is_tunic' => ($group['bulk_model'] ?? 'biasa') === 'tunic',
-                                                'model' => $group['bulk_model'] ?? 'biasa',
-                                                'group_label' => $group['group_label'] ?? null,
-                                                'spec_notes' => $group['spec_notes'] ?? null,
-                                                'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
-                                                'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
-                                                'sablon_keterangan' => $data['bulk_sablon_keterangan'] ?? null,
-                                                'person_notes' => $personData['notes'] ?? null,
-                                                'custom_measurements' => [
-                                                    'ld' => $personData['ld'] ?? null,
-                                                    'pb' => $personData['pb'] ?? null,
-                                                    'pl' => $personData['pl'] ?? null,
-                                                    'lb' => $personData['lb'] ?? null,
-                                                    'lp' => $personData['lp'] ?? null,
-                                                    'lph' => $personData['lph'] ?? null,
-                                                ],
-                                                'measurements' => [
-                                                    'LD' => $personData['ld'] ?? null,
-                                                    'PB' => $personData['pb'] ?? null,
-                                                    'PL' => $personData['pl'] ?? null,
-                                                    'LB' => $personData['lb'] ?? null,
-                                                    'LP' => $personData['lp'] ?? null,
-                                                    'LPh' => $personData['lph'] ?? null,
-                                                ],
-                                                'LD' => $personData['ld'] ?? null,
-                                                'PB' => $personData['pb'] ?? null,
-                                                'PL' => $personData['pl'] ?? null,
-                                                'LB' => $personData['lb'] ?? null,
-                                                'LP' => $personData['lp'] ?? null,
-                                                'LPh' => $personData['lph'] ?? null,
-                                                'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
-                                                'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
-                                                'sablon_keterangan' => $data['bulk_sablon_keterangan'] ?? null,
-                                                'material_variant_id' => $customVariantId,
-                                                'product_variant_id' => null,
-                                                'supplier_product' => null,
-                                                'use_stock' => $customUseStock,
-                                                'stock_qty_used' => $customStockUsed,
-                                            ],
-                                        ]);
-                                    }
-                                }
-
-                                if (!$groupCreated) {
-                                    $this->order->orderItems()->create([
-                                        'product_name' => $productName,
-                                        'production_category' => $category,
-                                        'bahan_id' => ($category === 'produksi') ? ($data['bulk_bahan'] ?? null) : null,
-                                        'size' => 'M',
-                                        'quantity' => 0,
-                                        'price' => (int) ($group['price_custom'] ?? $data['bulk_price'] ?? 0),
-                                        'design_status' => $this->getNewItemDesignStatus($productName),
-                                        'size_and_request_details' => [
+                                        $customDetails = [
                                             'gender' => $group['bulk_gender'] ?? 'L',
                                             'sleeve_model' => $group['bulk_sleeve'] ?? 'pendek',
                                             'pocket_model' => $group['bulk_pocket'] ?? 'tanpa_saku',
@@ -1516,13 +1553,72 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             'sablon_jenis' => $data['bulk_sablon_teknik'] ?? null,
                                             'sablon_lokasi' => $data['bulk_sablon_lokasi'] ?? null,
                                             'sablon_keterangan' => $data['bulk_sablon_keterangan'] ?? null,
-                                            'material_variant_id' => $variantId,
+                                            'person_notes' => $personData['notes'] ?? null,
+                                            'custom_measurements' => [
+                                                'ld' => $personData['ld'] ?? null,
+                                                'pb' => $personData['pb'] ?? null,
+                                                'pl' => $personData['pl'] ?? null,
+                                                'lb' => $personData['lb'] ?? null,
+                                                'lp' => $personData['lp'] ?? null,
+                                                'lph' => $personData['lph'] ?? null,
+                                            ],
+                                            'measurements' => [
+                                                'LD' => $personData['ld'] ?? null,
+                                                'PB' => $personData['pb'] ?? null,
+                                                'PL' => $personData['pl'] ?? null,
+                                                'LB' => $personData['lb'] ?? null,
+                                                'LP' => $personData['lp'] ?? null,
+                                                'LPh' => $personData['lph'] ?? null,
+                                            ],
+                                            'LD' => $personData['ld'] ?? null,
+                                            'PB' => $personData['pb'] ?? null,
+                                            'PL' => $personData['pl'] ?? null,
+                                            'LB' => $personData['lb'] ?? null,
+                                            'LP' => $personData['lp'] ?? null,
+                                            'LPh' => $personData['lph'] ?? null,
+                                            'material_variant_id' => $customVariantId,
                                             'product_variant_id' => null,
                                             'supplier_product' => null,
-                                            'use_stock' => $useStock,
-                                            'stock_qty_used' => 0,
-                                        ],
-                                    ]);
+                                            'use_stock' => $customUseStock,
+                                            'stock_qty_used' => $customStockUsed,
+                                        ];
+
+                                        $existingCustomId = $personData['item_id'] ?? null;
+                                        $matchedCustom = $existingCustomId ? $existingItems->firstWhere('id', $existingCustomId) : null;
+
+                                        if ($matchedCustom) {
+                                            $matchedCustom->update([
+                                                'production_category' => $category,
+                                                'bahan_id' => ($category === 'produksi') ? ($data['bulk_bahan'] ?? null) : null,
+                                                'price' => $personPrice,
+                                                'recipient_name' => $personName,
+                                                'size_and_request_details' => $customDetails,
+                                            ]);
+                                            $existingItemIdsToKeep[] = $matchedCustom->id;
+                                        } else {
+                                            $newCustom = $this->order->orderItems()->create([
+                                                'product_name' => $productName,
+                                                'production_category' => $category,
+                                                'bahan_id' => ($category === 'produksi') ? ($data['bulk_bahan'] ?? null) : null,
+                                                'size' => 'Custom',
+                                                'quantity' => 1,
+                                                'price' => $personPrice,
+                                                'recipient_name' => $personName,
+                                                'design_status' => $this->getNewItemDesignStatus($productName),
+                                                'size_and_request_details' => $customDetails,
+                                            ]);
+                                            $existingItemIdsToKeep[] = $newCustom->id;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // If this was an existing product, remove items that were deleted from form
+                            if ($existingItems->isNotEmpty() && !empty($existingItemIdsToKeep)) {
+                                foreach ($existingItems as $oldItem) {
+                                    if (!in_array($oldItem->id, $existingItemIdsToKeep)) {
+                                        $oldItem->delete();
+                                    }
                                 }
                             }
                         }
