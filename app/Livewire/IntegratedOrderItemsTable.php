@@ -2116,9 +2116,17 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
         $recordSablonLokasi = $recordDetails['sablon_lokasi'] ?? null;
         $recordSablonKeterangan = $recordDetails['sablon_keterangan'] ?? null;
 
+        $isCustom = $record->size === 'Custom';
+
         $query = OrderItem::where('order_id', $record->order_id)
             ->where('product_name', $record->product_name)
             ->where('production_category', $record->production_category);
+
+        if ($isCustom) {
+            $query->where('size', 'Custom');
+        } else {
+            $query->where('size', '!=', 'Custom');
+        }
 
         if ($record->bahan_id === null) {
             $query->whereNull('bahan_id');
