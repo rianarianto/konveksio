@@ -341,6 +341,13 @@ class DesignTaskResource extends Resource
                         ->schema([
                             FileUpload::make('design_image')
                                 ->label('Pilih File Artwork')
+                                ->helperText(new HtmlString('
+                                    <div class="mt-2 text-xs text-gray-500 space-y-1">
+                                        <div>📄 <strong>Format yang didukung:</strong> JPG, PNG, WEBP, PDF</div>
+                                        <div>📦 <strong>Ukuran maksimal:</strong> 5 MB</div>
+                                        <div>💡 <em>Tips: Gambar akan otomatis dioptimasi & dikompresi agar tetap tajam namun ringan dibuka tukang.</em></div>
+                                    </div>
+                                '))
                                 ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
                                 ->maxSize(5120) // 5MB Limit
                                 ->disk('public')
