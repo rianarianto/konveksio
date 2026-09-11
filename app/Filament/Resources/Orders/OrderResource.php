@@ -574,9 +574,17 @@ class OrderResource extends Resource
                                 })
                                 ->columnSpanFull(),
                         ])
-                        ->visible(fn (?Order $record) => $record?->status === 'selesai' || $record?->status === 'siap_diambil' || !empty($record?->pickup_proof) || $record?->returns()->exists())
+                        ->visible(function (?Order $record): bool {
+                            if (!$record) return false;
+                            return $record->status === 'selesai' 
+                                || $record->status === 'siap_diambil' 
+                                || $record->status === 'diambil'
+                                || !empty($record->pickup_proof) 
+                                || !empty($record->pickup_at)
+                                || $record->returns()->exists();
+                        })
                         ->collapsible()
-                        ->collapsed(),
+                        ->collapsed(false),
 
                 ])
                 ->columnSpanFull(),
