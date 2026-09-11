@@ -1315,6 +1315,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                 ->addActionLabel('+ Tambah Baju Custom')
                                                 ->defaultItems(0)
                                                 ->collapsible()
+                                                ->collapsed()
                                                 ->compact()
                                                 ->schema([
                                                     \Filament\Forms\Components\Hidden::make('item_id'),
@@ -2173,7 +2174,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
             ->defaultGroup('item_group_identity')
             ->collapsedGroupsByDefault()
             ->groupingSettingsHidden()
-            ->paginated(false)
+            ->paginated([10, 25, 50])
+            ->defaultPaginationPageOption(10)
             ->defaultSort('product_name', 'asc')
             ->defaultKeySort(false);
     }
