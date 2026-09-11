@@ -99,6 +99,7 @@ class PaymentsRelationManager extends RelationManager
                 ->numeric()
                 ->prefix('Rp')
                 ->required()
+                ->dehydrateStateUsing(fn($state) => (int) preg_replace('/[^\d]/', '', (string) ($state ?? 0)))
                 ->minValue(1)
                 ->maxValue(function () {
                     $order = $this->getOwnerRecord();

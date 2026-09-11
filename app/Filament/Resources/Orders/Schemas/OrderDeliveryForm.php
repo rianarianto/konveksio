@@ -58,6 +58,7 @@ class OrderDeliveryForm
                         ->label('Nominal Pelunasan (Rp)')
                         ->numeric()
                         ->prefix('Rp')
+                        ->dehydrateStateUsing(fn($state) => (int) preg_replace('/[^\d]/', '', (string) ($state ?? 0)))
                         ->helperText(function ($record) {
                             if (!$record) return null;
                             $order = $record instanceof Order ? $record : $record->order ?? null;

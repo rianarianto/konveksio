@@ -1367,16 +1367,18 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             $useStock = false;
                             $isFirstItem = true;
                             $remainingStockToStore = 0;
+                            $sanitizeInt = fn($val) => (int) preg_replace('/[^\d]/', '', (string) ($val ?? 0));
+
                             if ($category === 'produksi') {
                                 $variantId = $data['bulk_material_variant_id'] ?? null;
                                 $useStock = filled($data['bulk_stock_qty'] ?? null);
-                                $remainingStockToStore = $useStock ? (int) ($data['bulk_stock_qty']) : 0;
+                                $remainingStockToStore = $useStock ? $sanitizeInt($data['bulk_stock_qty']) : 0;
                             }
 
                             foreach ($specGroups as $group) {
                                 $groupCreated = false;
                                 foreach ($sizeOptions as $key => $label) {
-                                    $qty = (int) ($group["qty_{$key}"] ?? 0);
+                                    $qty = $sanitizeInt($group["qty_{$key}"] ?? 0);
                                     if ($qty <= 0) continue;
 
                                     $groupCreated = true;
@@ -1385,12 +1387,13 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         $isFirstItem = false;
                                         $remainingStockToStore = 0;
 
+                                        $rawPrice = $group["price_{$key}"] ?? $data['bulk_price'] ?? 0;
                                         $this->order->orderItems()->create([
                                             'product_name' => $productName,
                                             'production_category' => $category,
                                             'bahan_id' => $data['bulk_bahan'] ?? null,
                                             'size' => $key,
-                                            'price' => (int) ($group["price_{$key}"] ?? $data['bulk_price'] ?? 0),
+                                            'price' => $sanitizeInt($rawPrice),
                                             'quantity' => $qty,
                                             'design_status' => $this->getNewItemDesignStatus($productName),
                                             'size_and_request_details' => [
@@ -1429,7 +1432,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         $isFirstItem = false;
                                         $remainingStockToStore = 0;
 
-                                        $personPrice = (int) ($group['price_custom'] ?? $data['bulk_price_custom'] ?? $data['bulk_price'] ?? 0);
+                                        $rawPersonPrice = $group['price_custom'] ?? $data['bulk_price_custom'] ?? $data['bulk_price'] ?? 0;
+                                        $personPrice = $sanitizeInt($rawPersonPrice);
                                         $personName = !empty($personData['name']) ? $personData['name'] : null;
 
                                         $this->order->orderItems()->create([
@@ -1814,64 +1818,63 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             ]);
                         }
 
+                        $sanitizeInt = fn($val) => (int) preg_replace('/[^\d]/', '', (string) ($val ?? 0));
+
                         if ($newCategory === 'jasa') {
-                            $newQty = (int) ($data['edit_jasa_qty'] ?? 1);
-                            $newPrice = (int) ($data['edit_jasa_price'] ?? 0);
-                            
                             $record->update([
-                                'quantity' => $newQty,
-                                'price' => $newPrice ?: $record->price,
-                            ]);
-                        } elseif ($record->size === 'Custom') {
-                            $newPrice = (int) ($data['edit_custom_price'] ?? 0);
-                            $record->update([
-                                'price' => $newPrice ?: $record->price,
+                                'product_name' => $newProductName,
+                                'production_category' => 'jasa',
+                                'bahan_id' => null,
+                                'price' => $sanitizeInt($data['edit_jasa_price'] ?? $record->price),
+                                'quantity' => $sanitizeInt($data['edit_jasa_qty'] ?? $record->quantity),
                                 'size_and_request_details' => $newDetails,
                             ]);
+                        } elseif ($record->size === 'Custom') {
+                            $newCustomPrice = $sanitizeInt($data['edit_custom_price'] ?? $record->price);
+                            foreach ($itemsInGroup as $itemToUpdate) {
+                                $itemToUpdate->update([
+                                    'product_name' => $newProductName,
+                                    'production_category' => $newCategory,
+                                    'bahan_id' => $newBahanId,
+                                    'price' => $newCustomPrice,
+                                    'size_and_request_details' => $itemToUpdate->id === $record->id ? $newDetails : $itemDetails,
+                                ]);
+                            }
                         } else {
                             foreach ($sizeOptions as $key => $label) {
-                                $qty = (int) ($data["qty_{$key}"] ?? 0);
-                                $price = (int) ($data["price_{$key}"] ?? 0);
-                                if ($price <= 0) {
-                                    $price = $groupDefaultPrice;
+                                $newQty = $sanitizeInt($data["qty_{$key}"] ?? 0);
+                                $rawPrice = $data["price_{$key}"] ?? 0;
+                                $newPrice = $sanitizeInt($rawPrice);
+                                if ($newPrice <= 0) {
+                                    $newPrice = $groupDefaultPrice;
                                 }
 
-                                $itemsOfSize = $itemsInGroup->where('size', $key);
-                                $existingItem = $itemsOfSize->first();
+                                $existingItem = $itemsInGroup->where('size', $key)->first();
 
-                                if ($qty > 0) {
+                                if ($newQty > 0) {
                                     if ($existingItem) {
                                         $existingItem->update([
                                             'product_name' => $newProductName,
                                             'production_category' => $newCategory,
                                             'bahan_id' => $newBahanId,
-                                            'quantity' => $qty,
-                                            'price' => $price ?: $existingItem->price,
-                                            'size_and_request_details' => $newDetails,
+                                            'quantity' => $newQty,
+                                            'price' => $newPrice,
+                                            'size_and_request_details' => $existingItem->id === $record->id ? $newDetails : $itemDetails,
                                         ]);
-
-                                        // Consolidate extra items of this size if any
-                                        if ($itemsOfSize->count() > 1) {
-                                            foreach ($itemsOfSize->slice(1) as $extraItem) {
-                                                $extraItem->delete();
-                                            }
-                                        }
                                     } else {
                                         $record->order->orderItems()->create([
                                             'product_name' => $newProductName,
                                             'production_category' => $newCategory,
                                             'bahan_id' => $newBahanId,
                                             'size' => $key,
-                                            'price' => $price ?: $record->price,
-                                            'quantity' => $qty,
+                                            'quantity' => $newQty,
+                                            'price' => $newPrice,
                                             'design_status' => $record->order->orderItems()->where('product_name', $newProductName)->where('design_status', 'approved')->exists() && !in_array($record->order->status, ['draft', 'antrian']) ? 'approved' : 'pending',
                                             'size_and_request_details' => $newDetails,
                                         ]);
                                     }
-                                } else {
-                                    foreach ($itemsOfSize as $itemToDelete) {
-                                        $itemToDelete->delete();
-                                    }
+                                } elseif ($existingItem) {
+                                    $existingItem->delete();
                                 }
                             }
                         }
