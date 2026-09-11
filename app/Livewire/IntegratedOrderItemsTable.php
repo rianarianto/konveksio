@@ -730,7 +730,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->placeholder('Pilih atau ketik nama baru...')
                                             ->helperText(fn(Get $get) => $isExistingProduct($get) ? '🔒 Detail Produksi & Sablon/Bordir dikunci.' : null)
                                             ->live(onBlur: true)
-                                            ->afterStateUpdated(function ($state, Set $set) {
+                                            ->afterStateUpdated(function ($state, Set $set) use ($sizeOptions) {
                                                 if (!$state) return;
                                                 $existing = OrderItem::where('order_id', $this->order->id)
                                                     ->where('product_name', $state)
