@@ -102,8 +102,7 @@ class EditOrder extends EditRecord
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
                 ->action(function (array $data): void {
-                    $data['shop_id'] = $this->record->shop_id;
-                    $this->record->returns()->create($data);
+                    \App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::processReturnCreation($this->record, $data);
                     \Filament\Notifications\Notification::make()
                         ->title('Retur Berhasil Dicatat')
                         ->success()

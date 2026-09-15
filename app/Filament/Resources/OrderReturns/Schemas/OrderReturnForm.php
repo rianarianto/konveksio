@@ -11,6 +11,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Schema;
 use App\Models\OrderItem;
+use App\Models\Order;
+use App\Models\OrderReturn;
 
 class OrderReturnForm
 {
@@ -38,32 +40,56 @@ class OrderReturnForm
                 ->preload()
                 ->required()
                 ->reactive();
+        } else {
+            $components[] = \Filament\Forms\Components\Hidden::make('order_id')
+                ->default(function ($record) {
+                    if ($record instanceof Order) {
+                        return $record->id;
+                    }
+                    if ($record && isset($record->order_id)) {
+                        return $record->order_id;
+                    }
+                    $routeRecord = request()->route()?->parameter('record');
+                    if ($routeRecord instanceof Order) {
+                        return $routeRecord->id;
+                    }
+                    if (is_numeric($routeRecord)) {
+                        return (int) $routeRecord;
+                    }
+                    return null;
+                });
         }
+
+        $resolveOrderId = function ($get, $record) {
+            $orderId = $get('order_id') ?? $get('../../order_id');
+            if ($orderId) {
+                return $orderId;
+            }
+            if ($record instanceof Order) {
+                return $record->id;
+            }
+            if ($record && isset($record->order_id)) {
+                return $record->order_id;
+            }
+            $routeRecord = request()->route()?->parameter('record');
+            if ($routeRecord instanceof Order) {
+                return $routeRecord->id;
+            }
+            if (is_numeric($routeRecord)) {
+                return (int) $routeRecord;
+            }
+            return null;
+        };
 
         return array_merge($components, [
             // Batch Retur Grouping
             Select::make('batch_number')
                 ->label('📦 Batch Retur')
-                ->options(function ($get, $record) {
-                    $orderId = $get('order_id');
-                    if (!$orderId && $record) {
-                        if ($record instanceof \App\Models\Order) {
-                            $orderId = $record->id;
-                        } elseif (isset($record->order_id)) {
-                            $orderId = $record->order_id;
-                        }
-                    }
-                    if (!$orderId) {
-                        $routeRecord = request()->route()?->parameter('record');
-                        if ($routeRecord instanceof \App\Models\Order) {
-                            $orderId = $routeRecord->id;
-                        } elseif (is_numeric($routeRecord)) {
-                            $orderId = (int) $routeRecord;
-                        }
-                    }
+                ->options(function ($get, $record) use ($resolveOrderId) {
+                    $orderId = $resolveOrderId($get, $record);
                     if (!$orderId) return [1 => 'Batch #1 (Retur Pertama)'];
 
-                    $existingBatches = \App\Models\OrderReturn::withoutGlobalScopes()
+                    $existingBatches = OrderReturn::withoutGlobalScopes()
                         ->where('order_id', $orderId)
                         ->distinct()
                         ->pluck('batch_number')
@@ -74,7 +100,7 @@ class OrderReturnForm
 
                     $options = [];
                     foreach ($existingBatches as $bNum) {
-                        $undeliveredCount = \App\Models\OrderReturn::withoutGlobalScopes()
+                        $undeliveredCount = OrderReturn::withoutGlobalScopes()
                             ->where('order_id', $orderId)
                             ->where('batch_number', $bNum)
                             ->whereNull('delivered_at')
@@ -90,27 +116,12 @@ class OrderReturnForm
 
                     return $options;
                 })
-                ->default(function ($get, $record) {
-                    $orderId = $get('order_id');
-                    if (!$orderId && $record) {
-                        if ($record instanceof \App\Models\Order) {
-                            $orderId = $record->id;
-                        } elseif (isset($record->order_id)) {
-                            $orderId = $record->order_id;
-                        }
-                    }
-                    if (!$orderId) {
-                        $routeRecord = request()->route()?->parameter('record');
-                        if ($routeRecord instanceof \App\Models\Order) {
-                            $orderId = $routeRecord->id;
-                        } elseif (is_numeric($routeRecord)) {
-                            $orderId = (int) $routeRecord;
-                        }
-                    }
+                ->default(function ($get, $record) use ($resolveOrderId) {
+                    $orderId = $resolveOrderId($get, $record);
                     if (!$orderId) return 1;
 
                     // Default to latest active (undelivered) batch, or new batch if all delivered
-                    $activeBatch = \App\Models\OrderReturn::withoutGlobalScopes()
+                    $activeBatch = OrderReturn::withoutGlobalScopes()
                         ->where('order_id', $orderId)
                         ->whereNull('delivered_at')
                         ->orderBy('batch_number', 'desc')
@@ -120,7 +131,7 @@ class OrderReturnForm
                         return (int) $activeBatch;
                     }
 
-                    $maxBatch = \App\Models\OrderReturn::withoutGlobalScopes()
+                    $maxBatch = OrderReturn::withoutGlobalScopes()
                         ->where('order_id', $orderId)
                         ->max('batch_number');
 
@@ -132,23 +143,8 @@ class OrderReturnForm
             // 1. Pilih Produk Utama Pesanan
             Select::make('selected_product_name')
                 ->label('1. Pilih Produk Pesanan')
-                ->options(function ($get, $record) {
-                    $orderId = $get('order_id');
-                    if (!$orderId && $record) {
-                        if ($record instanceof \App\Models\Order) {
-                            $orderId = $record->id;
-                        } elseif (isset($record->order_id)) {
-                            $orderId = $record->order_id;
-                        }
-                    }
-                    if (!$orderId) {
-                        $routeRecord = request()->route()?->parameter('record');
-                        if ($routeRecord instanceof \App\Models\Order) {
-                            $orderId = $routeRecord->id;
-                        } elseif (is_numeric($routeRecord)) {
-                            $orderId = (int) $routeRecord;
-                        }
-                    }
+                ->options(function ($get, $record) use ($resolveOrderId) {
+                    $orderId = $resolveOrderId($get, $record);
                     if (!$orderId) return [];
 
                     $items = OrderItem::where('order_id', $orderId)->get();
@@ -189,24 +185,9 @@ class OrderReturnForm
                 ->schema([
                     Select::make('order_item_id')
                         ->label('Ukuran / Varian Item')
-                        ->options(function ($get, $record) {
+                        ->options(function ($get, $record) use ($resolveOrderId) {
                             $pName = $get('../../selected_product_name');
-                            $orderId = $get('../../order_id');
-                            if (!$orderId && $record) {
-                                if ($record instanceof \App\Models\Order) {
-                                    $orderId = $record->id;
-                                } elseif (isset($record->order_id)) {
-                                    $orderId = $record->order_id;
-                                }
-                            }
-                            if (!$orderId) {
-                                $routeRecord = request()->route()?->parameter('record');
-                                if ($routeRecord instanceof \App\Models\Order) {
-                                    $orderId = $routeRecord->id;
-                                } elseif (is_numeric($routeRecord)) {
-                                    $orderId = (int) $routeRecord;
-                                }
-                            }
+                            $orderId = $resolveOrderId($get, $record);
                             if (!$orderId || !$pName) return [];
 
                             $items = OrderItem::where('order_id', $orderId)
@@ -272,7 +253,15 @@ class OrderReturnForm
             CheckboxList::make('target_stages')
                 ->label('5. Kirim Ke Divisi Mana? (Untuk Perbaikan)')
                 ->options(function ($get) {
-                    $itemId = $get('order_item_id');
+                    $multiItems = $get('multi_size_items') ?? [];
+                    $firstItemId = null;
+                    if (!empty($multiItems) && is_array($multiItems)) {
+                        $firstItemId = $multiItems[0]['order_item_id'] ?? null;
+                    }
+                    if (!$firstItemId) {
+                        $firstItemId = $get('order_item_id');
+                    }
+
                     $dbStages = \App\Models\ProductionStage::where('name', '!=', 'QC')
                         ->orderBy('order_sequence')
                         ->pluck('name')
@@ -282,7 +271,7 @@ class OrderReturnForm
                         $dbStages = ['Potong', 'Jahit', 'Kancing', 'Bordir/Sablon', 'Finishing'];
                     }
 
-                    $item = $itemId ? OrderItem::find($itemId) : null;
+                    $item = $firstItemId ? OrderItem::find($firstItemId) : null;
                     $cat = $item?->production_category ?? 'produksi';
 
                     if ($cat === 'non_produksi' || $cat === 'jasa') {
@@ -359,5 +348,40 @@ class OrderReturnForm
                 ->maxSize(5120)
                 ->columnSpanFull(),
         ]);
+    }
+
+    public static function processReturnCreation(Order $order, array $data): OrderReturn
+    {
+        $data['shop_id'] = $order->shop_id ?? \Filament\Facades\Filament::getTenant()?->id;
+        $data['order_id'] = $order->id;
+
+        $targetStages = $data['target_stages'] ?? [];
+        $multiItems = $data['multi_size_items'] ?? [];
+
+        unset($data['target_stages'], $data['multi_size_items'], $data['selected_product_name'], $data['selection_mode']);
+
+        $retur = new OrderReturn();
+        $retur->fill($data);
+        $retur->target_stages = $targetStages;
+        $retur->multi_size_items = $multiItems;
+
+        if (empty($retur->order_item_id) && !empty($multiItems)) {
+            $firstItemId = $multiItems[0]['order_item_id'] ?? null;
+            if ($firstItemId) {
+                $retur->order_item_id = $firstItemId;
+            }
+        }
+
+        if (empty($retur->quantity) && !empty($multiItems)) {
+            $totalQty = 0;
+            foreach ($multiItems as $item) {
+                $totalQty += (int)($item['return_qty'] ?? 1);
+            }
+            $retur->quantity = $totalQty > 0 ? $totalQty : 1;
+        }
+
+        $retur->save();
+
+        return $retur;
     }
 }
