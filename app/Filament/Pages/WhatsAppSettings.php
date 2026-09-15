@@ -43,11 +43,11 @@ class WhatsAppSettings extends Page
     }
 
     /**
-     * Check if the current user can manage connection (Owner & Admin).
+     * Check if the current user is an Owner (for privileged actions like logout).
      */
     public function isOwner(): bool
     {
-        return in_array(auth()->user()->role, ['owner', 'admin']);
+        return auth()->user()->role === 'owner';
     }
 
     /**
