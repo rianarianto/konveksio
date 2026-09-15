@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('order_returns', function (Blueprint $table) {
-            $table->unsignedInteger('batch_number')->default(1)->after('order_id');
+            if (!Schema::hasColumn('order_returns', 'batch_number')) {
+                $table->unsignedInteger('batch_number')->default(1)->after('order_id');
+            }
         });
     }
 

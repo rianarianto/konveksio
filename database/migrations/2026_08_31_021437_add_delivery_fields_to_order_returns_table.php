@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('order_returns', function (Blueprint $table) {
-            $table->timestamp('delivered_at')->nullable()->after('status');
-            $table->string('delivery_proof')->nullable()->after('delivered_at');
-            $table->text('delivery_note')->nullable()->after('delivery_proof');
+            if (!Schema::hasColumn('order_returns', 'delivered_at')) {
+                $table->timestamp('delivered_at')->nullable()->after('status');
+            }
+            if (!Schema::hasColumn('order_returns', 'delivery_proof')) {
+                $table->string('delivery_proof')->nullable()->after('delivered_at');
+            }
+            if (!Schema::hasColumn('order_returns', 'delivery_note')) {
+                $table->text('delivery_note')->nullable()->after('delivery_proof');
+            }
         });
     }
 
