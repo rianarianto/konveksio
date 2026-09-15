@@ -1186,6 +1186,10 @@ class OrderResource extends Resource
                     \Filament\Actions\Action::make('create_return')
                         ->label('Retur Pesanan')
                         ->icon('heroicon-o-arrow-path')
+                        ->fillForm(fn (Order $record): array => [
+                            'order_id' => $record->id,
+                            'shop_id' => $record->shop_id,
+                        ])
                         ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
                         ->action(function (Order $record, array $data): void {
                             \App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::processReturnCreation($record, $data);

@@ -100,6 +100,10 @@ class EditOrder extends EditRecord
             Action::make('create_return')
                 ->label('Catat Retur')
                 ->icon('heroicon-o-arrow-uturn-left')
+                ->fillForm(fn (): array => [
+                    'order_id' => $this->record->id,
+                    'shop_id' => $this->record->shop_id,
+                ])
                 ->form(\App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::getComponents(true))
                 ->action(function (array $data): void {
                     \App\Filament\Resources\OrderReturns\Schemas\OrderReturnForm::processReturnCreation($this->record, $data);
