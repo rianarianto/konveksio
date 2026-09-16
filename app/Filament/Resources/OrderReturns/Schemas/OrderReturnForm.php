@@ -111,7 +111,8 @@ class OrderReturnForm
 
                     $nextBatch = (!empty($existingBatches) ? max($existingBatches) : 0) + 1;
                     if (!isset($options[$nextBatch])) {
-                        $options[$nextBatch] = "➕ Buat Batch #{$nextBatch} Baru (Retur Susulan)";
+                        $labelSuffix = $nextBatch === 1 ? '(Retur Pertama)' : '(Retur Susulan)';
+                        $options[$nextBatch] = "➕ Buat Batch #{$nextBatch} Baru {$labelSuffix}";
                     }
 
                     return $options;
