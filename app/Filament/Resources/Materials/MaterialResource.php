@@ -251,8 +251,12 @@ class MaterialResource extends Resource
                         $html .= '</div>';
                         return $html;
                     })
-                    ->html()
-                    ->searchable(['variants.color_name']),
+                    ->searchable(query: function ($query, string $search) {
+                        $query->whereHas('variants', function ($q) use ($search) {
+                            $q->where('color_name', 'like', "%{$search}%")
+                              ->orWhere('color_code', 'like', "%{$search}%");
+                        });
+                    }),
                 TextColumn::make('supplier.name')
                     ->label('Supplier')
                     ->placeholder('—'),
