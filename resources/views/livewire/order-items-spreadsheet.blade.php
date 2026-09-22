@@ -856,7 +856,7 @@
                 <!-- Custom Measurements -->
                 <div class="space-y-4">
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        @foreach(['LD' => 'L. Dada', 'PB' => 'P. Baju', 'PL' => 'P. Lengan', 'LB' => 'L. Bahu', 'LP' => 'L. Perut', 'LPh' => 'L. Paha'] as $key => $label)
+                        @foreach(['LD' => 'L. Dada', 'PB' => 'P. Baju', 'PL' => 'P. Lengan', 'LB' => 'L. Bahu', 'LP' => 'L. Perut', 'LPh' => 'L. Pinggul'] as $key => $label)
                             <div class="space-y-1">
                                 <label class="text-[11px] font-medium text-gray-500">{{ $label }}</label>
                                 <x-filament::input.wrapper suffix="CM">

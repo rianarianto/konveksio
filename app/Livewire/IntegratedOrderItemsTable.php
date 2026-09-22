@@ -1338,7 +1338,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                     Grid::make(3)->schema([
                                                         TextInput::make('lb')->label('LB (Lebar Bahu)')->placeholder('44')->numeric()->suffix('cm'),
                                                         TextInput::make('lp')->label('LP (Lingkar Pinggang)')->placeholder('86')->numeric()->suffix('cm'),
-                                                        TextInput::make('lph')->label('LPh (Lingkar Paha)')->placeholder('58')->numeric()->suffix('cm'),
+                                                        TextInput::make('lph')->label('LPh (Lingkar Pinggul)')->placeholder('58')->numeric()->suffix('cm'),
                                                     ]),
                                                 ]),
                                         ])->compact(),

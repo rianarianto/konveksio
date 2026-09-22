@@ -407,7 +407,7 @@ class OrderForm
                                         TextInput::make('PL')->label('PL (P. Lengan)')->numeric()->suffix('cm'),
                                         TextInput::make('LB')->label('LB (L. Bahu)')->numeric()->suffix('cm'),
                                         TextInput::make('LP')->label('LP (L. Perut)')->numeric()->suffix('cm'),
-                                        TextInput::make('LPh')->label('LPh (L. Paha)')->numeric()->suffix('cm'),
+                                        TextInput::make('LPh')->label('LPh (L. Pinggul)')->numeric()->suffix('cm'),
                                     ]),
                             ])
                             ->action(function () { }),
