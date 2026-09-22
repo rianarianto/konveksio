@@ -10,27 +10,58 @@ class MonitorController extends Controller
 {
     public function produksi(Shop $shop)
     {
-        // 1. Items yang sedang DIPROSES (Sudah ada yang dimulai/selesai, tapi belum selesai semua)
-        $inProgress = OrderItem::with(['order.customer', 'productionTasks.assignedTo'])
-            ->whereHas('order', fn($q) => $q->where('shop_id', $shop->id))
-            ->whereHas('productionTasks', fn($q) => $q->whereIn('status', ['in_progress', 'done']))
-            ->whereHas('productionTasks', fn($q) => $q->where('status', '!=', 'done'))
-            ->get()
-            ->sortBy(function($item) {
-                // Urutkan: Express dulu (0), baru deadline terdekat
-                return ($item->order->is_express ? '0' : '1') . '_' . $item->order->deadline;
-            });
-
-        // 2. Items yang dalam ANTRIAN (BELUM ada tugas yang dimulai sama sekali)
-        $antrian = OrderItem::with(['order.customer', 'productionTasks'])
-            ->whereHas('order', fn($q) => $q->where('shop_id', $shop->id))
-            ->whereHas('productionTasks') // Pastikan sudah diatur tugasnya
-            ->whereDoesntHave('productionTasks', fn($q) => $q->whereIn('status', ['in_progress', 'done']))
-            ->get()
-            ->sortBy(function($item) {
-                return ($item->order->is_express ? '0' : '1') . '_' . $item->order->deadline;
+        // Query base untuk order item yang valid di shop ini
+        $baseQuery = OrderItem::with(['order.customer', 'productionTasks.assignedTo'])
+            ->whereHas('order', function ($q) use ($shop) {
+                $q->where('shop_id', $shop->id)
+                  ->whereNotIn('status', ['batal', 'dibatalkan', 'selesai', 'diambil']);
             })
-            ->take(15);
+            ->whereHas('productionTasks'); // Sudah diatur tugas produksinya
+
+        $allItems = $baseQuery->get();
+
+        $inProgressList = collect();
+        $antrianList = collect();
+
+        foreach ($allItems as $item) {
+            $groupItemIds = $item->getItemsInGroup()->pluck('id');
+            $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                ->whereIn('order_item_id', $groupItemIds)
+                ->where('wo_number', 'not like', '%-R%')
+                ->first();
+
+            $tasks = $item->productionTasks;
+            $allTasksDone = $tasks->isNotEmpty() && $tasks->every(fn($t) => $t->status === 'done');
+            $anyTaskStarted = $tasks->contains(fn($t) => in_array($t->status, ['in_progress', 'done']));
+
+            // Cek status WO
+            $isWoCompleted = $wo && $wo->status === \App\Models\WorkOrder::STATUS_COMPLETED;
+            $isWoInQc = $wo && in_array($wo->status, [
+                \App\Models\WorkOrder::STATUS_QC_PREP,
+                \App\Models\WorkOrder::STATUS_QC_REVIEW,
+                \App\Models\WorkOrder::STATUS_QC_AKHIR,
+                'QC_PERSIAPAN',
+            ]);
+
+            // Jika WO sudah selesai sepenuhnya (COMPLETED) atau order selesai, tidak perlu tampil di monitor
+            if ($isWoCompleted || ($allTasksDone && !$isWoInQc && (!$wo || !$wo->has_qc_selesai))) {
+                continue;
+            }
+
+            // Jika sedang diproses (ada task jalan/selesai ATAU WO sedang di tahap QC)
+            if ($anyTaskStarted || $isWoInQc || ($wo && $wo->status !== \App\Models\WorkOrder::STATUS_CREATED)) {
+                $inProgressList->push($item);
+            } else {
+                $antrianList->push($item);
+            }
+        }
+
+        $sortFunc = function ($item) {
+            return ($item->order->is_express ? '0' : '1') . '_' . ($item->order->deadline?->format('Y-m-d') ?? '9999-12-31');
+        };
+
+        $inProgress = $inProgressList->sortBy($sortFunc);
+        $antrian = $antrianList->sortBy($sortFunc)->take(15);
 
         return view('monitor.produksi', compact('shop', 'inProgress', 'antrian'));
     }

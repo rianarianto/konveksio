@@ -572,7 +572,7 @@
     {{-- ─ HEADER ─ --}}
     <div class="header">
         <div>
-            <div class="header-shop">Dunia Bordir Komputer</div>
+            <div class="header-shop">{{ $shop->name }}</div>
             <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
                 <div class="refresh-dot"></div>
                 <span style="font-size:11px;color:#64748b;">Auto-refresh setiap 30 detik</span>
@@ -654,10 +654,59 @@
             @forelse($inProgress as $item)
                 @php
                     $order = $item->order;
-                    $tasks = $item->productionTasks->sortBy('id');
-                    $total = $tasks->count();
-                    $done = $tasks->where('status', 'done')->count();
-                    $progress = $total > 0 ? round(($done / $total) * 100) : 0;
+                    $groupItemIds = $item->getItemsInGroup()->pluck('id');
+                    $wo = \App\Models\WorkOrder::withoutGlobalScopes()
+                        ->whereIn('order_item_id', $groupItemIds)
+                        ->where('wo_number', 'not like', '%-R%')
+                        ->first();
+
+                    $rawTasks = $item->productionTasks;
+                    
+                    // Pisahkan task QC_PERSIAPAN dengan task tukang biasa
+                    $qcPrepTask = $rawTasks->firstWhere('stage_name', 'QC_PERSIAPAN');
+                    $workerTasks = $rawTasks->filter(fn($t) => $t->stage_name !== 'QC_PERSIAPAN')->sortBy('id');
+
+                    // Gabungkan dengan urutan: QC_PERSIAPAN dulu (jika ada), baru tahapan tukang
+                    $displayTasks = collect();
+                    if ($qcPrepTask) {
+                        $displayTasks->push($qcPrepTask);
+                    }
+                    foreach ($workerTasks as $wt) {
+                        $displayTasks->push($wt);
+                    }
+
+                    // Cek apakah ada QC Akhir pada WorkOrder
+                    $hasQcAkhir = $wo ? ($wo->has_qc_selesai ?? true) : false;
+                    $qcWorkerName = $wo && $wo->qc_worker_id ? (\App\Models\Worker::find($wo->qc_worker_id)?->name ?? 'Petugas QC') : 'Petugas QC';
+
+                    // Hitung total unit dan total progress
+                    $totalSteps = $displayTasks->count() + ($hasQcAkhir ? 1 : 0);
+                    $doneSteps = $displayTasks->where('status', 'done')->count();
+                    
+                    // Tentukan status QC Akhir
+                    $qcAkhirStatus = 'pending'; // default: Belum Mulai
+                    $qcAkhirLabel = 'Belum Mulai';
+                    $qcAkhirRowClass = 'pending';
+
+                    if ($hasQcAkhir && $wo) {
+                        if ($wo->status === \App\Models\WorkOrder::STATUS_COMPLETED || $wo->completed_at !== null) {
+                            $qcAkhirStatus = 'done';
+                            $qcAkhirLabel = '✅ Selesai';
+                            $qcAkhirRowClass = 'done';
+                            $doneSteps++;
+                        } elseif ($wo->status === \App\Models\WorkOrder::STATUS_QC_AKHIR) {
+                            $qcAkhirStatus = 'in_progress';
+                            $qcAkhirLabel = '🔍 Menunggu Verifikasi QC';
+                            $qcAkhirRowClass = 'in-progress';
+                        } elseif ($workerTasks->isNotEmpty() && $workerTasks->every(fn($t) => $t->status === 'done')) {
+                            // Semua tukang sudah selesai tapi WO belum di-advance/approve
+                            $qcAkhirStatus = 'in_progress';
+                            $qcAkhirLabel = '🔍 Menunggu Verifikasi QC';
+                            $qcAkhirRowClass = 'in-progress';
+                        }
+                    }
+
+                    $progress = $totalSteps > 0 ? round(($doneSteps / $totalSteps) * 100) : 0;
                     $daysLeft = now()->startOfDay()->diffInDays($order->deadline, false);
                     $dlClass = $daysLeft < 0 ? 'urgent' : ($daysLeft <= 1 ? 'urgent' : ($daysLeft <= 3 ? 'soon' : 'ok'));
 
@@ -739,7 +788,7 @@
                     <div class="progress-row">
                         <div class="progress-label">
                             <span>Progress Tahapan</span>
-                            <span>{{ $done }}/{{ $total }} selesai — {{ $progress }}%</span>
+                            <span>{{ $doneSteps }}/{{ $totalSteps }} selesai — {{ $progress }}%</span>
                         </div>
                         <div class="progress-bar-bg">
                             <div class="progress-bar-fill" style="width:{{ $progress }}%"></div>
@@ -748,8 +797,11 @@
 
                     {{-- Task List --}}
                     <div class="tasks-scroll">
-                        @foreach($tasks as $task)
+                        @foreach($displayTasks as $task)
                             @php
+                                $isQcPrep = ($task->stage_name === 'QC_PERSIAPAN');
+                                $displayStageName = $isQcPrep ? 'QC Persiapan (Awal)' : str_replace('_', ' ', $task->stage_name);
+                                
                                 $rowClass = match ($task->status) { 'done' => 'done', 'in_progress' => 'in-progress', default => 'pending'};
                                 $statusLabel = match ($task->status) { 'done' => '✅ Selesai', 'in_progress' => '🔨 Proses', default => 'Belum Mulai'};
 
@@ -767,7 +819,7 @@
                             <div class="task-row {{ $rowClass }}">
                                 <div class="task-left">
                                     <div class="task-stage">
-                                        {{ str_replace('_', ' ', $task->stage_name) }}
+                                        {{ $displayStageName }}
                                         <span style="font-weight:600;font-size:16px;color:#d1dbea;margin-left:6px;">&mdash;
                                             {{ $task->assignedTo?->name ?? '—' }}</span>
                                     </div>
@@ -778,6 +830,20 @@
                                 <div class="task-status {{ $rowClass }}">{{ $statusLabel }}</div>
                             </div>
                         @endforeach
+
+                        {{-- Baris Khusus: QC Akhir --}}
+                        @if($hasQcAkhir)
+                            <div class="task-row {{ $qcAkhirRowClass }}">
+                                <div class="task-left">
+                                    <div class="task-stage">
+                                        QC Akhir (Verifikasi Final)
+                                        <span style="font-weight:600;font-size:16px;color:#d1dbea;margin-left:6px;">&mdash;
+                                            {{ $qcWorkerName }}</span>
+                                    </div>
+                                </div>
+                                <div class="task-status {{ $qcAkhirRowClass }}">{{ $qcAkhirLabel }}</div>
+                            </div>
+                        @endif
                     </div>
 
                 </div>
