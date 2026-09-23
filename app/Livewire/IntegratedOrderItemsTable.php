@@ -196,12 +196,12 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             ->fromSub(
                         OrderItem::query()
                             ->where('order_id', $this->order->id)
-                            ->leftJoin('materials', 'order_items.bahan_id', '=', 'materials.id')
                             ->leftJoin('material_variants', function($join) {
-                                $join->on(\Illuminate\Support\Facades\DB::raw("JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.material_variant_id'))"), '=', 'material_variants.id');
+                                $join->on(\Illuminate\Support\Facades\DB::raw("COALESCE(order_items.bahan_id, JSON_UNQUOTE(JSON_EXTRACT(order_items.size_and_request_details, '$.material_variant_id')))"), '=', 'material_variants.id');
                             })
+                            ->leftJoin('materials', 'material_variants.material_id', '=', 'materials.id')
                             ->leftJoin('product_variants', function($join) {
-                                $join->on(\Illuminate\Support\Facades\DB::raw("JSON_UNQUOTE(JSON_EXTRACT(size_and_request_details, '$.product_variant_id'))"), '=', 'product_variants.id');
+                                $join->on(\Illuminate\Support\Facades\DB::raw("JSON_UNQUOTE(JSON_EXTRACT(order_items.size_and_request_details, '$.product_variant_id'))"), '=', 'product_variants.id');
                             })
                             ->leftJoin('products', 'product_variants.product_id', '=', 'products.id')
                             ->select('order_items.*')
@@ -337,7 +337,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         if ($totalStockUsed > 0) {
                             $unit = 'pcs';
                             if ($record->production_category === 'produksi' && $record->bahan_id) {
-                                $unit = \App\Models\Material::find($record->bahan_id)?->unit ?? 'm';
+                                $unit = \App\Models\MaterialVariant::find($record->bahan_id)?->material?->unit 
+                                    ?? \App\Models\Material::find($record->bahan_id)?->unit 
+                                    ?? 'm';
                             }
                             $formatted = number_format($totalStockUsed, ($totalStockUsed == (int)$totalStockUsed ? 0 : 1), ',', '.');
                             return "📦 Stok Terpakai: {$formatted} {$unit}";
@@ -556,12 +558,19 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                             ->first(fn($i) => filled($i->size_and_request_details['sablon_jenis'] ?? null) || filled($i->size_and_request_details['sablon_lokasi'] ?? null));
                         $sDetails = $sablonItem?->size_and_request_details ?? $details;
 
+                        $sampleBahanId = $sample->bahan_id;
+                        $sampleMaterial = null;
+                        if ($sampleBahanId) {
+                            $sampleMaterial = \App\Models\Material::find($sampleBahanId) 
+                                ?? \App\Models\MaterialVariant::find($sampleBahanId)?->material;
+                        }
+
                         return [
                             'select_product_name' => $productName,
                             'new_product_name' => $sample->product_name,
                             'new_category' => $sample->production_category === 'custom' ? 'produksi' : ($sample->production_category ?? 'produksi'),
-                            'new_bahan_id' => $sample->bahan_id,
-                            'new_material_variant_id' => $details['material_variant_id'] ?? null,
+                            'new_bahan_id' => $sampleMaterial?->id ?? ($sampleBahanId ?? null),
+                            'new_material_variant_id' => $details['material_variant_id'] ?? ($sampleBahanId ?? null),
                             'new_sablon_teknik' => $sDetails['sablon_jenis'] ?? null,
                             'new_sablon_lokasi' => $sDetails['sablon_lokasi'] ?? null,
                             'new_sablon_keterangan' => $sDetails['sablon_keterangan'] ?? null,
@@ -640,8 +649,11 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                         $newName = $data['new_product_name'] ?? $oldName;
                         $newCat = $data['new_category'] ?? 'produksi';
-                        $newBahan = ($newCat === 'produksi') ? ($data['new_bahan_id'] ?? null) : null;
                         $newMatVar = ($newCat === 'produksi') ? ($data['new_material_variant_id'] ?? null) : null;
+                        if ($newCat === 'produksi' && !$newMatVar && !empty($data['new_bahan_id'])) {
+                            $newMatVar = \App\Models\MaterialVariant::where('material_id', $data['new_bahan_id'])->value('id');
+                        }
+                        $newBahan = ($newCat === 'produksi') ? $newMatVar : null;
                         $newTeknik = $data['new_sablon_teknik'] ?? null;
                         $newLokasi = $data['new_sablon_lokasi'] ?? null;
                         $newKet = $data['new_sablon_keterangan'] ?? null;
@@ -776,8 +788,13 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                         $set('bulk_price', $stdItem?->price ?? $existing->price);
                                                         $set('bulk_price_custom', $customItem?->price ?? null);
                                                         
-                                                        $set('bulk_bahan', $existing->bahan_id);
-                                                        $set('bulk_material_variant_id', $details['material_variant_id'] ?? null);
+                                                        $existingMatId = null;
+                                                        if ($existing->bahan_id) {
+                                                            $existingMatId = \App\Models\Material::find($existing->bahan_id)?->id 
+                                                                ?? \App\Models\MaterialVariant::find($existing->bahan_id)?->material_id;
+                                                        }
+                                                        $set('bulk_bahan', $existingMatId);
+                                                        $set('bulk_material_variant_id', $details['material_variant_id'] ?? $existing->bahan_id);
                                                         $sablonItem = OrderItem::where('order_id', $this->order->id)
                                                              ->where('product_name', $state)
                                                              ->get()
@@ -1443,6 +1460,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                             if ($category === 'produksi') {
                                 $variantId = $data['bulk_material_variant_id'] ?? null;
+                                if (!$variantId && !empty($data['bulk_bahan'])) {
+                                    $variantId = \App\Models\MaterialVariant::where('material_id', $data['bulk_bahan'])->value('id');
+                                }
                                 $useStock = filled($data['bulk_stock_qty'] ?? null);
                                 $remainingStockToStore = $useStock ? $sanitizeInt($data['bulk_stock_qty']) : 0;
                             }
@@ -1502,7 +1522,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     if ($matchedItem) {
                                         $matchedItem->update([
                                             'production_category' => $category,
-                                            'bahan_id' => $data['bulk_bahan'] ?? null,
+                                            'bahan_id' => ($category === 'produksi') ? $variantId : null,
                                             'price' => $itemPrice,
                                             'quantity' => $qty,
                                             'size_and_request_details' => $itemDetails,
@@ -1512,7 +1532,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         $newItem = $this->order->orderItems()->create([
                                             'product_name' => $productName,
                                             'production_category' => $category,
-                                            'bahan_id' => $data['bulk_bahan'] ?? null,
+                                            'bahan_id' => ($category === 'produksi') ? $variantId : null,
                                             'size' => $key,
                                             'price' => $itemPrice,
                                             'quantity' => $qty,
@@ -1590,7 +1610,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                         if ($matchedCustom) {
                                             $matchedCustom->update([
                                                 'production_category' => $category,
-                                                'bahan_id' => ($category === 'produksi') ? ($data['bulk_bahan'] ?? null) : null,
+                                                'bahan_id' => ($category === 'produksi') ? $customVariantId : null,
                                                 'price' => $personPrice,
                                                 'recipient_name' => $personName,
                                                 'size_and_request_details' => $customDetails,
@@ -1600,7 +1620,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             $newCustom = $this->order->orderItems()->create([
                                                 'product_name' => $productName,
                                                 'production_category' => $category,
-                                                'bahan_id' => ($category === 'produksi') ? ($data['bulk_bahan'] ?? null) : null,
+                                                'bahan_id' => ($category === 'produksi') ? $customVariantId : null,
                                                 'size' => 'Custom',
                                                 'quantity' => 1,
                                                 'price' => $personPrice,

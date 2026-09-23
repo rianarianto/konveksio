@@ -42,9 +42,7 @@ class OrderItemRelationManager extends RelationManager
             ->pluck('name', 'name')
             ->toArray();
 
-        $bahanOptions = Material::where('shop_id', $tenantId)
-            ->pluck('name', 'id')
-            ->toArray();
+        $bahanOptions = \App\Filament\Resources\Orders\OrderResource::getBahanOptions();
 
         $categoryOptions = [
             'produksi' => 'Produksi',
