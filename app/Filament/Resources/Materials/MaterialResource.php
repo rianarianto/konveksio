@@ -251,6 +251,7 @@ class MaterialResource extends Resource
                         $html .= '</div>';
                         return $html;
                     })
+                    ->html()
                     ->searchable(query: function ($query, string $search) {
                         $query->whereHas('variants', function ($q) use ($search) {
                             $q->where('color_name', 'like', "%{$search}%")
