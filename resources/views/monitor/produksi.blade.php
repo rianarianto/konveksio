@@ -89,152 +89,35 @@
         /* ── BODY ── */
         .body {
             display: flex;
+            flex-direction: column;
             flex: 1;
             overflow: hidden;
             gap: 0;
-        }
-
-        /* ── SIDEBAR ── */
-        .sidebar {
-            width: 380px;
-            flex-shrink: 0;
-            background: var(--surface);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .sidebar-header {
-            padding: 16px 18px 12px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .sidebar-header h2 {
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-
-        .sidebar-count {
-            display: inline-flex;
-            align-items: center;
-            background: var(--yellow-bg);
-            color: var(--yellow);
-            font-size: 11px;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 999px;
-            margin-top: 6px;
-        }
-
-        .sidebar-scroll {
-            flex: 1;
-            overflow-y: auto;
-            padding: 12px;
-        }
-
-        .sidebar-scroll::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .sidebar-scroll::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .sidebar-scroll::-webkit-scrollbar-thumb {
-            background: var(--surface2);
-            border-radius: 4px;
-        }
-
-        .queue-card {
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 12px 14px;
-            margin-bottom: 10px;
             position: relative;
         }
 
-        .queue-card.is-express {
-            border-color: var(--red);
-            border-width: 1.5px;
-        }
-
-        .queue-card-meta {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 6px;
-        }
-
-        .badge-cat {
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 999px;
-            background: rgba(124, 58, 237, 0.2);
-            color: #a78bfa;
-        }
-
-        .badge-express {
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 999px;
-            background: var(--red-bg);
-            color: var(--red);
-            animation: pulse 1.5s infinite;
-        }
-
-        .order-num {
-            font-size: 10px;
-            color: var(--muted);
-            margin-left: auto;
-        }
-
-        .queue-product {
-            font-size: 22px;
-            font-weight: 800;
-            color: var(--text);
-            margin-bottom: 8px;
-            line-height: 1.2;
-        }
-
-        .queue-details {
-            font-size: 16px;
-            font-weight: 600;
-            color: #94a3b8;
-            margin-bottom: 10px;
-        }
-
-        .queue-deadline {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        .queue-deadline.urgent {
-            color: var(--red);
-        }
-
-        .queue-deadline.soon {
-            color: var(--yellow);
-        }
-
-        .queue-deadline.ok {
-            color: var(--green);
-        }
-
-        /* ── MAIN AREA ── */
+        /* ── MAIN AREA: 3 KOLOM PENUH DI SMART TV ── */
         .main {
             flex: 1;
             overflow-x: auto;
             overflow-y: hidden;
-            display: flex;
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: calc((100% - 32px) / 3);
             gap: 16px;
-            padding: 16px;
+            padding: 16px 20px;
+        }
+
+        @media (max-width: 1200px) {
+            .main {
+                grid-auto-columns: calc((100% - 16px) / 2);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main {
+                grid-auto-columns: 100%;
+            }
         }
 
         .main::-webkit-scrollbar {
@@ -250,9 +133,145 @@
             border-radius: 4px;
         }
 
+        /* ── BOTTOM TICKER: ANTRIAN PRODUKSI ── */
+        .queue-ticker {
+            height: 52px;
+            flex-shrink: 0;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 16px;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        .queue-ticker-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--yellow);
+            background: var(--yellow-bg);
+            padding: 6px 14px;
+            border-radius: 8px;
+            white-space: nowrap;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .queue-ticker-track {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
+        }
+
+        .queue-ticker-items {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            white-space: nowrap;
+            animation: tickerScroll 40s linear infinite;
+        }
+
+        .queue-ticker-items:hover {
+            animation-play-state: paused;
+        }
+
+        @keyframes tickerScroll {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-50%);
+            }
+        }
+
+        .ticker-card {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text);
+            flex-shrink: 0;
+        }
+
+        .ticker-card.is-express {
+            border-color: var(--red);
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        .badge-cat {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--muted);
+        }
+
+        .badge-express {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: var(--red-bg);
+            color: var(--red);
+            animation: pulse 1.5s infinite;
+        }
+
+        .order-num {
+            font-size: 11px;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .ticker-prod-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .ticker-details {
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .ticker-deadline {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .ticker-deadline.urgent {
+            color: var(--red);
+        }
+
+        .ticker-deadline.soon {
+            color: var(--yellow);
+        }
+
+        .ticker-deadline.ok {
+            color: var(--green);
+        }
+
         /* ── ITEM CARD ── */
         .item-card {
-            width: 550px;
+            width: 100%;
             height: 100%;
             flex-shrink: 0;
             background: var(--surface);
@@ -261,16 +280,17 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
         .item-card.is-express {
             border-color: var(--red);
             border-width: 2px;
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
         }
 
         .item-card-header {
-            padding: 14px 16px 10px;
+            padding: 12px 16px 10px;
             border-bottom: 1px solid var(--border);
         }
 
@@ -279,13 +299,16 @@
             align-items: center;
             justify-content: space-between;
             width: 100%;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
         }
 
         .customer-name {
-            font-size: 16px;
+            font-size: 13px;
             font-weight: 600;
             color: #cbd5e1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .express-banner {
@@ -294,12 +317,13 @@
             gap: 4px;
             background: var(--red);
             color: #fff;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 800;
-            padding: 3px 10px;
+            padding: 2px 8px;
             border-radius: 999px;
             letter-spacing: 0.05em;
             animation: pulse 1.5s infinite;
+            flex-shrink: 0;
         }
 
         @keyframes pulse {
@@ -315,20 +339,24 @@
         }
 
         .item-qty {
-            font-size: 24px;
+            font-size: 18px;
             font-weight: 800;
-            color: #94a3b8;
+            color: var(--blue);
             line-height: 1;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .item-name {
-            font-size: 38px;
+            font-size: 24px;
             font-weight: 800;
             color: #fff;
-            letter-spacing: -0.03em;
-            line-height: 1.1;
-            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         .item-info {
@@ -339,9 +367,9 @@
         }
 
         .info-badge {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 700;
-            padding: 4px 12px;
+            padding: 3px 10px;
             border-radius: 6px;
             background: rgba(59, 130, 246, 0.25);
             color: #bfdbfe;
@@ -349,12 +377,13 @@
 
         .item-sizes {
             font-size: 12px;
+            font-weight: 600;
             color: var(--muted);
             margin-bottom: 4px;
         }
 
         .item-sablon {
-            font-size: 16px;
+            font-size: 13px;
             font-weight: 600;
             color: #94a3b8;
             margin-top: 4px;
@@ -364,14 +393,15 @@
         .deadline-row {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 10px;
-            padding: 10px 16px;
+            padding: 8px 16px;
             border-bottom: 1px solid var(--border);
         }
 
         .deadline-text {
-            font-size: 18px;
-            font-weight: 800;
+            font-size: 14px;
+            font-weight: 700;
         }
 
         .deadline-text.urgent {
@@ -387,10 +417,10 @@
         }
 
         .hari-badge {
-            font-size: 16px;
-            font-weight: 900;
-            padding: 6px 16px;
-            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 6px;
         }
 
         .hari-badge.urgent {
@@ -410,17 +440,17 @@
 
         /* ── PROGRESS ── */
         .progress-row {
-            padding: 10px 16px 8px;
+            padding: 8px 16px 6px;
             border-bottom: 1px solid var(--border);
         }
 
         .progress-label {
             display: flex;
             justify-content: space-between;
-            font-size: 18px;
+            font-size: 13px;
             font-weight: 700;
             color: #cbd5e1;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .progress-bar-bg {
@@ -441,7 +471,7 @@
         .tasks-scroll {
             flex: 1;
             overflow-y: auto;
-            padding: 8px;
+            padding: 8px 12px;
         }
 
         .tasks-scroll::-webkit-scrollbar {
@@ -457,8 +487,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 20px;
-            padding: 10px 12px;
+            gap: 12px;
+            padding: 8px 10px;
             border-radius: 8px;
             margin-bottom: 6px;
         }
@@ -477,32 +507,33 @@
 
         .task-left {
             flex: 1;
+            min-width: 0;
         }
 
         .task-stage {
-            font-size: 20px;
+            font-size: 15px;
             font-weight: 800;
             color: #fff;
-            line-height: 1.3;
+            line-height: 1.25;
             word-break: break-word;
         }
 
         .task-worker {
-            font-size: 15px;
+            font-size: 12px;
             font-weight: 600;
             color: #cbd5e1;
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         .task-sizes {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 700;
             color: #e2e8f0;
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         .task-status {
-            font-size: 16px;
+            font-size: 13px;
             font-weight: 800;
             text-align: right;
             white-space: nowrap;
@@ -522,13 +553,14 @@
 
         /* ── EMPTY STATE ── */
         .empty-main {
-            flex: 1;
+            grid-column: 1 / -1;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-direction: column;
             gap: 12px;
             color: var(--muted);
+            min-height: 300px;
         }
 
         .empty-icon {
@@ -590,66 +622,7 @@
     {{-- ─ BODY ─ --}}
     <div class="body">
 
-        {{-- ─ SIDEBAR: Antrian ─ --}}
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>⏳ Antrian Produksi</h2>
-                <div class="sidebar-count">{{ $antrian->count() }} item menunggu</div>
-            </div>
-            <div class="sidebar-scroll">
-                @forelse($antrian as $item)
-                    @php
-                        $order = $item->order;
-                        $daysLeft = now()->startOfDay()->diffInDays($order->deadline, false);
-                        $dlClass = $daysLeft <= 1 ? 'urgent' : ($daysLeft <= 3 ? 'soon' : 'ok');
-
-                        $cat = match ($item->production_category) {
-                            'custom' => '🧵 Produksi',
-                            'non_produksi' => '📦 Non-Produksi',
-                            'jasa' => '🔧 Jasa',
-                            default => '🏭 Produksi',
-                        };
-
-                        $details = $item->size_and_request_details ?? [];
-                        $sizeParts = [];
-                        if (!empty($details['varian_ukuran'])) {
-                            foreach ($details['varian_ukuran'] as $v) {
-                                $sz = strtoupper($v['ukuran'] ?? '');
-                                $q = (int) ($v['qty'] ?? 0);
-                                if ($sz && $q > 0)
-                                    $sizeParts[] = "{$sz}:{$q}";
-                            }
-                        }
-                        $sizeStr = implode(', ', $sizeParts);
-                    @endphp
-                    <div class="queue-card {{ $order->is_express ? 'is-express' : '' }}">
-                        <div class="queue-card-meta">
-                            <span class="badge-cat">{{ $cat }}</span>
-                            @if($order->is_express)
-                                <span class="badge-express">⚡ EXPRESS</span>
-                            @endif
-                            <span class="order-num">{{ $order->order_number }}</span>
-                        </div>
-                        <div class="queue-product">{{ $item->quantity }}x {{ $item->product_name }}</div>
-                        @if($sizeStr)
-                            <div class="queue-details">{{ $sizeStr }}</div>
-                        @endif
-                        <div class="queue-deadline {{ $dlClass }}">
-                            📅 Deadline {{ $order->deadline->translatedFormat('d M Y') }}
-                            @if($daysLeft <= 0) — HARI INI!
-                            @elseif($daysLeft <= 1) — H-{{ $daysLeft }}
-                            @endif
-                        </div>
-                    </div>
-                @empty
-                    <div style="padding:24px;text-align:center;color:#475569;font-size:13px;">
-                        Tidak ada item dalam antrian
-                    </div>
-                @endforelse
-            </div>
-        </div>
-
-        {{-- ─ MAIN: In Progress ─ --}}
+        {{-- ─ MAIN: In Progress (3 Kolom) ─ --}}
         <div class="main">
             @forelse($inProgress as $item)
                 @php
@@ -856,6 +829,71 @@
             @endforelse
         </div>
 
+        {{-- ─ BOTTOM TICKER: ANTRIAN PRODUKSI ─ --}}
+        <div class="queue-ticker">
+            <div class="queue-ticker-label">
+                <span>⏳ Antrian</span>
+                <span style="opacity:0.85;">({{ $antrian->count() }})</span>
+            </div>
+            <div class="queue-ticker-track">
+                @if($antrian->isNotEmpty())
+                    <div class="queue-ticker-items">
+                        {{-- Duplikat 2x loop agar scrolling marquee mulus tanpa jeda --}}
+                        @for($repeat = 0; $repeat < 2; $repeat++)
+                            @foreach($antrian as $item)
+                                @php
+                                    $order = $item->order;
+                                    $daysLeft = now()->startOfDay()->diffInDays($order->deadline, false);
+                                    $dlClass = $daysLeft < 0 ? 'urgent' : ($daysLeft <= 1 ? 'urgent' : ($daysLeft <= 3 ? 'soon' : 'ok'));
+
+                                    $cat = match ($item->production_category) {
+                                        'custom' => 'Produksi',
+                                        'non_produksi' => 'Non-Prod',
+                                        'jasa' => 'Jasa',
+                                        default => 'Produksi',
+                                    };
+
+                                    $details = $item->size_and_request_details ?? [];
+                                    $sizeParts = [];
+                                    if (!empty($details['varian_ukuran'])) {
+                                        foreach ($details['varian_ukuran'] as $v) {
+                                            $sz = strtoupper($v['ukuran'] ?? '');
+                                            $q = (int) ($v['qty'] ?? 0);
+                                            if ($sz && $q > 0)
+                                                $sizeParts[] = "{$sz}:{$q}";
+                                        }
+                                    }
+                                    $sizeStr = implode(', ', $sizeParts);
+                                @endphp
+                                <div class="ticker-card {{ $order->is_express ? 'is-express' : '' }}">
+                                    <span class="badge-cat">{{ $cat }}</span>
+                                    @if($order->is_express)
+                                        <span class="badge-express">⚡ EXPRESS</span>
+                                    @endif
+                                    <span class="order-num">{{ $order->order_number }}</span>
+                                    <span class="ticker-prod-name">{{ $item->quantity }}x {{ $item->product_name }}</span>
+                                    @if($sizeStr)
+                                        <span class="ticker-details">{{ $sizeStr }}</span>
+                                    @endif
+                                    <span class="ticker-deadline {{ $dlClass }}">
+                                        📅 {{ $order->deadline->translatedFormat('d M') }}
+                                        @if($daysLeft < 0) (LEWAT!)
+                                        @elseif($daysLeft == 0) (HARI INI)
+                                        @elseif($daysLeft <= 1) (H-{{ $daysLeft }})
+                                        @endif
+                                    </span>
+                                </div>
+                            @endforeach
+                        @endfor
+                    </div>
+                @else
+                    <div style="color:#64748b;font-size:13px;font-weight:600;padding-left:12px;">
+                        Tidak ada antrian pesanan yang menunggu saat ini ✨
+                    </div>
+                @endif
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -874,11 +912,10 @@
         updateClock();
         setInterval(updateClock, 1000);
 
-        // Auto-scroll tasks
+        // Auto-scroll tasks inside each card
         function initAutoScroll() {
             const containers = document.querySelectorAll('.tasks-scroll');
             containers.forEach(el => {
-                let scrollAmount = 0;
                 let step = 1;
                 let isPaused = false;
 
@@ -903,10 +940,35 @@
                             }, 3000); // Pause at bottom
                         }
                     }
-                }, 50); // Speed of scroll
+                }, 50);
             });
         }
         initAutoScroll();
+
+        // Horizontal Auto-scroll for Main columns if > 3 items
+        function initMainAutoScroll() {
+            const main = document.querySelector('.main');
+            if (!main) return;
+
+            let scrollTimer;
+            const scrollNext = () => {
+                if (main.scrollWidth > main.clientWidth + 20) {
+                    const cardWidth = main.querySelector('.item-card')?.offsetWidth || (main.clientWidth / 3);
+                    const gap = 16;
+                    const shift = (cardWidth + gap) * 3; // Shift 3 columns at once
+
+                    if (main.scrollLeft + main.clientWidth >= main.scrollWidth - 10) {
+                        main.scrollTo({ left: 0, behavior: 'smooth' });
+                    } else {
+                        main.scrollBy({ left: shift, behavior: 'smooth' });
+                    }
+                }
+            };
+
+            // Switch page every 15 seconds if > 3 items
+            setInterval(scrollNext, 15000);
+        }
+        initMainAutoScroll();
     </script>
 </body>
 
