@@ -1115,6 +1115,24 @@ class OrderResource extends Resource
             ])
 
             ->filters([
+                SelectFilter::make('is_express')
+                    ->label('Tipe Pesanan')
+                    ->options([
+                        '1' => '⚡ Hanya Express',
+                        '0' => 'Reguler',
+                    ]),
+
+                SelectFilter::make('status')
+                    ->label('Status Pesanan')
+                    ->options([
+                        'draft' => 'Draft',
+                        'pending' => 'Pending (Menunggu DP)',
+                        'proses' => 'Sedang Diproses',
+                        'siap_diambil' => 'Siap Diambil',
+                        'selesai' => 'Selesai / Diterima',
+                        'batal' => 'Dibatalkan',
+                    ]),
+
                 Filter::make('hutang')
                     ->label('Belum Lunas (Piutang)')
                     ->query(fn(Builder $query) => $query->whereRaw('(SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id) < orders.total_price')),
@@ -1128,7 +1146,7 @@ class OrderResource extends Resource
                     ->query(fn(Builder $query) => $query->where('deadline', '<=', now()->addDays(3))->where('deadline', '>=', now())),
 
                 SelectFilter::make('tipe_produk')
-                    ->label('Tipe Produk')
+                    ->label('Kategori Produksi')
                     ->options([
                         'produksi' => 'Produksi',
                         'non_produksi' => 'Non-Produksi',
@@ -1145,6 +1163,12 @@ class OrderResource extends Resource
                         return $query->whereHas('orderItems', fn($q) => $q->where('production_category', $data['value']));
                     }),
             ])
+            ->filtersTriggerAction(
+                fn (\Filament\Tables\Actions\Action $action) => $action
+                    ->button()
+                    ->label('Filter')
+                    ->icon('heroicon-m-funnel')
+            )
 
             ->actions([
                 \Filament\Actions\ActionGroup::make([
@@ -1224,11 +1248,11 @@ class OrderResource extends Resource
 
                                     return new HtmlString("
                                         <div style='font-size:13px;color:#374151;'>
-                                            <div style='margin-bottom:6px;'><strong>Waktu Penyerahan:</strong> {$pickupAt}</div>
-                                            <div style='margin-bottom:6px;'><strong>Catatan / Penerima:</strong> {$note}</div>
-                                            {$imgHtml}
-                                        </div>
-                                    ");
+                                             <div style='margin-bottom:6px;'><strong>Waktu Penyerahan:</strong> {$pickupAt}</div>
+                                             <div style='margin-bottom:6px;'><strong>Catatan / Penerima:</strong> {$note}</div>
+                                             {$imgHtml}
+                                         </div>
+                                     ");
                                 })
                         ])
                         ->visible(fn (Order $record): bool => $record->status === 'selesai' || !empty($record->pickup_proof)),
@@ -1253,7 +1277,12 @@ class OrderResource extends Resource
                 ]),
             ])
             ->defaultSort('id', 'desc')
-            ->modifyQueryUsing(fn($query) => $query->orderBy('is_express', 'desc')->orderBy('id', 'desc'))
+            ->modifyQueryUsing(function (Builder $query) {
+                // Express yang AKTIF (belum selesai/diambil/batal) diprioritaskan di paling atas (1), sisanya (0) urut seperti biasa berdasarkan id desc
+                return $query
+                    ->orderByRaw("CASE WHEN is_express = 1 AND status NOT IN ('selesai', 'diambil', 'batal', 'dibatalkan') THEN 1 ELSE 0 END DESC")
+                    ->orderBy('id', 'desc');
+            })
             ->extraAttributes([
                 'class' => 'orders-main-table-container',
             ]);
