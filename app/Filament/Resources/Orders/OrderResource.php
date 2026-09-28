@@ -1164,7 +1164,7 @@ class OrderResource extends Resource
                     }),
             ])
             ->filtersTriggerAction(
-                fn (\Filament\Tables\Actions\Action $action) => $action
+                fn (\Filament\Actions\Action $action) => $action
                     ->button()
                     ->label('Filter')
                     ->icon('heroicon-m-funnel')
