@@ -708,14 +708,37 @@
         {{-- PAGINATION --}}
         @if($orders->hasPages())
             <div
-                style="padding:16px 24px; border-top:1px solid #f3f4f6; display:flex; align-items:center; justify-content:space-between;">
+                style="padding:16px 24px; border-top:1px solid #f3f4f6; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
                 <div style="font-size:13px; color:#666666;">
-                    Show Result
-                    <span
-                        style="display:inline-block; padding:2px 8px; margin:0 4px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px;">{{ $perPage }}</span>
+                    Menampilkan <span style="font-weight:600; color:#111827;">{{ $orders->firstItem() }}</span> - <span style="font-weight:600; color:#111827;">{{ $orders->lastItem() }}</span> dari <span style="font-weight:600; color:#111827;">{{ $orders->total() }}</span> pesanan
                 </div>
-                <div>
-                    {{ $orders->links('filament::components.pagination') }}
+                <div style="display:flex; align-items:center; gap:6px;">
+                    {{-- Previous Page --}}
+                    @if($orders->onFirstPage())
+                        <span style="display:inline-flex; align-items:center; justify-content:center; padding:6px 12px; border-radius:8px; border:1px solid #e5e7eb; background:#f9fafb; color:#9ca3af; font-size:12px; font-weight:500; cursor:not-allowed;">
+                            &larr; Sebelumnya
+                        </span>
+                    @else
+                        <button wire:click="previousPage" style="display:inline-flex; align-items:center; justify-content:center; padding:6px 12px; border-radius:8px; border:1px solid #e5e7eb; background:white; color:#374151; font-size:12px; font-weight:500; cursor:pointer; transition:all 0.15s;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'">
+                            &larr; Sebelumnya
+                        </button>
+                    @endif
+
+                    {{-- Page Info --}}
+                    <span style="font-size:12px; font-weight:600; color:#6b7280; padding:0 8px;">
+                        Hal {{ $orders->currentPage() }} dari {{ $orders->lastPage() }}
+                    </span>
+
+                    {{-- Next Page --}}
+                    @if($orders->hasMorePages())
+                        <button wire:click="nextPage" style="display:inline-flex; align-items:center; justify-content:center; padding:6px 12px; border-radius:8px; border:1px solid #e5e7eb; background:white; color:#374151; font-size:12px; font-weight:500; cursor:pointer; transition:all 0.15s;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'">
+                            Berikutnya &rarr;
+                        </button>
+                    @else
+                        <span style="display:inline-flex; align-items:center; justify-content:center; padding:6px 12px; border-radius:8px; border:1px solid #e5e7eb; background:#f9fafb; color:#9ca3af; font-size:12px; font-weight:500; cursor:not-allowed;">
+                            Berikutnya &rarr;
+                        </span>
+                    @endif
                 </div>
             </div>
         @endif
