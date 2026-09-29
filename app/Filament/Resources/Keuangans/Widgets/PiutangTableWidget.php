@@ -192,12 +192,12 @@ class PiutangTableWidget extends BaseWidget
                     ->query(function ($query, array $data) {
                         return $query
                             ->when(
-                                $data['deadline_from'],
-                                fn($query, $date) => $query->whereDate('deadline_date', '>=', $date),
+                                $data['deadline_from'] ?? null,
+                                fn($query, $date) => $query->whereDate('deadline', '>=', $date),
                             )
                             ->when(
-                                $data['deadline_until'],
-                                fn($query, $date) => $query->whereDate('deadline_date', '<=', $date),
+                                $data['deadline_until'] ?? null,
+                                fn($query, $date) => $query->whereDate('deadline', '<=', $date),
                             );
                     })
                     ->indicateUsing(function (array $data): array {

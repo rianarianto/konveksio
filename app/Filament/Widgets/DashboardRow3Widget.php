@@ -66,10 +66,12 @@ class DashboardRow3Widget extends Widget
         }
 
         if (!empty($this->statusFilter)) {
-            if ($this->statusFilter === 'dikerjakan') {
-                $query->whereIn('status', ['dikerjakan', 'proses', 'produksi']);
-            } elseif ($this->statusFilter === 'diterima') {
-                $query->whereIn('status', ['diterima', 'draft', 'pending']);
+            if ($this->statusFilter === 'proses' || $this->statusFilter === 'dikerjakan') {
+                $query->whereIn('status', ['proses', 'diproses', 'dikerjakan', 'produksi']);
+            } elseif ($this->statusFilter === 'selesai') {
+                $query->whereIn('status', ['selesai', 'diambil']);
+            } elseif ($this->statusFilter === 'pending') {
+                $query->whereIn('status', ['pending', 'diterima']);
             } else {
                 $query->where('status', $this->statusFilter);
             }

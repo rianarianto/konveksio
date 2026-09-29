@@ -159,12 +159,14 @@
                     {{-- Status Filter --}}
                     <div style="position:relative;">
                         <select wire:model.live="statusFilter" class="r3-filter-select"
-                            style="appearance:none; border-radius:12px; padding:10px 36px 10px 16px; font-size:13px; cursor:pointer; min-width:155px; outline:none;">
-                            <option value="">Status Pesanan</option>
-                            <option value="pending">Pending</option>
-                            <option value="diterima">Antrian</option>
-                            <option value="dikerjakan">Dikerjakan</option>
-                            <option value="selesai">Selesai</option>
+                            style="appearance:none; border-radius:12px; padding:10px 36px 10px 16px; font-size:13px; cursor:pointer; min-width:160px; outline:none;">
+                            <option value="">Semua Status</option>
+                            <option value="draft">Draft</option>
+                            <option value="pending">Pending (DP)</option>
+                            <option value="proses">Sedang Diproses</option>
+                            <option value="siap_diambil">Siap Diambil</option>
+                            <option value="selesai">Selesai / Diterima</option>
+                            <option value="batal">Dibatalkan</option>
                         </select>
                         <div
                             style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#666666; pointer-events:none;">
