@@ -44,11 +44,11 @@
     <style>
         .r2-grid {
             display: grid;
-            grid-template-columns: 2fr 1fr;
+            grid-template-columns: 1.6fr 1fr;
             gap: 20px;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 1100px) {
             .r2-grid {
                 grid-template-columns: 1fr;
             }
@@ -60,14 +60,17 @@
             border-radius: 18px;
             border: 1px solid #e9e9e9;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-            padding: 28px 28px 24px 28px;
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         .r2-card-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
 
         .r2-icon-wrap {
@@ -80,15 +83,6 @@
             justify-content: center;
         }
 
-        @media (max-width: 640px) {
-            .r2-card-header .r2-icon-wrap {
-                display: none;
-            }
-            .r2-cashflow-title {
-                margin-top: 8px; /* Compensate for removed icon space */
-            }
-        }
-
         .r2-icon-wrap svg {
             width: 18px;
             height: 18px;
@@ -97,63 +91,58 @@
 
         .r2-cashflow-inner {
             display: flex;
-            gap: 32px;
+            gap: 24px;
             align-items: center;
+            justify-content: space-between;
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 768px) {
             .r2-cashflow-inner {
                 flex-direction: column;
-                align-items: flex-start;
-                gap: 24px;
+                align-items: center;
+                text-align: center;
+                gap: 20px;
             }
         }
 
         .r2-cashflow-title {
             font-size: 16px;
-            font-weight: 600;
-            color: #222;
-            margin-bottom: 24px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 20px;
         }
 
         .r2-metric-label {
             font-size: 12px;
-            color: #a3a3a3;
-            font-weight: 500;
+            color: #6b7280;
+            font-weight: 600;
             margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
         }
 
         .r2-metric-value {
-            font-size: 42px;
-            font-weight: 600;
-            color: #171717;
-            letter-spacing: -0.5px;
-            margin-bottom: 20px;
-            line-height: 1.1;
-            word-break: break-word; /* Prevent long numbers from overflowing */
+            font-size: clamp(22px, 2.2vw, 34px);
+            font-weight: 800;
+            color: #111827;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+            line-height: 1.2;
+            white-space: nowrap;
         }
 
         /* ─── DONUT CHART ─── */
         .r2-donut-wrap {
             flex-shrink: 0;
             position: relative;
-            width: 200px;
-            height: 200px;
-            margin: 0 auto; /* Center on mobile when column flex */
-        }
-
-        @media (max-width: 640px) {
-            .r2-donut-wrap {
-                width: 160px;
-                height: 160px;
-            }
-            .r2-donut-wrap svg {
-                width: 160px;
-                height: 160px;
-            }
+            width: clamp(140px, 14vw, 175px);
+            height: clamp(140px, 14vw, 175px);
+            margin: 0 auto;
         }
 
         .r2-donut-wrap svg {
+            width: 100%;
+            height: 100%;
             transform: rotate(-90deg);
             display: block;
         }
@@ -165,18 +154,14 @@
             gap: 6px;
         }
 
-        @media (max-width: 640px) {
-            .r2-donut-legend {
-                align-items: center; /* Center legend text on mobile */
-            }
-        }
-
         .r2-legend-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             font-size: 12px;
-            color: #6b6b6b;
+            font-weight: 600;
+            color: #4b5563;
+            white-space: nowrap;
         }
 
         .r2-legend-dot {
