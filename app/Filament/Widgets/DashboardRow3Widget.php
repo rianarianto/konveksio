@@ -54,7 +54,7 @@ class DashboardRow3Widget extends Widget
             });
         }
 
-        if (auth()->user()->role === 'owner') {
+        if (auth()->user()->role === 'owner' && empty($this->statusFilter) && empty($this->deadlineFilter) && empty($this->search)) {
             $query->where('status', '!=', 'batal')
                 ->where(function (Builder $query) {
                     $query->whereRaw('total_price > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)')
@@ -66,11 +66,20 @@ class DashboardRow3Widget extends Widget
         }
 
         if (!empty($this->statusFilter)) {
-            $query->where('status', $this->statusFilter);
+            if ($this->statusFilter === 'dikerjakan') {
+                $query->whereIn('status', ['dikerjakan', 'proses', 'produksi']);
+            } elseif ($this->statusFilter === 'diterima') {
+                $query->whereIn('status', ['diterima', 'draft', 'pending']);
+            } else {
+                $query->where('status', $this->statusFilter);
+            }
         }
 
         if (!empty($this->deadlineFilter)) {
-            $query->whereDate('deadline', $this->deadlineFilter);
+            $query->where(function ($q) {
+                $q->whereDate('deadline', $this->deadlineFilter)
+                  ->orWhereDate('order_date', $this->deadlineFilter);
+            });
         }
 
         // Default order by deadline so urgent ones are on top
