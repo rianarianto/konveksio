@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ShopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
     protected $fillable = [
+        'shop_id',
         'order_id',
+        'type',
         'amount',
         'payment_date',
         'payment_method',
@@ -22,7 +25,17 @@ class Payment extends Model
         'amount'       => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ShopScope());
+    }
+
     // ── Relasi ───────────────────────────────────────────────────────────────
+
+    public function shop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class);
+    }
 
     public function order(): BelongsTo
     {

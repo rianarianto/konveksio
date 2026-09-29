@@ -32,23 +32,25 @@ class KeuanganStatsWidget extends BaseWidget
         $orders = Order::where('shop_id', $tenantId)->get();
         $totalPiutang = $orders->sum('remaining_balance');
 
-        // 2. Uang Masuk Hari Ini
-        $uangMasukHariIni = Payment::whereHas('order', fn($q) => $q->where('shop_id', $tenantId))
+        // 2. Uang Masuk Hari Ini (Semua pembayaran pesanan & modal masuk hari ini)
+        $uangMasukHariIni = Payment::where(function ($q) use ($tenantId) {
+                $q->where('shop_id', $tenantId)
+                  ->orWhereHas('order', fn($oq) => $oq->where('shop_id', $tenantId));
+            })
             ->whereDate('payment_date', Carbon::today())
             ->sum('amount');
 
-        // 3. Saldo Kas Kecil Bulan Ini
-        $paymentsBulanIni = Payment::whereHas('order', fn($q) => $q->where('shop_id', $tenantId))
-            ->whereMonth('payment_date', Carbon::now()->month)
-            ->whereYear('payment_date', Carbon::now()->year)
+        // 3. Saldo Kas Kecil Kumulatif (Modal Masuk + Pembayaran Cash - Pengeluaran Kas/Setoran)
+        $totalPemasukanKas = Payment::where(function ($q) use ($tenantId) {
+                $q->where('shop_id', $tenantId)
+                  ->orWhereHas('order', fn($oq) => $oq->where('shop_id', $tenantId));
+            })
             ->sum('amount');
 
-        $expensesBulanIni = Expense::where('shop_id', $tenantId)
-            ->whereMonth('expense_date', Carbon::now()->month)
-            ->whereYear('expense_date', Carbon::now()->year)
+        $totalPengeluaranKas = Expense::where('shop_id', $tenantId)
             ->sum('amount');
 
-        $saldoKasKecil = $paymentsBulanIni - $expensesBulanIni;
+        $saldoKasKecil = $totalPemasukanKas - $totalPengeluaranKas;
 
         // 4. Breakdown Pengeluaran Bulan Ini per Kategori
         $expenseBreakdown = Expense::where('shop_id', $tenantId)
@@ -79,9 +81,9 @@ class KeuanganStatsWidget extends BaseWidget
                 ->color('success'),
 
             Stat::make('Saldo Kas Kecil', 'Rp ' . number_format($saldoKasKecil, 0, ',', '.'))
-                ->description('Pemasukan - Pengeluaran (Bulan: ' . Carbon::now()->translatedFormat('F') . ')')
+                ->description($saldoKasKecil >= 0 ? 'Kas Fisik Tersedia' : 'Defisit Kas')
                 ->descriptionIcon('heroicon-m-wallet')
-                ->color('primary'),
+                ->color($saldoKasKecil >= 0 ? 'primary' : 'danger'),
         ];
     }
 }

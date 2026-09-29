@@ -21,6 +21,51 @@ class ListPengeluaran extends ListRecords
     public ?string $dari_tgl = null;
     public ?string $sampai_tgl = null;
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\Action::make('export_csv')
+                ->label('Export Excel/CSV')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->form([
+                    \Filament\Forms\Components\DatePicker::make('from')
+                        ->label('Dari Tanggal')
+                        ->default(now()->startOfMonth()),
+                    \Filament\Forms\Components\DatePicker::make('until')
+                        ->label('Sampai Tanggal')
+                        ->default(now()),
+                ])
+                ->action(function (array $data) {
+                    $url = route('reports.export-pengeluaran', [
+                        'from' => $data['from'] ?? null,
+                        'until' => $data['until'] ?? null,
+                    ]);
+                    return redirect()->away($url);
+                }),
+
+            \Filament\Actions\Action::make('export_pdf')
+                ->label('Cetak Laporan PDF')
+                ->icon('heroicon-o-printer')
+                ->color('primary')
+                ->form([
+                    \Filament\Forms\Components\DatePicker::make('from')
+                        ->label('Dari Tanggal')
+                        ->default(now()->startOfMonth()),
+                    \Filament\Forms\Components\DatePicker::make('until')
+                        ->label('Sampai Tanggal')
+                        ->default(now()),
+                ])
+                ->action(function (array $data) {
+                    $url = route('reports.export-pdf', [
+                        'from' => $data['from'] ?? null,
+                        'until' => $data['until'] ?? null,
+                    ]);
+                    return redirect()->away($url);
+                }),
+        ];
+    }
+
     public function getViewData(): array
     {
         $tenantId = Filament::getTenant()?->id;

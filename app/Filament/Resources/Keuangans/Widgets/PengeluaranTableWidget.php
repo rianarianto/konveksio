@@ -99,6 +99,7 @@ class PengeluaranTableWidget extends BaseWidget
                                 'Transport' => 'Transport',
                                 'Alat & Mesin' => 'Alat & Mesin',
                                 'Kasbon Karyawan' => 'Kasbon Karyawan',
+                                'Setoran Kas ke Owner' => 'Setoran Kas ke Owner',
                                 'Lainnya' => 'Lainnya',
                             ])
                             ->placeholder('Pilih kategori...'),

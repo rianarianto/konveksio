@@ -62,3 +62,10 @@ Route::get('/worker/{token}', function (string $token) {
 Route::get('/worker/{token}/keuangan', function (string $token) {
     return view('worker-finance', ['token' => $token]);
 })->name('worker.finance');
+
+// ─── Export Laporan Keuangan ────────────────────────────────────────────────
+Route::prefix('reports')->middleware(['web', 'auth'])->group(function () {
+    Route::get('/export-pemasukan', [\App\Http\Controllers\ReportExportController::class, 'exportPemasukan'])->name('reports.export-pemasukan');
+    Route::get('/export-pengeluaran', [\App\Http\Controllers\ReportExportController::class, 'exportPengeluaran'])->name('reports.export-pengeluaran');
+    Route::get('/export-pdf', [\App\Http\Controllers\ReportExportController::class, 'downloadPdfSummary'])->name('reports.export-pdf');
+});
