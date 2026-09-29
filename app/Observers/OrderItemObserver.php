@@ -19,6 +19,15 @@ class OrderItemObserver
             $item->is_addition = true;
         }
 
+        // Auto-approve if it's jasa or non_produksi without sablon/bordir
+        $details = $item->size_and_request_details ?? [];
+        $sablonJenis = $details['sablon_jenis'] ?? null;
+        $hasSablon = !empty($sablonJenis) && $sablonJenis !== 'Tanpa Sablon/Bordir';
+
+        if (in_array($item->production_category, ['jasa', 'non_produksi']) && !$hasSablon) {
+            $item->design_status = 'approved';
+        }
+
         $existingApproved = OrderItem::where('order_id', $item->order_id)
             ->where('product_name', $item->product_name)
             ->where('design_status', 'approved')

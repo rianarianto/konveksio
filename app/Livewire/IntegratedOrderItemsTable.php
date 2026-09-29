@@ -2200,8 +2200,13 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
             ->defaultKeySort(false);
     }
 
-    protected function getNewItemDesignStatus(string $productName): string
+    protected function getNewItemDesignStatus(string $productName, ?string $category = null, ?string $sablonJenis = null): string
     {
+        $hasSablon = !empty($sablonJenis) && $sablonJenis !== 'Tanpa Sablon/Bordir';
+        if (in_array($category, ['jasa', 'non_produksi']) && !$hasSablon) {
+            return 'approved';
+        }
+
         if (in_array($this->order->status, ['draft', 'antrian'])) {
             return 'pending';
         }

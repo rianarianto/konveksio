@@ -55,14 +55,34 @@ class DesignTaskResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
+        $hasSablonCondition = function ($q) {
+            $q->whereNotIn('production_category', ['jasa', 'non_produksi'])
+              ->orWhere(function ($sub) {
+                  $sub->whereIn('production_category', ['jasa', 'non_produksi'])
+                      ->whereNotNull('size_and_request_details->sablon_jenis')
+                      ->where('size_and_request_details->sablon_jenis', '!=', '')
+                      ->where('size_and_request_details->sablon_jenis', '!=', 'Tanpa Sablon/Bordir');
+              });
+        };
+
         return parent::getEloquentQuery()
             ->with(['order.customer', 'bahan.material'])
             ->whereHas('order', fn($q) => $q->where('status', '!=', 'draft'))
             ->whereIn('design_status', ['pending', 'uploaded'])
-            ->whereIn('id', function (\Illuminate\Database\Query\Builder $query) {
+            ->where($hasSablonCondition)
+            ->whereIn('id', function (\Illuminate\Database\Query\Builder $query) use ($hasSablonCondition) {
                 $query->selectRaw('MIN(id)')
                     ->from('order_items')
                     ->whereIn('design_status', ['pending', 'uploaded'])
+                    ->where(function ($subQ) {
+                        $subQ->whereNotIn('production_category', ['jasa', 'non_produksi'])
+                            ->orWhere(function ($nested) {
+                                $nested->whereIn('production_category', ['jasa', 'non_produksi'])
+                                    ->whereNotNull('size_and_request_details->sablon_jenis')
+                                    ->where('size_and_request_details->sablon_jenis', '!=', '')
+                                    ->where('size_and_request_details->sablon_jenis', '!=', 'Tanpa Sablon/Bordir');
+                            });
+                    })
                     ->groupBy('order_id', 'product_name');
             });
     }
