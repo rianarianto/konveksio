@@ -147,7 +147,7 @@ class KasMasukTableWidget extends BaseWidget
                 CreateAction::make('tambah_modal')
                     ->label('Tambah Modal Kas Kecil')
                     ->icon('heroicon-o-plus-circle')
-                    ->color('success')
+                    ->color('primary')
                     ->modalHeading('Tambah Modal Kas Kecil / Kas Masuk')
                     ->form([
                         TextInput::make('amount')
@@ -252,7 +252,7 @@ class KasMasukTableWidget extends BaseWidget
                                     ->columnSpanFull(),
                             ];
                         })
-                        ->modalSubmitActionLabel('Proses Keputusan')
+                        ->modalSubmitActionLabel('Kirim')
                         ->action(function ($record, array $data) {
                             $req = $record?->pendingCorrectionRequest();
                             if (!$req) return;

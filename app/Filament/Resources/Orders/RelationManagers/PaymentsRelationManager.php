@@ -325,7 +325,7 @@ class PaymentsRelationManager extends RelationManager
                                     ->columnSpanFull(),
                             ];
                         })
-                        ->modalSubmitActionLabel('Proses Keputusan')
+                        ->modalSubmitActionLabel('Kirim')
                         ->action(function ($record, array $data) {
                             $req = $record?->pendingCorrectionRequest();
                             if (!$req) return;
