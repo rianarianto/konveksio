@@ -201,7 +201,7 @@ class KasMasukTableWidget extends BaseWidget
                 ActionGroup::make([
                     // ── Aksi 1: Owner Review & Setujui Pengajuan ──
                     Action::make('review_pengajuan')
-                        ->label('Review & Setujui Pengajuan')
+                        ->label('Review')
                         ->icon('heroicon-o-check-badge')
                         ->color('warning')
                         ->visible(fn ($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
@@ -293,7 +293,7 @@ class KasMasukTableWidget extends BaseWidget
 
                     // ── Aksi 2: Owner Tolak Pengajuan ──
                     Action::make('tolak_pengajuan')
-                        ->label('Tolak Pengajuan')
+                        ->label('Tolak')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->visible(fn ($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
@@ -346,14 +346,14 @@ class KasMasukTableWidget extends BaseWidget
 
                     // ── Aksi 3: Buka Pesanan (Jika terkait pesanan) ──
                     Action::make('lihat_pesanan')
-                        ->label('Buka Detail Pesanan')
+                        ->label('Detail')
                         ->icon('heroicon-o-arrow-top-right-on-square')
                         ->visible(fn ($record) => (bool) $record?->order_id)
                         ->url(fn ($record) => "/app/" . ($record?->shop_id ?? Filament::getTenant()?->id) . "/orders/{$record?->order_id}?relation=1"),
 
                     // ── Aksi 4: Edit Modal Kas Kecil (Bukan Pesanan) ──
                     EditAction::make('edit_modal')
-                        ->label('Edit Modal')
+                        ->label('Edit')
                         ->visible(fn ($record) => $record?->type === 'modal_awal' || !$record?->order_id)
                         ->form([
                             TextInput::make('amount')
@@ -392,7 +392,7 @@ class KasMasukTableWidget extends BaseWidget
 
                     // ── Aksi 5: Hapus Modal Kas Kecil (Bukan Pesanan) ──
                     DeleteAction::make('hapus_modal')
-                        ->label('Hapus Modal')
+                        ->label('Hapus')
                         ->visible(fn ($record) => ($record?->type === 'modal_awal' || !$record?->order_id) && auth()->user()->role === 'owner')
                         ->after(function () {
                             $this->dispatch('refreshStats');

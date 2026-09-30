@@ -274,7 +274,7 @@ class PaymentsRelationManager extends RelationManager
                 ActionGroup::make([
                     // ── Aksi 1: Owner Review & Setujui Pengajuan ──
                     Action::make('review_pengajuan')
-                        ->label('Review & Setujui Pengajuan')
+                        ->label('Review')
                         ->icon('heroicon-o-check-badge')
                         ->color('warning')
                         ->visible(fn ($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
@@ -366,7 +366,7 @@ class PaymentsRelationManager extends RelationManager
 
                     // ── Aksi 2: Owner Tolak Pengajuan ──
                     Action::make('tolak_pengajuan')
-                        ->label('Tolak Pengajuan')
+                        ->label('Tolak')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->visible(fn ($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
@@ -419,6 +419,7 @@ class PaymentsRelationManager extends RelationManager
 
                     // ── Aksi 3: Owner Langsung Edit ──
                     EditAction::make()
+                        ->label('Edit')
                         ->visible(fn () => auth()->user()->role === 'owner')
                         ->after(function () {
                             $this->dispatch('refreshOrderSummary');
@@ -426,7 +427,7 @@ class PaymentsRelationManager extends RelationManager
 
                     // ── Aksi 4: Admin Ajukan Koreksi ──
                     Action::make('ajukan_koreksi')
-                        ->label('Ajukan Koreksi')
+                        ->label('Koreksi')
                         ->icon('heroicon-o-pencil-square')
                         ->color('primary')
                         ->visible(fn ($record) => auth()->user()->role !== 'owner' && $record?->pendingCorrectionRequest() === null)
@@ -544,7 +545,7 @@ class PaymentsRelationManager extends RelationManager
 
                     // ── Aksi 5: Admin Ajukan Hapus ──
                     Action::make('ajukan_hapus')
-                        ->label('Ajukan Hapus')
+                        ->label('Hapus')
                         ->icon('heroicon-o-trash')
                         ->color('danger')
                         ->visible(fn ($record) => auth()->user()->role !== 'owner' && $record?->pendingCorrectionRequest() === null)
