@@ -435,8 +435,10 @@ class PaymentsRelationManager extends RelationManager
                             ->columnSpanFull(),
                     ])
                     ->action(function ($record, array $data) {
+                        $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
+
                         $req = \App\Models\PaymentCorrectionRequest::create([
-                            'shop_id' => \Filament\Facades\Filament::getTenant()?->id,
+                            'shop_id' => $shopId,
                             'payment_id' => $record->id,
                             'request_type' => 'edit',
                             'old_amount' => $record->amount,
@@ -454,22 +456,42 @@ class PaymentsRelationManager extends RelationManager
                         ]);
 
                         // Kirim Notifikasi ke semua Owner di toko ini
-                        $owners = \App\Models\User::withoutGlobalScopes()
-                            ->where('shop_id', \Filament\Facades\Filament::getTenant()?->id)
-                            ->where('role', 'owner')
-                            ->get();
+                        try {
+                            $owners = \App\Models\User::withoutGlobalScopes()
+                                ->where(function ($q) use ($shopId) {
+                                    $q->where('shop_id', $shopId)->orWhereNull('shop_id');
+                                })
+                                ->where('role', 'owner')
+                                ->get();
 
-                        foreach ($owners as $owner) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('⚠️ Permintaan Koreksi Pembayaran')
-                                ->body(auth()->user()->name . " mengajukan koreksi pembayaran " . ($record->order?->order_number ?? '') . " dari Rp " . number_format($record->amount, 0, ',', '.') . " -> Rp " . number_format($data['new_amount'], 0, ',', '.') . ". Alasan: " . $data['reason'])
-                                ->warning()
-                                ->actions([
-                                    \Filament\Notifications\Actions\Action::make('view')
-                                        ->label('Lihat Pesanan')
-                                        ->url(\App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $record->order_id])),
-                                ])
-                                ->sendToDatabase($owner);
+                            $orderUrl = null;
+                            try {
+                                $orderUrl = \App\Filament\Resources\Orders\OrderResource::getUrl('view', [
+                                    'record' => $record->order_id,
+                                    'tenant' => $shopId,
+                                ]);
+                            } catch (\Throwable $e) {
+                                // Fallback jika format routing beda
+                            }
+
+                            foreach ($owners as $owner) {
+                                $notif = \Filament\Notifications\Notification::make()
+                                    ->title('⚠️ Permintaan Koreksi Pembayaran')
+                                    ->body(auth()->user()->name . " mengajukan koreksi pembayaran " . ($record->order?->order_number ?? '') . " dari Rp " . number_format($record->amount, 0, ',', '.') . " -> Rp " . number_format($data['new_amount'], 0, ',', '.') . ". Alasan: " . $data['reason'])
+                                    ->warning();
+
+                                if ($orderUrl) {
+                                    $notif->actions([
+                                        \Filament\Notifications\Actions\Action::make('view')
+                                            ->label('Lihat Pesanan')
+                                            ->url($orderUrl),
+                                    ]);
+                                }
+
+                                $notif->sendToDatabase($owner);
+                            }
+                        } catch (\Throwable $e) {
+                            // Abaikan error notifikasi jika gagal
                         }
 
                         \Filament\Notifications\Notification::make()
@@ -477,6 +499,8 @@ class PaymentsRelationManager extends RelationManager
                             ->body('Pengajuan telah dikirim ke Owner untuk ditinjau.')
                             ->success()
                             ->send();
+
+                        $this->dispatch('refreshOrderSummary');
                     }),
 
                 // ── Aksi 4: Admin Ajukan Hapus ──
@@ -493,8 +517,10 @@ class PaymentsRelationManager extends RelationManager
                             ->columnSpanFull(),
                     ])
                     ->action(function ($record, array $data) {
+                        $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
+
                         \App\Models\PaymentCorrectionRequest::create([
-                            'shop_id' => \Filament\Facades\Filament::getTenant()?->id,
+                            'shop_id' => $shopId,
                             'payment_id' => $record->id,
                             'request_type' => 'delete',
                             'old_amount' => $record->amount,
@@ -508,22 +534,42 @@ class PaymentsRelationManager extends RelationManager
                         ]);
 
                         // Kirim Notifikasi ke semua Owner di toko ini
-                        $owners = \App\Models\User::withoutGlobalScopes()
-                            ->where('shop_id', \Filament\Facades\Filament::getTenant()?->id)
-                            ->where('role', 'owner')
-                            ->get();
+                        try {
+                            $owners = \App\Models\User::withoutGlobalScopes()
+                                ->where(function ($q) use ($shopId) {
+                                    $q->where('shop_id', $shopId)->orWhereNull('shop_id');
+                                })
+                                ->where('role', 'owner')
+                                ->get();
 
-                        foreach ($owners as $owner) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('⚠️ Permintaan Hapus Pembayaran')
-                                ->body(auth()->user()->name . " mengajukan penghapusan pembayaran " . ($record->order?->order_number ?? '') . " (Rp " . number_format($record->amount, 0, ',', '.') . "). Alasan: " . $data['reason'])
-                                ->danger()
-                                ->actions([
-                                    \Filament\Notifications\Actions\Action::make('view')
-                                        ->label('Lihat Pesanan')
-                                        ->url(\App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $record->order_id])),
-                                ])
-                                ->sendToDatabase($owner);
+                            $orderUrl = null;
+                            try {
+                                $orderUrl = \App\Filament\Resources\Orders\OrderResource::getUrl('view', [
+                                    'record' => $record->order_id,
+                                    'tenant' => $shopId,
+                                ]);
+                            } catch (\Throwable $e) {
+                                // Fallback jika format routing beda
+                            }
+
+                            foreach ($owners as $owner) {
+                                $notif = \Filament\Notifications\Notification::make()
+                                    ->title('⚠️ Permintaan Hapus Pembayaran')
+                                    ->body(auth()->user()->name . " mengajukan penghapusan pembayaran " . ($record->order?->order_number ?? '') . " (Rp " . number_format($record->amount, 0, ',', '.') . "). Alasan: " . $data['reason'])
+                                    ->danger();
+
+                                if ($orderUrl) {
+                                    $notif->actions([
+                                        \Filament\Notifications\Actions\Action::make('view')
+                                            ->label('Lihat Pesanan')
+                                            ->url($orderUrl),
+                                    ]);
+                                }
+
+                                $notif->sendToDatabase($owner);
+                            }
+                        } catch (\Throwable $e) {
+                            // Abaikan error notifikasi jika gagal
                         }
 
                         \Filament\Notifications\Notification::make()
@@ -531,6 +577,8 @@ class PaymentsRelationManager extends RelationManager
                             ->body('Pengajuan telah dikirim ke Owner untuk ditinjau.')
                             ->success()
                             ->send();
+
+                        $this->dispatch('refreshOrderSummary');
                     }),
 
                 // ── Aksi 5: Owner Langsung Hapus ──
