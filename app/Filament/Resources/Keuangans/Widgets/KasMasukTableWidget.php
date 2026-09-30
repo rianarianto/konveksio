@@ -253,6 +253,7 @@ class KasMasukTableWidget extends BaseWidget
                             ];
                         })
                         ->modalSubmitActionLabel('Kirim')
+                        ->modalSubmitAction(fn ($action) => $action->color('primary'))
                         ->action(function ($record, array $data) {
                             $req = $record?->pendingCorrectionRequest();
                             if (!$req) return;
@@ -397,10 +398,10 @@ class KasMasukTableWidget extends BaseWidget
                         }),
                 ])
                     ->label('Opsi')
-                    ->icon('heroicon-m-ellipsis-vertical')
-                    ->color('gray')
+                    ->icon(fn ($record) => $record?->pendingCorrectionRequest() ? 'heroicon-m-exclamation-circle' : 'heroicon-m-ellipsis-vertical')
+                    ->color(fn ($record) => $record?->pendingCorrectionRequest() ? 'warning' : 'gray')
                     ->size('sm')
-                    ->tooltip('Menu Aksi'),
+                    ->tooltip(fn ($record) => $record?->pendingCorrectionRequest() ? 'Ada pengajuan koreksi yang butuh review' : 'Menu Aksi'),
             ])
             ->emptyStateHeading('Belum Ada Kas Masuk')
             ->emptyStateDescription('Catat modal harian atau pembayaran pesanan melalui detail pesanan / tab Piutang.')

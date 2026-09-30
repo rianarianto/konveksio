@@ -326,6 +326,7 @@ class PaymentsRelationManager extends RelationManager
                             ];
                         })
                         ->modalSubmitActionLabel('Kirim')
+                        ->modalSubmitAction(fn ($action) => $action->color('primary'))
                         ->action(function ($record, array $data) {
                             $req = $record?->pendingCorrectionRequest();
                             if (!$req) return;
