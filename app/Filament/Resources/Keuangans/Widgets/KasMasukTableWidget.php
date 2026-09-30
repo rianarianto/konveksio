@@ -177,195 +177,208 @@ class KasMasukTableWidget extends BaseWidget
                     }),
             ])
             ->actions([
-                // ── Aksi Utama: Owner Review Pengajuan Koreksi / Hapus (Mencolok saat Pending) ──
-                \Filament\Actions\Action::make('review_pengajuan')
-                    ->label('Review Pengajuan')
-                    ->icon('heroicon-o-check-badge')
-                    ->color('warning')
-                    ->button()
-                    ->size('sm')
-                    ->visible(fn($record) => auth()->user()->role === 'owner' && $record->pendingCorrectionRequest() !== null)
-                    ->modalHeading('Review Pengajuan Koreksi Pembayaran')
-                    ->modalDescription(function ($record) {
-                        $req = $record->pendingCorrectionRequest();
-                        return "Diajukan oleh: " . ($req->requester->name ?? 'Admin') . " | Alasan: " . $req->reason;
-                    })
-                    ->form(function ($record) {
-                        $req = $record->pendingCorrectionRequest();
-                        if (!$req) return [];
+                \Filament\Tables\Actions\ActionGroup::make([
+                    // ── Aksi 1: Owner Review Pengajuan Koreksi / Hapus (Pertama jika Pending) ──
+                    \Filament\Tables\Actions\Action::make('review_pengajuan')
+                        ->label('Review Pengajuan')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('warning')
+                        ->visible(fn($record) => auth()->user()->role === 'owner' && $record->pendingCorrectionRequest() !== null)
+                        ->modalHeading('Review Pengajuan Koreksi Pembayaran')
+                        ->modalDescription(function ($record) {
+                            $req = $record->pendingCorrectionRequest();
+                            return "Diajukan oleh: " . ($req->requester->name ?? 'Admin') . " | Alasan: " . $req->reason;
+                        })
+                        ->form(function ($record) {
+                            $req = $record->pendingCorrectionRequest();
+                            if (!$req) return [];
 
-                        $isDelete = $req->request_type === 'delete';
+                            $isDelete = $req->request_type === 'delete';
 
-                        return [
-                            \Filament\Forms\Components\Placeholder::make('info_perbandingan')
-                                ->label(false)
-                                ->content(function() use ($record, $req, $isDelete) {
-                                    $html = "<div style='background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:12px; font-size:13px;'>";
-                                    $html .= "<div style='font-weight:700; color:#111827; margin-bottom:8px;'>Jenis Pengajuan: " . ($isDelete ? "<span style='color:#ef4444;'>HAPUS PEMBAYARAN</span>" : "<span style='color:#8000FF;'>UBAH / KOREKSI DATA</span>") . "</div>";
-                                    $html .= "<table style='width:100%; border-collapse:collapse;'>";
-                                    $html .= "<tr style='border-bottom:1px solid #e5e7eb;'><td style='padding:4px 0; color:#6b7280;'>Data Saat Ini:</td><td style='padding:4px 0; font-weight:600;'>Rp " . number_format($req->old_amount, 0, ',', '.') . " (" . ucfirst($req->old_payment_method) . ") - Tgl: " . \Carbon\Carbon::parse($req->old_payment_date)->format('d/m/Y') . "</td></tr>";
-                                    if (!$isDelete) {
-                                        $html .= "<tr style='border-bottom:1px solid #e5e7eb;'><td style='padding:4px 0; color:#047857;'>Data Yang Diajukan:</td><td style='padding:4px 0; font-weight:700; color:#047857;'>Rp " . number_format($req->new_amount, 0, ',', '.') . " (" . ucfirst($req->new_payment_method) . ") - Tgl: " . \Carbon\Carbon::parse($req->new_payment_date)->format('d/m/Y') . "</td></tr>";
-                                    }
-                                    $html .= "<tr><td style='padding:4px 0; color:#b45309;'>Alasan Admin:</td><td style='padding:4px 0; font-style:italic; color:#b45309;'>" . htmlspecialchars($req->reason) . "</td></tr>";
-                                    $html .= "</table>";
-                                    $html .= "</div>";
-                                    return new \Illuminate\Support\HtmlString($html);
-                                })
-                                ->columnSpanFull(),
-                            
-                            \Filament\Forms\Components\Textarea::make('catatan_penolakan')
-                                ->label('Catatan (Jika Ingin Menolak)')
-                                ->placeholder('Tulis alasan jika menolak pengajuan ini...'),
-                        ];
-                    })
-                    ->modalSubmitActionLabel('Setujui Perubahan (Approve)')
-                    ->action(function ($record, array $data) {
-                        $req = $record->pendingCorrectionRequest();
-                        if (!$req) return;
+                            return [
+                                \Filament\Forms\Components\Placeholder::make('info_perbandingan')
+                                    ->label(false)
+                                    ->content(function() use ($record, $req, $isDelete) {
+                                        $html = "<div style='background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:12px; font-size:13px;'>";
+                                        $html .= "<div style='font-weight:700; color:#111827; margin-bottom:8px;'>Jenis Pengajuan: " . ($isDelete ? "<span style='color:#ef4444;'>HAPUS PEMBAYARAN</span>" : "<span style='color:#8000FF;'>UBAH / KOREKSI DATA</span>") . "</div>";
+                                        $html .= "<table style='width:100%; border-collapse:collapse;'>";
+                                        $html .= "<tr style='border-bottom:1px solid #e5e7eb;'><td style='padding:4px 0; color:#6b7280;'>Data Saat Ini:</td><td style='padding:4px 0; font-weight:600;'>Rp " . number_format($req->old_amount, 0, ',', '.') . " (" . ucfirst($req->old_payment_method) . ") - Tgl: " . \Carbon\Carbon::parse($req->old_payment_date)->format('d/m/Y') . "</td></tr>";
+                                        if (!$isDelete) {
+                                            $html .= "<tr style='border-bottom:1px solid #e5e7eb;'><td style='padding:4px 0; color:#047857;'>Data Yang Diajukan:</td><td style='padding:4px 0; font-weight:700; color:#047857;'>Rp " . number_format($req->new_amount, 0, ',', '.') . " (" . ucfirst($req->new_payment_method) . ") - Tgl: " . \Carbon\Carbon::parse($req->new_payment_date)->format('d/m/Y') . "</td></tr>";
+                                        }
+                                        $html .= "<tr><td style='padding:4px 0; color:#b45309;'>Alasan Admin:</td><td style='padding:4px 0; font-style:italic; color:#b45309;'>" . htmlspecialchars($req->reason) . "</td></tr>";
+                                        $html .= "</table>";
+                                        $html .= "</div>";
+                                        return new \Illuminate\Support\HtmlString($html);
+                                    })
+                                    ->columnSpanFull(),
+                                
+                                \Filament\Forms\Components\Textarea::make('catatan_penolakan')
+                                    ->label('Catatan (Jika Ingin Menolak)')
+                                    ->placeholder('Tulis alasan jika menolak pengajuan ini...'),
+                            ];
+                        })
+                        ->modalSubmitActionLabel('Setujui Perubahan (Approve)')
+                        ->action(function ($record, array $data) {
+                            $req = $record->pendingCorrectionRequest();
+                            if (!$req) return;
 
-                        $orderNumber = $record->order?->order_number ?? 'Pembayaran';
-                        $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
+                            $orderNumber = $record->order?->order_number ?? 'Pembayaran';
+                            $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
 
-                        if ($req->request_type === 'delete') {
-                            $req->update([
-                                'status' => 'approved',
-                                'reviewed_by' => auth()->id(),
-                                'reviewed_at' => now(),
-                            ]);
-                            $record->delete();
-                        } else {
-                            $record->update([
-                                'amount' => $req->new_amount,
-                                'payment_method' => $req->new_payment_method,
-                                'payment_date' => $req->new_payment_date,
-                                'note' => $req->new_note,
-                                'proof_image' => $req->new_proof_image ?: $record->proof_image,
-                            ]);
-                            $req->update([
-                                'status' => 'approved',
-                                'reviewed_by' => auth()->id(),
-                                'reviewed_at' => now(),
-                            ]);
-                        }
-
-                        // Kirim notifikasi lonceng ke Admin pemohon
-                        if ($req->requester) {
-                            try {
-                                \Filament\Notifications\Notification::make()
-                                    ->title('Pengajuan Koreksi Pembayaran Disetujui')
-                                    ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} telah disetujui Owner.")
-                                    ->success()
-                                    ->sendToDatabase($req->requester);
-                            } catch (\Throwable $e) {}
-
-                            // WhatsApp ke Admin pemohon
-                            if ($req->requester->phone) {
-                                $pesanWaAdmin = "✅ *PENGAJUAN KOREKSI PEMBAYARAN DISETUJUI*\n\n"
-                                    . "Halo {$req->requester->name},\n"
-                                    . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DISETUJUI* oleh Owner.\n\n"
-                                    . "Data pembayaran telah berhasil diperbarui di sistem.";
-                                \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
-                            }
-                        }
-
-                        \Filament\Notifications\Notification::make()
-                            ->title('Perubahan Berhasil Disetujui')
-                            ->success()
-                            ->send();
-
-                        $this->dispatch('refreshStats');
-                    })
-                    ->extraModalFooterActions([
-                        \Filament\Actions\Action::make('tolak_pengajuan')
-                            ->label('Tolak Pengajuan')
-                            ->color('danger')
-                            ->requiresConfirmation()
-                            ->action(function ($record, array $data) {
-                                $req = $record->pendingCorrectionRequest();
-                                if (!$req) return;
-
-                                $orderNumber = $record->order?->order_number ?? 'Pembayaran';
-                                $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
-                                $alasanTolak = $data['catatan_penolakan'] ?? 'Ditolak oleh Owner';
-
+                            if ($req->request_type === 'delete') {
                                 $req->update([
-                                    'status' => 'rejected',
+                                    'status' => 'approved',
                                     'reviewed_by' => auth()->id(),
                                     'reviewed_at' => now(),
-                                    'rejection_reason' => $alasanTolak,
                                 ]);
+                                $record->delete();
+                            } else {
+                                $record->update([
+                                    'amount' => $req->new_amount,
+                                    'payment_method' => $req->new_payment_method,
+                                    'payment_date' => $req->new_payment_date,
+                                    'note' => $req->new_note,
+                                    'proof_image' => $req->new_proof_image ?: $record->proof_image,
+                                ]);
+                                $req->update([
+                                    'status' => 'approved',
+                                    'reviewed_by' => auth()->id(),
+                                    'reviewed_at' => now(),
+                                ]);
+                            }
 
-                                if ($req->requester) {
-                                    try {
-                                        \Filament\Notifications\Notification::make()
-                                            ->title('Pengajuan Koreksi Pembayaran Ditolak')
-                                            ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
-                                            ->danger()
-                                            ->sendToDatabase($req->requester);
-                                    } catch (\Throwable $e) {}
+                            if ($req->requester) {
+                                try {
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Pengajuan Koreksi Pembayaran Disetujui')
+                                        ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} telah disetujui Owner.")
+                                        ->success()
+                                        ->sendToDatabase($req->requester);
+                                } catch (\Throwable $e) {}
 
-                                    if ($req->requester->phone) {
-                                        $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
-                                            . "Halo {$req->requester->name},\n"
-                                            . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
-                                            . "📝 *Alasan Penolakan:* {$alasanTolak}";
-                                        \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
-                                    }
+                                if ($req->requester->phone) {
+                                    $pesanWaAdmin = "✅ *PENGAJUAN KOREKSI PEMBAYARAN DISETUJUI*\n\n"
+                                        . "Halo {$req->requester->name},\n"
+                                        . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DISETUJUI* oleh Owner.\n\n"
+                                        . "Data pembayaran telah berhasil diperbarui di sistem.";
+                                    \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
                                 }
+                            }
 
-                                \Filament\Notifications\Notification::make()
-                                    ->title('Pengajuan Berhasil Ditolak')
-                                    ->warning()
-                                    ->send();
+                            \Filament\Notifications\Notification::make()
+                                ->title('Perubahan Berhasil Disetujui')
+                                ->success()
+                                ->send();
 
-                                $this->dispatch('refreshStats');
-                            }),
-                    ]),
+                            $this->dispatch('refreshStats');
+                        })
+                        ->extraModalFooterActions([
+                            \Filament\Tables\Actions\Action::make('tolak_pengajuan')
+                                ->label('Tolak Pengajuan')
+                                ->color('danger')
+                                ->requiresConfirmation()
+                                ->action(function ($record, array $data) {
+                                    $req = $record->pendingCorrectionRequest();
+                                    if (!$req) return;
 
-                // ── Edit & Hapus Modal Kas Kecil ──
-                \Filament\Actions\EditAction::make()
-                    ->visible(fn($record) => $record->type === 'modal_awal' || !$record->order_id)
-                    ->form([
-                        \Filament\Forms\Components\TextInput::make('amount')
-                            ->label('Nominal Modal (Rp)')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->required(),
+                                    $orderNumber = $record->order?->order_number ?? 'Pembayaran';
+                                    $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
+                                    $alasanTolak = $data['catatan_penolakan'] ?? 'Ditolak oleh Owner';
 
-                        \Filament\Forms\Components\DatePicker::make('payment_date')
-                            ->label('Tanggal Masuk')
-                            ->required()
-                            ->native(false),
+                                    $req->update([
+                                        'status' => 'rejected',
+                                        'reviewed_by' => auth()->id(),
+                                        'reviewed_at' => now(),
+                                        'rejection_reason' => $alasanTolak,
+                                    ]);
 
-                        \Filament\Forms\Components\Select::make('payment_method')
-                            ->label('Metode Penerimaan')
-                            ->options([
-                                'cash' => 'Cash (Tunai Fisik)',
-                                'transfer' => 'Transfer Bank',
-                            ])
-                            ->required(),
+                                    if ($req->requester) {
+                                        try {
+                                            \Filament\Notifications\Notification::make()
+                                                ->title('Pengajuan Koreksi Pembayaran Ditolak')
+                                                ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
+                                                ->danger()
+                                                ->sendToDatabase($req->requester);
+                                        } catch (\Throwable $e) {}
 
-                        \Filament\Forms\Components\TextInput::make('note')
-                            ->label('Keterangan / Catatan')
-                            ->required()
-                            ->maxLength(255),
+                                        if ($req->requester->phone) {
+                                            $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
+                                                . "Halo {$req->requester->name},\n"
+                                                . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
+                                                . "📝 *Alasan Penolakan:* {$alasanTolak}";
+                                            \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                        }
+                                    }
 
-                        \Filament\Forms\Components\FileUpload::make('proof_image')
-                            ->label('Foto Bukti (Opsional)')
-                            ->image()
-                            ->disk('public')
-                            ->directory('payment-proofs'),
-                    ])
-                    ->after(function () {
-                        $this->dispatch('refreshStats');
-                    }),
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Pengajuan Berhasil Ditolak')
+                                        ->warning()
+                                        ->send();
 
-                \Filament\Actions\DeleteAction::make()
-                    ->visible(fn($record) => ($record->type === 'modal_awal' || !$record->order_id) && auth()->user()->role === 'owner')
-                    ->after(function () {
-                        $this->dispatch('refreshStats');
-                    }),
+                                    $this->dispatch('refreshStats');
+                                }),
+                        ]),
+
+                    // ── Aksi 2: Buka Pesanan (Jika terkait pesanan) ──
+                    \Filament\Tables\Actions\Action::make('lihat_pesanan')
+                        ->label('Buka Detail Pesanan')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->visible(fn($record) => (bool) $record->order_id)
+                        ->url(fn($record) => "/app/" . ($record->shop_id ?? Filament::getTenant()?->id) . "/orders/{$record->order_id}?relation=1"),
+
+                    // ── Aksi 3: Edit Modal Kas Kecil (Bukan Pesanan) ──
+                    \Filament\Tables\Actions\EditAction::make('edit_modal')
+                        ->label('Edit Modal')
+                        ->visible(fn($record) => $record->type === 'modal_awal' || !$record->order_id)
+                        ->form([
+                            \Filament\Forms\Components\TextInput::make('amount')
+                                ->label('Nominal Modal (Rp)')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->required(),
+
+                            \Filament\Forms\Components\DatePicker::make('payment_date')
+                                ->label('Tanggal Masuk')
+                                ->required()
+                                ->native(false),
+
+                            \Filament\Forms\Components\Select::make('payment_method')
+                                ->label('Metode Penerimaan')
+                                ->options([
+                                    'cash' => 'Cash (Tunai Fisik)',
+                                    'transfer' => 'Transfer Bank',
+                                ])
+                                ->required(),
+
+                            \Filament\Forms\Components\TextInput::make('note')
+                                ->label('Keterangan / Catatan')
+                                ->required()
+                                ->maxLength(255),
+
+                            \Filament\Forms\Components\FileUpload::make('proof_image')
+                                ->label('Foto Bukti (Opsional)')
+                                ->image()
+                                ->disk('public')
+                                ->directory('payment-proofs'),
+                        ])
+                        ->after(function () {
+                            $this->dispatch('refreshStats');
+                        }),
+
+                    // ── Aksi 4: Hapus Modal Kas Kecil (Bukan Pesanan) ──
+                    \Filament\Tables\Actions\DeleteAction::make('hapus_modal')
+                        ->label('Hapus Modal')
+                        ->visible(fn($record) => ($record->type === 'modal_awal' || !$record->order_id) && auth()->user()->role === 'owner')
+                        ->after(function () {
+                            $this->dispatch('refreshStats');
+                        }),
+                ])
+                    ->label('Opsi')
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->color('gray')
+                    ->size('sm')
+                    ->tooltip('Menu Aksi'),
             ])
             ->emptyStateHeading('Belum Ada Kas Masuk')
             ->emptyStateDescription('Catat modal harian atau pembayaran pesanan melalui detail pesanan / tab Piutang.')
