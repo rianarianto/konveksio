@@ -272,7 +272,7 @@ class PaymentsRelationManager extends RelationManager
             ])
             ->actions([
                 ActionGroup::make([
-                    // ── Aksi 1: Owner Review & Setujui Pengajuan ──
+                    // ── Aksi 1: Owner Review (Approve / Tolak dalam satu modal) ──
                     Action::make('review_pengajuan')
                         ->label('Review')
                         ->icon('heroicon-o-check-badge')
@@ -281,7 +281,7 @@ class PaymentsRelationManager extends RelationManager
                         ->modalHeading('Review Pengajuan Koreksi Pembayaran')
                         ->modalDescription(function ($record) {
                             $req = $record?->pendingCorrectionRequest();
-                            return "Diajukan oleh: " . ($req?->requester?->name ?? 'Admin') . " | Alasan: " . ($req?->reason ?? '-');
+                            return "Diajukan oleh: " . ($req?->requester?->name ?? 'Admin') . " | Alasan Admin: " . ($req?->reason ?? '-');
                         })
                         ->form(function ($record) {
                             $req = $record?->pendingCorrectionRequest();
@@ -306,113 +306,111 @@ class PaymentsRelationManager extends RelationManager
                                         return new HtmlString($html);
                                     })
                                     ->columnSpanFull(),
+
+                                \Filament\Forms\Components\Radio::make('keputusan')
+                                    ->label('Keputusan Review')
+                                    ->options([
+                                        'approve' => 'Setujui Pengajuan (Approve)',
+                                        'reject' => 'Tolak Pengajuan (Reject)',
+                                    ])
+                                    ->default('approve')
+                                    ->live()
+                                    ->required(),
+
+                                Textarea::make('alasan_penolakan')
+                                    ->label('Alasan Penolakan (Wajib jika ditolak)')
+                                    ->placeholder('Tuliskan alasan penolakan untuk admin...')
+                                    ->visible(fn (\Filament\Forms\Get $get) => $get('keputusan') === 'reject')
+                                    ->required(fn (\Filament\Forms\Get $get) => $get('keputusan') === 'reject')
+                                    ->columnSpanFull(),
                             ];
                         })
-                        ->modalSubmitActionLabel('Setujui Pengajuan (Approve)')
-                        ->action(function ($record) {
-                            $req = $record?->pendingCorrectionRequest();
-                            if (!$req) return;
-
-                            $orderNumber = $record->order?->order_number ?? 'Pembayaran';
-                            $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
-
-                            if ($req->request_type === 'delete') {
-                                $req->update([
-                                    'status' => 'approved',
-                                    'reviewed_by' => auth()->id(),
-                                    'reviewed_at' => now(),
-                                ]);
-                                $record->delete();
-                            } else {
-                                $record->update([
-                                    'amount' => $req->new_amount,
-                                    'payment_method' => $req->new_payment_method,
-                                    'payment_date' => $req->new_payment_date,
-                                    'note' => $req->new_note,
-                                    'proof_image' => $req->new_proof_image ?: $record->proof_image,
-                                ]);
-                                $req->update([
-                                    'status' => 'approved',
-                                    'reviewed_by' => auth()->id(),
-                                    'reviewed_at' => now(),
-                                ]);
-                            }
-
-                            if ($req->requester) {
-                                try {
-                                    Notification::make()
-                                        ->title('Pengajuan Koreksi Pembayaran Disetujui')
-                                        ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} telah disetujui Owner.")
-                                        ->success()
-                                        ->sendToDatabase($req->requester);
-                                } catch (\Throwable $e) {}
-
-                                if ($req->requester->phone) {
-                                    $pesanWaAdmin = "✅ *PENGAJUAN KOREKSI PEMBAYARAN DISETUJUI*\n\n"
-                                        . "Halo {$req->requester->name},\n"
-                                        . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DISETUJUI* oleh Owner.\n\n"
-                                        . "Data pembayaran telah berhasil diperbarui di sistem.";
-                                    \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
-                                }
-                            }
-
-                            Notification::make()
-                                ->title('Perubahan Berhasil Disetujui')
-                                ->success()
-                                ->send();
-
-                            $this->dispatch('refreshOrderSummary');
-                        }),
-
-                    // ── Aksi 2: Owner Tolak Pengajuan ──
-                    Action::make('tolak_pengajuan')
-                        ->label('Tolak')
-                        ->icon('heroicon-o-x-circle')
-                        ->color('danger')
-                        ->visible(fn ($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
-                        ->form([
-                            Textarea::make('catatan_penolakan')
-                                ->label('Alasan Penolakan (Wajib)')
-                                ->placeholder('Tulis alasan mengapa pengajuan ditolak...')
-                                ->required(),
-                        ])
+                        ->modalSubmitActionLabel('Proses Keputusan')
                         ->action(function ($record, array $data) {
                             $req = $record?->pendingCorrectionRequest();
                             if (!$req) return;
 
                             $orderNumber = $record->order?->order_number ?? 'Pembayaran';
                             $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
-                            $alasanTolak = $data['catatan_penolakan'] ?? 'Ditolak oleh Owner';
+                            $keputusan = $data['keputusan'] ?? 'approve';
 
-                            $req->update([
-                                'status' => 'rejected',
-                                'reviewed_by' => auth()->id(),
-                                'reviewed_at' => now(),
-                                'rejection_reason' => $alasanTolak,
-                            ]);
+                            if ($keputusan === 'reject') {
+                                $alasanTolak = $data['alasan_penolakan'] ?? 'Ditolak oleh Owner';
+                                $req->update([
+                                    'status' => 'rejected',
+                                    'reviewed_by' => auth()->id(),
+                                    'reviewed_at' => now(),
+                                    'rejection_reason' => $alasanTolak,
+                                ]);
 
-                            if ($req->requester) {
-                                try {
-                                    Notification::make()
-                                        ->title('Pengajuan Koreksi Pembayaran Ditolak')
-                                        ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
-                                        ->danger()
-                                        ->sendToDatabase($req->requester);
-                                } catch (\Throwable $e) {}
+                                if ($req->requester) {
+                                    try {
+                                        Notification::make()
+                                            ->title('Pengajuan Koreksi Pembayaran Ditolak')
+                                            ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
+                                            ->danger()
+                                            ->sendToDatabase($req->requester);
+                                    } catch (\Throwable $e) {}
 
-                                if ($req->requester->phone) {
-                                    $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
-                                        . "Halo {$req->requester->name},\n"
-                                        . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
-                                        . "📝 *Alasan Penolakan:* {$alasanTolak}";
-                                    \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                    if ($req->requester->phone) {
+                                        $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
+                                            . "Halo {$req->requester->name},\n"
+                                            . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
+                                            . "📝 *Alasan Penolakan:* {$alasanTolak}";
+                                        \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                    }
                                 }
-                            }
 
-                            Notification::make()
-                                ->title('Pengajuan Berhasil Ditolak')
-                                ->warning()
-                                ->send();
+                                Notification::make()
+                                    ->title('Pengajuan Berhasil Ditolak')
+                                    ->warning()
+                                    ->send();
+                            } else {
+                                if ($req->request_type === 'delete') {
+                                    $req->update([
+                                        'status' => 'approved',
+                                        'reviewed_by' => auth()->id(),
+                                        'reviewed_at' => now(),
+                                    ]);
+                                    $record->delete();
+                                } else {
+                                    $record->update([
+                                        'amount' => $req->new_amount,
+                                        'payment_method' => $req->new_payment_method,
+                                        'payment_date' => $req->new_payment_date,
+                                        'note' => $req->new_note,
+                                        'proof_image' => $req->new_proof_image ?: $record->proof_image,
+                                    ]);
+                                    $req->update([
+                                        'status' => 'approved',
+                                        'reviewed_by' => auth()->id(),
+                                        'reviewed_at' => now(),
+                                    ]);
+                                }
+
+                                if ($req->requester) {
+                                    try {
+                                        Notification::make()
+                                            ->title('Pengajuan Koreksi Pembayaran Disetujui')
+                                            ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} telah disetujui Owner.")
+                                            ->success()
+                                            ->sendToDatabase($req->requester);
+                                    } catch (\Throwable $e) {}
+
+                                    if ($req->requester->phone) {
+                                        $pesanWaAdmin = "✅ *PENGAJUAN KOREKSI PEMBAYARAN DISETUJUI*\n\n"
+                                            . "Halo {$req->requester->name},\n"
+                                            . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DISETUJUI* oleh Owner.\n\n"
+                                            . "Data pembayaran telah berhasil diperbarui di sistem.";
+                                        \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                    }
+                                }
+
+                                Notification::make()
+                                    ->title('Perubahan Berhasil Disetujui')
+                                    ->success()
+                                    ->send();
+                            }
 
                             $this->dispatch('refreshOrderSummary');
                         }),
