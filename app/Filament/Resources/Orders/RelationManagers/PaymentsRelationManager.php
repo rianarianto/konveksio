@@ -49,9 +49,9 @@ class PaymentsRelationManager extends RelationManager
                     $shipping = (int) ($order->shipping_cost ?? 0);
                     $discount = (int) ($order->discount ?? 0);
                     $expressFee = $order->is_express ? (int) ($order->express_fee ?? 0) : 0;
-                    $total = $order->total_price;
+                    $total = (int) ($order->total_price ?? 0);
                     
-                    $paid = (int) $order->payments()->sum('amount');
+                    $paid = (int) ($order->payments()?->sum('amount') ?? 0);
                     $remaining = max(0, $total - $paid);
                     
                     return new \Illuminate\Support\HtmlString("
@@ -106,7 +106,7 @@ class PaymentsRelationManager extends RelationManager
                 ->maxValue(function () {
                     $order = $this->getOwnerRecord();
                     if (!$order) return null;
-                    return max(0, (int) $order->total_price - (int) $order->payments()->sum('amount'));
+                    return max(0, (int) ($order->total_price ?? 0) - (int) ($order->payments()?->sum('amount') ?? 0));
                 })
                 ->validationMessages([
                     'max' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan.',
@@ -184,7 +184,7 @@ class PaymentsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with('recorder'))
+            ->modifyQueryUsing(fn ($query) => $query->with(['recorder', 'order']))
             ->recordTitleAttribute('note')
             ->columns([
                 TextColumn::make('payment_date')
@@ -196,7 +196,7 @@ class PaymentsRelationManager extends RelationManager
 
                 TextColumn::make('amount')
                     ->label('Jumlah')
-                    ->formatStateUsing(fn($state) => 'Rp ' . number_format($state, 0, ',', '.'))
+                    ->formatStateUsing(fn($state) => 'Rp ' . number_format((int) ($state ?? 0), 0, ',', '.'))
                     ->color('success')
                     ->verticallyAlignCenter()
                     ->weight('bold'),
@@ -223,7 +223,7 @@ class PaymentsRelationManager extends RelationManager
 
                 ImageColumn::make('proof_image')
                     ->label('Bukti')
-                    ->state(fn($record) => $record->proof_image ? asset('storage/' . $record->proof_image) : null)
+                    ->state(fn($record) => $record?->proof_image ? asset('storage/' . $record->proof_image) : null)
                     ->disk(null)
                     ->square()
                     ->size(48)
@@ -233,6 +233,7 @@ class PaymentsRelationManager extends RelationManager
                 TextColumn::make('recorder_display_name')
                     ->label('Dicatat Oleh')
                     ->state(function ($record) {
+                        if (!$record) return '—';
                         return $record->recorder?->name 
                             ?? ($record->recorded_by ? \App\Models\User::find($record->recorded_by)?->name : null)
                             ?? '—';
@@ -244,6 +245,7 @@ class PaymentsRelationManager extends RelationManager
                     ->label('Status')
                     ->badge()
                     ->state(function ($record) {
+                        if (!$record) return 'Tercatat';
                         $pending = $record->pendingCorrectionRequest();
                         if ($pending) {
                             return '⏳ Menunggu Approval Owner (' . ($pending->request_type === 'delete' ? 'Hapus' : 'Ubah') . ')';
@@ -251,6 +253,7 @@ class PaymentsRelationManager extends RelationManager
                         return 'Tercatat';
                     })
                     ->color(function ($record) {
+                        if (!$record) return 'success';
                         return $record->pendingCorrectionRequest() ? 'warning' : 'success';
                     })
                     ->verticallyAlignCenter(),
@@ -275,14 +278,14 @@ class PaymentsRelationManager extends RelationManager
                         ->label('Review Pengajuan')
                         ->icon('heroicon-o-check-badge')
                         ->color('warning')
-                        ->visible(fn($record) => auth()->user()->role === 'owner' && $record->pendingCorrectionRequest() !== null)
+                        ->visible(fn($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
                         ->modalHeading('Review Pengajuan Koreksi Pembayaran')
                         ->modalDescription(function ($record) {
-                            $req = $record->pendingCorrectionRequest();
-                            return "Diajukan oleh: " . ($req->requester->name ?? 'Admin') . " | Alasan: " . $req->reason;
+                            $req = $record?->pendingCorrectionRequest();
+                            return "Diajukan oleh: " . ($req?->requester?->name ?? 'Admin') . " | Alasan: " . ($req?->reason ?? '-');
                         })
                         ->form(function ($record) {
-                            $req = $record->pendingCorrectionRequest();
+                            $req = $record?->pendingCorrectionRequest();
                             if (!$req) return [];
 
                             $isDelete = $req->request_type === 'delete';
@@ -298,7 +301,7 @@ class PaymentsRelationManager extends RelationManager
                                         if (!$isDelete) {
                                             $html .= "<tr style='border-bottom:1px solid #e5e7eb;'><td style='padding:4px 0; color:#047857;'>Data Yang Diajukan:</td><td style='padding:4px 0; font-weight:700; color:#047857;'>Rp " . number_format($req->new_amount, 0, ',', '.') . " (" . ucfirst($req->new_payment_method) . ") - Tgl: " . \Carbon\Carbon::parse($req->new_payment_date)->format('d/m/Y') . "</td></tr>";
                                         }
-                                        $html .= "<tr><td style='padding:4px 0; color:#b45309;'>Alasan Admin:</td><td style='padding:4px 0; font-style:italic; color:#b45309;'>" . htmlspecialchars($req->reason) . "</td></tr>";
+                                        $html .= "<tr><td style='padding:4px 0; color:#b45309;'>Alasan Admin:</td><td style='padding:4px 0; font-style:italic; color:#b45309;'>" . htmlspecialchars($req->reason ?? '') . "</td></tr>";
                                         $html .= "</table>";
                                         $html .= "</div>";
                                         return new \Illuminate\Support\HtmlString($html);
@@ -312,7 +315,7 @@ class PaymentsRelationManager extends RelationManager
                         })
                         ->modalSubmitActionLabel('Setujui Perubahan (Approve)')
                         ->action(function ($record, array $data) {
-                            $req = $record->pendingCorrectionRequest();
+                            $req = $record?->pendingCorrectionRequest();
                             if (!$req) return;
 
                             $orderNumber = $record->order?->order_number ?? 'Pembayaran';
@@ -365,18 +368,20 @@ class PaymentsRelationManager extends RelationManager
 
                             $this->dispatch('refreshOrderSummary');
                         })
-                        ->extraModalFooterActions([
-                            Action::make('tolak_pengajuan')
+                        ->extraModalFooterActions(fn(Action $action): array => [
+                            \Filament\Actions\Action::make('tolak_pengajuan')
                                 ->label('Tolak Pengajuan')
                                 ->color('danger')
                                 ->requiresConfirmation()
-                                ->action(function ($record, array $data) {
-                                    $req = $record->pendingCorrectionRequest();
+                                ->action(function () use ($action) {
+                                    $record = $action->getRecord();
+                                    $req = $record?->pendingCorrectionRequest();
                                     if (!$req) return;
 
                                     $orderNumber = $record->order?->order_number ?? 'Pembayaran';
                                     $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
-                                    $alasanTolak = $data['catatan_penolakan'] ?? 'Ditolak oleh Owner';
+                                    $formData = $action->getMountedActionData() ?? [];
+                                    $alasanTolak = $formData['catatan_penolakan'] ?? 'Ditolak oleh Owner';
 
                                     $req->update([
                                         'status' => 'rejected',
@@ -424,13 +429,13 @@ class PaymentsRelationManager extends RelationManager
                         ->label('Ajukan Koreksi')
                         ->icon('heroicon-o-pencil-square')
                         ->color('primary')
-                        ->visible(fn($record) => auth()->user()->role !== 'owner' && $record->pendingCorrectionRequest() === null)
-                        ->fillForm(fn($record): array => [
+                        ->visible(fn($record) => auth()->user()->role !== 'owner' && $record?->pendingCorrectionRequest() === null)
+                        ->fillForm(fn($record): array => $record ? [
                             'new_amount' => $record->amount,
                             'new_payment_date' => $record->payment_date,
                             'new_payment_method' => $record->payment_method,
                             'new_note' => $record->note,
-                        ])
+                        ] : [])
                         ->form([
                             \Filament\Forms\Components\TextInput::make('new_amount')
                                 ->label('Nominal Baru yang Benar (Rp)')
@@ -542,7 +547,7 @@ class PaymentsRelationManager extends RelationManager
                         ->label('Ajukan Hapus')
                         ->icon('heroicon-o-trash')
                         ->color('danger')
-                        ->visible(fn($record) => auth()->user()->role !== 'owner' && $record->pendingCorrectionRequest() === null)
+                        ->visible(fn($record) => auth()->user()->role !== 'owner' && $record?->pendingCorrectionRequest() === null)
                         ->form([
                             \Filament\Forms\Components\Textarea::make('reason')
                                 ->label('Alasan Pengajuan Hapus Pembayaran (Wajib)')

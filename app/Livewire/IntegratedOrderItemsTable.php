@@ -294,7 +294,14 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
             ->columns([
                 TextColumn::make('product_name')
                     ->label('Penerima / Tipe')
-                    ->searchable()
+                    ->searchable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $search): \Illuminate\Database\Eloquent\Builder {
+                        return $query->where(function ($q) use ($search) {
+                            $q->where('product_name', 'like', "%{$search}%")
+                              ->orWhere('recipient_name', 'like', "%{$search}%")
+                              ->orWhere('size_and_request_details', 'like', "%{$search}%")
+                              ->orWhere('item_group_identity', 'like', "%{$search}%");
+                        });
+                    })
                     ->sortable()
                     ->view('filament.tables.columns.recipient-name-input'),
 
@@ -313,12 +320,19 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         'jasa' => '🔧 Jasa',
                         default => '🏭 Produksi',
                     })
+                    ->searchable()
                     ->sortable(),
 
                 TextColumn::make('bahan_warna')
                     ->label('Bahan & Warna')
                     ->badge()
                     ->color('gray')
+                    ->searchable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $search): \Illuminate\Database\Eloquent\Builder {
+                        return $query->where(function ($q) use ($search) {
+                            $q->where('bahan_name', 'like', "%{$search}%")
+                              ->orWhere('varian_warna', 'like', "%{$search}%");
+                        });
+                    })
                     ->state(function(OrderItem $record) {
                         if ($record->production_category === 'jasa') return '-';
                         $color = $record->varian_warna ?: 'Tanpa Warna';
@@ -349,6 +363,13 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
 
                  TextColumn::make('sablon_bordir')
                     ->label('Desain Sablon / Bordir')
+                    ->searchable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $search): \Illuminate\Database\Eloquent\Builder {
+                        return $query->where(function ($q) use ($search) {
+                            $q->where('sablon_jenis', 'like', "%{$search}%")
+                              ->orWhere('sablon_lokasi', 'like', "%{$search}%")
+                              ->orWhere('sablon_keterangan', 'like', "%{$search}%");
+                        });
+                    })
                     ->state(function(OrderItem $record) {
                         $details = $record->size_and_request_details ?? [];
                         $sablon = $details['sablon_jenis'] ?? null;
@@ -478,6 +499,9 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->label('Ukuran & Qty')
                     ->badge()
                     ->color('primary')
+                    ->searchable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $search): \Illuminate\Database\Eloquent\Builder {
+                        return $query->where('sizes_summary', 'like', "%{$search}%");
+                    })
                     ->state(function(OrderItem $record) {
                         if ($record->size === 'Custom') {
                             return 'Custom';
