@@ -511,7 +511,7 @@ class PaymentsRelationManager extends RelationManager
                                             ->body(auth()->user()->name . " mengajukan koreksi pembayaran {$orderNumber} dari Rp " . number_format($record->amount, 0, ',', '.') . " -> Rp " . number_format($data['new_amount'], 0, ',', '.') . ". Alasan: " . $data['reason'])
                                             ->warning()
                                             ->actions([
-                                                \Filament\Notifications\Actions\Action::make('view')
+                                                \Filament\Actions\Action::make('view')
                                                     ->label('Lihat Pesanan')
                                                     ->url($orderUrl),
                                             ])
@@ -592,7 +592,7 @@ class PaymentsRelationManager extends RelationManager
                                             ->body(auth()->user()->name . " mengajukan penghapusan pembayaran {$orderNumber} (Rp " . number_format($record->amount, 0, ',', '.') . "). Alasan: " . $data['reason'])
                                             ->danger()
                                             ->actions([
-                                                \Filament\Notifications\Actions\Action::make('view')
+                                                \Filament\Actions\Action::make('view')
                                                     ->label('Lihat Pesanan')
                                                     ->url($orderUrl),
                                             ])
