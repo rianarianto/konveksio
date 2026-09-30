@@ -499,25 +499,24 @@ class PaymentsRelationManager extends RelationManager
 
                             try {
                                 $owners = \App\Models\User::withoutGlobalScopes()
-                                    ->where(function ($q) use ($shopId) {
-                                        $q->where('shop_id', $shopId)->orWhereNull('shop_id');
-                                    })
                                     ->where('role', 'owner')
                                     ->get();
 
                                 $orderUrl = "/app/{$shopId}/orders/{$record->order_id}";
 
                                 if ($owners->isNotEmpty()) {
-                                    Notification::make()
-                                        ->title('⚠️ Permintaan Koreksi Pembayaran')
-                                        ->body(auth()->user()->name . " mengajukan koreksi pembayaran {$orderNumber} dari Rp " . number_format($record->amount, 0, ',', '.') . " -> Rp " . number_format($data['new_amount'], 0, ',', '.') . ". Alasan: " . $data['reason'])
-                                        ->warning()
-                                        ->actions([
-                                            \Filament\Notifications\Actions\Action::make('view')
-                                                ->label('Lihat Pesanan')
-                                                ->url($orderUrl),
-                                        ])
-                                        ->sendToDatabase($owners);
+                                    foreach ($owners as $owner) {
+                                        Notification::make()
+                                            ->title('⚠️ Permintaan Koreksi Pembayaran')
+                                            ->body(auth()->user()->name . " mengajukan koreksi pembayaran {$orderNumber} dari Rp " . number_format($record->amount, 0, ',', '.') . " -> Rp " . number_format($data['new_amount'], 0, ',', '.') . ". Alasan: " . $data['reason'])
+                                            ->warning()
+                                            ->actions([
+                                                \Filament\Notifications\Actions\Action::make('view')
+                                                    ->label('Lihat Pesanan')
+                                                    ->url($orderUrl),
+                                            ])
+                                            ->sendToDatabase($owner);
+                                    }
                                 }
 
                                 foreach ($owners as $owner) {
@@ -581,25 +580,24 @@ class PaymentsRelationManager extends RelationManager
 
                             try {
                                 $owners = \App\Models\User::withoutGlobalScopes()
-                                    ->where(function ($q) use ($shopId) {
-                                        $q->where('shop_id', $shopId)->orWhereNull('shop_id');
-                                    })
                                     ->where('role', 'owner')
                                     ->get();
 
                                 $orderUrl = "/app/{$shopId}/orders/{$record->order_id}";
 
                                 if ($owners->isNotEmpty()) {
-                                    Notification::make()
-                                        ->title('⚠️ Permintaan Hapus Pembayaran')
-                                        ->body(auth()->user()->name . " mengajukan penghapusan pembayaran {$orderNumber} (Rp " . number_format($record->amount, 0, ',', '.') . "). Alasan: " . $data['reason'])
-                                        ->danger()
-                                        ->actions([
-                                            \Filament\Notifications\Actions\Action::make('view')
-                                                ->label('Lihat Pesanan')
-                                                ->url($orderUrl),
-                                        ])
-                                        ->sendToDatabase($owners);
+                                    foreach ($owners as $owner) {
+                                        Notification::make()
+                                            ->title('⚠️ Permintaan Hapus Pembayaran')
+                                            ->body(auth()->user()->name . " mengajukan penghapusan pembayaran {$orderNumber} (Rp " . number_format($record->amount, 0, ',', '.') . "). Alasan: " . $data['reason'])
+                                            ->danger()
+                                            ->actions([
+                                                \Filament\Notifications\Actions\Action::make('view')
+                                                    ->label('Lihat Pesanan')
+                                                    ->url($orderUrl),
+                                            ])
+                                            ->sendToDatabase($owner);
+                                    }
                                 }
 
                                 foreach ($owners as $owner) {
