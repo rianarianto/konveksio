@@ -52,6 +52,26 @@ class KasMasukResource extends Resource
         return in_array($user->role, ['owner', 'admin']);
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        if (auth()->user()?->role !== 'owner') {
+            return null;
+        }
+
+        $count = \App\Models\PaymentCorrectionRequest::where('status', 'pending')->count();
+        return $count > 0 ? (string)$count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Menunggu Persetujuan Koreksi Pembayaran';
+    }
+
     // ── Form untuk Tambah/Edit Pengeluaran ───────────────────────────────────
     public static function form(Schema $schema): Schema
     {

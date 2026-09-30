@@ -47,6 +47,16 @@ class Payment extends Model
         return $this->belongsTo(User::class, 'recorded_by');
     }
 
+    public function correctionRequests(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PaymentCorrectionRequest::class);
+    }
+
+    public function pendingCorrectionRequest(): ?PaymentCorrectionRequest
+    {
+        return $this->correctionRequests()->where('status', 'pending')->latest()->first();
+    }
+
     // ── Label method untuk enum method ───────────────────────────────────────
 
     public function methodLabel(): string

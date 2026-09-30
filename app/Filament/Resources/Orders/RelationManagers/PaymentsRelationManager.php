@@ -238,6 +238,20 @@ class PaymentsRelationManager extends RelationManager
                     ->verticallyAlignCenter()
                     ->color('gray'),
 
+                TextColumn::make('status_approval')
+                    ->label('Status')
+                    ->badge()
+                    ->state(function ($record) {
+                        $pending = $record->pendingCorrectionRequest();
+                        if ($pending) {
+                            return '⏳ Menunggu Approval Owner (' . ($pending->request_type === 'delete' ? 'Hapus' : 'Ubah') . ')';
+                        }
+                        return 'Tercatat';
+                    })
+                    ->color(function ($record) {
+                        return $record->pendingCorrectionRequest() ? 'warning' : 'success';
+                    })
+                    ->verticallyAlignCenter(),
             ])
             ->headerActions([
                 CreateAction::make()
@@ -245,6 +259,7 @@ class PaymentsRelationManager extends RelationManager
                     ->icon('heroicon-o-plus')
                     ->using(function (array $data, RelationManager $livewire): \App\Models\Payment {
                         $data['recorded_by'] = \Filament\Facades\Filament::auth()->id() ?? auth()->id();
+                        $data['shop_id'] = \Filament\Facades\Filament::getTenant()?->id;
                         return $livewire->getOwnerRecord()->payments()->create($data);
                     })
                     ->after(function () {
@@ -252,11 +267,270 @@ class PaymentsRelationManager extends RelationManager
                     }),
             ])
             ->actions([
+                // ── Aksi 1: Owner Langsung Edit ──
                 EditAction::make()
                     ->visible(fn() => auth()->user()->role === 'owner')
                     ->after(function () {
                         $this->dispatch('refreshOrderSummary');
                     }),
+
+                // ── Aksi 2: Owner Review Pengajuan Koreksi / Hapus dari Admin ──
+                \Filament\Actions\Action::make('review_pengajuan')
+                    ->label('Review Pengajuan')
+                    ->icon('heroicon-o-check-badge')
+                    ->color('warning')
+                    ->visible(fn($record) => auth()->user()->role === 'owner' && $record->pendingCorrectionRequest() !== null)
+                    ->modalHeading('Review Pengajuan Koreksi Pembayaran')
+                    ->modalDescription(function ($record) {
+                        $req = $record->pendingCorrectionRequest();
+                        return "Diajukan oleh: " . ($req->requester->name ?? 'Admin') . " | Alasan: " . $req->reason;
+                    })
+                    ->form(function ($record) {
+                        $req = $record->pendingCorrectionRequest();
+                        if (!$req) return [];
+
+                        $isDelete = $req->request_type === 'delete';
+
+                        return [
+                            \Filament\Forms\Components\Placeholder::make('info_perbandingan')
+                                ->label(false)
+                                ->content(function() use ($record, $req, $isDelete) {
+                                    $html = "<div style='background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:12px; font-size:13px;'>";
+                                    $html .= "<div style='font-weight:700; color:#111827; margin-bottom:8px;'>Jenis Pengajuan: " . ($isDelete ? "<span style='color:#ef4444;'>HAPUS PEMBAYARAN</span>" : "<span style='color:#8000FF;'>UBAH / KOREKSI DATA</span>") . "</div>";
+                                    $html .= "<table style='width:100%; border-collapse:collapse;'>";
+                                    $html .= "<tr style='border-bottom:1px solid #e5e7eb;'><td style='padding:4px 0; color:#6b7280;'>Data Saat Ini:</td><td style='padding:4px 0; font-weight:600;'>Rp " . number_format($req->old_amount, 0, ',', '.') . " (" . ucfirst($req->old_payment_method) . ") - Tgl: " . \Carbon\Carbon::parse($req->old_payment_date)->format('d/m/Y') . "</td></tr>";
+                                    if (!$isDelete) {
+                                        $html .= "<tr style='border-bottom:1px solid #e5e7eb;'><td style='padding:4px 0; color:#047857;'>Data Yang Diajukan:</td><td style='padding:4px 0; font-weight:700; color:#047857;'>Rp " . number_format($req->new_amount, 0, ',', '.') . " (" . ucfirst($req->new_payment_method) . ") - Tgl: " . \Carbon\Carbon::parse($req->new_payment_date)->format('d/m/Y') . "</td></tr>";
+                                    }
+                                    $html .= "<tr><td style='padding:4px 0; color:#b45309;'>Alasan Admin:</td><td style='padding:4px 0; font-style:italic; color:#b45309;'>" . htmlspecialchars($req->reason) . "</td></tr>";
+                                    $html .= "</table>";
+                                    $html .= "</div>";
+                                    return new \Illuminate\Support\HtmlString($html);
+                                })
+                                ->columnSpanFull(),
+                            
+                            \Filament\Forms\Components\Textarea::make('catatan_penolakan')
+                                ->label('Catatan (Jika Ingin Menolak)')
+                                ->placeholder('Tulis alasan jika menolak pengajuan ini...'),
+                        ];
+                    })
+                    ->modalSubmitActionLabel('Setujui Perubahan (Approve)')
+                    ->action(function ($record, array $data) {
+                        $req = $record->pendingCorrectionRequest();
+                        if (!$req) return;
+
+                        if ($req->request_type === 'delete') {
+                            $req->update([
+                                'status' => 'approved',
+                                'reviewed_by' => auth()->id(),
+                                'reviewed_at' => now(),
+                            ]);
+                            $record->delete();
+                        } else {
+                            $record->update([
+                                'amount' => $req->new_amount,
+                                'payment_method' => $req->new_payment_method,
+                                'payment_date' => $req->new_payment_date,
+                                'note' => $req->new_note,
+                                'proof_image' => $req->new_proof_image ?: $record->proof_image,
+                            ]);
+                            $req->update([
+                                'status' => 'approved',
+                                'reviewed_by' => auth()->id(),
+                                'reviewed_at' => now(),
+                            ]);
+                        }
+
+                        // Kirim notifikasi lonceng ke Admin pemohon
+                        if ($req->requester) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Pengajuan Koreksi Pembayaran Disetujui')
+                                ->body("Pengajuan koreksi untuk pembayaran {$record->order?->order_number} telah disetujui Owner.")
+                                ->success()
+                                ->sendToDatabase($req->requester);
+                        }
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Perubahan Berhasil Disetujui')
+                            ->success()
+                            ->send();
+
+                        $this->dispatch('refreshOrderSummary');
+                    })
+                    ->extraModalFooterActions([
+                        \Filament\Actions\Action::make('tolak_pengajuan')
+                            ->label('Tolak Pengajuan')
+                            ->color('danger')
+                            ->requiresConfirmation()
+                            ->action(function ($record, array $data) {
+                                $req = $record->pendingCorrectionRequest();
+                                if (!$req) return;
+
+                                $req->update([
+                                    'status' => 'rejected',
+                                    'reviewed_by' => auth()->id(),
+                                    'reviewed_at' => now(),
+                                    'rejection_reason' => $data['catatan_penolakan'] ?? 'Ditolak oleh Owner',
+                                ]);
+
+                                // Kirim notifikasi lonceng ke Admin pemohon
+                                if ($req->requester) {
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Pengajuan Koreksi Pembayaran Ditolak')
+                                        ->body("Pengajuan koreksi untuk pembayaran {$record->order?->order_number} ditolak Owner. Alasan: " . ($data['catatan_penolakan'] ?? '-'))
+                                        ->danger()
+                                        ->sendToDatabase($req->requester);
+                                }
+
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Pengajuan Berhasil Ditolak')
+                                    ->warning()
+                                    ->send();
+
+                                $this->dispatch('refreshOrderSummary');
+                            }),
+                    ]),
+
+                // ── Aksi 3: Admin Ajukan Koreksi ──
+                \Filament\Actions\Action::make('ajukan_koreksi')
+                    ->label('Ajukan Koreksi')
+                    ->icon('heroicon-o-pencil-square')
+                    ->color('primary')
+                    ->visible(fn($record) => auth()->user()->role !== 'owner' && $record->pendingCorrectionRequest() === null)
+                    ->form([
+                        \Filament\Forms\Components\TextInput::make('new_amount')
+                            ->label('Nominal Baru yang Benar (Rp)')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->required()
+                            ->default(fn($record) => $record->amount),
+
+                        \Filament\Forms\Components\DatePicker::make('new_payment_date')
+                            ->label('Tanggal Pembayaran')
+                            ->required()
+                            ->native(false)
+                            ->default(fn($record) => $record->payment_date),
+
+                        \Filament\Forms\Components\Select::make('new_payment_method')
+                            ->label('Metode Pembayaran')
+                            ->options([
+                                'cash' => '💵 Cash',
+                                'transfer' => '🏦 Transfer Bank',
+                                'qris' => '📱 QRIS',
+                            ])
+                            ->required()
+                            ->default(fn($record) => $record->payment_method),
+
+                        \Filament\Forms\Components\TextInput::make('new_note')
+                            ->label('Catatan Pembayaran')
+                            ->default(fn($record) => $record->note),
+
+                        \Filament\Forms\Components\Textarea::make('reason')
+                            ->label('Alasan Pengajuan Koreksi (Wajib)')
+                            ->placeholder('Contoh: Salah ketik kelebihan nol, pelanggan sebenarnya bayar via transfer...')
+                            ->required()
+                            ->columnSpanFull(),
+                    ])
+                    ->action(function ($record, array $data) {
+                        $req = \App\Models\PaymentCorrectionRequest::create([
+                            'shop_id' => \Filament\Facades\Filament::getTenant()?->id,
+                            'payment_id' => $record->id,
+                            'request_type' => 'edit',
+                            'old_amount' => $record->amount,
+                            'old_payment_method' => $record->payment_method,
+                            'old_payment_date' => $record->payment_date,
+                            'old_note' => $record->note,
+                            'old_proof_image' => $record->proof_image,
+                            'new_amount' => $data['new_amount'],
+                            'new_payment_method' => $data['new_payment_method'],
+                            'new_payment_date' => $data['new_payment_date'],
+                            'new_note' => $data['new_note'] ?? null,
+                            'reason' => $data['reason'],
+                            'requested_by' => auth()->id(),
+                            'status' => 'pending',
+                        ]);
+
+                        // Kirim Notifikasi ke semua Owner di toko ini
+                        $owners = \App\Models\User::withoutGlobalScopes()
+                            ->where('shop_id', \Filament\Facades\Filament::getTenant()?->id)
+                            ->where('role', 'owner')
+                            ->get();
+
+                        foreach ($owners as $owner) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('⚠️ Permintaan Koreksi Pembayaran')
+                                ->body(auth()->user()->name . " mengajukan koreksi pembayaran " . ($record->order?->order_number ?? '') . " dari Rp " . number_format($record->amount, 0, ',', '.') . " -> Rp " . number_format($data['new_amount'], 0, ',', '.') . ". Alasan: " . $data['reason'])
+                                ->warning()
+                                ->actions([
+                                    \Filament\Notifications\Actions\Action::make('view')
+                                        ->label('Lihat Pesanan')
+                                        ->url(\App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $record->order_id])),
+                                ])
+                                ->sendToDatabase($owner);
+                        }
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Pengajuan Koreksi Terkirim')
+                            ->body('Pengajuan telah dikirim ke Owner untuk ditinjau.')
+                            ->success()
+                            ->send();
+                    }),
+
+                // ── Aksi 4: Admin Ajukan Hapus ──
+                \Filament\Actions\Action::make('ajukan_hapus')
+                    ->label('Ajukan Hapus')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->visible(fn($record) => auth()->user()->role !== 'owner' && $record->pendingCorrectionRequest() === null)
+                    ->form([
+                        \Filament\Forms\Components\Textarea::make('reason')
+                            ->label('Alasan Pengajuan Hapus Pembayaran (Wajib)')
+                            ->placeholder('Contoh: Transaksi pembayaran duplikat / salah input ke pesanan ini...')
+                            ->required()
+                            ->columnSpanFull(),
+                    ])
+                    ->action(function ($record, array $data) {
+                        \App\Models\PaymentCorrectionRequest::create([
+                            'shop_id' => \Filament\Facades\Filament::getTenant()?->id,
+                            'payment_id' => $record->id,
+                            'request_type' => 'delete',
+                            'old_amount' => $record->amount,
+                            'old_payment_method' => $record->payment_method,
+                            'old_payment_date' => $record->payment_date,
+                            'old_note' => $record->note,
+                            'old_proof_image' => $record->proof_image,
+                            'reason' => $data['reason'],
+                            'requested_by' => auth()->id(),
+                            'status' => 'pending',
+                        ]);
+
+                        // Kirim Notifikasi ke semua Owner di toko ini
+                        $owners = \App\Models\User::withoutGlobalScopes()
+                            ->where('shop_id', \Filament\Facades\Filament::getTenant()?->id)
+                            ->where('role', 'owner')
+                            ->get();
+
+                        foreach ($owners as $owner) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('⚠️ Permintaan Hapus Pembayaran')
+                                ->body(auth()->user()->name . " mengajukan penghapusan pembayaran " . ($record->order?->order_number ?? '') . " (Rp " . number_format($record->amount, 0, ',', '.') . "). Alasan: " . $data['reason'])
+                                ->danger()
+                                ->actions([
+                                    \Filament\Notifications\Actions\Action::make('view')
+                                        ->label('Lihat Pesanan')
+                                        ->url(\App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $record->order_id])),
+                                ])
+                                ->sendToDatabase($owner);
+                        }
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Pengajuan Hapus Terkirim')
+                            ->body('Pengajuan telah dikirim ke Owner untuk ditinjau.')
+                            ->success()
+                            ->send();
+                    }),
+
+                // ── Aksi 5: Owner Langsung Hapus ──
                 DeleteAction::make()
                     ->visible(fn() => auth()->user()->role === 'owner')
                     ->after(function () {

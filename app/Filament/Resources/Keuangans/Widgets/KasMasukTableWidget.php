@@ -107,12 +107,19 @@ class KasMasukTableWidget extends BaseWidget
                     ->default('-')
                     ->extraCellAttributes(['style' => 'vertical-align: top;']),
 
-                ImageColumn::make('proof_image')
-                    ->label('Bukti')
-                    ->state(fn($record) => $record->proof_image ? asset('storage/' . $record->proof_image) : null)
-                    ->disk(null)
-                    ->width(48)
-                    ->defaultImageUrl(null)
+                TextColumn::make('status_approval')
+                    ->label('Status')
+                    ->badge()
+                    ->state(function ($record) {
+                        $pending = $record->pendingCorrectionRequest();
+                        if ($pending) {
+                            return '⏳ Menunggu Approval (' . ($pending->request_type === 'delete' ? 'Hapus' : 'Ubah') . ')';
+                        }
+                        return 'Tercatat';
+                    })
+                    ->color(function ($record) {
+                        return $record->pendingCorrectionRequest() ? 'warning' : 'success';
+                    })
                     ->extraCellAttributes(['style' => 'vertical-align: top;']),
             ])
             ->headerActions([
