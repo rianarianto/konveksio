@@ -54,7 +54,11 @@ class Payment extends Model
 
     public function pendingCorrectionRequest(): ?PaymentCorrectionRequest
     {
-        return $this->correctionRequests()->where('status', 'pending')->latest()->first();
+        try {
+            return $this->correctionRequests()->where('status', 'pending')->latest()->first();
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     // ── Label method untuk enum method ───────────────────────────────────────

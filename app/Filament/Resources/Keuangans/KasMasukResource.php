@@ -58,8 +58,12 @@ class KasMasukResource extends Resource
             return null;
         }
 
-        $count = \App\Models\PaymentCorrectionRequest::where('status', 'pending')->count();
-        return $count > 0 ? (string)$count : null;
+        try {
+            $count = \App\Models\PaymentCorrectionRequest::where('status', 'pending')->count();
+            return $count > 0 ? (string)$count : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     public static function getNavigationBadgeColor(): ?string
