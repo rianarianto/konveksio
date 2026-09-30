@@ -267,12 +267,13 @@ class PaymentsRelationManager extends RelationManager
                     }),
             ])
             ->actions([
-                // ── Aksi 1: Owner Langsung Edit ──
-                EditAction::make()
-                    ->visible(fn() => auth()->user()->role === 'owner')
-                    ->after(function () {
-                        $this->dispatch('refreshOrderSummary');
-                    }),
+                \Filament\Actions\ActionGroup::make([
+                    // ── Aksi 1: Owner Langsung Edit ──
+                    EditAction::make()
+                        ->visible(fn() => auth()->user()->role === 'owner')
+                        ->after(function () {
+                            $this->dispatch('refreshOrderSummary');
+                        }),
 
                 // ── Aksi 2: Owner Review Pengajuan Koreksi / Hapus dari Admin ──
                 \Filament\Actions\Action::make('review_pengajuan')
@@ -536,6 +537,12 @@ class PaymentsRelationManager extends RelationManager
                     ->after(function () {
                         $this->dispatch('refreshOrderSummary');
                     }),
+                ])
+                ->label('Opsi')
+                ->icon('heroicon-m-ellipsis-vertical')
+                ->color('gray')
+                ->size('sm')
+                ->tooltip('Menu Aksi'),
             ])
             ->defaultSort('payment_date', 'asc');
     }
