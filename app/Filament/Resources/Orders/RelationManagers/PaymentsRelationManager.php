@@ -4,20 +4,24 @@ namespace App\Filament\Resources\Orders\RelationManagers;
 
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\CreateAction;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Intervention\Image\Laravel\Facades\Image;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -38,23 +42,23 @@ class PaymentsRelationManager extends RelationManager
     public function form(Schema $schema): Schema
     {
         return $schema->components([
-            \Filament\Forms\Components\Placeholder::make('payment_summary')
+            Placeholder::make('payment_summary')
                 ->label(false)
-                ->content(function() {
+                ->content(function () {
                     $order = $this->getOwnerRecord();
                     if (!$order) return '';
-                    
+
                     $subtotal = (int) ($order->subtotal ?? 0);
                     $tax = (int) ($order->tax ?? 0);
                     $shipping = (int) ($order->shipping_cost ?? 0);
                     $discount = (int) ($order->discount ?? 0);
                     $expressFee = $order->is_express ? (int) ($order->express_fee ?? 0) : 0;
                     $total = (int) ($order->total_price ?? 0);
-                    
+
                     $paid = (int) ($order->payments()?->sum('amount') ?? 0);
                     $remaining = max(0, $total - $paid);
-                    
-                    return new \Illuminate\Support\HtmlString("
+
+                    return new HtmlString("
                         <div style='background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-size: 13px; color: #374151;'>
                             <div style='display: flex; justify-content: space-between; margin-bottom: 4px;'>
                                 <span>Subtotal Biaya:</span>
@@ -96,12 +100,13 @@ class PaymentsRelationManager extends RelationManager
                     ");
                 })
                 ->columnSpanFull(),
+
             TextInput::make('amount')
                 ->label('Jumlah Dibayar (Rp)')
                 ->numeric()
                 ->prefix('Rp')
                 ->required()
-                ->dehydrateStateUsing(fn($state) => (int) preg_replace('/[^\d]/', '', (string) ($state ?? 0)))
+                ->dehydrateStateUsing(fn ($state) => (int) preg_replace('/[^\d]/', '', (string) ($state ?? 0)))
                 ->minValue(1)
                 ->maxValue(function () {
                     $order = $this->getOwnerRecord();
@@ -159,25 +164,19 @@ class PaymentsRelationManager extends RelationManager
                 })
                 ->saveUploadedFileUsing(function (TemporaryUploadedFile $file): string {
                     $mimeType = $file->getMimeType();
-
-                    // Gambar — kompres dengan Intervention Image
                     $img = Image::read($file->getRealPath());
 
-                    // Resize jika lebar > 1920px (pertahankan aspek rasio)
                     if ($img->width() > 1920) {
                         $img->scaleDown(width: 1920);
                     }
 
-                    // Encode ke JPEG quality 75
                     $encoded = $img->toJpeg(quality: 75);
-
                     $filename = Str::uuid() . '.jpg';
                     $path = 'payments/proofs/' . $filename;
                     Storage::disk('public')->put($path, (string) $encoded);
 
                     return $path;
                 }),
-
         ]);
     }
 
@@ -196,7 +195,7 @@ class PaymentsRelationManager extends RelationManager
 
                 TextColumn::make('amount')
                     ->label('Jumlah')
-                    ->formatStateUsing(fn($state) => 'Rp ' . number_format((int) ($state ?? 0), 0, ',', '.'))
+                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format((int) ($state ?? 0), 0, ',', '.'))
                     ->color('success')
                     ->verticallyAlignCenter()
                     ->weight('bold'),
@@ -204,12 +203,12 @@ class PaymentsRelationManager extends RelationManager
                 TextColumn::make('payment_method')
                     ->label('Metode')
                     ->badge()
-                    ->formatStateUsing(fn($state) => match ($state) {
+                    ->formatStateUsing(fn ($state) => match ($state) {
                         'transfer' => '🏦 Transfer Bank',
                         'qris' => '📱 QRIS',
                         default => '💵 Cash',
                     })
-                    ->color(fn($state) => match ($state) {
+                    ->color(fn ($state) => match ($state) {
                         'transfer' => 'info',
                         'qris' => 'warning',
                         default => 'success',
@@ -223,7 +222,7 @@ class PaymentsRelationManager extends RelationManager
 
                 ImageColumn::make('proof_image')
                     ->label('Bukti')
-                    ->state(fn($record) => $record?->proof_image ? asset('storage/' . $record->proof_image) : null)
+                    ->state(fn ($record) => $record?->proof_image ? asset('storage/' . $record->proof_image) : null)
                     ->disk(null)
                     ->square()
                     ->size(48)
@@ -273,12 +272,12 @@ class PaymentsRelationManager extends RelationManager
             ])
             ->actions([
                 ActionGroup::make([
-                    // ── Aksi 1: Owner Review Pengajuan Koreksi / Hapus (Pertama jika Pending) ──
+                    // ── Aksi 1: Owner Review & Setujui Pengajuan ──
                     Action::make('review_pengajuan')
-                        ->label('Review Pengajuan')
+                        ->label('Review & Setujui Pengajuan')
                         ->icon('heroicon-o-check-badge')
                         ->color('warning')
-                        ->visible(fn($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
+                        ->visible(fn ($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
                         ->modalHeading('Review Pengajuan Koreksi Pembayaran')
                         ->modalDescription(function ($record) {
                             $req = $record?->pendingCorrectionRequest();
@@ -291,9 +290,9 @@ class PaymentsRelationManager extends RelationManager
                             $isDelete = $req->request_type === 'delete';
 
                             return [
-                                \Filament\Forms\Components\Placeholder::make('info_perbandingan')
+                                Placeholder::make('info_perbandingan')
                                     ->label(false)
-                                    ->content(function() use ($record, $req, $isDelete) {
+                                    ->content(function () use ($record, $req, $isDelete) {
                                         $html = "<div style='background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:12px; font-size:13px;'>";
                                         $html .= "<div style='font-weight:700; color:#111827; margin-bottom:8px;'>Jenis Pengajuan: " . ($isDelete ? "<span style='color:#ef4444;'>HAPUS PEMBAYARAN</span>" : "<span style='color:#8000FF;'>UBAH / KOREKSI DATA</span>") . "</div>";
                                         $html .= "<table style='width:100%; border-collapse:collapse;'>";
@@ -304,17 +303,13 @@ class PaymentsRelationManager extends RelationManager
                                         $html .= "<tr><td style='padding:4px 0; color:#b45309;'>Alasan Admin:</td><td style='padding:4px 0; font-style:italic; color:#b45309;'>" . htmlspecialchars($req->reason ?? '') . "</td></tr>";
                                         $html .= "</table>";
                                         $html .= "</div>";
-                                        return new \Illuminate\Support\HtmlString($html);
+                                        return new HtmlString($html);
                                     })
                                     ->columnSpanFull(),
-                                
-                                \Filament\Forms\Components\Textarea::make('catatan_penolakan')
-                                    ->label('Catatan (Jika Ingin Menolak)')
-                                    ->placeholder('Tulis alasan jika menolak pengajuan ini...'),
                             ];
                         })
-                        ->modalSubmitActionLabel('Setujui Perubahan (Approve)')
-                        ->action(function ($record, array $data) {
+                        ->modalSubmitActionLabel('Setujui Pengajuan (Approve)')
+                        ->action(function ($record) {
                             $req = $record?->pendingCorrectionRequest();
                             if (!$req) return;
 
@@ -345,7 +340,7 @@ class PaymentsRelationManager extends RelationManager
 
                             if ($req->requester) {
                                 try {
-                                    \Filament\Notifications\Notification::make()
+                                    Notification::make()
                                         ->title('Pengajuan Koreksi Pembayaran Disetujui')
                                         ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} telah disetujui Owner.")
                                         ->success()
@@ -361,94 +356,99 @@ class PaymentsRelationManager extends RelationManager
                                 }
                             }
 
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title('Perubahan Berhasil Disetujui')
                                 ->success()
                                 ->send();
 
                             $this->dispatch('refreshOrderSummary');
-                        })
-                        ->extraModalFooterActions(fn(Action $action): array => [
-                            \Filament\Actions\Action::make('tolak_pengajuan')
-                                ->label('Tolak Pengajuan')
-                                ->color('danger')
-                                ->requiresConfirmation()
-                                ->action(function () use ($action) {
-                                    $record = $action->getRecord();
-                                    $req = $record?->pendingCorrectionRequest();
-                                    if (!$req) return;
+                        }),
 
-                                    $orderNumber = $record->order?->order_number ?? 'Pembayaran';
-                                    $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
-                                    $formData = $action->getMountedActionData() ?? [];
-                                    $alasanTolak = $formData['catatan_penolakan'] ?? 'Ditolak oleh Owner';
+                    // ── Aksi 2: Owner Tolak Pengajuan ──
+                    Action::make('tolak_pengajuan')
+                        ->label('Tolak Pengajuan')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn ($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
+                        ->form([
+                            Textarea::make('catatan_penolakan')
+                                ->label('Alasan Penolakan (Wajib)')
+                                ->placeholder('Tulis alasan mengapa pengajuan ditolak...')
+                                ->required(),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $req = $record?->pendingCorrectionRequest();
+                            if (!$req) return;
 
-                                    $req->update([
-                                        'status' => 'rejected',
-                                        'reviewed_by' => auth()->id(),
-                                        'reviewed_at' => now(),
-                                        'rejection_reason' => $alasanTolak,
-                                    ]);
+                            $orderNumber = $record->order?->order_number ?? 'Pembayaran';
+                            $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
+                            $alasanTolak = $data['catatan_penolakan'] ?? 'Ditolak oleh Owner';
 
-                                    if ($req->requester) {
-                                        try {
-                                            \Filament\Notifications\Notification::make()
-                                                ->title('Pengajuan Koreksi Pembayaran Ditolak')
-                                                ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
-                                                ->danger()
-                                                ->sendToDatabase($req->requester);
-                                        } catch (\Throwable $e) {}
+                            $req->update([
+                                'status' => 'rejected',
+                                'reviewed_by' => auth()->id(),
+                                'reviewed_at' => now(),
+                                'rejection_reason' => $alasanTolak,
+                            ]);
 
-                                        if ($req->requester->phone) {
-                                            $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
-                                                . "Halo {$req->requester->name},\n"
-                                                . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
-                                                . "📝 *Alasan Penolakan:* {$alasanTolak}";
-                                            \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
-                                        }
-                                    }
+                            if ($req->requester) {
+                                try {
+                                    Notification::make()
+                                        ->title('Pengajuan Koreksi Pembayaran Ditolak')
+                                        ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
+                                        ->danger()
+                                        ->sendToDatabase($req->requester);
+                                } catch (\Throwable $e) {}
 
-                                    \Filament\Notifications\Notification::make()
-                                        ->title('Pengajuan Berhasil Ditolak')
-                                        ->warning()
-                                        ->send();
+                                if ($req->requester->phone) {
+                                    $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
+                                        . "Halo {$req->requester->name},\n"
+                                        . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
+                                        . "📝 *Alasan Penolakan:* {$alasanTolak}";
+                                    \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                }
+                            }
 
-                                    $this->dispatch('refreshOrderSummary');
-                                }),
-                        ]),
+                            Notification::make()
+                                ->title('Pengajuan Berhasil Ditolak')
+                                ->warning()
+                                ->send();
 
-                    // ── Aksi 2: Owner Langsung Edit ──
+                            $this->dispatch('refreshOrderSummary');
+                        }),
+
+                    // ── Aksi 3: Owner Langsung Edit ──
                     EditAction::make()
-                        ->visible(fn() => auth()->user()->role === 'owner')
+                        ->visible(fn () => auth()->user()->role === 'owner')
                         ->after(function () {
                             $this->dispatch('refreshOrderSummary');
                         }),
 
-                    // ── Aksi 3: Admin Ajukan Koreksi ──
+                    // ── Aksi 4: Admin Ajukan Koreksi ──
                     Action::make('ajukan_koreksi')
                         ->label('Ajukan Koreksi')
                         ->icon('heroicon-o-pencil-square')
                         ->color('primary')
-                        ->visible(fn($record) => auth()->user()->role !== 'owner' && $record?->pendingCorrectionRequest() === null)
-                        ->fillForm(fn($record): array => $record ? [
+                        ->visible(fn ($record) => auth()->user()->role !== 'owner' && $record?->pendingCorrectionRequest() === null)
+                        ->fillForm(fn ($record): array => $record ? [
                             'new_amount' => $record->amount,
                             'new_payment_date' => $record->payment_date,
                             'new_payment_method' => $record->payment_method,
                             'new_note' => $record->note,
                         ] : [])
                         ->form([
-                            \Filament\Forms\Components\TextInput::make('new_amount')
+                            TextInput::make('new_amount')
                                 ->label('Nominal Baru yang Benar (Rp)')
                                 ->numeric()
                                 ->prefix('Rp')
                                 ->required(),
 
-                            \Filament\Forms\Components\DatePicker::make('new_payment_date')
+                            DatePicker::make('new_payment_date')
                                 ->label('Tanggal Pembayaran')
                                 ->required()
                                 ->native(false),
 
-                            \Filament\Forms\Components\Select::make('new_payment_method')
+                            Select::make('new_payment_method')
                                 ->label('Metode Pembayaran')
                                 ->options([
                                     'cash' => '💵 Cash',
@@ -457,10 +457,10 @@ class PaymentsRelationManager extends RelationManager
                                 ])
                                 ->required(),
 
-                            \Filament\Forms\Components\TextInput::make('new_note')
+                            TextInput::make('new_note')
                                 ->label('Catatan Pembayaran'),
 
-                            \Filament\Forms\Components\Textarea::make('reason')
+                            Textarea::make('reason')
                                 ->label('Alasan Pengajuan Koreksi (Wajib)')
                                 ->placeholder('Contoh: Salah ketik kelebihan nol, pelanggan sebenarnya bayar via transfer...')
                                 ->required()
@@ -470,7 +470,7 @@ class PaymentsRelationManager extends RelationManager
                             $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
                             $orderNumber = $record->order?->order_number ?? 'Pembayaran';
 
-                            $req = \App\Models\PaymentCorrectionRequest::create([
+                            \App\Models\PaymentCorrectionRequest::create([
                                 'shop_id' => $shopId,
                                 'payment_id' => $record->id,
                                 'request_type' => 'edit',
@@ -508,7 +508,7 @@ class PaymentsRelationManager extends RelationManager
                                 $orderUrl = "/app/{$shopId}/orders/{$record->order_id}";
 
                                 if ($owners->isNotEmpty()) {
-                                    \Filament\Notifications\Notification::make()
+                                    Notification::make()
                                         ->title('⚠️ Permintaan Koreksi Pembayaran')
                                         ->body(auth()->user()->name . " mengajukan koreksi pembayaran {$orderNumber} dari Rp " . number_format($record->amount, 0, ',', '.') . " -> Rp " . number_format($data['new_amount'], 0, ',', '.') . ". Alasan: " . $data['reason'])
                                         ->warning()
@@ -530,10 +530,10 @@ class PaymentsRelationManager extends RelationManager
                                     \App\Helpers\NotificationHelper::sendWaMessage($record->shop->phone, $pesanWaOwner, $shopId);
                                 }
                             } catch (\Throwable $e) {
-                                \Illuminate\Support\Facades\Log::error('[Correction-Req] Gagal kirim notif: ' . $e->getMessage());
+                                Log::error('[Correction-Req] Gagal kirim notif: ' . $e->getMessage());
                             }
 
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title('Pengajuan Koreksi Terkirim')
                                 ->body('Pengajuan telah dikirim ke Owner untuk ditinjau.')
                                 ->success()
@@ -542,14 +542,14 @@ class PaymentsRelationManager extends RelationManager
                             $this->dispatch('refreshOrderSummary');
                         }),
 
-                    // ── Aksi 4: Admin Ajukan Hapus ──
+                    // ── Aksi 5: Admin Ajukan Hapus ──
                     Action::make('ajukan_hapus')
                         ->label('Ajukan Hapus')
                         ->icon('heroicon-o-trash')
                         ->color('danger')
-                        ->visible(fn($record) => auth()->user()->role !== 'owner' && $record?->pendingCorrectionRequest() === null)
+                        ->visible(fn ($record) => auth()->user()->role !== 'owner' && $record?->pendingCorrectionRequest() === null)
                         ->form([
-                            \Filament\Forms\Components\Textarea::make('reason')
+                            Textarea::make('reason')
                                 ->label('Alasan Pengajuan Hapus Pembayaran (Wajib)')
                                 ->placeholder('Contoh: Transaksi pembayaran duplikat / salah input ke pesanan ini...')
                                 ->required()
@@ -590,7 +590,7 @@ class PaymentsRelationManager extends RelationManager
                                 $orderUrl = "/app/{$shopId}/orders/{$record->order_id}";
 
                                 if ($owners->isNotEmpty()) {
-                                    \Filament\Notifications\Notification::make()
+                                    Notification::make()
                                         ->title('⚠️ Permintaan Hapus Pembayaran')
                                         ->body(auth()->user()->name . " mengajukan penghapusan pembayaran {$orderNumber} (Rp " . number_format($record->amount, 0, ',', '.') . "). Alasan: " . $data['reason'])
                                         ->danger()
@@ -612,10 +612,10 @@ class PaymentsRelationManager extends RelationManager
                                     \App\Helpers\NotificationHelper::sendWaMessage($record->shop->phone, $pesanWaOwner, $shopId);
                                 }
                             } catch (\Throwable $e) {
-                                \Illuminate\Support\Facades\Log::error('[Delete-Req] Gagal kirim notif: ' . $e->getMessage());
+                                Log::error('[Delete-Req] Gagal kirim notif: ' . $e->getMessage());
                             }
 
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title('Pengajuan Hapus Terkirim')
                                 ->body('Pengajuan telah dikirim ke Owner untuk ditinjau.')
                                 ->success()
@@ -624,9 +624,9 @@ class PaymentsRelationManager extends RelationManager
                             $this->dispatch('refreshOrderSummary');
                         }),
 
-                    // ── Aksi 5: Owner Langsung Hapus ──
+                    // ── Aksi 6: Owner Langsung Hapus ──
                     DeleteAction::make()
-                        ->visible(fn() => auth()->user()->role === 'owner')
+                        ->visible(fn () => auth()->user()->role === 'owner')
                         ->after(function () {
                             $this->dispatch('refreshOrderSummary');
                         }),

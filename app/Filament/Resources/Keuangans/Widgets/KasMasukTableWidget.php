@@ -3,11 +3,29 @@
 namespace App\Filament\Resources\Keuangans\Widgets;
 
 use App\Models\Payment;
-use Filament\Tables;
+use App\Models\PaymentCorrectionRequest;
+use App\Models\User;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\CreateAction;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 use Filament\Facades\Filament;
 
@@ -64,10 +82,9 @@ class KasMasukTableWidget extends BaseWidget
                             $html .= '<div style="color:#6b7280; font-size:11px; font-style:italic;">Ket: ' . htmlspecialchars($record->note) . '</div>';
                         }
 
-                        // Tampilkan item produk dengan gaya yang dicari
                         if ($order->orderItems && $order->orderItems->count() > 0) {
                             $html .= '<div class="flex flex-wrap gap-1 mt-1">';
-                            $groupedItems = $order->orderItems->groupBy(fn($item) => ($item->product_name ?: 'Item'));
+                            $groupedItems = $order->orderItems->groupBy(fn ($item) => ($item->product_name ?: 'Item'));
                             
                             foreach ($groupedItems as $name => $items) {
                                 $qty = $items->sum('quantity');
@@ -86,7 +103,7 @@ class KasMasukTableWidget extends BaseWidget
 
                 TextColumn::make('amount')
                     ->label('Nominal')
-                    ->formatStateUsing(fn($state) => 'Rp ' . number_format((int) ($state ?? 0), 0, ',', '.'))
+                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format((int) ($state ?? 0), 0, ',', '.'))
                     ->extraAttributes([
                         'class' => 'text-purple-600',
                     ])
@@ -96,8 +113,8 @@ class KasMasukTableWidget extends BaseWidget
                 TextColumn::make('payment_method')
                     ->label('Metode')
                     ->badge()
-                    ->formatStateUsing(fn($record) => $record?->methodLabel() ?? 'Cash')
-                    ->color(fn($record) => match ($record?->payment_method) {
+                    ->formatStateUsing(fn ($record) => $record?->methodLabel() ?? 'Cash')
+                    ->color(fn ($record) => match ($record?->payment_method) {
                         'transfer' => 'primary',
                         'qris' => 'info',
                         default => 'gray',
@@ -127,26 +144,26 @@ class KasMasukTableWidget extends BaseWidget
                     ->extraCellAttributes(['style' => 'vertical-align: top;']),
             ])
             ->headerActions([
-                \Filament\Tables\Actions\CreateAction::make('tambah_modal')
+                CreateAction::make('tambah_modal')
                     ->label('Tambah Modal Kas Kecil')
                     ->icon('heroicon-o-plus-circle')
                     ->color('success')
                     ->modalHeading('Tambah Modal Kas Kecil / Kas Masuk')
                     ->form([
-                        \Filament\Forms\Components\TextInput::make('amount')
+                        TextInput::make('amount')
                             ->label('Nominal Modal (Rp)')
                             ->numeric()
                             ->prefix('Rp')
                             ->required()
                             ->placeholder('1000000'),
 
-                        \Filament\Forms\Components\DatePicker::make('payment_date')
+                        DatePicker::make('payment_date')
                             ->label('Tanggal Masuk')
                             ->required()
                             ->default(now())
                             ->native(false),
 
-                        \Filament\Forms\Components\Select::make('payment_method')
+                        Select::make('payment_method')
                             ->label('Metode Penerimaan')
                             ->options([
                                 'cash' => 'Cash (Tunai Fisik)',
@@ -155,14 +172,14 @@ class KasMasukTableWidget extends BaseWidget
                             ->default('cash')
                             ->required(),
 
-                        \Filament\Forms\Components\TextInput::make('note')
+                        TextInput::make('note')
                             ->label('Keterangan / Catatan')
                             ->placeholder('Contoh: Modal harian dari Owner')
                             ->default('Modal harian dari Owner')
                             ->required()
                             ->maxLength(255),
 
-                        \Filament\Forms\Components\FileUpload::make('proof_image')
+                        FileUpload::make('proof_image')
                             ->label('Foto Bukti / Struk (Opsional)')
                             ->image()
                             ->disk('public')
@@ -181,13 +198,13 @@ class KasMasukTableWidget extends BaseWidget
                     }),
             ])
             ->actions([
-                \Filament\Tables\Actions\ActionGroup::make([
-                    // ── Aksi 1: Owner Review Pengajuan Koreksi / Hapus (Pertama jika Pending) ──
-                    \Filament\Tables\Actions\Action::make('review_pengajuan')
-                        ->label('Review Pengajuan')
+                ActionGroup::make([
+                    // ── Aksi 1: Owner Review & Setujui Pengajuan ──
+                    Action::make('review_pengajuan')
+                        ->label('Review & Setujui Pengajuan')
                         ->icon('heroicon-o-check-badge')
                         ->color('warning')
-                        ->visible(fn($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
+                        ->visible(fn ($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
                         ->modalHeading('Review Pengajuan Koreksi Pembayaran')
                         ->modalDescription(function ($record) {
                             $req = $record?->pendingCorrectionRequest();
@@ -200,9 +217,9 @@ class KasMasukTableWidget extends BaseWidget
                             $isDelete = $req->request_type === 'delete';
 
                             return [
-                                \Filament\Forms\Components\Placeholder::make('info_perbandingan')
+                                Placeholder::make('info_perbandingan')
                                     ->label(false)
-                                    ->content(function() use ($record, $req, $isDelete) {
+                                    ->content(function () use ($record, $req, $isDelete) {
                                         $html = "<div style='background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:12px; font-size:13px;'>";
                                         $html .= "<div style='font-weight:700; color:#111827; margin-bottom:8px;'>Jenis Pengajuan: " . ($isDelete ? "<span style='color:#ef4444;'>HAPUS PEMBAYARAN</span>" : "<span style='color:#8000FF;'>UBAH / KOREKSI DATA</span>") . "</div>";
                                         $html .= "<table style='width:100%; border-collapse:collapse;'>";
@@ -213,17 +230,13 @@ class KasMasukTableWidget extends BaseWidget
                                         $html .= "<tr><td style='padding:4px 0; color:#b45309;'>Alasan Admin:</td><td style='padding:4px 0; font-style:italic; color:#b45309;'>" . htmlspecialchars($req->reason ?? '') . "</td></tr>";
                                         $html .= "</table>";
                                         $html .= "</div>";
-                                        return new \Illuminate\Support\HtmlString($html);
+                                        return new HtmlString($html);
                                     })
                                     ->columnSpanFull(),
-                                
-                                \Filament\Forms\Components\Textarea::make('catatan_penolakan')
-                                    ->label('Catatan (Jika Ingin Menolak)')
-                                    ->placeholder('Tulis alasan jika menolak pengajuan ini...'),
                             ];
                         })
-                        ->modalSubmitActionLabel('Setujui Perubahan (Approve)')
-                        ->action(function ($record, array $data) {
+                        ->modalSubmitActionLabel('Setujui Pengajuan (Approve)')
+                        ->action(function ($record) {
                             $req = $record?->pendingCorrectionRequest();
                             if (!$req) return;
 
@@ -254,7 +267,7 @@ class KasMasukTableWidget extends BaseWidget
 
                             if ($req->requester) {
                                 try {
-                                    \Filament\Notifications\Notification::make()
+                                    Notification::make()
                                         ->title('Pengajuan Koreksi Pembayaran Disetujui')
                                         ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} telah disetujui Owner.")
                                         ->success()
@@ -270,86 +283,91 @@ class KasMasukTableWidget extends BaseWidget
                                 }
                             }
 
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title('Perubahan Berhasil Disetujui')
                                 ->success()
                                 ->send();
 
                             $this->dispatch('refreshStats');
-                        })
-                        ->extraModalFooterActions(fn(\Filament\Tables\Actions\Action $action): array => [
-                            \Filament\Actions\Action::make('tolak_pengajuan')
-                                ->label('Tolak Pengajuan')
-                                ->color('danger')
-                                ->requiresConfirmation()
-                                ->action(function () use ($action) {
-                                    $record = $action->getRecord();
-                                    $req = $record?->pendingCorrectionRequest();
-                                    if (!$req) return;
+                        }),
 
-                                    $orderNumber = $record->order?->order_number ?? 'Pembayaran';
-                                    $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
-                                    $formData = $action->getMountedActionData() ?? [];
-                                    $alasanTolak = $formData['catatan_penolakan'] ?? 'Ditolak oleh Owner';
+                    // ── Aksi 2: Owner Tolak Pengajuan ──
+                    Action::make('tolak_pengajuan')
+                        ->label('Tolak Pengajuan')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn ($record) => auth()->user()->role === 'owner' && $record?->pendingCorrectionRequest() !== null)
+                        ->form([
+                            Textarea::make('catatan_penolakan')
+                                ->label('Alasan Penolakan (Wajib)')
+                                ->placeholder('Tulis alasan mengapa pengajuan ditolak...')
+                                ->required(),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $req = $record?->pendingCorrectionRequest();
+                            if (!$req) return;
 
-                                    $req->update([
-                                        'status' => 'rejected',
-                                        'reviewed_by' => auth()->id(),
-                                        'reviewed_at' => now(),
-                                        'rejection_reason' => $alasanTolak,
-                                    ]);
+                            $orderNumber = $record->order?->order_number ?? 'Pembayaran';
+                            $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
+                            $alasanTolak = $data['catatan_penolakan'] ?? 'Ditolak oleh Owner';
 
-                                    if ($req->requester) {
-                                        try {
-                                            \Filament\Notifications\Notification::make()
-                                                ->title('Pengajuan Koreksi Pembayaran Ditolak')
-                                                ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
-                                                ->danger()
-                                                ->sendToDatabase($req->requester);
-                                        } catch (\Throwable $e) {}
+                            $req->update([
+                                'status' => 'rejected',
+                                'reviewed_by' => auth()->id(),
+                                'reviewed_at' => now(),
+                                'rejection_reason' => $alasanTolak,
+                            ]);
 
-                                        if ($req->requester->phone) {
-                                            $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
-                                                . "Halo {$req->requester->name},\n"
-                                                . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
-                                                . "📝 *Alasan Penolakan:* {$alasanTolak}";
-                                            \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
-                                        }
-                                    }
+                            if ($req->requester) {
+                                try {
+                                    Notification::make()
+                                        ->title('Pengajuan Koreksi Pembayaran Ditolak')
+                                        ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
+                                        ->danger()
+                                        ->sendToDatabase($req->requester);
+                                } catch (\Throwable $e) {}
 
-                                    \Filament\Notifications\Notification::make()
-                                        ->title('Pengajuan Berhasil Ditolak')
-                                        ->warning()
-                                        ->send();
+                                if ($req->requester->phone) {
+                                    $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
+                                        . "Halo {$req->requester->name},\n"
+                                        . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
+                                        . "📝 *Alasan Penolakan:* {$alasanTolak}";
+                                    \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                }
+                            }
 
-                                    $this->dispatch('refreshStats');
-                                }),
-                        ]),
+                            Notification::make()
+                                ->title('Pengajuan Berhasil Ditolak')
+                                ->warning()
+                                ->send();
 
-                    // ── Aksi 2: Buka Pesanan (Jika terkait pesanan) ──
-                    \Filament\Tables\Actions\Action::make('lihat_pesanan')
+                            $this->dispatch('refreshStats');
+                        }),
+
+                    // ── Aksi 3: Buka Pesanan (Jika terkait pesanan) ──
+                    Action::make('lihat_pesanan')
                         ->label('Buka Detail Pesanan')
                         ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->visible(fn($record) => (bool) $record?->order_id)
-                        ->url(fn($record) => "/app/" . ($record?->shop_id ?? Filament::getTenant()?->id) . "/orders/{$record?->order_id}?relation=1"),
+                        ->visible(fn ($record) => (bool) $record?->order_id)
+                        ->url(fn ($record) => "/app/" . ($record?->shop_id ?? Filament::getTenant()?->id) . "/orders/{$record?->order_id}?relation=1"),
 
-                    // ── Aksi 3: Edit Modal Kas Kecil (Bukan Pesanan) ──
-                    \Filament\Tables\Actions\EditAction::make('edit_modal')
+                    // ── Aksi 4: Edit Modal Kas Kecil (Bukan Pesanan) ──
+                    EditAction::make('edit_modal')
                         ->label('Edit Modal')
-                        ->visible(fn($record) => $record?->type === 'modal_awal' || !$record?->order_id)
+                        ->visible(fn ($record) => $record?->type === 'modal_awal' || !$record?->order_id)
                         ->form([
-                            \Filament\Forms\Components\TextInput::make('amount')
+                            TextInput::make('amount')
                                 ->label('Nominal Modal (Rp)')
                                 ->numeric()
                                 ->prefix('Rp')
                                 ->required(),
 
-                            \Filament\Forms\Components\DatePicker::make('payment_date')
+                            DatePicker::make('payment_date')
                                 ->label('Tanggal Masuk')
                                 ->required()
                                 ->native(false),
 
-                            \Filament\Forms\Components\Select::make('payment_method')
+                            Select::make('payment_method')
                                 ->label('Metode Penerimaan')
                                 ->options([
                                     'cash' => 'Cash (Tunai Fisik)',
@@ -357,12 +375,12 @@ class KasMasukTableWidget extends BaseWidget
                                 ])
                                 ->required(),
 
-                            \Filament\Forms\Components\TextInput::make('note')
+                            TextInput::make('note')
                                 ->label('Keterangan / Catatan')
                                 ->required()
                                 ->maxLength(255),
 
-                            \Filament\Forms\Components\FileUpload::make('proof_image')
+                            FileUpload::make('proof_image')
                                 ->label('Foto Bukti (Opsional)')
                                 ->image()
                                 ->disk('public')
@@ -372,10 +390,10 @@ class KasMasukTableWidget extends BaseWidget
                             $this->dispatch('refreshStats');
                         }),
 
-                    // ── Aksi 4: Hapus Modal Kas Kecil (Bukan Pesanan) ──
-                    \Filament\Tables\Actions\DeleteAction::make('hapus_modal')
+                    // ── Aksi 5: Hapus Modal Kas Kecil (Bukan Pesanan) ──
+                    DeleteAction::make('hapus_modal')
                         ->label('Hapus Modal')
-                        ->visible(fn($record) => ($record?->type === 'modal_awal' || !$record?->order_id) && auth()->user()->role === 'owner')
+                        ->visible(fn ($record) => ($record?->type === 'modal_awal' || !$record?->order_id) && auth()->user()->role === 'owner')
                         ->after(function () {
                             $this->dispatch('refreshStats');
                         }),
@@ -389,36 +407,36 @@ class KasMasukTableWidget extends BaseWidget
             ->emptyStateHeading('Belum Ada Kas Masuk')
             ->emptyStateDescription('Catat modal harian atau pembayaran pesanan melalui detail pesanan / tab Piutang.')
             ->filters([
-                Tables\Filters\Filter::make('payment_date')
+                Filter::make('payment_date')
                     ->form([
-                        \Filament\Forms\Components\DatePicker::make('from')
+                        DatePicker::make('from')
                             ->label('Dari Tanggal'),
-                        \Filament\Forms\Components\DatePicker::make('until')
+                        DatePicker::make('until')
                             ->label('Sampai Tanggal'),
                     ])
-                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                    ->query(function (Builder $query, array $data): Builder {
                         return $query
                             ->when(
                                 $data['from'] ?? null,
-                                fn(\Illuminate\Database\Eloquent\Builder $query, $date): \Illuminate\Database\Eloquent\Builder => $query->whereDate('payment_date', '>=', $date),
+                                fn (Builder $query, $date): Builder => $query->whereDate('payment_date', '>=', $date),
                             )
                             ->when(
                                 $data['until'] ?? null,
-                                fn(\Illuminate\Database\Eloquent\Builder $query, $date): \Illuminate\Database\Eloquent\Builder => $query->whereDate('payment_date', '<=', $date),
+                                fn (Builder $query, $date): Builder => $query->whereDate('payment_date', '<=', $date),
                             );
                     })
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
                         if ($data['from'] ?? null) {
-                            $indicators['from'] = 'Dari ' . \Illuminate\Support\Carbon::parse($data['from'])->format('d M Y');
+                            $indicators['from'] = 'Dari ' . Carbon::parse($data['from'])->format('d M Y');
                         }
                         if ($data['until'] ?? null) {
-                            $indicators['until'] = 'Sampai ' . \Illuminate\Support\Carbon::parse($data['until'])->format('d M Y');
+                            $indicators['until'] = 'Sampai ' . Carbon::parse($data['until'])->format('d M Y');
                         }
                         return $indicators;
                     }),
 
-                Tables\Filters\SelectFilter::make('payment_method')
+                SelectFilter::make('payment_method')
                     ->label('Metode Pembayaran')
                     ->options([
                         'cash' => 'Cash',
