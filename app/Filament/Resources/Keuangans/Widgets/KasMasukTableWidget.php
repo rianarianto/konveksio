@@ -48,6 +48,7 @@ class KasMasukTableWidget extends BaseWidget
                               $oq->withoutGlobalScopes()->where('shop_id', $tenantId);
                           });
                     })
+                    ->orderByRaw("EXISTS (SELECT 1 FROM payment_correction_requests WHERE payment_correction_requests.payment_id = payments.id AND payment_correction_requests.status = 'pending') DESC")
                     ->latest('payment_date')
             )
             ->columns([
