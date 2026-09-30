@@ -18,11 +18,12 @@
             </x-filament::tabs.item>
 
             <x-filament::tabs.item alpine-active="activeTab === 'kas_masuk'" x-on:click="activeTab = 'kas_masuk'">
-                <div class="flex items-center gap-2">
+                <div class="inline-flex items-center gap-2">
                     <span>Riwayat Kas Masuk</span>
                     @if($pendingApprovalsCount > 0)
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700 animate-pulse">
-                            {{ $pendingApprovalsCount }} Butuh Review
+                        <span class="relative flex h-2.5 w-2.5" title="{{ $pendingApprovalsCount }} pengajuan butuh review">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
                         </span>
                     @endif
                 </div>
