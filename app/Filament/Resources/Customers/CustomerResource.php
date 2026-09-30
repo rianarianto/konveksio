@@ -36,7 +36,7 @@ class CustomerResource extends Resource
 
     public static function canAccess(): bool
     {
-        return in_array(auth()->user()->role, ['owner', 'admin']);
+        return in_array(auth()->user()->role, ['owner', 'admin', 'designer']);
     }
 
     public static function form(Schema $schema): Schema

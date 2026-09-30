@@ -39,7 +39,7 @@ class DesignTaskResource extends Resource
 
     public static function canAccess(): bool
     {
-        return in_array(auth()->user()->role, ['designer', 'owner']);
+        return in_array(auth()->user()->role, ['designer', 'admin', 'owner']);
     }
 
     public static function scopeEloquentQueryToTenant(Builder $query, ?Model $tenant): Builder

@@ -73,7 +73,7 @@ class OrderResource extends Resource
 
     public static function canCreate(): bool
     {
-        return in_array(auth()->user()->role, ['owner', 'admin']);
+        return in_array(auth()->user()->role, ['owner', 'admin', 'designer']);
     }
 
     public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
@@ -82,7 +82,7 @@ class OrderResource extends Resource
         if ($record->hasStartedProduction() || in_array($record->status, ['diproses', 'selesai', 'siap_diambil', 'produksi'])) {
             return false;
         }
-        return in_array(auth()->user()->role, ['owner', 'admin']);
+        return in_array(auth()->user()->role, ['owner', 'admin', 'designer']);
     }
 
     public static function canView(\Illuminate\Database\Eloquent\Model $record): bool
