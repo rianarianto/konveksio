@@ -272,21 +272,27 @@ class KasMasukTableWidget extends BaseWidget
                                     'rejection_reason' => $alasanTolak,
                                 ]);
 
-                                if ($req->requester) {
+                                $requester = $req->requested_by 
+                                    ? \App\Models\User::withoutGlobalScopes()->find($req->requested_by) 
+                                    : null;
+
+                                if ($requester) {
                                     try {
                                         Notification::make()
                                             ->title('Pengajuan Koreksi Pembayaran Ditolak')
                                             ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
                                             ->danger()
-                                            ->sendToDatabase($req->requester);
-                                    } catch (\Throwable $e) {}
+                                            ->sendToDatabase($requester);
+                                    } catch (\Throwable $e) {
+                                        Log::error('[Reject-Notif] Gagal kirim db notif ke requester: ' . $e->getMessage());
+                                    }
 
-                                    if ($req->requester->phone) {
+                                    if ($requester->phone) {
                                         $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
-                                            . "Halo {$req->requester->name},\n"
+                                            . "Halo {$requester->name},\n"
                                             . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
                                             . "📝 *Alasan Penolakan:* {$alasanTolak}";
-                                        \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                        \App\Helpers\NotificationHelper::sendWaMessage($requester->phone, $pesanWaAdmin, $shopId);
                                     }
                                 }
 
@@ -317,21 +323,27 @@ class KasMasukTableWidget extends BaseWidget
                                     ]);
                                 }
 
-                                if ($req->requester) {
+                                $requester = $req->requested_by 
+                                    ? \App\Models\User::withoutGlobalScopes()->find($req->requested_by) 
+                                    : null;
+
+                                if ($requester) {
                                     try {
                                         Notification::make()
                                             ->title('Pengajuan Koreksi Pembayaran Disetujui')
                                             ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} telah disetujui Owner.")
                                             ->success()
-                                            ->sendToDatabase($req->requester);
-                                    } catch (\Throwable $e) {}
+                                            ->sendToDatabase($requester);
+                                    } catch (\Throwable $e) {
+                                        Log::error('[Approve-Notif] Gagal kirim db notif ke requester: ' . $e->getMessage());
+                                    }
 
-                                    if ($req->requester->phone) {
+                                    if ($requester->phone) {
                                         $pesanWaAdmin = "✅ *PENGAJUAN KOREKSI PEMBAYARAN DISETUJUI*\n\n"
-                                            . "Halo {$req->requester->name},\n"
+                                            . "Halo {$requester->name},\n"
                                             . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DISETUJUI* oleh Owner.\n\n"
                                             . "Data pembayaran telah berhasil diperbarui di sistem.";
-                                        \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                        \App\Helpers\NotificationHelper::sendWaMessage($requester->phone, $pesanWaAdmin, $shopId);
                                     }
                                 }
 
