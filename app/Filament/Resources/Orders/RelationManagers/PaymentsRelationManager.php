@@ -307,11 +307,11 @@ class PaymentsRelationManager extends RelationManager
                                     })
                                     ->columnSpanFull(),
 
-                                \Filament\Forms\Components\Radio::make('keputusan')
+                                Select::make('keputusan')
                                     ->label('Keputusan Review')
                                     ->options([
                                         'approve' => 'Setujui Pengajuan (Approve)',
-                                        'reject' => 'Tolak Pengajuan (Reject)',
+                                        'reject' => 'Tolak Pengajuan (Reject / Batalkan)',
                                     ])
                                     ->default('approve')
                                     ->live()
@@ -320,8 +320,8 @@ class PaymentsRelationManager extends RelationManager
                                 Textarea::make('alasan_penolakan')
                                     ->label('Alasan Penolakan (Wajib jika ditolak)')
                                     ->placeholder('Tuliskan alasan penolakan untuk admin...')
-                                    ->visible(fn (\Filament\Forms\Get $get) => $get('keputusan') === 'reject')
-                                    ->required(fn (\Filament\Forms\Get $get) => $get('keputusan') === 'reject')
+                                    ->visible(fn ($get) => $get('keputusan') === 'reject')
+                                    ->required(fn ($get) => $get('keputusan') === 'reject')
                                     ->columnSpanFull(),
                             ];
                         })
