@@ -123,7 +123,7 @@ class KasMasukTableWidget extends BaseWidget
                     ->extraCellAttributes(['style' => 'vertical-align: top;']),
             ])
             ->headerActions([
-                \Filament\Actions\CreateAction::make('tambah_modal')
+                \Filament\Tables\Actions\CreateAction::make('tambah_modal')
                     ->label('Tambah Modal Kas Kecil')
                     ->icon('heroicon-o-plus-circle')
                     ->color('success')

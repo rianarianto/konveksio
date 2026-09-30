@@ -9,9 +9,11 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
-use Filament\Actions\CreateAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
+use Filament\Tables\Actions\CreateAction;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -267,9 +269,9 @@ class PaymentsRelationManager extends RelationManager
                     }),
             ])
             ->actions([
-                \Filament\Actions\ActionGroup::make([
+                ActionGroup::make([
                     // ── Aksi 1: Owner Review Pengajuan Koreksi / Hapus (Pertama jika Pending) ──
-                    \Filament\Actions\Action::make('review_pengajuan')
+                    Action::make('review_pengajuan')
                         ->label('Review Pengajuan')
                         ->icon('heroicon-o-check-badge')
                         ->color('warning')
@@ -364,7 +366,7 @@ class PaymentsRelationManager extends RelationManager
                             $this->dispatch('refreshOrderSummary');
                         })
                         ->extraModalFooterActions([
-                            \Filament\Actions\Action::make('tolak_pengajuan')
+                            Action::make('tolak_pengajuan')
                                 ->label('Tolak Pengajuan')
                                 ->color('danger')
                                 ->requiresConfirmation()
@@ -418,7 +420,7 @@ class PaymentsRelationManager extends RelationManager
                         }),
 
                     // ── Aksi 3: Admin Ajukan Koreksi ──
-                    \Filament\Actions\Action::make('ajukan_koreksi')
+                    Action::make('ajukan_koreksi')
                         ->label('Ajukan Koreksi')
                         ->icon('heroicon-o-pencil-square')
                         ->color('primary')
@@ -536,7 +538,7 @@ class PaymentsRelationManager extends RelationManager
                         }),
 
                     // ── Aksi 4: Admin Ajukan Hapus ──
-                    \Filament\Actions\Action::make('ajukan_hapus')
+                    Action::make('ajukan_hapus')
                         ->label('Ajukan Hapus')
                         ->icon('heroicon-o-trash')
                         ->color('danger')
