@@ -26,8 +26,15 @@ class EditProfile extends BaseEditProfile
                     ->placeholder('Contoh: 081234567890')
                     ->helperText('Nomor ini digunakan untuk notifikasi sistem & persetujuan keuangan.')
                     ->maxLength(255),
-                $this->getPasswordFormComponent(),
+                $this->getPasswordFormComponent()
+                    ->helperText('Kosongkan jika tidak ingin mengubah kata sandi lama.'),
                 $this->getPasswordConfirmationFormComponent(),
             ]);
+    }
+
+    protected function getPasswordFormComponent(): \Filament\Schemas\Components\Component
+    {
+        return parent::getPasswordFormComponent()
+            ->helperText('Kosongkan jika tidak ingin mengubah kata sandi lama.');
     }
 }
