@@ -398,10 +398,10 @@ class KasMasukTableWidget extends BaseWidget
                         }),
                 ])
                     ->label('Opsi')
-                    ->icon(fn ($record) => $record?->pendingCorrectionRequest() ? 'heroicon-m-exclamation-circle' : 'heroicon-m-ellipsis-vertical')
-                    ->color(fn ($record) => $record?->pendingCorrectionRequest() ? 'warning' : 'gray')
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->color('gray')
                     ->size('sm')
-                    ->tooltip(fn ($record) => $record?->pendingCorrectionRequest() ? 'Ada pengajuan koreksi yang butuh review' : 'Menu Aksi'),
+                    ->tooltip('Menu Aksi'),
             ])
             ->emptyStateHeading('Belum Ada Kas Masuk')
             ->emptyStateDescription('Catat modal harian atau pembayaran pesanan melalui detail pesanan / tab Piutang.')
