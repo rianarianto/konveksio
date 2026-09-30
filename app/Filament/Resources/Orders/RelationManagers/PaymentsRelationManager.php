@@ -398,19 +398,23 @@ class PaymentsRelationManager extends RelationManager
                     ->icon('heroicon-o-pencil-square')
                     ->color('primary')
                     ->visible(fn($record) => auth()->user()->role !== 'owner' && $record->pendingCorrectionRequest() === null)
+                    ->fillForm(fn($record): array => [
+                        'new_amount' => $record->amount,
+                        'new_payment_date' => $record->payment_date,
+                        'new_payment_method' => $record->payment_method,
+                        'new_note' => $record->note,
+                    ])
                     ->form([
                         \Filament\Forms\Components\TextInput::make('new_amount')
                             ->label('Nominal Baru yang Benar (Rp)')
                             ->numeric()
                             ->prefix('Rp')
-                            ->required()
-                            ->default(fn($record) => $record->amount),
+                            ->required(),
 
                         \Filament\Forms\Components\DatePicker::make('new_payment_date')
                             ->label('Tanggal Pembayaran')
                             ->required()
-                            ->native(false)
-                            ->default(fn($record) => $record->payment_date),
+                            ->native(false),
 
                         \Filament\Forms\Components\Select::make('new_payment_method')
                             ->label('Metode Pembayaran')
@@ -419,12 +423,10 @@ class PaymentsRelationManager extends RelationManager
                                 'transfer' => '🏦 Transfer Bank',
                                 'qris' => '📱 QRIS',
                             ])
-                            ->required()
-                            ->default(fn($record) => $record->payment_method),
+                            ->required(),
 
                         \Filament\Forms\Components\TextInput::make('new_note')
-                            ->label('Catatan Pembayaran')
-                            ->default(fn($record) => $record->note),
+                            ->label('Catatan Pembayaran'),
 
                         \Filament\Forms\Components\Textarea::make('reason')
                             ->label('Alasan Pengajuan Koreksi (Wajib)')
