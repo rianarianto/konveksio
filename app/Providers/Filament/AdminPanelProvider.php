@@ -30,6 +30,7 @@ class AdminPanelProvider extends PanelProvider
             ->tenant(\App\Models\Shop::class)
             ->tenantRegistration(\App\Filament\Pages\Tenancy\RegisterShop::class)
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
+            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->globalSearch(false)
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
@@ -383,15 +384,15 @@ class AdminPanelProvider extends PanelProvider
                 '),
             )
             ->userMenuItems([
-                'profile' => \Filament\Navigation\MenuItem::make()
-                    ->label('Shop Settings')
+                'shop_settings' => \Filament\Navigation\MenuItem::make()
+                    ->label('Pengaturan Toko')
                     ->url(fn(): string => filament()->getTenant() ? \App\Filament\Resources\Shops\ShopResource::getUrl('edit', ['record' => filament()->getTenant()]) : '#')
-                    ->icon('heroicon-o-cog-6-tooth')
+                    ->icon('heroicon-o-building-storefront')
                     ->visible(fn(): bool => filament()->getTenant() !== null),
                 'manage_shops' => \Filament\Navigation\MenuItem::make()
-                    ->label('Manage All Shops')
+                    ->label('Daftar Semua Toko')
                     ->url(fn(): string => filament()->getTenant() ? \App\Filament\Resources\Shops\ShopResource::getUrl('index') : '#')
-                    ->icon('heroicon-o-building-storefront')
+                    ->icon('heroicon-o-squares-2x2')
                     ->visible(fn(): bool => auth()->check() && auth()->user()->role === 'owner' && filament()->getTenant() !== null),
             ])
             ->brandLogo(fn() => view('filament.brand-logo'))

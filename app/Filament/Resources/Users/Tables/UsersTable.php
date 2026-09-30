@@ -32,6 +32,11 @@ class UsersTable
                     ->label('Email Address')
                     ->searchable()
                     ->sortable(),
+
+                TextColumn::make('phone')
+                    ->label('No. WhatsApp')
+                    ->searchable()
+                    ->placeholder('—'),
                     
                 TextColumn::make('role')
                     ->badge()

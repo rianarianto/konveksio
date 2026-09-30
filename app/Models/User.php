@@ -32,6 +32,7 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         'name',
         'username',
         'email',
+        'phone',
         'password',
         'role',
         'shop_id',

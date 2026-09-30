@@ -32,6 +32,12 @@ class UserForm
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
 
+                TextInput::make('phone')
+                    ->label('Nomor WhatsApp / HP')
+                    ->tel()
+                    ->placeholder('081234567890')
+                    ->maxLength(255),
+
                 TextInput::make('password')
                     ->password()
                     ->revealable()
