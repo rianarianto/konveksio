@@ -334,6 +334,7 @@ class PaymentsRelationManager extends RelationManager
                             $orderNumber = $record->order?->order_number ?? 'Pembayaran';
                             $shopId = $record->shop_id ?? \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
                             $keputusan = $data['keputusan'] ?? 'approve';
+                            $requester = $req->requested_by ? \App\Models\User::withoutGlobalScopes()->find($req->requested_by) : null;
 
                             if ($keputusan === 'reject') {
                                 $alasanTolak = $data['alasan_penolakan'] ?? 'Ditolak oleh Owner';
@@ -344,21 +345,21 @@ class PaymentsRelationManager extends RelationManager
                                     'rejection_reason' => $alasanTolak,
                                 ]);
 
-                                if ($req->requester) {
+                                if ($requester) {
                                     try {
                                         Notification::make()
                                             ->title('Pengajuan Koreksi Pembayaran Ditolak')
                                             ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} ditolak Owner. Alasan: " . $alasanTolak)
                                             ->danger()
-                                            ->sendToDatabase($req->requester);
+                                            ->sendToDatabase($requester);
                                     } catch (\Throwable $e) {}
 
-                                    if ($req->requester->phone) {
+                                    if ($requester->phone) {
                                         $pesanWaAdmin = "❌ *PENGAJUAN KOREKSI PEMBAYARAN DITOLAK*\n\n"
-                                            . "Halo {$req->requester->name},\n"
+                                            . "Halo {$requester->name},\n"
                                             . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DITOLAK* oleh Owner.\n\n"
                                             . "📝 *Alasan Penolakan:* {$alasanTolak}";
-                                        \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                        \App\Helpers\NotificationHelper::sendWaMessage($requester->phone, $pesanWaAdmin, $shopId);
                                     }
                                 }
 
@@ -389,21 +390,21 @@ class PaymentsRelationManager extends RelationManager
                                     ]);
                                 }
 
-                                if ($req->requester) {
+                                if ($requester) {
                                     try {
                                         Notification::make()
                                             ->title('Pengajuan Koreksi Pembayaran Disetujui')
                                             ->body("Pengajuan koreksi untuk pembayaran {$orderNumber} telah disetujui Owner.")
                                             ->success()
-                                            ->sendToDatabase($req->requester);
+                                            ->sendToDatabase($requester);
                                     } catch (\Throwable $e) {}
 
-                                    if ($req->requester->phone) {
+                                    if ($requester->phone) {
                                         $pesanWaAdmin = "✅ *PENGAJUAN KOREKSI PEMBAYARAN DISETUJUI*\n\n"
-                                            . "Halo {$req->requester->name},\n"
+                                            . "Halo {$requester->name},\n"
                                             . "Pengajuan koreksi pembayaran untuk pesanan *{$orderNumber}* telah *DISETUJUI* oleh Owner.\n\n"
                                             . "Data pembayaran telah berhasil diperbarui di sistem.";
-                                        \App\Helpers\NotificationHelper::sendWaMessage($req->requester->phone, $pesanWaAdmin, $shopId);
+                                        \App\Helpers\NotificationHelper::sendWaMessage($requester->phone, $pesanWaAdmin, $shopId);
                                     }
                                 }
 
