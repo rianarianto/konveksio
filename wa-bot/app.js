@@ -215,6 +215,28 @@ const cleanAuthDir = async (session) => {
     }
 };
 
+/**
+ * Membersihkan cache kunci kontak & pre-key tanpa menghapus creds.json (tidak perlu scan QR ulang)
+ * Digunakan untuk menyembuhkan 'Waiting for this message' / Signal desync secara instan.
+ */
+const cleanSessionKeys = async (session) => {
+    try {
+        if (await fs.pathExists(session.authDir)) {
+            const files = await fs.readdir(session.authDir);
+            let cleanedCount = 0;
+            for (const file of files) {
+                if (file.startsWith('session-') || file.startsWith('pre-key-') || file.startsWith('sender-key-')) {
+                    await fs.remove(path.join(session.authDir, file));
+                    cleanedCount++;
+                }
+            }
+            console.log(`🧹 [Shop ${session.shopId}] Cleaned ${cleanedCount} session/pre-key files to fix Signal desync.`);
+        }
+    } catch (err) {
+        console.error(`❌ [Shop ${session.shopId}] Failed to clean session keys:`, err);
+    }
+};
+
 const addToLog = (session, entry) => {
     session.messageLog.unshift({
         ...entry,
@@ -394,8 +416,11 @@ const forceReconnect = async (session, reason = 'manual') => {
         session.sock = null;
     }
 
+    // Bersihkan session keys (tanpa hapus login creds.json) agar fix 'waiting for this message'
+    await cleanSessionKeys(session);
+
     session.consecutiveFailures = 0;
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
     session.isReconnecting = false;
     await connectToWhatsApp(session);
 };
@@ -529,7 +554,8 @@ const apiSendHandler = async (req, res) => {
         console.log(`✅ [Shop ${session.shopId}] Message sent successfully! ID:`, msgId);
 
         if (msgId) {
-            storeMessage(session, msgId, messageContent);
+            // Simpan message proto untuk melayani retry decryption request dari WhatsApp penerima
+            storeMessage(session, msgId, sentResult?.message || messageContent);
             session.pendingDelivery.set(msgId, {
                 jid,
                 timestamp: Date.now(),
