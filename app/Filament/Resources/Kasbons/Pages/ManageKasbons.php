@@ -26,7 +26,9 @@ class ManageKasbons extends ManageRecords
                             ->default(now()),
                     ])
                     ->action(function (array $data) {
+                        $shopId = \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
                         $url = route('reports.export-pdf-kasbon', [
+                            'shop_id' => $shopId,
                             'from' => $data['from'] ?? null,
                             'until' => $data['until'] ?? null,
                         ]);
@@ -46,7 +48,9 @@ class ManageKasbons extends ManageRecords
                             ->default(now()),
                     ])
                     ->action(function (array $data) {
+                        $shopId = \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->shop_id;
                         $url = route('reports.export-kasbon', [
+                            'shop_id' => $shopId,
                             'from' => $data['from'] ?? null,
                             'until' => $data['until'] ?? null,
                         ]);

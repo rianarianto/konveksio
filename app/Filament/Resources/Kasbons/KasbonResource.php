@@ -411,6 +411,35 @@ class KasbonResource extends Resource
                 ]),
             ])
             ->filters([
+                \Filament\Tables\Filters\Filter::make('date_range')
+                    ->form([
+                        DatePicker::make('from')
+                            ->label('Dari Tanggal'),
+                        DatePicker::make('until')
+                            ->label('Sampai Tanggal'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('date', '>=', $date),
+                            )
+                            ->when(
+                                $data['until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('date', '<=', $date),
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if ($data['from'] ?? null) {
+                            $indicators['from'] = 'Dari: ' . \Carbon\Carbon::parse($data['from'])->toFormattedDateString();
+                        }
+                        if ($data['until'] ?? null) {
+                            $indicators['until'] = 'Sampai: ' . \Carbon\Carbon::parse($data['until'])->toFormattedDateString();
+                        }
+                        return $indicators;
+                    }),
+
                 SelectFilter::make('status')
                     ->label('Status')
                     ->options([

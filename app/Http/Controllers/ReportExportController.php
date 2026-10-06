@@ -221,7 +221,7 @@ class ReportExportController extends Controller
      */
     public function exportKasbon(Request $request)
     {
-        $shopId = Filament::getTenant()?->id ?? auth()->user()->shop_id;
+        $shopId = $request->query('shop_id') ?: (Filament::getTenant()?->id ?? auth()->user()->shop_id);
         $from = $request->query('from');
         $until = $request->query('until');
 
@@ -318,7 +318,7 @@ class ReportExportController extends Controller
      */
     public function downloadPdfKasbon(Request $request)
     {
-        $shopId = Filament::getTenant()?->id ?? auth()->user()->shop_id;
+        $shopId = $request->query('shop_id') ?: (Filament::getTenant()?->id ?? auth()->user()->shop_id);
         $shop = Shop::find($shopId);
         $from = $request->query('from') ?: Carbon::now()->startOfMonth()->toDateString();
         $until = $request->query('until') ?: Carbon::now()->endOfMonth()->toDateString();
