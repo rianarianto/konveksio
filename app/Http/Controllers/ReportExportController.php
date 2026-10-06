@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CashAdvance;
 use App\Models\Expense;
 use App\Models\Payment;
 use App\Models\ProductionTask;
@@ -206,6 +207,145 @@ class ReportExportController extends Controller
         ]);
 
         $filename = 'Laporan-Keuangan-' . Carbon::parse($from)->format('dMy') . '-' . Carbon::parse($until)->format('dMy') . '.pdf';
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+        $pdf->save($tempPath);
+        return response()->file($tempPath, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
+    }
+
+    /**
+     * Export Laporan Kasbon ke CSV / Excel
+     */
+    public function exportKasbon(Request $request)
+    {
+        $shopId = Filament::getTenant()?->id ?? auth()->user()->shop_id;
+        $from = $request->query('from');
+        $until = $request->query('until');
+
+        $query = CashAdvance::withoutGlobalScopes()
+            ->with(['cashAdvanceable', 'recorder'])
+            ->where('shop_id', $shopId);
+
+        if ($from) {
+            $query->whereDate('date', '>=', $from);
+        }
+        if ($until) {
+            $query->whereDate('date', '<=', $until);
+        }
+
+        $kasbons = $query->orderBy('date', 'asc')->get();
+
+        $filename = 'Laporan-Kasbon-' . date('Ymd-His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($kasbons) {
+            $file = fopen('php://output', 'w');
+            // BOM UTF-8 for Excel compatibility
+            fputs($file, "\xEF\xBB\xBF");
+
+            // Header kolom
+            fputcsv($file, [
+                'No',
+                'Tanggal',
+                'Nama Karyawan / Tukang',
+                'Tipe',
+                'Status',
+                'Nominal (Rp)',
+                'Catatan / Keperluan',
+                'Dicatat Oleh',
+            ]);
+
+            $no = 1;
+            $totalPinjaman = 0;
+            $totalPelunasan = 0;
+
+            foreach ($kasbons as $k) {
+                $isLoan = in_array($k->type, ['loan', 'pinjaman']);
+                $personName = $k->cashAdvanceable?->name ?? '-';
+                $tipeLabel = $isLoan ? 'Pinjaman (Kasbon)' : 'Pelunasan';
+                $statusLabel = match ($k->status) {
+                    'approved' => 'Disetujui',
+                    'pending'  => 'Pending',
+                    'rejected' => 'Ditolak',
+                    default    => ucfirst($k->status ?? '-'),
+                };
+
+                if ($k->status === 'approved') {
+                    if ($isLoan) {
+                        $totalPinjaman += $k->amount;
+                    } else {
+                        $totalPelunasan += $k->amount;
+                    }
+                }
+
+                fputcsv($file, [
+                    $no++,
+                    Carbon::parse($k->date)->format('d/m/Y'),
+                    $personName,
+                    $tipeLabel,
+                    $statusLabel,
+                    $k->amount,
+                    $k->note ?: '-',
+                    $k->recorder?->name ?? '-',
+                ]);
+            }
+
+            // Summary row
+            fputcsv($file, []);
+            fputcsv($file, ['RINGKASAN KASBON DISETUJUI', '', '', '', '', '', '', '']);
+            fputcsv($file, ['Total Pinjaman Dicairkan (Kasbon Keluar)', '', '', '', '', $totalPinjaman, '', '']);
+            fputcsv($file, ['Total Pelunasan Diterima (Kas Masuk)', '', '', '', '', $totalPelunasan, '', '']);
+            fputcsv($file, ['Sisa Kasbon Belum Lunas Periode Ini', '', '', '', '', ($totalPinjaman - $totalPelunasan), '', '']);
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Cetak Laporan Kasbon PDF
+     */
+    public function downloadPdfKasbon(Request $request)
+    {
+        $shopId = Filament::getTenant()?->id ?? auth()->user()->shop_id;
+        $shop = Shop::find($shopId);
+        $from = $request->query('from') ?: Carbon::now()->startOfMonth()->toDateString();
+        $until = $request->query('until') ?: Carbon::now()->endOfMonth()->toDateString();
+
+        $kasbons = CashAdvance::withoutGlobalScopes()
+            ->with(['cashAdvanceable', 'recorder'])
+            ->where('shop_id', $shopId)
+            ->whereDate('date', '>=', $from)
+            ->whereDate('date', '<=', $until)
+            ->orderBy('date', 'asc')
+            ->get();
+
+        $totalPinjaman = $kasbons->where('status', 'approved')->whereIn('type', ['loan', 'pinjaman'])->sum('amount');
+        $totalPelunasan = $kasbons->where('status', 'approved')->whereIn('type', ['repayment', 'pelunasan'])->sum('amount');
+        $sisaKasbon = $totalPinjaman - $totalPelunasan;
+
+        $pdf = app('dompdf.wrapper')->loadView('pdf.laporan-kasbon', [
+            'shop' => $shop,
+            'from' => $from,
+            'until' => $until,
+            'kasbons' => $kasbons,
+            'totalPinjaman' => $totalPinjaman,
+            'totalPelunasan' => $totalPelunasan,
+            'sisaKasbon' => $sisaKasbon,
+        ]);
+
+        $filename = 'Laporan-Kasbon-' . Carbon::parse($from)->format('dMy') . '-' . Carbon::parse($until)->format('dMy') . '.pdf';
 
         $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
         $pdf->save($tempPath);

@@ -67,5 +67,7 @@ Route::get('/worker/{token}/keuangan', function (string $token) {
 Route::prefix('reports')->middleware(['web', 'auth'])->group(function () {
     Route::get('/export-pemasukan', [\App\Http\Controllers\ReportExportController::class, 'exportPemasukan'])->name('reports.export-pemasukan');
     Route::get('/export-pengeluaran', [\App\Http\Controllers\ReportExportController::class, 'exportPengeluaran'])->name('reports.export-pengeluaran');
+    Route::get('/export-kasbon', [\App\Http\Controllers\ReportExportController::class, 'exportKasbon'])->name('reports.export-kasbon');
     Route::get('/export-pdf', [\App\Http\Controllers\ReportExportController::class, 'downloadPdfSummary'])->name('reports.export-pdf');
+    Route::get('/export-pdf-kasbon', [\App\Http\Controllers\ReportExportController::class, 'downloadPdfKasbon'])->name('reports.export-pdf-kasbon');
 });
