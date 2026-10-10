@@ -8,6 +8,8 @@ use Filament\Schemas\Schema;
 
 class EditProfile extends BaseEditProfile
 {
+    protected static bool $isDiscovered = false;
+
     public function form(Schema $schema): Schema
     {
         return $schema
