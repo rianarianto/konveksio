@@ -385,6 +385,10 @@ class AdminPanelProvider extends PanelProvider
                 '),
             )
             ->userMenuItems([
+                'profile' => \Filament\Navigation\MenuItem::make()
+                    ->label('Profil')
+                    ->url(fn(): string => \App\Filament\Pages\ProfilePage::getUrl())
+                    ->icon('heroicon-o-user-circle'),
                 'shop_settings' => \Filament\Navigation\MenuItem::make()
                     ->label('Pengaturan Toko')
                     ->url(fn(): string => filament()->getTenant() ? \App\Filament\Resources\Shops\ShopResource::getUrl('edit', ['record' => filament()->getTenant()]) : '#')
