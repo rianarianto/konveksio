@@ -30,7 +30,7 @@ class AdminPanelProvider extends PanelProvider
             ->tenant(\App\Models\Shop::class)
             ->tenantRegistration(\App\Filament\Pages\Tenancy\RegisterShop::class)
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
-            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
+            ->profile(\App\Filament\Pages\Auth\EditProfile::class, isSimple: false)
             ->darkMode(false)
             ->globalSearch(false)
             ->databaseNotifications()
