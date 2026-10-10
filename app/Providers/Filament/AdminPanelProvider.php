@@ -31,6 +31,7 @@ class AdminPanelProvider extends PanelProvider
             ->tenantRegistration(\App\Filament\Pages\Tenancy\RegisterShop::class)
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
             ->profile(\App\Filament\Pages\Auth\EditProfile::class)
+            ->darkMode(false)
             ->globalSearch(false)
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
