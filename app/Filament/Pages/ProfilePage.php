@@ -3,7 +3,7 @@
 namespace App\Filament\Pages;
 
 use Filament\Facades\Filament;
-use Filament\Forms\Components\Section;
+use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
