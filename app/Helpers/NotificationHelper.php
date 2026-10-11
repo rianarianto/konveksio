@@ -270,20 +270,25 @@ class NotificationHelper
                 self::sendWaMessage($adminWorker->phone, $pesanAdmin, $wo->shop_id);
             }
 
-            // 2. WhatsApp notification to Owner (from Shop settings)
-            $shop = $wo->shop;
-            if ($shop && $shop->phone) {
-                $pesanOwner = "✅ *WORK ORDER SELESAI — {$wo->wo_number}*\n\n"
-                    . "Halo Owner,\n"
-                    . "Work Order *{$wo->wo_number}* telah selesai diproduksi. Seluruh tahap QC telah disetujui.\n\n"
-                    . "📋 *Detail:*\n"
-                    . "• Produk: {$produk}\n"
-                    . "• Pelanggan: {$customer}\n"
-                    . "• Total Qty: {$totalQty} pcs\n"
-                    . "• Deadline: {$deadline}\n\n"
-                    . "Silakan pantau perkembangan order di sistem.";
+            // 2. WhatsApp notification to Owner (langsung ke nomor pribadi Owner / User role owner)
+            $owners = \App\Models\User::withoutGlobalScopes()
+                ->where('role', 'owner')
+                ->whereNotNull('phone')
+                ->get();
 
-                self::sendWaMessage($shop->phone, $pesanOwner, $wo->shop_id);
+            $pesanOwner = "✅ *WORK ORDER SELESAI — {$wo->wo_number}*\n\n"
+                . "Halo Owner,\n"
+                . "Work Order *{$wo->wo_number}* telah selesai diproduksi. Seluruh tahap QC telah disetujui.\n\n"
+                . "📋 *Detail:*\n"
+                . "• Toko: " . ($wo->shop->name ?? '-') . "\n"
+                . "• Produk: {$produk}\n"
+                . "• Pelanggan: {$customer}\n"
+                . "• Total Qty: {$totalQty} pcs\n"
+                . "• Deadline: {$deadline}\n\n"
+                . "Silakan pantau perkembangan order di sistem.";
+
+            foreach ($owners as $owner) {
+                self::sendWaMessage($owner->phone, $pesanOwner, $wo->shop_id);
             }
 
             // 3. Database/System notification to admin & owner users in this shop
