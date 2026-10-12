@@ -34,6 +34,30 @@ class WorkerPayrollResource extends Resource
 
     protected static bool $isScopedToTenant = true;
 
+    public static function getNavigationBadge(): ?string
+    {
+        if (auth()->user()?->role !== 'owner') {
+            return null;
+        }
+
+        try {
+            $count = \App\Models\WageCorrectionRequest::where('status', 'pending')->count();
+            return $count > 0 ? (string)$count : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Menunggu Persetujuan Koreksi Upah';
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

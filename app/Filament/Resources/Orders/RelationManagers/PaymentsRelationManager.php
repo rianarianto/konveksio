@@ -525,10 +525,6 @@ class PaymentsRelationManager extends RelationManager
                                         \App\Helpers\NotificationHelper::sendWaMessage($owner->phone, $pesanWaOwner, $shopId);
                                     }
                                 }
-
-                                if ($record->shop?->phone) {
-                                    \App\Helpers\NotificationHelper::sendWaMessage($record->shop->phone, $pesanWaOwner, $shopId);
-                                }
                             } catch (\Throwable $e) {
                                 Log::error('[Correction-Req] Gagal kirim notif: ' . $e->getMessage());
                             }
@@ -605,10 +601,6 @@ class PaymentsRelationManager extends RelationManager
                                     if ($owner->phone) {
                                         \App\Helpers\NotificationHelper::sendWaMessage($owner->phone, $pesanWaOwner, $shopId);
                                     }
-                                }
-
-                                if ($record->shop?->phone) {
-                                    \App\Helpers\NotificationHelper::sendWaMessage($record->shop->phone, $pesanWaOwner, $shopId);
                                 }
                             } catch (\Throwable $e) {
                                 Log::error('[Delete-Req] Gagal kirim notif: ' . $e->getMessage());

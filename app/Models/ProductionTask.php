@@ -96,6 +96,16 @@ class ProductionTask extends Model
         return $this->belongsTo(WorkOrder::class, 'order_item_id', 'order_item_id');
     }
 
+    public function wageCorrectionRequests()
+    {
+        return $this->hasMany(WageCorrectionRequest::class);
+    }
+
+    public function pendingWageCorrectionRequest(): ?WageCorrectionRequest
+    {
+        return $this->wageCorrectionRequests()->where('status', 'pending')->first();
+    }
+
     /**
      * Format list ukuran dengan detail nama custom + gender & standard size gender (disertai fallback limit nama agar ramah UI).
      */
