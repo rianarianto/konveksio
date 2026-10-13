@@ -304,9 +304,9 @@ class ProductionTasksRelationManager extends RelationManager
                                         ->columnSpanFull(),
 
                                     Textarea::make('reason')
-                                        ->label(fn () => auth()->user()->role === 'owner' ? 'Alasan / Catatan Koreksi (Wajib)' : 'Alasan Pengajuan Koreksi (Wajib)')
-                                        ->placeholder(fn () => auth()->user()->role === 'owner' ? 'Contoh: Penyesuaian tarif borongan khusus / koreksi salah input...' : 'Contoh: Salah atur tarif saat atur tugas produksi...')
-                                        ->required(fn ($get) => !$get('batal_pengajuan'))
+                                        ->label(fn () => auth()->user()->role === 'owner' ? 'Alasan / Catatan Koreksi (Opsional)' : 'Alasan Pengajuan Koreksi (Wajib)')
+                                        ->placeholder(fn () => auth()->user()->role === 'owner' ? 'Contoh: Penyesuaian tarif borongan khusus (boleh dikosongkan)' : 'Contoh: Salah atur tarif saat atur tugas produksi...')
+                                        ->required(fn ($get) => auth()->user()->role !== 'owner' && !$get('batal_pengajuan'))
                                         ->columnSpanFull(),
 
                                     \Filament\Forms\Components\Checkbox::make('batal_pengajuan')
@@ -361,6 +361,8 @@ class ProductionTasksRelationManager extends RelationManager
                                 'size_quantities' => $updatedSq,
                             ]);
 
+                            $reason = !empty($data['reason']) ? $data['reason'] : 'Diubah langsung oleh Owner';
+
                             WageCorrectionRequest::create([
                                 'shop_id' => $shopId,
                                 'production_task_id' => $record->id,
@@ -370,7 +372,7 @@ class ProductionTasksRelationManager extends RelationManager
                                 'new_wage_per_pcs' => $newStdWage,
                                 'new_wage_custom_per_pcs' => $newCstWage,
                                 'new_wage_amount' => $newTotalWage,
-                                'reason' => $data['reason'],
+                                'reason' => $reason,
                                 'requested_by' => auth()->id(),
                                 'status' => 'approved',
                                 'reviewed_by' => auth()->id(),
