@@ -186,19 +186,62 @@
             margin: 10px auto;
             border-radius: 4px;
         }
+
+        .watermark {
+            position: fixed;
+            top: 25%;
+            left: 20%;
+            width: 60%;
+            text-align: center;
+            opacity: 0.08;
+            z-index: -1000;
+        }
+
+        .watermark img {
+            width: 320px;
+            height: auto;
+        }
+
+        .header-logo-cell {
+            vertical-align: middle;
+            padding-right: 12px;
+            width: 44px;
+        }
+
+        .header-logo-cell img {
+            width: 42px;
+            height: auto;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
+    @php
+        $logoPath = public_path('images/logo.jpeg');
+        $logoBase64 = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : null;
+    @endphp
+
+    @if($logoBase64)
+        <div class="watermark">
+            <img src="{{ $logoBase64 }}" alt="Watermark Logo">
+        </div>
+    @endif
+
     <!-- HALAMAN SPK PRODUKSI -->
     <div class="header">
         <table style="width: 100%;">
             <tr>
+                @if($logoBase64)
+                    <td class="header-logo-cell">
+                        <img src="{{ $logoBase64 }}" alt="Logo">
+                    </td>
+                @endif
                 <td>
                     <h1 class="header-title" style="{{ !empty($activeReturn) ? 'color:#dc2626;' : '' }}">
                         {{ !empty($activeReturn) ? 'SURAT PERINTAH KERJA (SPK PERBAIKAN RETUR)' : 'SURAT PERINTAH KERJA (SPK)' }}
                     </h1>
                     <div class="header-meta">
-                        ORDER: <strong>{{ $record->order->order_number }}</strong> | 
+                        {{ $record->order->shop->name ?? 'Konveksio' }} | ORDER: <strong>{{ $record->order->order_number }}</strong> | 
                         TANGGAL CETAK: {{ now()->format('d/m/Y H:i') }}
                     </div>
                 </td>

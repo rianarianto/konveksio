@@ -118,13 +118,55 @@
             background-color: #f9fafb;
             font-weight: bold;
         }
+
+        .watermark {
+            position: fixed;
+            top: 25%;
+            left: 20%;
+            width: 60%;
+            text-align: center;
+            opacity: 0.08;
+            z-index: -1000;
+        }
+
+        .watermark img {
+            width: 320px;
+            height: auto;
+        }
+
+        .header-logo-cell {
+            vertical-align: middle;
+            padding-right: 12px;
+            width: 44px;
+        }
+
+        .header-logo-cell img {
+            width: 42px;
+            height: auto;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
+    @php
+        $logoPath = public_path('images/logo.jpeg');
+        $logoBase64 = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : null;
+    @endphp
+
+    @if($logoBase64)
+        <div class="watermark">
+            <img src="{{ $logoBase64 }}" alt="Watermark Logo">
+        </div>
+    @endif
 
 <div class="header">
     <table>
         <tr>
+            @if($logoBase64)
+                <td class="header-logo-cell">
+                    <img src="{{ $logoBase64 }}" alt="Logo">
+                </td>
+            @endif
             <td>
                 <div class="shop-name">{{ $shop->name ?? 'KONVEKSI' }}</div>
                 <div class="title">LAPORAN KASBON & PINJAMAN KARYAWAN</div>

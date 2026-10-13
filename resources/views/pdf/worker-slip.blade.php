@@ -94,13 +94,49 @@
         .clear {
             clear: both;
         }
+
+        .watermark {
+            position: fixed;
+            top: 25%;
+            left: 20%;
+            width: 60%;
+            text-align: center;
+            opacity: 0.08;
+            z-index: -1000;
+        }
+
+        .watermark img {
+            width: 320px;
+            height: auto;
+        }
+
+        .header-logo {
+            width: 48px;
+            height: auto;
+            margin-bottom: 6px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
+    @php
+        $logoPath = public_path('images/logo.jpeg');
+        $logoBase64 = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : null;
+    @endphp
+
+    @if($logoBase64)
+        <div class="watermark">
+            <img src="{{ $logoBase64 }}" alt="Watermark Logo">
+        </div>
+    @endif
+
     <div class="container">
         <div class="header">
+            @if($logoBase64)
+                <img src="{{ $logoBase64 }}" alt="Logo" class="header-logo">
+            @endif
             <h1>SLIP {{ $isMonthly ? 'GAJI KARYAWAN BULANAN' : 'UPAH KARYAWAN BORONGAN' }}</h1>
-            <p>{{ $payroll->shop->name }}</p>
+            <p>{{ $payroll->shop->name ?? 'Konveksio' }}</p>
         </div>
 
         <table class="info-table">

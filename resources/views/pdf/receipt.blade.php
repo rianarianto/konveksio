@@ -203,21 +203,76 @@
             margin-bottom: 5px;
             border-collapse: collapse;
         }
-        .annex-grid td {
-            padding: 4px 0;
-            vertical-align: top;
+        .watermark {
+            position: fixed;
+            top: 25%;
+            left: 20%;
+            width: 60%;
+            text-align: center;
+            opacity: 0.08;
+            z-index: -1000;
+        }
+
+        .watermark img {
+            width: 320px;
+            height: auto;
+        }
+
+        .header-brand {
+            display: table;
+        }
+
+        .header-logo-cell {
+            display: table-cell;
+            vertical-align: middle;
+            padding-right: 14px;
+        }
+
+        .header-logo-cell img {
+            width: 50px;
+            height: auto;
+            border-radius: 6px;
+        }
+
+        .header-text-cell {
+            display: table-cell;
+            vertical-align: middle;
         }
     </style>
 </head>
 
 <body>
+    @php
+        $logoPath = public_path('images/logo.jpeg');
+        $logoBase64 = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : null;
+    @endphp
+
+    @if($logoBase64)
+        <div class="watermark">
+            <img src="{{ $logoBase64 }}" alt="Watermark Logo">
+        </div>
+    @endif
+
     <div class="container">
         <div class="header clearfix">
             <div style="float: left;">
-                <h1 class="shop-name">{{ $order->shop->name }}</h1>
-                <div class="shop-info">
-                    {{ $order->shop->address }}<br>
-                    Telp: {{ $order->shop->phone }}
+                <div class="header-brand">
+                    @if($logoBase64)
+                        <div class="header-logo-cell">
+                            <img src="{{ $logoBase64 }}" alt="Logo">
+                        </div>
+                    @endif
+                    <div class="header-text-cell">
+                        <h1 class="shop-name">{{ $order->shop->name ?? 'Konveksio' }}</h1>
+                        <div class="shop-info">
+                            @if(!empty($order->shop->address))
+                                {{ $order->shop->address }}<br>
+                            @endif
+                            @if(!empty($order->shop->phone))
+                                Telp: {{ $order->shop->phone }}
+                            @endif
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="title-box">
@@ -563,8 +618,17 @@
     <div class="container">
         <div class="header clearfix">
             <div style="float: left;">
-                <h1 class="shop-name">{{ $order->shop->name }}</h1>
-                <div class="shop-info">LAMPIRAN SPESIFIKASI PESANAN</div>
+                <div class="header-brand">
+                    @if($logoBase64)
+                        <div class="header-logo-cell">
+                            <img src="{{ $logoBase64 }}" alt="Logo">
+                        </div>
+                    @endif
+                    <div class="header-text-cell">
+                        <h1 class="shop-name">{{ $order->shop->name ?? 'Konveksio' }}</h1>
+                        <div class="shop-info">LAMPIRAN SPESIFIKASI PESANAN</div>
+                    </div>
+                </div>
             </div>
             <div class="title-box">
                 <div class="info-value" style="color: #7F00FF; font-size: 16px;">
