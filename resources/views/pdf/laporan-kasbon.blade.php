@@ -125,8 +125,9 @@
             left: 10%;
             width: 80%;
             text-align: center;
-            opacity: 0.04;
-            z-index: -1000;
+            opacity: 0.06;
+            z-index: 99999;
+            pointer-events: none;
         }
 
         .watermark img {
@@ -153,12 +154,6 @@
         $logoPath = public_path('images/logo.jpeg');
         $logoBase64 = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : null;
     @endphp
-
-    @if($logoBase64)
-        <div class="watermark">
-            <img src="{{ $logoBase64 }}" alt="Watermark Logo">
-        </div>
-    @endif
 
 <div class="header">
     <table>
@@ -243,5 +238,10 @@
     </tbody>
 </table>
 
+    @if($logoBase64)
+        <div class="watermark">
+            <img src="{{ $logoBase64 }}" alt="Watermark Logo">
+        </div>
+    @endif
 </body>
 </html>
