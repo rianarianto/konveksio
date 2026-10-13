@@ -121,29 +121,30 @@
 
         .watermark {
             position: fixed;
-            top: 25%;
-            left: 20%;
-            width: 60%;
+            top: 28%;
+            left: 10%;
+            width: 80%;
             text-align: center;
-            opacity: 0.08;
+            opacity: 0.04;
             z-index: -1000;
         }
 
         .watermark img {
-            width: 320px;
+            width: 480px;
             height: auto;
         }
 
         .header-logo-cell {
             vertical-align: middle;
             padding-right: 12px;
-            width: 44px;
+            width: 70px;
         }
 
         .header-logo-cell img {
-            width: 42px;
+            width: 68px;
             height: auto;
             border-radius: 4px;
+            display: block;
         }
     </style>
 </head>

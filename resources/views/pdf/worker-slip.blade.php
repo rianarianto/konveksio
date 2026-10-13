@@ -97,24 +97,25 @@
 
         .watermark {
             position: fixed;
-            top: 25%;
-            left: 20%;
-            width: 60%;
+            top: 28%;
+            left: 10%;
+            width: 80%;
             text-align: center;
-            opacity: 0.08;
+            opacity: 0.04;
             z-index: -1000;
         }
 
         .watermark img {
-            width: 320px;
+            width: 480px;
             height: auto;
         }
 
         .header-logo {
-            width: 48px;
+            width: 72px;
             height: auto;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             border-radius: 4px;
+            display: inline-block;
         }
     </style>
 </head>

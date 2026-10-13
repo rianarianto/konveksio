@@ -205,16 +205,16 @@
         }
         .watermark {
             position: fixed;
-            top: 25%;
-            left: 20%;
-            width: 60%;
+            top: 28%;
+            left: 10%;
+            width: 80%;
             text-align: center;
-            opacity: 0.08;
+            opacity: 0.04;
             z-index: -1000;
         }
 
         .watermark img {
-            width: 320px;
+            width: 480px;
             height: auto;
         }
 
@@ -229,9 +229,10 @@
         }
 
         .header-logo-cell img {
-            width: 50px;
+            width: 82px;
             height: auto;
-            border-radius: 6px;
+            border-radius: 5px;
+            display: block;
         }
 
         .header-text-cell {
