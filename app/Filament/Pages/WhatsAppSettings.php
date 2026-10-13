@@ -109,13 +109,49 @@ class WhatsAppSettings extends Page
                 'shop_id' => $this->getShopId(),
             ]);
             if ($response->successful()) {
-                return $response->json();
+                $data = $response->json();
+
+                // Auto-sync nomor HP WhatsApp ke data Toko jika terhubung
+                $connectedPhone = $data['connectedPhone'] ?? null;
+                if (!empty($connectedPhone)) {
+                    $this->syncShopPhone($connectedPhone);
+                }
+
+                return $data;
             }
             Log::warning("[WA Settings] Bot status fetch failed for shop {$this->getShopId()}: HTTP " . $response->status());
         } catch (\Exception $e) {
             Log::warning("[WA Settings] Bot status fetch error for shop {$this->getShopId()}: " . $e->getMessage());
         }
         return null;
+    }
+
+    /**
+     * Sinkronkan nomor WhatsApp bot ke kolom phone pada toko aktif.
+     */
+    protected function syncShopPhone(string $rawPhone): void
+    {
+        try {
+            $digits = preg_replace('/[^0-9]/', '', $rawPhone);
+            if (empty($digits)) return;
+
+            // Format ke 08xxxxxxxxxx jika diawali 62
+            if (str_starts_with($digits, '62')) {
+                $formattedPhone = '0' . substr($digits, 2);
+            } elseif (str_starts_with($digits, '0')) {
+                $formattedPhone = $digits;
+            } else {
+                $formattedPhone = '0' . $digits;
+            }
+
+            $shop = \App\Models\Shop::find($this->getShopId());
+            if ($shop && $shop->phone !== $formattedPhone) {
+                $shop->update(['phone' => $formattedPhone]);
+                Log::info("[WA Settings] Auto-synced Shop #{$shop->id} ({$shop->name}) phone to {$formattedPhone}");
+            }
+        } catch (\Throwable $e) {
+            Log::warning("[WA Settings] Failed to sync shop phone: " . $e->getMessage());
+        }
     }
 
     /**

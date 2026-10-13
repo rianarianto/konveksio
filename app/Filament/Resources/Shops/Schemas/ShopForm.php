@@ -16,7 +16,9 @@ class ShopForm
                 TextInput::make('address')
                     ->required(),
                 TextInput::make('phone')
+                    ->label('No. Telepon / WhatsApp Toko')
                     ->tel()
+                    ->helperText('Otomatis tersinkronisasi saat bot WhatsApp toko ini terhubung, atau bisa diisi manual.')
                     ->required(),
                 TextInput::make('max_capacity_pcs')
                     ->label('Workshop Capacity (Pcs)')
