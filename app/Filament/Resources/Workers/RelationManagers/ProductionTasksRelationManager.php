@@ -304,8 +304,8 @@ class ProductionTasksRelationManager extends RelationManager
                                         ->columnSpanFull(),
 
                                     Textarea::make('reason')
-                                        ->label('Alasan Koreksi (Wajib)')
-                                        ->placeholder('Contoh: Salah atur tarif saat atur tugas produksi...')
+                                        ->label(fn () => auth()->user()->role === 'owner' ? 'Alasan / Catatan Koreksi (Wajib)' : 'Alasan Pengajuan Koreksi (Wajib)')
+                                        ->placeholder(fn () => auth()->user()->role === 'owner' ? 'Contoh: Penyesuaian tarif borongan khusus / koreksi salah input...' : 'Contoh: Salah atur tarif saat atur tugas produksi...')
                                         ->required(fn ($get) => !$get('batal_pengajuan'))
                                         ->columnSpanFull(),
 
