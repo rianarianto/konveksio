@@ -354,4 +354,320 @@ class ReportExportController extends Controller
             'Content-Disposition' => 'inline; filename="' . $filename . '"',
         ]);
     }
+
+    /**
+     * Export Tabel Bayar Gaji & Upah ke CSV
+     */
+    public function exportPayrollsCsv(Request $request)
+    {
+        $shopId = $request->query('shop_id') ?: (Filament::getTenant()?->id ?? auth()->user()->shop_id);
+        $tab = $request->query('tab', 'borongan');
+        $from = $request->query('from');
+        $until = $request->query('until');
+
+        $query = \App\Models\Worker::withoutGlobalScopes()
+            ->where('shop_id', $shopId);
+
+        if ($tab === 'bulanan') {
+            $query->where('wage_type', 'monthly');
+        } else {
+            $query->where('wage_type', 'piece_rate')
+                ->whereHas('productionTasks', function ($q) use ($from, $until) {
+                    $q->where('status', 'done')->where('is_paid', false);
+                    if ($from) {
+                        $q->whereDate('completed_at', '>=', $from);
+                    }
+                    if ($until) {
+                        $q->whereDate('completed_at', '<=', $until);
+                    }
+                });
+        }
+
+        $workers = $query->with(['productionTasks' => function ($q) use ($from, $until) {
+            $q->where('status', 'done')->where('is_paid', false)->with('orderItem');
+            if ($from) {
+                $q->whereDate('completed_at', '>=', $from);
+            }
+            if ($until) {
+                $q->whereDate('completed_at', '<=', $until);
+            }
+        }])->orderBy('name')->get();
+
+        $filename = ($tab === 'bulanan' ? 'Laporan-Gaji-Bulanan-' : 'Laporan-Upah-Borongan-') . date('Ymd-His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($workers, $tab) {
+            $file = fopen('php://output', 'w');
+            fputs($file, "\xEF\xBB\xBF");
+
+            if ($tab === 'bulanan') {
+                fputcsv($file, [
+                    'No',
+                    'Nama Karyawan',
+                    'No HP',
+                    'Gaji Pokok Kotor (Rp)',
+                    'Sisa Kasbon (Rp)',
+                    'Gaji Bersih Diterima (Rp)',
+                ]);
+
+                $no = 1;
+                $totalKotor = 0;
+                $totalKasbon = 0;
+                $totalBersih = 0;
+
+                foreach ($workers as $w) {
+                    $kotor = (int) $w->base_salary;
+                    $kasbon = (int) $w->current_cash_advance;
+                    $bersih = max(0, $kotor - $kasbon);
+
+                    $totalKotor += $kotor;
+                    $totalKasbon += $kasbon;
+                    $totalBersih += $bersih;
+
+                    fputcsv($file, [
+                        $no++,
+                        $w->name,
+                        $w->phone ?: '-',
+                        $kotor,
+                        $kasbon,
+                        $bersih,
+                    ]);
+                }
+
+                fputcsv($file, []);
+                fputcsv($file, ['TOTAL', '', '', $totalKotor, $totalKasbon, $totalBersih]);
+            } else {
+                fputcsv($file, [
+                    'No',
+                    'Nama Tukang / Pekerja',
+                    'Periode Tugas',
+                    'Jml Pesanan',
+                    'Jml Item',
+                    'Total Pcs',
+                    'Total Upah Kotor (Rp)',
+                    'Sisa Kasbon (Rp)',
+                    'Upah Bersih Diterima (Rp)',
+                ]);
+
+                $no = 1;
+                $totalPcs = 0;
+                $totalKotor = 0;
+                $totalKasbon = 0;
+                $totalBersih = 0;
+
+                foreach ($workers as $w) {
+                    $tasks = $w->productionTasks;
+                    $minDate = $tasks->min('completed_at');
+                    $maxDate = $tasks->max('completed_at');
+                    $period = '-';
+                    if ($minDate && $maxDate) {
+                        $f = Carbon::parse($minDate)->format('d/m/Y');
+                        $t = Carbon::parse($maxDate)->format('d/m/Y');
+                        $period = $f === $t ? $f : "{$f} - {$t}";
+                    }
+
+                    $pesananCount = $tasks->pluck('orderItem.order_id')->filter()->unique()->count();
+                    $itemsCount = $tasks->pluck('order_item_id')->filter()->unique()->count();
+                    $pcs = (int) $tasks->sum('quantity');
+                    $kotor = (int) $tasks->sum('wage_amount');
+                    $kasbon = (int) $w->current_cash_advance;
+                    $bersih = max(0, $kotor - $kasbon);
+
+                    $totalPcs += $pcs;
+                    $totalKotor += $kotor;
+                    $totalKasbon += $kasbon;
+                    $totalBersih += $bersih;
+
+                    fputcsv($file, [
+                        $no++,
+                        $w->name,
+                        $period,
+                        $pesananCount,
+                        $itemsCount,
+                        $pcs,
+                        $kotor,
+                        $kasbon,
+                        $bersih,
+                    ]);
+                }
+
+                fputcsv($file, []);
+                fputcsv($file, ['TOTAL', '', '', '', '', $totalPcs, $totalKotor, $totalKasbon, $totalBersih]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Download PDF Tabel Bayar Gaji & Upah
+     */
+    public function downloadPdfPayrolls(Request $request)
+    {
+        $shopId = $request->query('shop_id') ?: (Filament::getTenant()?->id ?? auth()->user()->shop_id);
+        $shop = Shop::find($shopId);
+        $tab = $request->query('tab', 'borongan');
+        $from = $request->query('from');
+        $until = $request->query('until');
+
+        $query = \App\Models\Worker::withoutGlobalScopes()
+            ->where('shop_id', $shopId);
+
+        if ($tab === 'bulanan') {
+            $query->where('wage_type', 'monthly');
+        } else {
+            $query->where('wage_type', 'piece_rate')
+                ->whereHas('productionTasks', function ($q) use ($from, $until) {
+                    $q->where('status', 'done')->where('is_paid', false);
+                    if ($from) {
+                        $q->whereDate('completed_at', '>=', $from);
+                    }
+                    if ($until) {
+                        $q->whereDate('completed_at', '<=', $until);
+                    }
+                });
+        }
+
+        $workers = $query->with(['productionTasks' => function ($q) use ($from, $until) {
+            $q->where('status', 'done')->where('is_paid', false)->with('orderItem');
+            if ($from) {
+                $q->whereDate('completed_at', '>=', $from);
+            }
+            if ($until) {
+                $q->whereDate('completed_at', '<=', $until);
+            }
+        }])->orderBy('name')->get();
+
+        $pdf = app('dompdf.wrapper')->loadView('pdf.laporan-payrolls', [
+            'shop' => $shop,
+            'tab' => $tab,
+            'from' => $from,
+            'until' => $until,
+            'workers' => $workers,
+        ]);
+
+        $filename = ($tab === 'bulanan' ? 'Laporan-Gaji-Bulanan-' : 'Laporan-Upah-Borongan-') . date('Ymd-His') . '.pdf';
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+        $pdf->save($tempPath);
+        return response()->file($tempPath, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
+    }
+
+    /**
+     * Export Detail Rincian Karyawan (Profil + Ringkasan Upah + Riwayat Tugas + Riwayat Kasbon)
+     */
+    public function exportWorkerDetail(Request $request)
+    {
+        $workerId = $request->query('worker_id');
+        $type = $request->query('type', 'pdf'); // pdf or csv
+
+        $worker = \App\Models\Worker::withoutGlobalScopes()
+            ->with([
+                'shop',
+                'productionTasks.orderItem.order',
+                'cashAdvances' => fn($q) => $q->orderBy('date', 'desc'),
+                'payrolls' => fn($q) => $q->orderBy('created_at', 'desc'),
+            ])
+            ->findOrFail($workerId);
+
+        if ($type === 'csv') {
+            $filename = 'Rincian-Karyawan-' . \Illuminate\Support\Str::slug($worker->name) . '-' . date('Ymd-His') . '.csv';
+
+            $headers = [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => "attachment; filename=\"$filename\"",
+                'Pragma' => 'no-cache',
+                'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+                'Expires' => '0',
+            ];
+
+            $callback = function () use ($worker) {
+                $file = fopen('php://output', 'w');
+                fputs($file, "\xEF\xBB\xBF");
+
+                // Info Karyawan
+                fputcsv($file, ['PROFIL KARYAWAN']);
+                fputcsv($file, ['Nama', $worker->name]);
+                fputcsv($file, ['No HP', $worker->phone ?: '-']);
+                fputcsv($file, ['Tipe Upah', $worker->wage_type === 'monthly' ? 'Gaji Bulanan' : 'Upah Borongan']);
+                fputcsv($file, ['Status', $worker->is_active ? 'Aktif' : 'Nonaktif']);
+                fputcsv($file, ['Sisa Kasbon Saat Ini', $worker->current_cash_advance]);
+                fputcsv($file, ['Limit Kasbon', $worker->max_cash_advance]);
+                fputcsv($file, []);
+
+                // Ringkasan Upah
+                fputcsv($file, ['RINGKASAN UPAH']);
+                fputcsv($file, ['Upah Belum Dibayar (Unpaid)', $worker->unpaid_wage]);
+                fputcsv($file, ['Upah Bulan Ini', $worker->monthly_earned]);
+                fputcsv($file, ['Total Upah Keseluruhan', $worker->total_earned]);
+                fputcsv($file, []);
+
+                // Riwayat Pekerjaan
+                fputcsv($file, ['RIWAYAT PEKERJAAN & UPAH']);
+                fputcsv($file, ['No', 'No Pesanan', 'Produk', 'Tahap', 'Qty', 'Upah (Rp)', 'Status Kerja', 'Status Pembayaran', 'Tanggal Selesai']);
+                $no = 1;
+                foreach ($worker->productionTasks as $task) {
+                    fputcsv($file, [
+                        $no++,
+                        $task->orderItem?->order?->order_number ?? '-',
+                        $task->orderItem?->product_name ?? '-',
+                        $task->stage_name,
+                        $task->quantity,
+                        $task->wage_amount,
+                        $task->status,
+                        $task->is_paid ? 'Lunas' : 'Belum Dibayar',
+                        $task->completed_at ? Carbon::parse($task->completed_at)->format('d/m/Y H:i') : '-',
+                    ]);
+                }
+                fputcsv($file, []);
+
+                // Riwayat Kasbon
+                fputcsv($file, ['RIWAYAT KASBON & PELUNASAN']);
+                fputcsv($file, ['No', 'Tanggal', 'Jenis', 'Nominal (Rp)', 'Status', 'Catatan']);
+                $noK = 1;
+                foreach ($worker->cashAdvances as $kasbon) {
+                    fputcsv($file, [
+                        $noK++,
+                        Carbon::parse($kasbon->date)->format('d/m/Y'),
+                        $kasbon->type === 'loan' ? 'Pinjaman (Kasbon)' : 'Pelunasan',
+                        $kasbon->amount,
+                        $kasbon->status,
+                        $kasbon->note ?: '-',
+                    ]);
+                }
+
+                fclose($file);
+            };
+
+            return response()->stream($callback, 200, $headers);
+        }
+
+        // PDF Generation
+        $pdf = app('dompdf.wrapper')->loadView('pdf.worker-detail-report', [
+            'worker' => $worker,
+            'shop' => $worker->shop,
+        ]);
+
+        $filename = 'Rincian-Karyawan-' . \Illuminate\Support\Str::slug($worker->name) . '-' . date('Ymd-His') . '.pdf';
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'pdf_');
+        $pdf->save($tempPath);
+        return response()->file($tempPath, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
+    }
 }
+

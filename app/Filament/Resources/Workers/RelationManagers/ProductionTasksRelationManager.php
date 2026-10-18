@@ -132,6 +132,12 @@ class ProductionTasksRelationManager extends RelationManager
                         default => $state,
                     }),
 
+                TextColumn::make('is_paid')
+                    ->label('Upah Dibayar')
+                    ->badge()
+                    ->color(fn (bool $state): string => $state ? 'success' : 'danger')
+                    ->formatStateUsing(fn (bool $state): string => $state ? 'Lunas' : 'Belum Dibayar'),
+
                 TextColumn::make('completed_at')
                     ->label('Selesai')
                     ->dateTime('d M Y, H:i')
@@ -582,5 +588,29 @@ class ProductionTasksRelationManager extends RelationManager
             ])
             ->bulkActions([])
             ->defaultSort('created_at', 'desc');
+    }
+
+    public function getDefaultActiveTab(): string | int | null
+    {
+        return 'unpaid';
+    }
+
+    public function getTabs(): array
+    {
+        return [
+            'unpaid' => \Filament\Schemas\Components\Tabs\Tab::make('Belum Dibayar')
+                ->badge(fn () => $this->getOwnerRecord()->productionTasks()->where('status', 'done')->where('is_paid', false)->count())
+                ->badgeColor('danger')
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('status', 'done')->where('is_paid', false)),
+
+            'paid' => \Filament\Schemas\Components\Tabs\Tab::make('Sudah Dibayar')
+                ->badge(fn () => $this->getOwnerRecord()->productionTasks()->where('is_paid', true)->count())
+                ->badgeColor('success')
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('is_paid', true)),
+
+            'all' => \Filament\Schemas\Components\Tabs\Tab::make('Semua Pekerjaan')
+                ->badge(fn () => $this->getOwnerRecord()->productionTasks()->count())
+                ->modifyQueryUsing(fn (Builder $query) => $query),
+        ];
     }
 }

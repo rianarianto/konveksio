@@ -76,82 +76,92 @@ class WorkerPayrollResource extends Resource
             ->sortable()
             ->weight('bold'),
 
+            TextColumn::make('task_period')
+                ->label('Periode Tugas')
+                ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
+                ->state(function (Worker $record, $livewire): string {
+                    $tasks = static::getFilteredTasks($record, $livewire);
+                    if ($tasks->isEmpty()) {
+                        return '-';
+                    }
+                    $minDate = $tasks->min('completed_at');
+                    $maxDate = $tasks->max('completed_at');
+                    if (!$minDate || !$maxDate) {
+                        return '-';
+                    }
+                    $from = \Illuminate\Support\Carbon::parse($minDate)->format('d/m/Y');
+                    $to = \Illuminate\Support\Carbon::parse($maxDate)->format('d/m/Y');
+                    return $from === $to ? $from : "{$from} - {$to}";
+                })
+                ->badge()
+                ->color('gray'),
+
             TextColumn::make('pesanan_count')
-            ->label('Jml Pesanan')
-            ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
-            ->state(function (Worker $record): int {
-            return $record->productionTasks
-                ->where('status', 'done')
-                ->where('is_paid', false)
-                ->pluck('orderItem.order_id')
-                ->unique()
-                ->count();
-        }),
+                ->label('Jml Pesanan')
+                ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
+                ->state(function (Worker $record, $livewire): int {
+                    return static::getFilteredTasks($record, $livewire)
+                        ->pluck('orderItem.order_id')
+                        ->filter()
+                        ->unique()
+                        ->count();
+                }),
 
             TextColumn::make('items_count')
-            ->label('Jml Item')
-            ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
-            ->state(function (Worker $record): int {
-            return $record->productionTasks
-                ->where('status', 'done')
-                ->where('is_paid', false)
-                ->pluck('order_item_id')
-                ->unique()
-                ->count();
-        }),
+                ->label('Jml Item')
+                ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
+                ->state(function (Worker $record, $livewire): int {
+                    return static::getFilteredTasks($record, $livewire)
+                        ->pluck('order_item_id')
+                        ->filter()
+                        ->unique()
+                        ->count();
+                }),
 
             TextColumn::make('total_pcs')
-            ->label('Total Pcs')
-            ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
-            ->state(function (Worker $record): int {
-            return (int)$record->productionTasks
-                ->where('status', 'done')
-                ->where('is_paid', false)
-                ->sum('quantity');
-        })
-            ->badge()
-            ->color('info'),
+                ->label('Total Pcs')
+                ->visible(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'borongan')
+                ->state(function (Worker $record, $livewire): int {
+                    return (int) static::getFilteredTasks($record, $livewire)->sum('quantity');
+                })
+                ->badge()
+                ->color('info'),
 
             TextColumn::make('total_wage')
-            ->label('Total Nominal')
-            ->state(function (Worker $record, $livewire): int {
-                if (($livewire->activeTab ?? 'borongan') === 'bulanan') {
-                    return (int) $record->base_salary;
-                }
-                return (int) $record->productionTasks
-                    ->where('status', 'done')
-                    ->where('is_paid', false)
-                    ->sum('wage_amount');
-            })
-            ->money('IDR')
-            ->weight('bold')
-            ->color('success'),
+                ->label('Total Nominal')
+                ->state(function (Worker $record, $livewire): int {
+                    if (($livewire->activeTab ?? 'borongan') === 'bulanan') {
+                        return (int) $record->base_salary;
+                    }
+                    return (int) static::getFilteredTasks($record, $livewire)->sum('wage_amount');
+                })
+                ->money('IDR')
+                ->weight('bold')
+                ->color('success'),
 
             TextColumn::make('current_cash_advance')
-            ->label('Sisa Kasbon (-) ')
-            ->money('IDR')
-            ->color(fn($state): string => $state > 0 ? 'danger' : 'gray'),
+                ->label('Sisa Kasbon (-) ')
+                ->money('IDR')
+                ->color(fn($state): string => $state > 0 ? 'danger' : 'gray'),
 
             TextColumn::make('net_wage')
-            ->label('Upah Bersih')
-            ->state(function (Worker $record, $livewire): int {
-                $totalWage = 0;
-                if (($livewire->activeTab ?? 'borongan') === 'bulanan') {
-                    $totalWage = (int) $record->base_salary;
-                } else {
-                    $totalWage = (int) $record->productionTasks
-                        ->where('status', 'done')
-                        ->where('is_paid', false)
-                        ->sum('wage_amount');
-                }
-                return max(0, $totalWage - $record->current_cash_advance);
-            })
-            ->money('IDR')
-            ->weight('bold')
-            ->color('primary'),
+                ->label('Upah Bersih')
+                ->state(function (Worker $record, $livewire): int {
+                    $totalWage = 0;
+                    if (($livewire->activeTab ?? 'borongan') === 'bulanan') {
+                        $totalWage = (int) $record->base_salary;
+                    } else {
+                        $totalWage = (int) static::getFilteredTasks($record, $livewire)->sum('wage_amount');
+                    }
+                    return max(0, $totalWage - $record->current_cash_advance);
+                })
+                ->money('IDR')
+                ->weight('bold')
+                ->color('primary'),
         ])
             ->actions([
-            Action::make('pay_all')
+                ActionGroup::make([
+                    Action::make('pay_all')
             ->label(fn($livewire) => ($livewire->activeTab ?? 'borongan') === 'bulanan' ? 'Bayar Gaji' : 'Bayar Upah')
             ->icon('heroicon-o-banknotes')
             ->color('success')
@@ -361,9 +371,64 @@ class WorkerPayrollResource extends Resource
             ->label('Rincian')
             ->icon('heroicon-o-eye')
             ->url(fn(Worker $record) => \App\Filament\Resources\Workers\WorkerResource::getUrl('view', ['record' => $record])),
+                ]),
         ])
+            ->filters([
+                \Filament\Tables\Filters\Filter::make('completed_at')
+                    ->form([
+                        \Filament\Forms\Components\DatePicker::make('completed_from')
+                            ->label('Tugas Selesai Dari')
+                            ->native(false),
+                        \Filament\Forms\Components\DatePicker::make('completed_until')
+                            ->label('Tugas Selesai Sampai')
+                            ->native(false),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['completed_from'],
+                                fn (Builder $q, $date) => $q->whereHas('productionTasks', fn ($tq) => $tq->where('status', 'done')->where('is_paid', false)->whereDate('completed_at', '>=', $date))
+                            )
+                            ->when(
+                                $data['completed_until'],
+                                fn (Builder $q, $date) => $q->whereHas('productionTasks', fn ($tq) => $tq->where('status', 'done')->where('is_paid', false)->whereDate('completed_at', '<=', $date))
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if ($data['completed_from'] ?? null) {
+                            $indicators['completed_from'] = 'Selesai dari: ' . \Illuminate\Support\Carbon::parse($data['completed_from'])->format('d/m/Y');
+                        }
+                        if ($data['completed_until'] ?? null) {
+                            $indicators['completed_until'] = 'Selesai sampai: ' . \Illuminate\Support\Carbon::parse($data['completed_until'])->format('d/m/Y');
+                        }
+                        return $indicators;
+                    }),
+            ])
             ->bulkActions([])
             ->defaultSort('name');
+    }
+
+    public static function getFilteredTasks(Worker $record, $livewire = null): \Illuminate\Support\Collection
+    {
+        $tasks = $record->productionTasks
+            ->where('status', 'done')
+            ->where('is_paid', false);
+
+        if ($livewire && isset($livewire->tableFilters['completed_at'])) {
+            $filter = $livewire->tableFilters['completed_at'];
+            $from = $filter['completed_from'] ?? null;
+            $until = $filter['completed_until'] ?? null;
+
+            if ($from) {
+                $tasks = $tasks->filter(fn ($t) => $t->completed_at && \Illuminate\Support\Carbon::parse($t->completed_at)->toDateString() >= $from);
+            }
+            if ($until) {
+                $tasks = $tasks->filter(fn ($t) => $t->completed_at && \Illuminate\Support\Carbon::parse($t->completed_at)->toDateString() <= $until);
+            }
+        }
+
+        return $tasks;
     }
 
     public static function canAccess(): bool
