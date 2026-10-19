@@ -200,12 +200,25 @@ class AdminPanelProvider extends PanelProvider
                             z-index: 10000 !important;
                         }
                         
-                        /* Ensure table action dropdowns don\'t cover modals */
+                        /* Ensure table filter dropdowns & action dropdowns never get clipped or covered */
                         .fi-dropdown-panel {
-                            z-index: 40 !important; 
+                            z-index: 25 !important; 
+                        }
+                        .fi-ta-filters-dropdown .fi-dropdown-panel {
+                            z-index: 28 !important;
+                            max-height: calc(100vh - 80px) !important;
+                            overflow-y: auto !important;
+                        }
+                        .fi-topbar-ctn {
+                            z-index: 30 !important;
                         }
 
-                        /* Global Sticky Actions Column on the Right for Tables */
+                        /* Ensure RelationManager / Table Cards do not clip dropdown popups */
+                        .fi-ta-ctn,
+                        .fi-ta-header-ctn,
+                        .fi-ta-header-toolbar {
+                            overflow: visible !important;
+                        }
                         .fi-ta-table th.fi-ta-actions-header-cell,
                         .fi-ta-table th.fi-table-header-cell-actions,
                         .fi-ta-table th.fi-ta-header-cell-actions,
@@ -308,7 +321,6 @@ class AdminPanelProvider extends PanelProvider
 
                         /* Global Table Horizontal Scrollbar Fix for Filament */
                         .fi-ta-content-ctn,
-                        .fi-ta-ctn,
                         .orders-main-table-container {
                             overflow-x: auto !important;
                             overflow-y: visible !important;
