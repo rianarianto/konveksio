@@ -98,13 +98,59 @@
         .clear {
             clear: both;
         }
+
+        .watermark {
+            position: fixed;
+            top: 28%;
+            left: 10%;
+            width: 80%;
+            text-align: center;
+            opacity: 0.05;
+            z-index: 99999;
+            pointer-events: none;
+        }
+
+        .watermark img {
+            width: 480px;
+            height: auto;
+        }
+
+        .header-logo-cell {
+            vertical-align: middle;
+            padding-right: 12px;
+            width: 70px;
+        }
+
+        .header-logo-cell img {
+            width: 65px;
+            height: auto;
+            border-radius: 4px;
+            display: block;
+        }
     </style>
 </head>
 <body>
+    @php
+        $logoPath = public_path('images/logo.jpeg');
+        $logoBase64 = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : null;
+    @endphp
+
+    @if($logoBase64)
+        <div class="watermark">
+            <img src="{{ $logoBase64 }}" alt="Watermark">
+        </div>
+    @endif
+
     <div class="header">
         <table>
             <tr>
+                @if($logoBase64)
+                    <td class="header-logo-cell">
+                        <img src="{{ $logoBase64 }}" alt="Logo">
+                    </td>
+                @endif
                 <td>
+                    <div class="shop-name">{{ $shop->name ?? 'KONVEKSI' }}</div>
                     <div class="title">{{ $tab === 'bulanan' ? 'Laporan Gaji Bulanan Karyawan' : 'Laporan Upah Borongan Tukang' }}</div>
                     <div class="period-info">
                         @if($from || $until)
@@ -112,15 +158,14 @@
                         @else
                             Semua Pekerjaan Selesai yang Belum Dibayar
                         @endif
-                        • Dicetak: {{ now()->translatedFormat('d F Y H:i') }}
                     </div>
                 </td>
-                <td style="text-align: right;">
-                    <div class="shop-name">{{ $shop->name ?? 'KONVEKSI' }}</div>
+                <td style="text-align: right; vertical-align: top;">
                     <div class="period-info">{{ $shop->address ?? '' }}</div>
                     @if(!empty($shop->phone))
                         <div class="period-info">Telp/WA: {{ $shop->phone }}</div>
                     @endif
+                    <div style="font-size: 10px; color: #9ca3af; margin-top: 4px;">Dicetak: {{ now()->translatedFormat('d F Y H:i') }}</div>
                 </td>
             </tr>
         </table>

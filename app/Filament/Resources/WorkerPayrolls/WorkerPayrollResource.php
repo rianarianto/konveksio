@@ -406,7 +406,8 @@ class WorkerPayrollResource extends Resource
                     }),
             ])
             ->bulkActions([])
-            ->defaultSort('name');
+            ->defaultSort('name')
+            ->stickyActions();
     }
 
     public static function getFilteredTasks(Worker $record, $livewire = null): \Illuminate\Support\Collection

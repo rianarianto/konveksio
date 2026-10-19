@@ -145,6 +145,26 @@ class ProductionTasksRelationManager extends RelationManager
                     ->toggleable(),
             ])
             ->filters([
+                SelectFilter::make('is_paid')
+                    ->label('Status Upah')
+                    ->options([
+                        '0' => 'Belum Dibayar',
+                        '1' => 'Sudah Dibayar',
+                    ])
+                    ->default('0')
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (!isset($data['value']) || $data['value'] === null || $data['value'] === '') {
+                            return $query;
+                        }
+                        if ($data['value'] === '0') {
+                            return $query->where('is_paid', false);
+                        }
+                        if ($data['value'] === '1') {
+                            return $query->where('is_paid', true);
+                        }
+                        return $query;
+                    }),
+
                 SelectFilter::make('status')
                     ->options([
                         'pending' => '⏳ Antrian',
@@ -587,30 +607,7 @@ class ProductionTasksRelationManager extends RelationManager
                     }),
             ])
             ->bulkActions([])
-            ->defaultSort('created_at', 'desc');
-    }
-
-    public function getDefaultActiveTab(): string | int | null
-    {
-        return 'unpaid';
-    }
-
-    public function getTabs(): array
-    {
-        return [
-            'unpaid' => \Filament\Schemas\Components\Tabs\Tab::make('Belum Dibayar')
-                ->badge(fn () => $this->getOwnerRecord()->productionTasks()->where('status', 'done')->where('is_paid', false)->count())
-                ->badgeColor('danger')
-                ->modifyQueryUsing(fn (Builder $query) => $query->where('status', 'done')->where('is_paid', false)),
-
-            'paid' => \Filament\Schemas\Components\Tabs\Tab::make('Sudah Dibayar')
-                ->badge(fn () => $this->getOwnerRecord()->productionTasks()->where('is_paid', true)->count())
-                ->badgeColor('success')
-                ->modifyQueryUsing(fn (Builder $query) => $query->where('is_paid', true)),
-
-            'all' => \Filament\Schemas\Components\Tabs\Tab::make('Semua Pekerjaan')
-                ->badge(fn () => $this->getOwnerRecord()->productionTasks()->count())
-                ->modifyQueryUsing(fn (Builder $query) => $query),
-        ];
+            ->defaultSort('created_at', 'desc')
+            ->stickyActions();
     }
 }

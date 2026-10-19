@@ -120,46 +120,144 @@
         .clear {
             clear: both;
         }
+
+        .watermark {
+            position: fixed;
+            top: 28%;
+            left: 10%;
+            width: 80%;
+            text-align: center;
+            opacity: 0.05;
+            z-index: 99999;
+            pointer-events: none;
+        }
+
+        .watermark img {
+            width: 480px;
+            height: auto;
+        }
+
+        .header-logo-cell {
+            vertical-align: middle;
+            padding-right: 12px;
+            width: 70px;
+        }
+
+        .header-logo-cell img {
+            width: 65px;
+            height: auto;
+            border-radius: 4px;
+            display: block;
+        }
+
+        .stat-card-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 6px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 8px 10px;
+            vertical-align: top;
+            width: 25%;
+        }
+
+        .stat-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            color: #6b7280;
+            font-weight: 600;
+            margin-bottom: 4px;
+            letter-spacing: 0.3px;
+        }
+
+        .stat-value {
+            font-size: 13px;
+            font-weight: bold;
+            color: #111827;
+        }
     </style>
 </head>
 <body>
+    @php
+        $logoPath = public_path('images/logo.jpeg');
+        $logoBase64 = file_exists($logoPath) ? 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath)) : null;
+    @endphp
+
+    @if($logoBase64)
+        <div class="watermark">
+            <img src="{{ $logoBase64 }}" alt="Watermark">
+        </div>
+    @endif
+
     <div class="header">
         <table>
             <tr>
+                @if($logoBase64)
+                    <td class="header-logo-cell">
+                        <img src="{{ $logoBase64 }}" alt="Logo">
+                    </td>
+                @endif
                 <td>
+                    <div class="shop-name">{{ $shop->name ?? 'KONVEKSI' }}</div>
                     <div class="title">Rincian Riwayat Karyawan & Upah</div>
                     <div class="period-info">
                         Nama: <strong>{{ $worker->name }}</strong> • {{ $worker->phone ?: 'No HP: -' }} • Status: {{ $worker->is_active ? 'Aktif' : 'Nonaktif' }}
                     </div>
-                    <div class="period-info">
-                        Dicetak pada: {{ now()->translatedFormat('d F Y H:i') }}
-                    </div>
                 </td>
-                <td style="text-align: right;">
-                    <div class="shop-name">{{ $shop->name ?? 'KONVEKSI' }}</div>
+                <td style="text-align: right; vertical-align: top;">
                     <div class="period-info">{{ $shop->address ?? '' }}</div>
+                    <div style="font-size: 10px; color: #9ca3af; margin-top: 4px;">Dicetak: {{ now()->translatedFormat('d F Y H:i') }}</div>
                 </td>
             </tr>
         </table>
     </div>
 
-    <!-- 1. Ringkasan Upah & Kasbon -->
-    <div class="summary-box">
-        <table class="summary-table">
-            <tr>
-                <td><strong>Sistem Upah:</strong> {{ $worker->wage_type === 'monthly' ? 'Gaji Bulanan' : 'Upah Borongan' }}</td>
-                <td><strong>Upah Belum Dibayar:</strong> <span style="color:#ef4444; font-weight:bold;">Rp {{ number_format($worker->unpaid_wage, 0, ',', '.') }}</span></td>
-                <td><strong>Upah Bulan Ini:</strong> <span style="color:#16a34a; font-weight:bold;">Rp {{ number_format($worker->monthly_earned, 0, ',', '.') }}</span></td>
-                <td class="summary-val" style="color:#8000FF;"><strong>Total Upah All-Time:</strong> Rp {{ number_format($worker->total_earned, 0, ',', '.') }}</td>
-            </tr>
-            <tr style="border-top: 1px dashed #e5e7eb;">
-                <td><strong>Sisa Kasbon Saat Ini:</strong> <span style="color:{{ $worker->current_cash_advance > 0 ? '#ef4444' : '#6b7280' }}; font-weight:bold;">Rp {{ number_format($worker->current_cash_advance, 0, ',', '.') }}</span></td>
-                <td><strong>Limit Maksimal Kasbon:</strong> Rp {{ number_format($worker->max_cash_advance, 0, ',', '.') }}</td>
-                <td><strong>Pekerjaan Selesai:</strong> {{ number_format($worker->done_count, 0, ',', '.') }} pcs</td>
-                <td class="summary-val"><strong>Antrian & Dikerjakan:</strong> {{ number_format($worker->pending_count + $worker->in_progress_count, 0, ',', '.') }} pcs</td>
-            </tr>
-        </table>
-    </div>
+    <!-- 1. Ringkasan Upah & Kasbon (Tampilan Baris Baru / Card Vertikal) -->
+    <table class="stat-card-table">
+        <tr>
+            <td class="stat-card">
+                <div class="stat-label">Sistem Upah</div>
+                <div class="stat-value" style="color: #4b5563;">{{ $worker->wage_type === 'monthly' ? 'Gaji Bulanan' : 'Upah Borongan' }}</div>
+            </td>
+            <td class="stat-card">
+                <div class="stat-label">Upah Belum Dibayar</div>
+                <div class="stat-value" style="color: #ef4444;">Rp {{ number_format($worker->unpaid_wage, 0, ',', '.') }}</div>
+            </td>
+            <td class="stat-card">
+                <div class="stat-label">Upah Bulan Ini</div>
+                <div class="stat-value" style="color: #16a34a;">Rp {{ number_format($worker->monthly_earned, 0, ',', '.') }}</div>
+            </td>
+            <td class="stat-card">
+                <div class="stat-label">Total Upah All-Time</div>
+                <div class="stat-value" style="color: #8000FF;">Rp {{ number_format($worker->total_earned, 0, ',', '.') }}</div>
+            </td>
+        </tr>
+        <tr>
+            <td class="stat-card">
+                <div class="stat-label">Sisa Kasbon Saat Ini</div>
+                <div class="stat-value" style="color: {{ $worker->current_cash_advance > 0 ? '#ef4444' : '#6b7280' }};">
+                    Rp {{ number_format($worker->current_cash_advance, 0, ',', '.') }}
+                </div>
+            </td>
+            <td class="stat-card">
+                <div class="stat-label">Limit Maksimal Kasbon</div>
+                <div class="stat-value" style="color: #4b5563;">Rp {{ number_format($worker->max_cash_advance, 0, ',', '.') }}</div>
+            </td>
+            <td class="stat-card">
+                <div class="stat-label">Pekerjaan Selesai</div>
+                <div class="stat-value" style="color: #2563eb;">{{ number_format($worker->done_count, 0, ',', '.') }} pcs</div>
+            </td>
+            <td class="stat-card">
+                <div class="stat-label">Antrian & Dikerjakan</div>
+                <div class="stat-value" style="color: #d97706;">{{ number_format($worker->pending_count + $worker->in_progress_count, 0, ',', '.') }} pcs</div>
+            </td>
+        </tr>
+    </table>
 
     <!-- 2. Riwayat Pekerjaan & Upah -->
     <div class="section-title">Riwayat Pekerjaan & Upah Produksi (Total: {{ $worker->productionTasks->count() }})</div>
