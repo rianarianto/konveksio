@@ -607,7 +607,6 @@ class ProductionTasksRelationManager extends RelationManager
                     }),
             ])
             ->bulkActions([])
-            ->defaultSort('created_at', 'desc')
-            ->stickyActions();
+            ->defaultSort('created_at', 'desc');
     }
 }
