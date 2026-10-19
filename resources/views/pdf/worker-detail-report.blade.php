@@ -170,7 +170,7 @@
             font-size: 9px;
             text-transform: uppercase;
             color: #6b7280;
-            font-weight: 600;
+            font-weight: bold;
             margin-bottom: 4px;
             letter-spacing: 0.3px;
         }
@@ -282,7 +282,7 @@
                     <td><strong>{{ $task->orderItem?->order?->order_number ?? '-' }}</strong></td>
                     <td>{{ $task->orderItem?->product_name ?? '-' }}</td>
                     <td>{{ $task->stage_name }}</td>
-                    <td class="text-center" style="font-weight: 600; color: #2563eb;">{{ $task->quantity }} pcs</td>
+                    <td class="text-center" style="font-weight: bold; color: #2563eb;">{{ $task->quantity }} pcs</td>
                     <td class="text-right" style="font-weight: bold; color: #16a34a;">{{ number_format($task->wage_amount, 0, ',', '.') }}</td>
                     <td class="text-center">
                         @if($task->status === 'done')

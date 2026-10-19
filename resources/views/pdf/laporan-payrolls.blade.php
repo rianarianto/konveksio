@@ -52,7 +52,7 @@
             font-size: 9px;
             text-transform: uppercase;
             color: #6b7280;
-            font-weight: 600;
+            font-weight: bold;
             margin-bottom: 4px;
             letter-spacing: 0.3px;
         }
@@ -330,7 +330,7 @@
                         <td class="text-center" style="font-size: 9px; color: #4b5563;">{{ $period }}</td>
                         <td class="text-center">{{ $pesananCount }}</td>
                         <td class="text-center">{{ $itemsCount }}</td>
-                        <td class="text-center" style="font-weight: 600; color: #2563eb;">{{ number_format($pcs, 0, ',', '.') }}</td>
+                        <td class="text-center" style="font-weight: bold; color: #2563eb;">{{ number_format($pcs, 0, ',', '.') }}</td>
                         <td class="text-right">{{ number_format($kotor, 0, ',', '.') }}</td>
                         <td class="text-right" style="color: {{ $kasbon > 0 ? '#ef4444' : '#6b7280' }};">
                             {{ number_format($kasbon, 0, ',', '.') }}
