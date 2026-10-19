@@ -5,7 +5,7 @@
     <title>Rincian Karyawan - {{ $worker->name }}</title>
     <style>
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'Helvetica', 'Arial', sans-serif;
             font-size: 11px;
             color: #333;
             line-height: 1.4;

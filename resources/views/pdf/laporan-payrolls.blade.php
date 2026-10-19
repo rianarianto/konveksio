@@ -5,7 +5,7 @@
     <title>{{ $tab === 'bulanan' ? 'Laporan Gaji Bulanan' : 'Laporan Upah Borongan' }}</title>
     <style>
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'Helvetica', 'Arial', sans-serif;
             font-size: 11px;
             color: #333;
             line-height: 1.4;
@@ -35,26 +35,31 @@
             color: #6b7280;
             margin-top: 3px;
         }
-        .summary-box {
+        .stat-card-table {
             width: 100%;
-            margin-bottom: 20px;
+            border-collapse: separate;
+            border-spacing: 6px;
+            margin-bottom: 15px;
+        }
+        .stat-card {
             background: #f9fafb;
             border: 1px solid #e5e7eb;
             border-radius: 6px;
-            padding: 10px;
+            padding: 8px 10px;
+            vertical-align: top;
         }
-        .summary-table {
-            width: 100%;
-            border-collapse: collapse;
+        .stat-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            color: #6b7280;
+            font-weight: 600;
+            margin-bottom: 4px;
+            letter-spacing: 0.3px;
         }
-        .summary-table td {
-            padding: 5px 8px;
-            font-size: 11px;
-        }
-        .summary-val {
+        .stat-value {
+            font-size: 13px;
             font-weight: bold;
-            font-size: 12px;
-            text-align: right;
+            color: #111827;
         }
         table.data-table {
             width: 100%;
@@ -180,16 +185,26 @@
                 $totBersih += max(0, (int)$w->base_salary - (int)$w->current_cash_advance);
             }
         @endphp
-        <div class="summary-box">
-            <table class="summary-table">
-                <tr>
-                    <td><strong>Total Karyawan:</strong> {{ $workers->count() }} orang</td>
-                    <td><strong>Total Gaji Pokok:</strong> Rp {{ number_format($totKotor, 0, ',', '.') }}</td>
-                    <td><strong>Potongan Kasbon:</strong> <span style="color:#ef4444;">Rp {{ number_format($totKasbon, 0, ',', '.') }}</span></td>
-                    <td class="summary-val" style="color:#16a34a;"><strong>Total Bersih:</strong> Rp {{ number_format($totBersih, 0, ',', '.') }}</td>
-                </tr>
-            </table>
-        </div>
+        <table class="stat-card-table">
+            <tr>
+                <td class="stat-card" style="width: 25%;">
+                    <div class="stat-label">Total Karyawan</div>
+                    <div class="stat-value">{{ $workers->count() }} orang</div>
+                </td>
+                <td class="stat-card" style="width: 25%;">
+                    <div class="stat-label">Total Gaji Pokok</div>
+                    <div class="stat-value">Rp {{ number_format($totKotor, 0, ',', '.') }}</div>
+                </td>
+                <td class="stat-card" style="width: 25%;">
+                    <div class="stat-label">Potongan Kasbon</div>
+                    <div class="stat-value" style="color: #ef4444;">Rp {{ number_format($totKasbon, 0, ',', '.') }}</div>
+                </td>
+                <td class="stat-card" style="width: 25%;">
+                    <div class="stat-label">Total Bersih</div>
+                    <div class="stat-value" style="color: #16a34a;">Rp {{ number_format($totBersih, 0, ',', '.') }}</div>
+                </td>
+            </tr>
+        </table>
 
         <table class="data-table">
             <thead>
@@ -251,17 +266,30 @@
                 $totBersih += max(0, $kotor - $kasbon);
             }
         @endphp
-        <div class="summary-box">
-            <table class="summary-table">
-                <tr>
-                    <td><strong>Total Pekerja:</strong> {{ $workers->count() }} orang</td>
-                    <td><strong>Total Hasil:</strong> {{ number_format($totPcs, 0, ',', '.') }} pcs</td>
-                    <td><strong>Total Upah Kotor:</strong> Rp {{ number_format($totKotor, 0, ',', '.') }}</td>
-                    <td><strong>Potongan Kasbon:</strong> <span style="color:#ef4444;">Rp {{ number_format($totKasbon, 0, ',', '.') }}</span></td>
-                    <td class="summary-val" style="color:#16a34a;"><strong>Total Bersih:</strong> Rp {{ number_format($totBersih, 0, ',', '.') }}</td>
-                </tr>
-            </table>
-        </div>
+        <table class="stat-card-table">
+            <tr>
+                <td class="stat-card" style="width: 20%;">
+                    <div class="stat-label">Total Pekerja</div>
+                    <div class="stat-value">{{ $workers->count() }} orang</div>
+                </td>
+                <td class="stat-card" style="width: 20%;">
+                    <div class="stat-label">Total Hasil</div>
+                    <div class="stat-value" style="color: #2563eb;">{{ number_format($totPcs, 0, ',', '.') }} pcs</div>
+                </td>
+                <td class="stat-card" style="width: 20%;">
+                    <div class="stat-label">Total Upah Kotor</div>
+                    <div class="stat-value">Rp {{ number_format($totKotor, 0, ',', '.') }}</div>
+                </td>
+                <td class="stat-card" style="width: 20%;">
+                    <div class="stat-label">Potongan Kasbon</div>
+                    <div class="stat-value" style="color: #ef4444;">Rp {{ number_format($totKasbon, 0, ',', '.') }}</div>
+                </td>
+                <td class="stat-card" style="width: 20%;">
+                    <div class="stat-label">Total Bersih</div>
+                    <div class="stat-value" style="color: #16a34a;">Rp {{ number_format($totBersih, 0, ',', '.') }}</div>
+                </td>
+            </tr>
+        </table>
 
         <table class="data-table">
             <thead>
