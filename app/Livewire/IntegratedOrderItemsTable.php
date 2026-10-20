@@ -585,8 +585,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                         $sampleBahanId = $sample->bahan_id;
                         $sampleMaterial = null;
                         if ($sampleBahanId) {
-                            $sampleMaterial = \App\Models\Material::find($sampleBahanId) 
-                                ?? \App\Models\MaterialVariant::find($sampleBahanId)?->material;
+                            $sampleMaterial = \App\Models\MaterialVariant::find($sampleBahanId)?->material
+                                ?? \App\Models\Material::find($sampleBahanId);
                         }
 
                         return [
@@ -814,8 +814,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                         
                                                         $existingMatId = null;
                                                         if ($existing->bahan_id) {
-                                                            $existingMatId = \App\Models\Material::find($existing->bahan_id)?->id 
-                                                                ?? \App\Models\MaterialVariant::find($existing->bahan_id)?->material_id;
+                                                            $existingMatId = \App\Models\MaterialVariant::find($existing->bahan_id)?->material_id
+                                                                ?? \App\Models\Material::find($existing->bahan_id)?->id;
                                                         }
                                                         $set('bulk_bahan', $existingMatId);
                                                         $set('bulk_material_variant_id', $details['material_variant_id'] ?? $existing->bahan_id);

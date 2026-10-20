@@ -233,7 +233,7 @@ class OrderForm
                     ->form([
                         Select::make('new_material')
                             ->label('Bahan/Produk Baru')
-                            ->options(\App\Models\Material::pluck('name', 'id'))
+                            ->options(OrderResource::getBahanOptions())
                             ->searchable()
                             ->required(),
                     ])
