@@ -623,7 +623,11 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->searchable()
                                             ->live()
                                             ->visible(fn(Get $get) => $get('new_category') === 'produksi')
-                                            ->afterStateUpdated(fn(Set $set) => $set('new_material_variant_id', null)),
+                                            ->afterStateUpdated(function (Set $set, $state, $old) {
+                                                if (filled($old) && $state !== $old) {
+                                                    $set('new_material_variant_id', null);
+                                                }
+                                            }),
                                         Select::make('new_material_variant_id')
                                             ->label('Warna / Varian Bahan')
                                             ->allowHtml()
@@ -818,7 +822,8 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                                                 ?? \App\Models\Material::find($existing->bahan_id)?->id;
                                                         }
                                                         $set('bulk_bahan', $existingMatId);
-                                                        $set('bulk_material_variant_id', $details['material_variant_id'] ?? $existing->bahan_id);
+                                                        $targetVariant = $details['material_variant_id'] ?? $existing->bahan_id;
+                                                        $set('bulk_material_variant_id', $targetVariant ? (int) $targetVariant : null);
                                                         $sablonItem = OrderItem::where('order_id', $this->order->id)
                                                              ->where('product_name', $state)
                                                              ->get()
@@ -920,7 +925,14 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->live()
                                             ->disabled($isExistingProduct)
                                             ->dehydrated()
-                                            ->afterStateUpdated(fn(Set $set) => $set('bulk_material_variant_id', null)),
+                                            ->afterStateUpdated(function (Set $set, Get $get, $state, $old) use ($isExistingProduct) {
+                                                if ($isExistingProduct($get)) {
+                                                    return;
+                                                }
+                                                if (filled($old) && $state !== $old) {
+                                                    $set('bulk_material_variant_id', null);
+                                                }
+                                            }),
                                         Select::make('bulk_material_variant_id')
                                             ->label('Warna / Varian')
                                             ->allowHtml()
