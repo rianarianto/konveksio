@@ -745,6 +745,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                     ->modalSubmitAction(fn ($action) => $action->color('primary')->label('Tambahkan ke Pesanan'))
                     ->form(function () use ($sizeOptions, $bahanOptions, $categoryOptions, $genderOptions, $sleeveOptions, $pocketOptions, $buttonOptions, $collarOptions, $modelOptions, $tenantId) {
                         $isExistingProduct = fn(Get $get) => filled($get('bulk_product_name')) && OrderItem::where('order_id', $this->order->id)->where('product_name', $get('bulk_product_name'))->exists();
+                        $isLocked = fn(Get $get) => empty($get('bulk_product_name')) || $isExistingProduct($get);
 
                         return [
                             Section::make('Kategori & Dasar')
@@ -768,7 +769,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             })
                                             ->required()
                                             ->placeholder('Pilih atau ketik nama baru...')
-                                            ->helperText(fn(Get $get) => $isExistingProduct($get) ? '🔒 Detail Produksi & Sablon/Bordir dikunci.' : null)
+                                            ->helperText(fn(Get $get) => empty($get('bulk_product_name')) ? '⚠️ Pilih nama produk dari daftar atau ketik nama baru untuk membuka pilihan bahan.' : ($isExistingProduct($get) ? '🔒 Detail Produksi & Sablon/Bordir dikunci.' : null))
                                             ->live(onBlur: true)
                                             ->afterStateUpdated(function ($state, Set $set) use ($sizeOptions) {
                                                 if (!$state) return;
@@ -923,7 +924,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->searchable()
                                             ->required()
                                             ->live()
-                                            ->disabled($isExistingProduct)
+                                            ->disabled($isLocked)
                                             ->dehydrated()
                                             ->afterStateUpdated(function (Set $set, Get $get, $state, $old) use ($isExistingProduct) {
                                                 if ($isExistingProduct($get)) {
@@ -949,7 +950,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->searchable()
                                             ->required()
                                             ->live()
-                                            ->disabled($isExistingProduct)
+                                            ->disabled($isLocked)
                                             ->dehydrated()
                                             ->visible(fn(Get $get) => filled($get('bulk_bahan'))),
                                     ]),
@@ -1013,7 +1014,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->options(Product::where('shop_id', $tenantId)->pluck('name', 'id'))
                                             ->searchable()->live()
                                             ->required()
-                                            ->disabled($isExistingProduct)
+                                            ->disabled($isLocked)
                                             ->dehydrated()
                                             ->visible(fn(Get $get) => $get('bulk_category') === 'non_produksi'),
                                         Select::make('bulk_product_color')
@@ -1031,7 +1032,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->searchable()
                                             ->live()
                                             ->required()
-                                            ->disabled($isExistingProduct)
+                                            ->disabled($isLocked)
                                             ->dehydrated()
                                             ->visible(fn(Get $get) => $get('bulk_category') === 'non_produksi'),
                                     ]),
@@ -1045,7 +1046,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->options(fn () => \App\Models\PrintType::where('category', 'jenis')->pluck('name', 'name'))
                                             ->default(fn () => \App\Models\PrintType::where('category', 'jenis')->first()?->name)
                                             ->searchable()
-                                            ->disabled($isExistingProduct)
+                                            ->disabled($isLocked)
                                             ->dehydrated()
                                             ->createOptionForm([
                                                 TextInput::make('name')
@@ -1067,7 +1068,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                             ->options(fn () => \App\Models\PrintType::where('category', 'lokasi')->pluck('name', 'name'))
                                             ->default(fn () => \App\Models\PrintType::where('category', 'lokasi')->first()?->name)
                                             ->searchable()
-                                            ->disabled($isExistingProduct)
+                                            ->disabled($isLocked)
                                             ->dehydrated()
                                             ->createOptionForm([
                                                 TextInput::make('name')
@@ -1088,7 +1089,7 @@ class IntegratedOrderItemsTable extends Component implements HasForms, HasTable,
                                     \Filament\Forms\Components\Textarea::make('bulk_sablon_keterangan')
                                         ->label('Keterangan')
                                         ->placeholder('misal: Logo depan dada atau rincian posisi')
-                                        ->disabled($isExistingProduct)
+                                        ->disabled($isLocked)
                                         ->dehydrated()
                                         ->rows(2),
                                 ])->compact(),

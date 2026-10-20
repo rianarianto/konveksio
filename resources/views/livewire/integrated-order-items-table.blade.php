@@ -324,7 +324,7 @@
     <x-filament-actions::modals />
 
     <!-- Loading Shield: Men-disable dan melindungi semua input saat data sedang dimuat -->
-    <div wire:loading.flex wire:target="mountedTableActionsData" class="fixed inset-0 z-[99999] bg-slate-900/40 backdrop-blur-[2px] items-center justify-center cursor-wait transition-all">
+    <div wire:loading.flex wire:target="mountedActions" class="fixed inset-0 z-[99999] bg-slate-900/40 backdrop-blur-[2px] items-center justify-center cursor-wait transition-all">
         <div class="bg-white dark:bg-gray-800 rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-3.5 border border-gray-100 dark:border-gray-700 animate-pulse">
             <svg class="animate-spin h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
